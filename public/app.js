@@ -265,7 +265,7 @@ console.log('🎯 birthMonth:', data.month);
 console.log('🎯 birthDay:', data.day);
 console.log('🎯 서버에서 받은 daeyunAge:', data.daeyunAge);
 console.log('ganji:', data.ganji);
-console.log('서버 응답 전체:', JSON.stringify(data, null, 2));
+
   console.log("🎯 클라이언트에서 사용하는 daeyunAge:", daeyunAge);
 // fetch 응답 후에 추가!
 // 서버에서 받은 생년월일 데이터를 전역 변수에 저장
