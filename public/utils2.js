@@ -37,6 +37,10 @@ export function calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor) {
   const msPerDay = 1000 * 60 * 60 * 24;
   const diffDays = (jeolipDate - birthDate) / msPerDay;
   const ageRaw = diffDays / 3;
+console.log("ageRaw:", ageRaw);
+console.log("age before rounding:", age);
+const roundedAge = Math.round(age * 10) / 10;
+console.log("age after rounding:", roundedAge);
 
   const isYang = isYangStem(yearStemKor);
   const isForward = (gender === 'male' && isYang) || (gender === 'female' && !isYang);
