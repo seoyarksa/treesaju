@@ -174,8 +174,8 @@ export default function handler(req, res) {
     console.error('Error: ganji.year is undefined or empty');
   }
 
-const daeyunAgeRaw = calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor);
-const daeyunAge = parseFloat(daeyunAgeRaw.toFixed(1));  // 소숫점 1자리 유지
+const daeyunAge = calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor);
+
 console.log('yearStemKor:', yearStemKor);
 console.log('birthDate:', birthDate.toISOString());
 console.log('jeolipDate:', jeolipDate.toISOString());
