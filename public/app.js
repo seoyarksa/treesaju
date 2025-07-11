@@ -352,10 +352,10 @@ window.daYunDirection = daYunDirection;
 
 const correctedStartAge = daeyunAge < 0 ? daeyunAge + 10 : daeyunAge;
 
-const ageLabels = [];  // 첫 번째는 항상 0으로 시작
+const ageLabels = [0];  // 첫 번째는 항상 0으로 시작
 
 for (let i = 1; i < daeyunPairs.length; i++) {
-  const ageValue = correctedStartAge + (i) * 10;
+  const ageValue = correctedStartAge + (i-1) * 10;
   ageLabels.push(ageValue.toFixed(1));
 }
 
