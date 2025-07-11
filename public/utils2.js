@@ -31,6 +31,11 @@ export function isYangStem(stemKor) {
 
 // 대운 시작 나이 계산
 export function calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor) {
+    console.log("🎯 calculateDaeyunAge 호출됨");
+  console.log("🎯 yearStemKor 전달값:", yearStemKor);
+  console.log("🎯 birthDate:", birthDate);
+  console.log("🎯 jeolipDate:", jeolipDate);
+  console.log("🎯 gender:", gender);
    if (!yearStemKor) {
     throw new Error('yearStemKor가 함수 인자로 전달되지 않았습니다.');
   }
@@ -53,10 +58,10 @@ export function calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor) {
   }
 
   const roundedAge = Math.round(age * 10) / 10;
-  console.log("🎯 diffDays:", diffDays.toFixed(2));
-  console.log("🎯 ageRaw:", ageRaw.toFixed(2));
+  console.log("🎯 diffDays:", diffDays.toFixed(4));
+  console.log("🎯 ageRaw:", ageRaw.toFixed(4));
   console.log("🎯 isForward:", isForward);
-  console.log("🎯 age (보정 후):", age.toFixed(2));
+  console.log("🎯 age (보정 후):", age.toFixed(4));
   console.log("🎯 roundedAge:", roundedAge);
   return Math.round(age * 10) / 10;
 }
