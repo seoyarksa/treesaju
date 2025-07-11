@@ -192,9 +192,6 @@ console.log('jeolipDate:', jeolipDate.toISOString());
     daeyunAge,
     yearStemKor,
     ganji,
-    birthYear: birthDate.getFullYear(),
-      // ✅ 아래 두 줄 추가
-    month,
-    day
+    birthYear: birthDate.getFullYear()
   });
 }
