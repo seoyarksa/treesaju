@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic&display=swap" rel="stylesheet" />
+
+<title>트리 만세력</title>
+<!-- ✅ 모듈로 로딩해야 import 문 사용 가능 -->
+<script type="module" src="utils2.js"></script>
+
+
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<h1>트리 만세력</h1>
+<form id="saju-form">
+  <label>생년월일:</label> 
+  <input type="date" id="birth-date" required value="1969-08-23" />
+  <label for="calendar-type"></label>
+  <select id="calendar-type" name="calendar-type">
+    <option value="solar" selected>양력</option>
+    <option value="lunar">음력</option>
+  </select><br />
+  <label>성별:</label>
+<label><input type="radio" name="gender" value="male" checked> 남자</label>
+<label><input type="radio" name="gender" value="female"> 여자</label>
+
+
+</label><br />
+
+  <label>출생 시간:</label>
+<label><input type="radio" name="ampm" value="AM" checked> 오전</label>
+<label><input type="radio" name="ampm" value="PM"> 오후</label>
+
+<!-- 시간 -->
+ <label>+</label>
+<select id="hour-select">
+  <option value="1">1시</option>
+  <option value="2">2시</option>
+  <option value="3">3시</option>
+  <option value="4">4시</option>
+  <option value="5">5시</option>
+  <option value="6">6시</option>
+  <option value="7">7시</option>
+  <option value="8" selected>8시</option>
+  <option value="9">9시</option>
+  <option value="10">10시</option>
+  <option value="11">11시</option>
+  <option value="12">12시</option>
+</select>
+
+
+
+<select id="minute-select">
+  <option value="0">0분</option>
+  <option value="1">1분</option>
+  <option value="2">2분</option>
+  <option value="3">3분</option>
+  <option value="4">4분</option>
+  <option value="5">5분</option>
+  <option value="6">6분</option>
+  <option value="7">7분</option>
+  <option value="8">8분</option>
+  <option value="9">9분</option>
+  <option value="10">10분</option>
+  <option value="11">11분</option>
+  <option value="12">12분</option>
+  <option value="13">13분</option>
+  <option value="14">14분</option>
+  <option value="15">15분</option>
+  <option value="16">16분</option>
+  <option value="17">17분</option>
+  <option value="18">18분</option>
+  <option value="19">19분</option>
+  <option value="20">20분</option>
+  <option value="21">21분</option>
+  <option value="22">22분</option>
+  <option value="23">23분</option>
+  <option value="24">24분</option>
+  <option value="25">25분</option>
+  <option value="26">26분</option>
+  <option value="27">27분</option>
+  <option value="28">28분</option>
+  <option value="29">29분</option>
+  <option value="30" selected>30분</option>
+  <option value="31">31분</option>
+  <option value="32">32분</option>
+  <option value="33">33분</option>
+  <option value="34">34분</option>
+  <option value="35">35분</option>
+  <option value="36">36분</option>
+  <option value="37">37분</option>
+  <option value="38">38분</option>
+  <option value="39">39분</option>
+  <option value="40">40분</option>
+  <option value="41">41분</option>
+  <option value="42">42분</option>
+  <option value="43">43분</option>
+  <option value="44">44분</option>
+  <option value="45">45분</option>
+  <option value="46">46분</option>
+  <option value="47">47분</option>
+  <option value="48">48분</option>
+  <option value="49">49분</option>
+  <option value="50">50분</option>
+  <option value="51">51분</option>
+  <option value="52">52분</option>
+  <option value="53">53분</option>
+  <option value="54">54분</option>
+  <option value="55">55분</option>
+  <option value="56">56분</option>
+  <option value="57">57분</option>
+  <option value="58">58분</option>
+  <option value="59">59분</option>
+</select>
+
+<br />
+
+  <button type="submit">사주 출력</button>
+</form>
+<div id="result" class="result-box"></div>
+<div id="sewoon" class="result-box"></div>
+
+
+
+</body>
+</html>
+
