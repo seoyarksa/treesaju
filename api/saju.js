@@ -1,3 +1,10 @@
+// saju.js
+// git add .
+// git commit -m "입력된 생년월일제거"
+// git push origin main
+
+
+
 import { calculateDaeyunAge, getJeolipDate } from '../public/utils2.js';
 import { stemOrder, branchOrder } from '../public/constants.js';
 import solarlunar from 'solarlunar';
