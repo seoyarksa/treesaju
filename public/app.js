@@ -15,8 +15,6 @@ import { convertHanToKorStem, normalizeBranch } from './utils2.js';
 
 
 let birthYear = null; // 출생 연도 저장용
-let birthMonth = null;
-let birthDay = null;
 // ...이하 기존 app.js 내용...
 // 대운 시작 방향: 남자는 양순(+) 여자 역순(-)
 //function getDaYunDirection(gender) {
@@ -35,7 +33,7 @@ function renderDaeyunTable({ daeyunAge, ageLabels, pairsToRender, birthYear, bir
   if (!container) return;
 
   console.log('✅ renderDaeyunTable: 전달된 sewonYear =', sewonYear);
-console.log('renderDaeyunTable daeyunAge:', daeyunAge);
+
   // sewonYear가 숫자면 그대로, 문자열이면 parseFloat로 변환, 아니면 NaN 처리
   const baseSewonYear = typeof sewonYear === 'number'
     ? sewonYear
@@ -249,13 +247,12 @@ const gender = document.querySelector('input[name="gender"]:checked')?.value || 
 console.log('보내는 데이터:', { year, month, day, hour, minute, calendarType });
 
   try {
-    const response = await fetch('api/saju', {
+    const response = await fetch('/api/saju', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({
   year, month, day, hour, minute, calendarType, gender // ← gender 추가
 }),
-
 
     });
 const data = await response.json();
@@ -263,9 +260,9 @@ console.log('서버에서 받은 data:', data);
 console.log('🎯 birthYear:', data.birthYear);
 console.log('🎯 birthMonth:', data.month);
 console.log('🎯 birthDay:', data.day);
-console.log('🎯 서버에서 받은 daeyunAge:', data.daeyunAge);
+console.log('🎯 daeyunAge:', data.daeyunAge);
 console.log('ganji:', data.ganji);
-
+console.log('서버 응답 전체:', JSON.stringify(data, null, 2));
 
 // fetch 응답 후에 추가!
 // 서버에서 받은 생년월일 데이터를 전역 변수에 저장
@@ -275,8 +272,7 @@ window.birthDay = data.day || day;
 
 // ✅ 직접 받은 birthYear 사용
 birthYear = data.birthYear;
-birthMonth = data.month;
-birthDay = data.day;
+
 
 // 대운 시작 나이도 그대로 사용
 // ✅ 서버에서 계산한 값을 사용해야 함
@@ -352,10 +348,10 @@ window.daYunDirection = daYunDirection;
 
 const correctedStartAge = daeyunAge < 0 ? daeyunAge + 10 : daeyunAge;
 
-const ageLabels = [0];  // 첫 번째는 항상 0으로 시작
+const ageLabels = ['0'];  // 첫 번째는 항상 0으로 시작
 
 for (let i = 1; i < daeyunPairs.length; i++) {
-  const ageValue = correctedStartAge + (i-1) * 10;
+  const ageValue = correctedStartAge + (i - 1) * 10;
   ageLabels.push(ageValue.toFixed(1));
 }
 
