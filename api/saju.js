@@ -190,7 +190,7 @@ console.log('jeolipDate:', jeolipDate.toISOString());
       hour,
       minute
     },
-    daeyunAge: calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor), // ✅ 확인 포인트
+    daeyunAge, // ✅ 확인 포인트
     yearStemKor,
     ganji,
     birthYear: birthDate.getFullYear(),
