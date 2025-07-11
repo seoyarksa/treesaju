@@ -15,6 +15,8 @@ import { convertHanToKorStem, normalizeBranch } from './utils2.js';
 
 
 let birthYear = null; // 출생 연도 저장용
+let birthMonth = null;
+let birthDay = null;
 // ...이하 기존 app.js 내용...
 // 대운 시작 방향: 남자는 양순(+) 여자 역순(-)
 //function getDaYunDirection(gender) {
@@ -272,7 +274,8 @@ window.birthDay = data.day || day;
 
 // ✅ 직접 받은 birthYear 사용
 birthYear = data.birthYear;
-
+birthMonth = data.month;
+birthDay = data.day;
 
 // 대운 시작 나이도 그대로 사용
 // ✅ 서버에서 계산한 값을 사용해야 함
