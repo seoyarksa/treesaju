@@ -37,14 +37,11 @@ export function calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor) {
   const msPerDay = 1000 * 60 * 60 * 24;
   const diffDays = (jeolipDate - birthDate) / msPerDay;
   const ageRaw = diffDays / 3;
-  console.log("ageRaw:", ageRaw);
-
   const isYang = isYangStem(yearStemKor);
   const isForward = (gender === 'male' && isYang) || (gender === 'female' && !isYang);
-console.log("yearStemKor:", yearStemKor);
-console.log("isYang:", isYangStem(yearStemKor));
+
   let age = isForward ? ageRaw : 10 - ageRaw;
- console.log("age before rounding:", age);
+
   // ✅ 음수 보정 (역행 시 음수일 수 있음)
   if (age < 0) {
     age += 10;
@@ -55,8 +52,12 @@ console.log("isYang:", isYangStem(yearStemKor));
     age -= 10;
   }
 
-    const roundedAge = Math.round(age * 10) / 10;
-  console.log("age after rounding:", roundedAge);
+  const roundedAge = Math.round(age * 10) / 10;
+  console.log("🎯 diffDays:", diffDays.toFixed(2));
+  console.log("🎯 ageRaw:", ageRaw.toFixed(2));
+  console.log("🎯 isForward:", isForward);
+  console.log("🎯 age (보정 후):", age.toFixed(2));
+  console.log("🎯 roundedAge:", roundedAge);
   return Math.round(age * 10) / 10;
 }
 

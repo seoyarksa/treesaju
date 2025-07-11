@@ -1,6 +1,7 @@
 // saju.js
+
 // git add .
-// git commit -m "입력된 생년월일제거"
+// git commit -m "대운 수 수정"
 // git push origin main
 
 
@@ -189,7 +190,7 @@ console.log('jeolipDate:', jeolipDate.toISOString());
       hour,
       minute
     },
-    daeyunAge,
+    daeyunAge: calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor), // ✅ 확인 포인트
     yearStemKor,
     ganji,
     birthYear: birthDate.getFullYear(),
