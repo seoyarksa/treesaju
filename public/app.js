@@ -35,7 +35,7 @@ function renderDaeyunTable({ daeyunAge, ageLabels, pairsToRender, birthYear, bir
   if (!container) return;
 
   console.log('✅ renderDaeyunTable: 전달된 sewonYear =', sewonYear);
-
+console.log('renderDaeyunTable daeyunAge:', daeyunAge);
   // sewonYear가 숫자면 그대로, 문자열이면 parseFloat로 변환, 아니면 NaN 처리
   const baseSewonYear = typeof sewonYear === 'number'
     ? sewonYear
