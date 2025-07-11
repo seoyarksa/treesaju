@@ -247,7 +247,7 @@ const gender = document.querySelector('input[name="gender"]:checked')?.value || 
 console.log('보내는 데이터:', { year, month, day, hour, minute, calendarType });
 
   try {
-    const response = await fetch('http://localhost:3000/api/saju', {
+    const response = await fetch('api/saju', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({
