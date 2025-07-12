@@ -175,7 +175,7 @@ export default function handler(req, res) {
   }
 
 const daeyunAge = parseFloat(calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor).toFixed(2));
-i
+
 console.log('yearStemKor:', yearStemKor);
 console.log('birthDate:', birthDate.toISOString());
 console.log('jeolipDate:', jeolipDate.toISOString());
