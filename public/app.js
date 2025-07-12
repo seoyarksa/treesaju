@@ -379,9 +379,10 @@ function calculateSewonYear(birthYear, birthMonth, birthDay, daeyunAge) {
 
   const sewonYear = (birthYear - 10) + daeyunAge + decimalPart;
 
-  return parseFloat(sewonYear.toFixed(2)); // 소숫점 1자리로 고정
+  return parseFloat(sewonYear.toFixed(2)); // 소숫점 2자리로 고정
 }
-
+const result = calculateSewonYear(1969, 8, 23, 5.1);
+console.log('계산된 세운 시작년도:', result);
 
 
 const sewonYear = calculateSewonYear(birthYear, birthMonth, birthDay, daeyunAge);
