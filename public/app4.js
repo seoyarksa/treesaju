@@ -371,8 +371,8 @@ console.log('ageLabels:', ageLabels);
 
 
 // ✅ 선언 후 사용
-let firstDaeyunAge = 5;
-console.log(firstDaeyunAge); // 5
+//let firstDaeyunAge = 5;
+//console.log(firstDaeyunAge); // 5
 
 
 function calculateSewonYear(birthYear, birthMonth, birthDay, daeyunAge) {
