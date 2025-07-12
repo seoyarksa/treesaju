@@ -278,6 +278,7 @@ birthYear = data.birthYear;
 // ✅ 서버에서 계산한 값을 사용해야 함
 const daeyunAge = data.daeyunAge;
 
+
     if (!response.ok) throw new Error('서버 오류 발생');
 
 
