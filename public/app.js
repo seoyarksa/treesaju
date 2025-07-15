@@ -100,9 +100,9 @@ document.getElementById("send-email-button").addEventListener("click", () => {
 `;
 
   // 출력 내용 수집 (텍스트로 받음)
-  const sajuText = document.getElementById("today-saju-container")?.innerHTML || "없음";
-  const daeyunText = document.getElementById("result")?.innerHTML || "없음";
-  const sewunText = document.getElementById("sewoon")?.innerHTML || "없음";
+  const sajuHTML = document.getElementById("today-saju-container")?.innerHTML || "없음";
+  const daeyunHTML = document.getElementById("result")?.innerHTML || "없음";
+  const sewunHTML = document.getElementById("sewoon")?.innerHTML || "없음";
 
   const emailBody = `
 [질문 내용]
