@@ -5,10 +5,17 @@
 // git push origin main
 
 
-
-import { calculateDaeyunAge, getJeolipDate } from '../public/utils2.js';
-import { stemOrder, branchOrder } from '../public/constants.js';
+import express from 'express';
+import cors from 'cors';
+import bodyParser from 'body-parser';
 import solarlunar from 'solarlunar';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// 수정된 유틸 import
+import { calculateDaeyunAge } from './public/dateUtils.js';
+import { getJeolipDate } from './public/dateUtils.js';
+import { stemOrder, branchOrder } from './public/constants.js';  // 사용 중이면 유지
 
 // 한자 <-> 한글 변환
 const hanToKorStem = {

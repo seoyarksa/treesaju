@@ -15,42 +15,40 @@
 <h1>트리 만세력</h1>
 <form id="saju-form">
   <label>생년월일:</label> 
-  <input type="date" id="birth-date" required />
+  <input type="date" id="birth-date" value="1969-08-23" required />
+  
   <label for="calendar-type"></label>
   <select id="calendar-type" name="calendar-type">
+    <option value=""></option>
     <option value="solar" selected>양력</option>
     <option value="lunar">음력</option>
   </select><br />
+
   <label>성별:</label>
-<label><input type="radio" name="gender" value="male" checked> 남자</label>
-<label><input type="radio" name="gender" value="female"> 여자</label>
-
-
-</label><br />
+  <label><input type="radio" name="gender" value="male" checked> 남자</label>
+  <label><input type="radio" name="gender" value="female"> 여자</label>
+  <br />
 
   <label>출생 시간:</label>
-<label><input type="radio" name="ampm" value="AM" checked> 오전</label>
-<label><input type="radio" name="ampm" value="PM"> 오후</label>
+  <label><input type="radio" name="ampm" value="AM" checked> 오전</label>
+  <label><input type="radio" name="ampm" value="PM"> 오후</label>
 
-<!-- 시간 -->
- <label>+</label>
-<select id="hour-select">
-  <option value=""></option>
-  <option value="1">1시</option>
-  <option value="2">2시</option>
-  <option value="3">3시</option>
-  <option value="4">4시</option>
-  <option value="5">5시</option>
-  <option value="6">6시</option>
-  <option value="7">7시</option>
-  <option value="8">8시</option>
-  <option value="9">9시</option>
-  <option value="10">10시</option>
-  <option value="11">11시</option>
-  <option value="12">12시</option>
-</select>
-
-
+  <label>+</label>
+  <select id="hour-select">
+    <option value=""></option>
+    <option value="1">1시</option>
+    <option value="2">2시</option>
+    <option value="3">3시</option>
+    <option value="4">4시</option>
+    <option value="5">5시</option>
+    <option value="6">6시</option>
+    <option value="7">7시</option>
+    <option value="8" selected>8시</option>
+    <option value="9">9시</option>
+    <option value="10">10시</option>
+    <option value="11">11시</option>
+    <option value="12">12시</option>
+  </select>
 
 <select id="minute-select">
   <option value=""></option>
@@ -84,7 +82,7 @@
   <option value="27">27분</option>
   <option value="28">28분</option>
   <option value="29">29분</option>
-  <option value="30">30분</option>
+  <option value="30"selected>30분</option>
   <option value="31">31분</option>
   <option value="32">32분</option>
   <option value="33">33분</option>
@@ -120,11 +118,12 @@
 
   <button type="submit">사주 출력</button>
 </form>
+
 <div id="result" class="result-box"></div>
 <div id="sewoon" class="result-box"></div>
-
-
+<div id="today-saju-container" style="margin: 2rem 20px 0;"></div>
 
 </body>
+
 </html>
 

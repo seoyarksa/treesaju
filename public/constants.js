@@ -1,7 +1,8 @@
 // constants.js
-export const stemOrder = ['갑','을','병','정','무','기','경','신','임','계'];
-export const branchOrder = ['자','축','인','묘','진','사','오','미','신','유','술','해'];
 
+export const stemOrder = ['갑', '을', '병', '정', '무', '기', '경', '신', '임', '계'];
+export const branchOrder = ['자', '축', '인', '묘', '진', '사', '오', '미', '신', '유', '술', '해'];
+// (필요하면 다른 상수도 여기에 추가)
 export const elementColors = {
   '甲': 'green', '乙': 'green', '寅': 'green', '卯': 'green',
   '丙': 'red', '丁': 'red', '巳': 'red', '午': 'red',

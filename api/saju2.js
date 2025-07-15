@@ -1,13 +1,21 @@
 // saju.js
+
 // git add .
-// git commit -m "입력된 생년월일제거"
+// git commit -m "대운 수 수정"
 // git push origin main
 
 
-
-import { calculateDaeyunAge, getJeolipDate } from '../public/utils2.js';
-import { stemOrder, branchOrder } from '../public/constants.js';
+import express from 'express';
+import cors from 'cors';
+import bodyParser from 'body-parser';
 import solarlunar from 'solarlunar';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// 수정된 유틸 import
+import { calculateDaeyunAge } from './public/dateUtils.js';
+import { getJeolipDate } from './public/dateUtils.js';
+import { stemOrder, branchOrder } from './public/constants.js';  // 사용 중이면 유지
 
 // 한자 <-> 한글 변환
 const hanToKorStem = {
@@ -173,7 +181,8 @@ export default function handler(req, res) {
     console.error('Error: ganji.year is undefined or empty');
   }
 
-  const daeyunAge = calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor);
+const daeyunAge = parseFloat(calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor).toFixed(2));
+
 console.log('yearStemKor:', yearStemKor);
 console.log('birthDate:', birthDate.toISOString());
 console.log('jeolipDate:', jeolipDate.toISOString());
@@ -189,9 +198,12 @@ console.log('jeolipDate:', jeolipDate.toISOString());
       hour,
       minute
     },
-    daeyunAge,
+    daeyunAge, // ✅ 확인 포인트
     yearStemKor,
     ganji,
-    birthYear: birthDate.getFullYear()
+    birthYear: birthDate.getFullYear(),
+      // ✅ 아래 두 줄 추가
+    month,
+    day
   });
 }

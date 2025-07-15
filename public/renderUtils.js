@@ -1,0 +1,338 @@
+// renderUtils.js
+//함수종류
+//renderDaeyunTable, renderDaeyunTable, highlightCurrentDaeyunByAge, renderYearlyGanjiSeries,
+//renderMonthlyGanjiSeries, handleDaeyunClick, elementColors, renderTodaySajuBox
+
+
+
+
+import { stemOrder, branchOrder } from './constants.js';
+
+import {
+  convertKorToHanStem,
+  convertKorToHanBranch,
+  convertHanToKorStem,
+  normalizeBranch,
+  isYangStem,
+  hiddenStemsMap,
+  getDaYunDirection,
+  generateDaYunStems,
+  getTenGod,
+  colorize,
+  splitGanji,
+  getThreeLinesFromArray,
+  generateDaYun,
+  getGanjiByYear,
+  generateYearlyGanjiSeries,
+  generateYearlyGanjiSeries2,
+  generateDaeyunBy60Gapja,
+  getStartMonthBySewoonStem,
+  calculateSewonYear,
+  findStartMonthIndex,
+  generateMonthlyGanjiSeriesByGanji
+} from './sajuUtils.js';
+
+
+// isYangStem, getDaYunDirection, generateDaYunStems, getTenGod, colorize, splitGanji, 
+// getThreeLinesFromArray, generateDaYun, getGanjiByYear, generateYearlyGanjiSeries, 
+// generateYearlyGanjiSeries2, generateDaeyunBy60Gapja, getStartMonthBySewoonStem, 
+// calculateSewonYear, findStartMonthIndex, generateMonthlyGanjiSeriesByGanji, 
+// dateUtils.js에서 필요한 함수 import
+import { getCurrentDaeyunIndexFromStartAge } from './dateUtils.js';
+
+// 오행 색상
+export const elementColors = {
+  '甲': 'green', '乙': 'green', '寅': 'green', '卯': 'green',
+  '丙': 'red', '丁': 'red', '巳': 'red', '午': 'red',
+  '戊': 'orange', '己': 'orange', '辰': 'orange', '戌': 'orange', '丑': 'orange', '未': 'orange',
+  '庚': 'gray', '辛': 'gray', '申': 'gray', '酉': 'gray',
+  '壬': 'blue', '癸': 'blue', '子': 'blue', '亥': 'blue'
+};
+//대운 테이블 렌더링 함수
+export function renderDaeyunTable({ daeyunAge, ageLabels, pairsToRender, birthYear, birthMonth, birthDay, sewonYear }) {
+  const container = document.querySelector('.daeyun-table-container');
+  if (!container) return;
+
+  console.log('✅ renderDaeyunTable: 전달된 sewonYear =', sewonYear);
+
+  // sewonYear가 숫자면 그대로, 문자열이면 parseFloat로 변환, 아니면 NaN 처리
+  const baseSewonYear = typeof sewonYear === 'number'
+    ? sewonYear
+    : (typeof sewonYear === 'string' ? parseFloat(sewonYear) : NaN);
+
+  let html = `
+    <table class="daeyun-table">
+      <thead>
+        <tr><th colspan="10">대운수: ${daeyunAge.toFixed(2)}</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          ${ageLabels.map(age => `<td style="font-size:0.85rem; color:#999;">${age}</td>`).join('')}
+        </tr>
+        <tr>
+          ${pairsToRender.map((pair, i) => {
+            const { stem, branch } = pair;
+            const stemHan = convertKorToHanStem(stem);
+            const branchHan = convertKorToHanBranch(branch);
+
+            const tenGodStem = getTenGod(window.dayGanKorGan, stem);
+
+            const hiddenStems = hiddenStemsMap[branch] || [];
+            let targetStemKor = '';
+            if (hiddenStems.length === 3) targetStemKor = hiddenStems[2];
+            else if (hiddenStems.length === 2) targetStemKor = hiddenStems[1];
+
+            const tenGodBranch = targetStemKor ? getTenGod(window.dayGanKorGan, targetStemKor) : '';
+
+            // baseSewonYear가 숫자면 i를 더해 소숫점 1자리까지 표시
+            const sewon = !isNaN(baseSewonYear) ? (baseSewonYear + i).toFixed(2) : '';
+
+            console.log(`세운 (${i}):`, sewon);
+
+            return `
+              <td data-index="${i}" onclick="handleDaeyunClick(${birthYear}, ${birthMonth}, ${birthDay}, ${i})">
+                <div class="daeyun-cell">
+                  <div>${colorize(stemHan, '1.1rem')}</div>
+                  <div style="font-size:0.75rem; color:#999;">(${tenGodStem})</div>
+                  <div>${colorize(branchHan, '1.1rem')}</div>
+                  ${tenGodBranch ? `<div style="font-size:0.75rem; color:#999;">(${tenGodBranch})</div>` : ''}
+                  
+                </div>
+              </td>
+            `;
+          }).join('')}
+        </tr>
+        <tr id="yearly-series-row">
+          ${Array(10).fill('<td style="height:100px; vertical-align:top;"></td>').join('')}
+        </tr>
+      </tbody>
+    </table>
+  `;
+
+  container.innerHTML = html;
+}
+
+
+//하이라이트 대운셀
+export function highlightCurrentDaeyunByAge(correctedStartAge, birthDate) {
+  const index = getCurrentDaeyunIndexFromStartAge(correctedStartAge, birthDate);
+  window.currentDaeyunIndex = index;
+
+  document.querySelectorAll('.daeyun-cell').forEach((cell, idx) => {
+    cell.classList.toggle('selected', idx === index);
+
+    cell.addEventListener('click', () => {
+      document.querySelectorAll('.daeyun-cell').forEach(c => c.classList.remove('selected'));
+      cell.classList.add('selected');
+      window.currentDaeyunIndex = idx;
+    });
+  });
+}
+
+//세운 테이블 렌더링 함수
+export function renderYearlyGanjiSeries(baseYear, stems, branches) {
+  const daeyunTable = document.querySelector('.daeyun-table tbody');
+  if (!daeyunTable) return;
+
+  // 기존 세운 관련 행 제거
+  const existingTitleRow = document.getElementById('yearly-title-row');
+  const existingDataRow = document.getElementById('yearly-series-row');
+  if (existingTitleRow) existingTitleRow.remove();
+  if (existingDataRow) existingDataRow.remove();
+
+  // 🎯 세운 제목 행 생성
+  const titleRow = document.createElement('tr');
+  titleRow.id = 'yearly-title-row';
+  titleRow.innerHTML = `<th colspan="10">세운시작년도: ${baseYear.toFixed(2)}</th>`;
+  daeyunTable.appendChild(titleRow);
+
+  // 🎯 세운 데이터 행 생성
+  const dataRow = document.createElement('tr');
+  dataRow.id = 'yearly-series-row';
+
+  for (let i = 0; i < 10; i++) {
+    const stemKor = stems[i];
+    const branchKor = branches[i];
+
+    const stemHan = convertKorToHanStem(stemKor);
+    const branchHan = convertKorToHanBranch(branchKor);
+
+    // 🌟 천간 육신
+    const tenGodStem = getTenGod(window.dayGanKorGan, stemKor);
+
+    // 🌟 지지의 지장간에서 육신용 천간 선택
+    const hiddenStems = hiddenStemsMap[branchKor] || [];
+    let targetStemKor = '';
+    if (hiddenStems.length === 3) {
+      targetStemKor = hiddenStems[2]; // 하단 천간
+    } else if (hiddenStems.length === 2) {
+      targetStemKor = hiddenStems[1]; // 중간 천간
+    }
+    const tenGodBranch = targetStemKor ? getTenGod(window.dayGanKorGan, targetStemKor) : '';
+
+    // 🎯 출력 HTML 구성
+    const year = baseYear + i;
+// 🎯 renderYearlyGanjiSeries 내부 세운 셀 코드
+dataRow.innerHTML += `
+  <td class="sewoon-cell" data-index="${i}" onclick="handleSewoonClick(${year.toFixed(2)}, '${stemKor}', '${branchKor}', ${i})">
+    <div style="font-size:0.85rem; color:#999;">${year.toFixed(2)}</div>
+    <div style="font-size:0.85rem;">${colorize(stemHan)}</div>
+    <div style="font-size:0.75rem; color:#999;">(${tenGodStem})</div>
+    <div style="font-size:0.85rem;">${colorize(branchHan)}</div>
+    ${tenGodBranch ? `<div style="font-size:0.75rem; color:#999;">(${tenGodBranch})</div>` : ''}
+  </td>`;
+
+  }
+
+  // 🎯 세운 데이터 행 삽입
+  daeyunTable.appendChild(dataRow);
+}
+
+//월운 테이블 렌더링 함수
+export function renderMonthlyGanjiSeries(baseYear, sewoonStem) {
+  const container = document.getElementById('yearly-ganji-container');
+  if (!container) return;
+
+  // 1. 세운 천간으로 시작 간지 구함
+  const { stem: startStem, branch: startBranch } = getStartMonthBySewoonStem(sewoonStem);
+
+  // 2. 간지 시리즈 생성
+  const { monthlyStems, monthlyBranches } = generateMonthlyGanjiSeriesByGanji(startStem, startBranch);
+
+  // 3. HTML 출력
+  let html = `<table class="daeyun-table" style="margin-top:1rem;">
+   <thead><tr><th colspan="12">월운 (${Math.floor(baseYear)}년)</th></tr>
+
+    <tr>${Array.from({ length: 12 }, (_, i) => `<th style="font-size:0.85rem;">${i + 1}월</th>`).join('')}</tr>
+    </thead><tbody><tr>`;
+
+  for (let i = 0; i < 12; i++) {
+    const stem = monthlyStems[i];
+    const branch = monthlyBranches[i];
+    const stemHan = convertKorToHanStem(stem);
+    const branchHan = convertKorToHanBranch(branch);
+    const tenGodStem = getTenGod(window.dayGanKorGan, stem);
+
+    const hiddenStems = hiddenStemsMap[branch] || [];
+    const targetStemKor = hiddenStems.length >= 2 ? hiddenStems[1] : (hiddenStems[0] || '');
+    const tenGodBranch = targetStemKor ? getTenGod(window.dayGanKorGan, targetStemKor) : '';
+
+    html += `
+      <td style="text-align:center;">
+        <div style="font-size:0.85rem;">${colorize(stemHan)}</div>
+        <div style="font-size:0.75rem; color:#999;">(${tenGodStem})</div>
+        <div style="font-size:0.85rem;">${colorize(branchHan)}</div>
+        ${tenGodBranch ? `<div style="font-size:0.75rem; color:#999;">(${tenGodBranch})</div>` : ''}
+      </td>`;
+  }
+
+  html += '</tr></tbody></table>';
+  container.innerHTML = html;
+}
+
+
+//대운 클릭시 세운 렌더링 함수
+export function handleDaeyunClick(birthYear,birthMonth, birthDay,  index) {
+    // 월운 출력 영역 초기화
+  const monthlyContainer = document.getElementById('yearly-ganji-container');
+  if (monthlyContainer) {
+    monthlyContainer.innerHTML = '';
+  }
+  
+    // 🔧 전역 대운 방향 변수 (1: 순행, -1: 역행)
+   console.log('🎯 birthYear:', birthYear, 'birthMonth:', birthMonth, 'birthDay:', birthDay);
+  const direction = window.daYunDirection || 1;
+
+  // ✅ 방향에 따라 실제 대운 인덱스 보정
+  const trueIndex = direction === -1
+    ? window.daeyunPairs.length - 1 - index
+    : index;
+
+  // 디버깅 출력
+  console.log('handleDaeyunClick index:', index, 'trueIndex:', trueIndex, 'direction:', direction);
+
+  // 🔎 클릭한 대운 간지 쌍 가져오기
+  const clickedPair = window.daeyunPairs[trueIndex];
+  const { stem: clickedDaeyunStem, branch: clickedDaeyunBranch } = clickedPair;
+  console.log('클릭한 대운 간지:', clickedDaeyunStem, clickedDaeyunBranch);
+
+  // 🔢 간지 인덱스 가져오기
+  const stemIndex = stemOrder.indexOf(clickedDaeyunStem);
+  const branchIndex = branchOrder.indexOf(clickedDaeyunBranch);
+
+  // 📅 해당 대운의 시작 기준 연도
+// ✅ 기존 baseYear 계산식 대체
+const baseYear = direction === 1
+  ? sewonYear + (trueIndex * 10)
+  : sewonYear + ((window.daeyunPairs.length - 1 - trueIndex) * 10);
+
+  // 📦 10년 세운 간지 시리즈 생성
+  const { yearlyStems, yearlyBranches } = generateYearlyGanjiSeries2(baseYear, stemIndex, branchIndex);
+
+  // 디버깅
+  console.log('window.daYunDirection:', direction);
+  console.log('clicked index:', index, 'true index:', trueIndex);
+
+  // 🖼️ 세운 테이블 렌더링
+  renderYearlyGanjiSeries(baseYear, yearlyStems, yearlyBranches);
+}
+
+
+//세운 클릭시 월운렌더링 함수
+export function handleSewoonClick(year, stemKor, branchKor, index) {
+  console.log('👉 클릭한 세운 연도:', year, '세운 천간:', stemKor);
+
+  // ✨ 선택 효과 처리
+  document.querySelectorAll('.sewoon-cell').forEach(cell => cell.classList.remove('selected'));
+  const clicked = document.querySelector(`.sewoon-cell[data-index="${index}"]`);
+  if (clicked) clicked.classList.add('selected');
+
+  window.selectedSewoonIndex = index;
+
+  // 월운 렌더링
+  renderMonthlyGanjiSeries(year, stemKor);
+}
+
+
+
+// renderUtils.js 또는 app.js에 추가 (추천: renderUtils.js에 UI만 담당)
+//오늘의 사주팔자
+export function renderTodaySajuBox({ yearGanji, monthGanji, dayGanji, timeGanji, dayGanKorGan, todayStr }) {
+  const container = document.getElementById('today-saju-container');
+  if (!container) return;
+
+  container.innerHTML = `
+  <div style="margin-top:2rem;">
+    <h3 style="font-size:1rem; margin-left:20px;">📆 오늘의 사주 (${todayStr})</h3>
+    <table class="ganji-table" style="font-size: 0.8rem; margin-left:20px;">
+               <thead>
+    <tr>
+      <th style="padding:2px; font-size: 0.75rem;">시</th>
+      <th style="padding:2px; font-size: 0.75rem;">일</th>
+      <th style="padding:2px; font-size: 0.75rem;">월</th>
+      <th style="padding:2px; font-size: 0.75rem;">년</th>
+    </tr>
+</thead>
+
+
+      <tbody>
+        <!-- 천간 -->
+        <tr>
+          <td>${colorize(timeGanji.gan)}</td>
+          <td>${colorize(dayGanji.gan)}</td>
+          <td>${colorize(monthGanji.gan)}</td>
+          <td>${colorize(yearGanji.gan)}</td>
+        </tr>
+        <!-- 지지 -->
+        <tr>
+          <td>${colorize(timeGanji.ji)}</td>
+          <td>${colorize(dayGanji.ji)}</td>
+          <td>${colorize(monthGanji.ji)}</td>
+          <td>${colorize(yearGanji.ji)}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>`;
+}
+
+

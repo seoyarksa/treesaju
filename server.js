@@ -1,19 +1,15 @@
 // server.js 
 import express from 'express';
-
-//console.log(calculateDaeyunAge(new Date(1969, 7, 23), new Date(1969, 8, 6, 15), 'male'));
-// server.js 최상단
-import { calculateDaeyunAge, getJeolipDate } from './public//utils2.js';
-import { stemOrder, branchOrder } from './public/constants.js';
-
-
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import solarlunar from 'solarlunar';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-
+// 수정된 유틸 import
+import { calculateDaeyunAge } from './public/dateUtils.js';
+import { getJeolipDate } from './public/dateUtils.js';
+import { stemOrder, branchOrder } from './public/constants.js';  // 사용 중이면 유지
 
 const app = express();
 const PORT = 3000;
