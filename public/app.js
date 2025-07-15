@@ -592,7 +592,7 @@ const birthInfoText = `
 
   const emailBody = `
 [질문 내용]
-${question}
+${userMessage}
 
 [사용자 생일 사주]
 ${birthInfoText}
