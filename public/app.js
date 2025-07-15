@@ -567,6 +567,24 @@ document.getElementById("send-email-button").addEventListener("click", () => {
     alert("질문 내용을 입력해주세요.");
     return;
   }
+
+  const year = document.getElementById('birth-date').value.split('-')[0];
+const month = document.getElementById('birth-date').value.split('-')[1];
+const day = document.getElementById('birth-date').value.split('-')[2];
+const calendarType = document.getElementById('calendar-type').value;
+const gender = document.querySelector('input[name="gender"]:checked').value;
+const ampm = document.querySelector('input[name="ampm"]:checked').value;
+const hour = document.getElementById('hour-select').value;
+const minute = document.getElementById('minute-select').value;
+const userMessage = document.getElementById('question-input').value.trim();
+
+// 템플릿에 포함할 생일 사주 정보 문자열 예
+const birthInfoText = `
+생년월일: ${year}년 ${month}월 ${day}일
+달력 타입: ${calendarType === 'solar' ? '양력' : '음력'}
+성별: ${gender === 'male' ? '남자' : '여자'}
+출생 시간: ${ampm} ${hour}시 ${minute}분
+`;
   // 출력 내용 수집
   const sajuHTML = document.getElementById("today-saju-container")?.innerText || "없음";
   const daeyunHTML = document.getElementById("result")?.innerText || "없음";
@@ -576,14 +594,18 @@ document.getElementById("send-email-button").addEventListener("click", () => {
 [질문 내용]
 ${question}
 
-[오늘 사주 정보]
-${sajuHTML}
+[사용자 생일 사주]
+${birthInfoText}
 
 [대운 정보]
 ${daeyunHTML}
 
 [세운 정보]
 ${sewunHTML}
+
+
+[오늘 사주 정보]
+${sajuHTML}
 `;
 
   const templateParams = {
