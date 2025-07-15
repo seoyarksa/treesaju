@@ -562,12 +562,11 @@ renderTodaySajuBox({
 emailjs.init("pya8naTr8rGsWWuw7"); // EmailJS 사용자 ID로 교체
 
 document.getElementById("send-email-button").addEventListener("click", () => {
-  const question = document.getElementById("question-input").value.trim();
-  if (!question) {
+  const userMessage = document.getElementById("question-input").value.trim();
+  if (!userMessage) {
     alert("질문 내용을 입력해주세요.");
     return;
   }
-
   // 출력 내용 수집
   const sajuHTML = document.getElementById("today-saju-container")?.innerText || "없음";
   const daeyunHTML = document.getElementById("result")?.innerText || "없음";
