@@ -5,53 +5,162 @@
 <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic&display=swap" rel="stylesheet" />
 
 <title>트리 만세력</title>
-<!-- ✅ 모듈로 로딩해야 import 문 사용 가능 -->
-
 
 <script type="module" src="app.js"></script>
+
+<style>
+  body {
+    font-family: 'Nanum Gothic', sans-serif;
+    margin: 0; padding: 0;
+    background-color: #f8f8f8;
+  }
+
+  /* 덩굴 테두리 컨테이너 전체 감싸기 */
+  .vine-border-container {
+    position: relative;
+    padding: 40px;
+    max-width: 800px;
+    margin: 40px auto 80px auto;
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    overflow: visible; /* 넝쿨 이미지가 영역 밖에 있을 수 있게 */
+  }
+
+  /* 흐릿한 배경 (내용 전체 배경 역할) */
+  .text-bg {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(255, 255, 255, 0.7);
+    border-radius: 10px;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  /* 덩굴 이미지 4모서리 */
+  .vine-deco {
+    position: absolute;
+    width: 100px; height: 100px;
+    background-image: url('https://www.pngkey.com/png/detail/187-1870678_-vine-border-paper-background-printable-flower-leaves.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    opacity: 0.85;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .vine-top-left {
+    top: 0; left: 0;
+    transform: rotate(180deg);
+  }
+  .vine-top-right {
+    top: 0; right: 0;
+    transform: scaleX(-1) rotate(180deg);
+  }
+  .vine-bottom-left {
+    bottom: 0; left: 0;
+    transform: scaleY(-1) rotate(180deg);
+  }
+  .vine-bottom-right {
+    bottom: 0; right: 0;
+    transform: scaleX(-1) scaleY(-1) rotate(180deg);
+  }
+
+  /* 내부 콘텐츠 영역 - 덩굴보다 위에 표시 */
+  .vine-border-container > *:not(.text-bg):not(.vine-deco) {
+    position: relative;
+    z-index: 3;
+  }
+
+  /* 제목, 폼 스타일 */
+  h1 {
+    margin-top: 0;
+    color: #222;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.25);
+  }
+
+  form#saju-form {
+    margin-top: 20px;
+  }
+
+  /* 결과 및 질문 박스 스타일 */
+  #result,
+  #sewoon,
+  #today-saju-container,
+  #question-box {
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 15px;
+    margin-top: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    color: #222;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+  }
+
+  /* 테이블 스타일 (결과 내부 테이블용) */
+  #result table,
+  #sewoon table,
+  #today-saju-container table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  #result table th,
+  #result table td,
+  #sewoon table th,
+  #sewoon table td,
+  #today-saju-container table th,
+  #today-saju-container table td {
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    background-color: transparent;
+    color: #222;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+  }
+
+</style>
 </head>
 <body>
-<h1>트리 만세력</h1>
-<form id="saju-form">
-  <label>생년월일:</label> 
-  <input type="date" id="birth-date" required />
-  <label for="calendar-type"></label>
-  <select id="calendar-type" name="calendar-type">
-    <option value="" ></option>
-    <option value="solar" >양력</option>
-    <option value="lunar">음력</option>
-  </select><br />
-  <label>성별:</label>
-<label><input type="radio" name="gender" value="male" > 남자</label>
-<label><input type="radio" name="gender" value="female"> 여자</label>
 
+<!-- 덩굴 테두리 컨테이너가 페이지 내용 전체 감싸기 -->
+<div class="vine-border-container">
+  <div class="text-bg"></div>
 
-</label><br />
+  <div class="vine-deco vine-top-left"></div>
+  <div class="vine-deco vine-top-right"></div>
+  <div class="vine-deco vine-bottom-left"></div>
+  <div class="vine-deco vine-bottom-right"></div>
 
-  <label>출생 시간:</label>
-<label><input type="radio" name="ampm" value="AM" > 오전</label>
-<label><input type="radio" name="ampm" value="PM"> 오후</label>
+  <h1>트리 만세력</h1>
 
-<!-- 시간 -->
- <label>+</label>
-<select id="hour-select">
-  <option value=""></option>
-  <option value="1">1시</option>
-  <option value="2">2시</option>
-  <option value="3">3시</option>
-  <option value="4">4시</option>
-  <option value="5">5시</option>
-  <option value="6">6시</option>
-  <option value="7">7시</option>
-  <option value="8">8시</option>
-  <option value="9">9시</option>
-  <option value="10">10시</option>
-  <option value="11">11시</option>
-  <option value="12">12시</option>
-</select>
-
-
-
+  <form id="saju-form">
+    <label>생년월일:</label> 
+    <input type="date" id="birth-date" required />
+    <select id="calendar-type" name="calendar-type">
+      <option value="" ></option>
+      <option value="solar" >양력</option>
+      <option value="lunar">음력</option>
+    </select><br />
+    <label>성별:</label>
+    <label><input type="radio" name="gender" value="male" > 남자</label>
+    <label><input type="radio" name="gender" value="female"> 여자</label><br />
+    <label>출생 시간:</label>
+    <label><input type="radio" name="ampm" value="AM" > 오전</label>
+    <label><input type="radio" name="ampm" value="PM"> 오후</label>
+    <label>+</label>
+    <select id="hour-select">
+      <option value=""></option>
+      <option value="1">1시</option>
+      <option value="2">2시</option>
+      <option value="3">3시</option>
+      <option value="4">4시</option>
+      <option value="5">5시</option>
+      <option value="6">6시</option>
+      <option value="7">7시</option>
+      <option value="8">8시</option>
+      <option value="9">9시</option>
+      <option value="10">10시</option>
+      <option value="11">11시</option>
+      <option value="12">12시</option>
+    </select>
 <select id="minute-select">
   <option value=""></option>
   <option value="0">0분</option>
@@ -114,19 +223,27 @@
   <option value="57">57분</option>
   <option value="58">58분</option>
   <option value="59">59분</option>
-</select>
+</select><br />
+    <button type="submit">사주 출력</button>
+  </form>
 
-<br />
+  <div id="result"></div>
+  <div id="sewoon"></div>
+  <div id="today-saju-container" style="margin-top:30px;"></div>
 
-  <button type="submit">사주 출력</button>
-</form>
-<div id="result" class="result-box"></div>
-<div id="sewoon" class="result-box"></div>
-<!-- 기존 출력 아래쪽에 추가 -->
-<div id="today-saju-container" style="margin-top:30px;"></div>
+  <div id="question-box" style="margin-top: 40px; padding: 20px; border-top: 1px solid #ccc;">
+    <h3>질문하기</h3>
+    <textarea id="question-input" placeholder="궁금한 점을 입력하세요...(반드시 사주출력후 질문하세요)" rows="8" style="width: 100%; padding: 10px;"></textarea>
+    <br />
+    <button id="send-email-button" style="margin-top: 10px; padding: 10px 20px;">보내기 (이메일)</button>
+  </div>
+</div>
 
-
+<!-- EmailJS SDK 추가 -->
+<script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
 
 </body>
 </html>
+
+
 

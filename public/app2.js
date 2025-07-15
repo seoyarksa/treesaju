@@ -70,6 +70,88 @@ const currentDecimalYear =
   (today.getDate() / 30) / 12;
 
 
+//이메일 전송
+// EmailJS 초기화
+// EmailJS 초기화
+emailjs.init("pya8naTr8rGsWWuw7"); // EmailJS 사용자 ID로 교체
+
+document.getElementById("send-email-button").addEventListener("click", () => {
+  const userMessage = document.getElementById("question-input").value.trim();
+  if (!userMessage) {
+    alert("질문 내용을 입력해주세요.");
+    return;
+  }
+
+  const [year, month, day] = document.getElementById('birth-date').value.split('-');
+  const calendarType = document.getElementById('calendar-type').value;
+  const gender = document.querySelector('input[name="gender"]:checked')?.value || "";
+  const ampm = document.querySelector('input[name="ampm"]:checked')?.value || "";
+  const hour = document.getElementById('hour-select').value;
+  const minute = document.getElementById('minute-select').value;
+
+  // 사용자 정보 텍스트 (pre로 줄바꿈 보존)
+const birthInfoText = `
+생년월일: ${year}년 ${month}월 ${day}일
+달력 타입: ${calendarType === 'solar' ? '양력' : '음력'}
+성별: ${gender === 'male' ? '남자' : '여자'}
+출생 시간: ${ampm} ${hour}시 ${minute}분
+`.replace(/\n/g, "<br />");
+
+  // 사주 출력 영역 내용 HTML
+   const sajuHTML = document.getElementById("today-saju-container")?.innerHTML.trim();
+
+  // 사주가 출력되지 않았을 경우 전송 차단
+  if (!sajuHTML || sajuHTML === "" || sajuHTML === "없음" || sajuHTML.includes("오늘의 사주") === false) {
+    alert("사주가 출력되지 않았습니다. 먼저 사주를 계산해 주세요.");
+    return;
+  }
+
+  const daeyunHTML = document.getElementById("result")?.innerHTML || "없음";
+  const sewunHTML = document.getElementById("sewoon")?.innerHTML || "없음";
+
+  // 최종 이메일 본문 (HTML로 구성)
+  const emailBody = `
+  <div style="font-family: 'Nanum Gothic', sans-serif; line-height: 1.6;">
+    <h2>질문 내용</h2>
+    <p>${userMessage.replace(/\n/g, "<br />")}</p>
+
+    <hr />
+
+    <h3>사용자 생일 사주</h3>
+    <pre style="background:#f9f9f9; padding:10px; border:1px solid #ddd;">${birthInfoText}</pre>
+
+    <hr />
+
+    <h3>대운 정보</h3>
+    <div>${daeyunHTML}</div>
+
+    <hr />
+
+    <h3>세운 정보</h3>
+    <div>${sewunHTML}</div>
+
+    <hr />
+
+    <h3>오늘의 사주</h3>
+    <div>${sajuHTML}</div>
+  </div>
+`;
+
+  const templateParams = {
+    from_name: "만세력 사용자",
+    message: emailBody, // HTML 포함
+  };
+
+  emailjs.send("service_y6cb7op", "template_xehb16a", templateParams)
+    .then(function () {
+      alert("성공적으로 전송되었습니다.");
+      document.getElementById("question-input").value = "";
+    }, function (error) {
+      console.error("이메일 전송 실패:", error);
+      alert("이메일 전송 중 오류가 발생했습니다.");
+    });
+});
+
 
 document.getElementById('saju-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -449,8 +531,7 @@ window.handleDaeyunClick = handleDaeyunClick;
   </tbody>
 </table>
 <div class="note-box">
-  ※ 태어난 분대가 20~40분(30분 근처)에 있는 분은 정확한 시주가 산출되지 않을 수도 있으니<br>
-     따로 확인해 주세요! 한국썸머타임은 적용된 상태입니다. 
+  ※ 태어난 분대가 20~40분(30분 근처)에 있는 분은 정확한 시주가 산출되지 않을 수도 있으니 따로 확인해 주세요! 한국썸머타임은 적용된 상태입니다. 
 </div>
 
  <!-- ✅ 대운 테이블 -->
@@ -556,6 +637,10 @@ renderTodaySajuBox({
   dayGanKorGan: dayGanKorGan2,
   todayStr
 });
+
+
+
+
 
 
   } catch (error) {
