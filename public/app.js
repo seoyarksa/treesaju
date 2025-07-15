@@ -100,9 +100,9 @@ document.getElementById("send-email-button").addEventListener("click", () => {
 `;
 
   // 출력 내용 수집 (텍스트로 받음)
-  const sajuText = document.getElementById("today-saju-container")?.innerText || "없음";
-  const daeyunText = document.getElementById("result")?.innerText || "없음";
-  const sewunText = document.getElementById("sewoon")?.innerText || "없음";
+  const sajuText = document.getElementById("today-saju-container")?.innerHTML || "없음";
+  const daeyunText = document.getElementById("result")?.innerHTML || "없음";
+  const sewunText = document.getElementById("sewoon")?.innerHTML || "없음";
 
   const emailBody = `
 [질문 내용]
@@ -112,13 +112,13 @@ ${userMessage}
 ${birthInfoText}
 
 [대운 정보]
-${daeyunText}
+${daeyunHTML}
 
 [세운 정보]
-${sewunText}
+${sewunHTML}
 
 [오늘 사주 정보]
-${sajuText}
+${sajuHTML}
 `;
 
   const templateParams = {
