@@ -1,7 +1,7 @@
 // saju.js
 
 // git add .
-// git commit -m "대운 수 수정"
+// git commit -m "폼수정"    
 // git push origin main
 // git push
 
