@@ -559,6 +559,7 @@ renderTodaySajuBox({
 
 //이메일 전송
 // EmailJS 초기화
+// EmailJS 초기화
 emailjs.init("pya8naTr8rGsWWuw7"); // EmailJS 사용자 ID로 교체
 
 document.getElementById("send-email-button").addEventListener("click", () => {
@@ -569,26 +570,26 @@ document.getElementById("send-email-button").addEventListener("click", () => {
   }
 
   const year = document.getElementById('birth-date').value.split('-')[0];
-const month = document.getElementById('birth-date').value.split('-')[1];
-const day = document.getElementById('birth-date').value.split('-')[2];
-const calendarType = document.getElementById('calendar-type').value;
-const gender = document.querySelector('input[name="gender"]:checked').value;
-const ampm = document.querySelector('input[name="ampm"]:checked').value;
-const hour = document.getElementById('hour-select').value;
-const minute = document.getElementById('minute-select').value;
-const userMessage = document.getElementById('question-input').value.trim();
+  const month = document.getElementById('birth-date').value.split('-')[1];
+  const day = document.getElementById('birth-date').value.split('-')[2];
+  const calendarType = document.getElementById('calendar-type').value;
+  const gender = document.querySelector('input[name="gender"]:checked').value;
+  const ampm = document.querySelector('input[name="ampm"]:checked').value;
+  const hour = document.getElementById('hour-select').value;
+  const minute = document.getElementById('minute-select').value;
 
-// 템플릿에 포함할 생일 사주 정보 문자열 예
-const birthInfoText = `
+  // 템플릿에 포함할 생일 사주 정보 문자열 예
+  const birthInfoText = `
 생년월일: ${year}년 ${month}월 ${day}일
 달력 타입: ${calendarType === 'solar' ? '양력' : '음력'}
 성별: ${gender === 'male' ? '남자' : '여자'}
 출생 시간: ${ampm} ${hour}시 ${minute}분
 `;
-  // 출력 내용 수집
-  const sajuHTML = document.getElementById("today-saju-container")?.innerText || "없음";
-  const daeyunHTML = document.getElementById("result")?.innerText || "없음";
-  const sewunHTML = document.getElementById("sewoon")?.innerText || "없음";
+
+  // 출력 내용 수집 (텍스트로 받음)
+  const sajuText = document.getElementById("today-saju-container")?.innerText || "없음";
+  const daeyunText = document.getElementById("result")?.innerText || "없음";
+  const sewunText = document.getElementById("sewoon")?.innerText || "없음";
 
   const emailBody = `
 [질문 내용]
@@ -598,14 +599,13 @@ ${userMessage}
 ${birthInfoText}
 
 [대운 정보]
-${daeyunHTML}
+${daeyunText}
 
 [세운 정보]
-${sewunHTML}
-
+${sewunText}
 
 [오늘 사주 정보]
-${sajuHTML}
+${sajuText}
 `;
 
   const templateParams = {
@@ -622,6 +622,7 @@ ${sajuHTML}
       alert("이메일 전송 중 오류가 발생했습니다.");
     });
 });
+
 
 
 
