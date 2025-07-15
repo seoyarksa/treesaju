@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 // 수정된 유틸 import
 import { calculateDaeyunAge } from './public/dateUtils.js';
 import { getJeolipDate } from './public/dateUtils.js';
+import { hiddenStemsMap } from './public/sajuUtils.js';
 import { stemOrder, branchOrder } from './public/constants.js';  // 사용 중이면 유지
 
 const app = express();

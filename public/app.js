@@ -122,7 +122,7 @@ body: JSON.stringify({
 }),
 
     });
-
+console.log('req.body:', req.body);
     if (!response.ok) {
   // 에러 메시지를 텍스트로 받아서 콘솔에 출력하거나 알림 처리
   const errorText = await response.text();
