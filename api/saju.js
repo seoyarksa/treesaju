@@ -3,7 +3,7 @@
 // git add .
 // git commit -m "대운 수 수정"
 // git push origin main
-
+// git push
 
 
 // saju.js (vercel serverless function)

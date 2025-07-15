@@ -1,7 +1,7 @@
 // renderUtils.js
 //함수종류
 //renderDaeyunTable, renderDaeyunTable, highlightCurrentDaeyunByAge, renderYearlyGanjiSeries,
-//renderMonthlyGanjiSeries, handleDaeyunClick, elementColors, 
+//renderMonthlyGanjiSeries, handleDaeyunClick, elementColors, renderTodaySajuBox
 
 
 
@@ -294,5 +294,45 @@ export function handleSewoonClick(year, stemKor, branchKor, index) {
 }
 
 
+
+// renderUtils.js 또는 app.js에 추가 (추천: renderUtils.js에 UI만 담당)
+//오늘의 사주팔자
+export function renderTodaySajuBox({ yearGanji, monthGanji, dayGanji, timeGanji, dayGanKorGan, todayStr }) {
+  const container = document.getElementById('today-saju-container');
+  if (!container) return;
+
+  container.innerHTML = `
+  <div style="margin-top:2rem;">
+    <h3 style="font-size:1rem; margin-left:20px;">📆 오늘의 사주 (${todayStr})</h3>
+    <table class="ganji-table" style="font-size: 0.8rem; margin-left:20px;">
+               <thead>
+    <tr>
+      <th style="padding:2px; font-size: 0.75rem;">시</th>
+      <th style="padding:2px; font-size: 0.75rem;">일</th>
+      <th style="padding:2px; font-size: 0.75rem;">월</th>
+      <th style="padding:2px; font-size: 0.75rem;">년</th>
+    </tr>
+</thead>
+
+
+      <tbody>
+        <!-- 천간 -->
+        <tr>
+          <td>${colorize(timeGanji.gan)}</td>
+          <td>${colorize(dayGanji.gan)}</td>
+          <td>${colorize(monthGanji.gan)}</td>
+          <td>${colorize(yearGanji.gan)}</td>
+        </tr>
+        <!-- 지지 -->
+        <tr>
+          <td>${colorize(timeGanji.ji)}</td>
+          <td>${colorize(dayGanji.ji)}</td>
+          <td>${colorize(monthGanji.ji)}</td>
+          <td>${colorize(yearGanji.ji)}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>`;
+}
 
 

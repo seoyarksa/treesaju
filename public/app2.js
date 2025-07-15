@@ -49,7 +49,8 @@ import {
   renderMonthlyGanjiSeries,
   handleDaeyunClick, 
   handleSewoonClick,
-  elementColors
+  elementColors,
+  renderTodaySajuBox
 } from './renderUtils.js';
 
 window.handleDaeyunClick = handleDaeyunClick;
@@ -121,6 +122,14 @@ body: JSON.stringify({
 }),
 
     });
+
+    if (!response.ok) {
+  // 에러 메시지를 텍스트로 받아서 콘솔에 출력하거나 알림 처리
+  const errorText = await response.text();
+  console.error('서버 오류:', errorText);
+  throw new Error('서버 오류 발생: ' + errorText);
+}
+
 const data = await response.json();
 console.log('서버에서 받은 data:', data);
 console.log('🎯 birthYear:', data.birthYear);
@@ -441,7 +450,7 @@ window.handleDaeyunClick = handleDaeyunClick;
 </table>
 <div class="note-box">
   ※ 태어난 분대가 20~40분(30분 근처)에 있는 분은 정확한 시주가 산출되지 않을 수도 있으니<br>
-     따로 확인해 주세요!
+     따로 확인해 주세요! 한국썸머타임은 적용된 상태입니다. 
 </div>
 
  <!-- ✅ 대운 테이블 -->
@@ -507,6 +516,45 @@ document.querySelectorAll('.daeyun-cell').forEach((cell, index) => {
     cell.classList.add('selected');
     window.currentDaeyunIndex = index;
   });
+});
+// 서버에서 ganji 정보 받은 뒤, 마지막에 추가
+// 오늘 날짜 기준 사주
+// 🎯 생일 사주 출력 완료 후 바로 아래!
+const today = new Date();
+const todayPayload = {
+  year: today.getFullYear(),
+  month: today.getMonth() + 1,
+  day: today.getDate(),
+  hour: today.getHours(),
+  minute: today.getMinutes(),
+  calendarType: 'solar',
+  gender: gender.value  // 생일 입력에서 선택한 성별 그대로 사용
+};
+
+const todayStr = `${todayPayload.year}-${String(todayPayload.month).padStart(2, '0')}-${String(todayPayload.day).padStart(2, '0')}`;
+
+const todayResponse = await fetch('/api/saju', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(todayPayload),
+});
+
+const todayData = await todayResponse.json();
+
+const yearGanji2 = splitGanji(todayData.ganji.year);
+const monthGanji2 = splitGanji(todayData.ganji.month);
+const dayGanji2 = splitGanji(todayData.ganji.day);
+const timeGanji2 = splitGanji(todayData.ganji.time);
+const dayGanKorGan2 = convertHanToKorStem(dayGanji2.gan);
+
+// 🎯 오늘 사주 렌더링
+renderTodaySajuBox({
+  yearGanji: yearGanji2,
+  monthGanji: monthGanji2,
+  dayGanji: dayGanji2,
+  timeGanji: timeGanji2,
+  dayGanKorGan: dayGanKorGan2,
+  todayStr
 });
 
 

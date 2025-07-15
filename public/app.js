@@ -557,6 +557,52 @@ renderTodaySajuBox({
   todayStr
 });
 
+//이메일 전송
+// EmailJS 초기화
+emailjs.init("pya8naTr8rGsWWuw7"); // EmailJS 사용자 ID로 교체
+
+document.getElementById("send-email-button").addEventListener("click", () => {
+  const question = document.getElementById("question-input").value.trim();
+  if (!question) {
+    alert("질문 내용을 입력해주세요.");
+    return;
+  }
+
+  // 출력 내용 수집
+  const sajuHTML = document.getElementById("today-saju-container")?.innerText || "없음";
+  const daeyunHTML = document.getElementById("result")?.innerText || "없음";
+  const sewunHTML = document.getElementById("sewoon")?.innerText || "없음";
+
+  const emailBody = `
+[질문 내용]
+${question}
+
+[오늘 사주 정보]
+${sajuHTML}
+
+[대운 정보]
+${daeyunHTML}
+
+[세운 정보]
+${sewunHTML}
+`;
+
+  const templateParams = {
+    from_name: "만세력 사용자",
+    message: emailBody,
+  };
+
+  emailjs.send("service_y6cb7op", "template_xehb16a", templateParams)
+    .then(function () {
+      alert("성공적으로 전송되었습니다.");
+      document.getElementById("question-input").value = "";
+    }, function (error) {
+      console.error("이메일 전송 실패:", error);
+      alert("이메일 전송 중 오류가 발생했습니다.");
+    });
+});
+
+
 
   } catch (error) {
     alert('에러 발생: ' + error.message);

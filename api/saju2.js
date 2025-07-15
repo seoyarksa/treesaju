@@ -3,21 +3,16 @@
 // git add .
 // git commit -m "대운 수 수정"
 // git push origin main
+// git push
 
 
-import express from 'express';
-import cors from 'cors';
-import bodyParser from 'body-parser';
+// saju.js (vercel serverless function)
+
 import solarlunar from 'solarlunar';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { calculateDaeyunAge } from '../public/dateUtils.js';
+import { getJeolipDate } from '../public/dateUtils.js';
+import { stemOrder, branchOrder } from '../public/constants.js'; // optional
 
-// 수정된 유틸 import
-import { calculateDaeyunAge } from './public/dateUtils.js';
-import { getJeolipDate } from './public/dateUtils.js';
-import { stemOrder, branchOrder } from './public/constants.js';  // 사용 중이면 유지
-
-// 한자 <-> 한글 변환
 const hanToKorStem = {
   '甲': '갑', '乙': '을', '丙': '병', '丁': '정', '戊': '무',
   '己': '기', '庚': '경', '辛': '신', '壬': '임', '癸': '계'
@@ -29,7 +24,6 @@ const korToHanStem = {
 const hanEarthlyBranches = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
 const hanToKor = (han) => hanToKorStem[han] || han;
 
-// 시주 천간표 (일간 기준)
 const timeGanTable = {
   '갑': ['갑','을','병','정','무','기','경','신','임','계','갑','을'],
   '을': ['병','정','무','기','경','신','임','계','갑','을','병','정'],
@@ -43,10 +37,8 @@ const timeGanTable = {
   '계': ['임','계','갑','을','병','정','무','기','경','신','임','계'],
 };
 
-// 한국 DST 여부 판단 함수 (역사적 썸머타임 구간 모두 반영)
 function isDSTKorea(year, month, day) {
   const date = new Date(Date.UTC(year, month - 1, day));
-
   const dstPeriods = [
     { start: new Date(Date.UTC(1948, 4, 8)), end: new Date(Date.UTC(1948, 8, 12)) },
     { start: new Date(Date.UTC(1955, 4, 15)), end: new Date(Date.UTC(1955, 8, 15)) },
@@ -58,80 +50,39 @@ function isDSTKorea(year, month, day) {
     { start: new Date(Date.UTC(1987, 4, 10)), end: new Date(Date.UTC(1987, 9, 11)) },
     { start: new Date(Date.UTC(1988, 4, 8)),  end: new Date(Date.UTC(1988, 9, 9)) }
   ];
-
   return dstPeriods.some(({ start, end }) => date >= start && date < end);
 }
 
-// 시지 계산: 30분 경계 기준 + DST 1시간 보정 포함
 function getTimeIndexByHourMinute(hour, minute) {
   const totalMinutes = hour * 60 + minute;
-
   const startMinutesArr = [
-    23 * 60 + 30,
-    1 * 60 + 30,
-    3 * 60 + 30,
-    5 * 60 + 30,
-    7 * 60 + 30,
-    9 * 60 + 30,
-    11 * 60 + 30,
-    13 * 60 + 30,
-    15 * 60 + 30,
-    17 * 60 + 30,
-    19 * 60 + 30,
-    21 * 60 + 30,
+    1410, 90, 210, 330, 450, 570,
+    690, 810, 930, 1050, 1170, 1290
   ];
-
   const modTotalMinutes = totalMinutes % 1440;
 
-  for (let i = 0; i < startMinutesArr.length; i++) {
+  for (let i = 0; i < 12; i++) {
     let start = startMinutesArr[i];
     let end = startMinutesArr[(i + 1) % 12] - 1;
-
     if (end < start) {
-      if ((modTotalMinutes >= start && modTotalMinutes <= 1439) || (modTotalMinutes >= 0 && modTotalMinutes <= end)) {
-        return i;
-      }
+      if ((modTotalMinutes >= start && modTotalMinutes <= 1439) || (modTotalMinutes >= 0 && modTotalMinutes <= end)) return i;
     } else {
-      if (modTotalMinutes >= start && modTotalMinutes <= end) {
-        return i;
-      }
+      if (modTotalMinutes >= start && modTotalMinutes <= end) return i;
     }
   }
-
   return 0;
 }
 
-// 간지 계산
 function getGanji(year, month, day, hour, minute) {
   const lunarDate = solarlunar.solar2lunar(year, month, day);
   const dayGanji = lunarDate.gzDay;
-  const dayGanHan = dayGanji.charAt(0);
-  const dayGanKor = hanToKor(dayGanHan);
-
-  const yearGanji = lunarDate.gzYear;
-  const monthGanji = lunarDate.gzMonth;
-
-  const isDST = isDSTKorea(year, month, day);
-
+  const dayGanKor = hanToKor(dayGanji.charAt(0));
   const timeIndex = getTimeIndexByHourMinute(hour, minute);
-
-  // console.log(`일간(일주) 천간: ${dayGanKor}`);
-  // console.log(`DST 여부: ${isDST}`);
-  // console.log(`계산된 시지 인덱스(timeIndex): ${timeIndex}`);
-
   const timeGanKor = timeGanTable[dayGanKor]?.[timeIndex] || '오류';
-
-  // console.log(`timeGanTable[${dayGanKor}][${timeIndex}]: ${timeGanKor}`);
-
-  const timeGanHan = korToHanStem[timeGanKor] || '?';
-  const timeJiHan = hanEarthlyBranches[timeIndex];
-  const timeGanji = timeGanHan + timeJiHan;
-
-  // console.log(`최종 시주 간지: ${timeGanji}`);
-
+  const timeGanji = (korToHanStem[timeGanKor] || '?') + hanEarthlyBranches[timeIndex];
   return {
-    year: yearGanji,
-    month: monthGanji,
+    year: lunarDate.gzYear,
+    month: lunarDate.gzMonth,
     day: dayGanji,
     time: timeGanji
   };
@@ -139,9 +90,9 @@ function getGanji(year, month, day, hour, minute) {
 
 export default function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
- console.log('req.body:', req.body);  // 여기 넣기
+
   let { year, month, day, hour, minute, calendarType, gender } = req.body;
 
   if (!year || !month || !day || hour === undefined || minute === undefined || !calendarType) {
@@ -150,7 +101,7 @@ export default function handler(req, res) {
 
   if (calendarType === 'lunar') {
     const converted = solarlunar.lunar2solar(year, month, day, false);
-    if (!converted || !converted.cYear) {
+    if (!converted?.cYear) {
       return res.status(400).json({ error: '음력을 양력으로 변환하는 데 실패했습니다.' });
     }
     year = converted.cYear;
@@ -170,22 +121,10 @@ export default function handler(req, res) {
   }
 
   const birthDate = new Date(`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00+09:00`);
-
   const jeolipDate = getJeolipDate(year, month);
-
   const ganji = getGanji(year, month, day, hour, minute);
-
   const yearStemKor = hanToKor(ganji.year.charAt(0));
-
-  if (!ganji.year) {
-    console.error('Error: ganji.year is undefined or empty');
-  }
-
-const daeyunAge = parseFloat(calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor).toFixed(2));
-
-console.log('yearStemKor:', yearStemKor);
-console.log('birthDate:', birthDate.toISOString());
-console.log('jeolipDate:', jeolipDate.toISOString());
+  const daeyunAge = parseFloat(calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor).toFixed(2));
   const lunar = solarlunar.solar2lunar(year, month, day);
 
   res.json({
@@ -198,11 +137,10 @@ console.log('jeolipDate:', jeolipDate.toISOString());
       hour,
       minute
     },
-    daeyunAge, // ✅ 확인 포인트
+    daeyunAge,
     yearStemKor,
     ganji,
     birthYear: birthDate.getFullYear(),
-      // ✅ 아래 두 줄 추가
     month,
     day
   });
