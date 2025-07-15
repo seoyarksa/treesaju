@@ -1,8 +1,13 @@
 // saju.js
 
 // git add .
-// git commit -m "대운 수 수정"
+// git commit -m "월운적용"
 // git push origin main
+//git add -u	수정/삭제된 기존 파일만 반영
+//git add -A	추가/수정/삭제 모두 반영
+//git add .	현재 디렉토리 기준으로 추가/수정 파일 반영 (삭제는 제외될 수 있음)
+//git rm -r src/old-folder/ 폴더 삭제
+//git commit -m "remove old file" 파일삭제
 
 
 import express from 'express';
