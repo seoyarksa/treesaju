@@ -122,6 +122,14 @@ body: JSON.stringify({
 }),
 
     });
+
+    if (!response.ok) {
+  // 에러 메시지를 텍스트로 받아서 콘솔에 출력하거나 알림 처리
+  const errorText = await response.text();
+  console.error('서버 오류:', errorText);
+  throw new Error('서버 오류 발생: ' + errorText);
+}
+
 const data = await response.json();
 console.log('서버에서 받은 data:', data);
 console.log('🎯 birthYear:', data.birthYear);
