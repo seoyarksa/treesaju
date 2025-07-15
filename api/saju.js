@@ -156,6 +156,7 @@ function getGanji(year, month, day, hour, minute) {
 
 // API 요청 처리
 app.post('/api/saju', (req, res) => {
+   console.log(req.body);
   let { year, month, day, hour, minute, calendarType, gender  } = req.body;
  // 1) 생년월일 Date 객체 생성
 
