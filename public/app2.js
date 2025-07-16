@@ -38,7 +38,9 @@ import {
   getStartMonthBySewoonStem,
   calculateSewonYear,
   findStartMonthIndex,
-  generateMonthlyGanjiSeriesByGanji
+  generateMonthlyGanjiSeriesByGanji,
+  getDangryeong,
+  getSaryeong
 } from './sajuUtils.js';
 //
 
@@ -50,7 +52,9 @@ import {
   handleDaeyunClick, 
   handleSewoonClick,
   elementColors,
-  renderTodaySajuBox
+  renderTodaySajuBox,
+  renderDangryeong, 
+  attachSewoonClickListeners 
 } from './renderUtils.js';
 
 window.handleDaeyunClick = handleDaeyunClick;
@@ -69,6 +73,7 @@ const currentDecimalYear =
   (today.getMonth()) / 12 +
   (today.getDate() / 30) / 12;
 
+window.gender = document.querySelector('input[name="gender"]:checked')?.value || null;
 
 //이메일 전송
 // EmailJS 초기화
@@ -161,8 +166,12 @@ document.getElementById('saju-form').addEventListener('submit', async (e) => {
   const hour12 = parseInt(document.getElementById('hour-select').value);
   const minute = parseInt(document.getElementById('minute-select').value);
 const calendarType = document.getElementById('calendar-type').value;
-const gender = document.querySelector('input[name="gender"]:checked');
- 
+  const genderInput = document.querySelector('input[name="gender"]:checked');
+  const gender = genderInput ? genderInput.value : null;
+   if (!gender) {
+    alert('성별을 선택하세요');
+    return;
+  }
    const value = document.getElementById('birth-date').value;
   const inputyear = parseInt(value.split('-')[0]);
 if (inputyear < 1000 || inputyear > 9999) {
@@ -216,7 +225,7 @@ const data = await response.json();
 console.log('서버에서 받은 data:', data);
 console.log('🎯 birthYear:', data.birthYear);
 
-console.log('🎯 daeyunAge:', data.daeyunAge);
+console.log('🎯 daeyunAge1:', data.daeyunAge);
 console.log('ganji:', data.ganji);
 console.log('서버 응답 전체:', JSON.stringify(data, null, 2));
 
@@ -230,11 +239,27 @@ console.log('🎯 birthMonth:', window.birthMonth);
 console.log('🎯 birthDay:', window.birthDay);
 // ✅ 직접 받은 birthYear 사용
 birthYear = data.birthYear;
-
+// 당령 계산에 필요한 값 꺼내기
 
 // 대운 시작 나이도 그대로 사용
 // ✅ 서버에서 계산한 값을 사용해야 함
-const daeyunAge = data.daeyunAge;
+// daeyunAge 계산부 (예시)
+const yearStemKor = data.yearStemKor; // ✅ 오류 발생 지점 수정됨
+const birthDateObj = new Date(window.birthYear, window.birthMonth - 1, window.birthDay);
+console.log('▶ birthDateObj:', birthDateObj);
+const jeolipDate = getJeolipDate(window.birthYear, window.birthMonth);
+console.log('▶ jeolipDate:', jeolipDate);
+
+// 원본 값 (소수점 유지)
+const daeyunAgeRaw = data.daeyunAge;
+window.daeyunAgeRaw = daeyunAgeRaw;
+
+// 표시용 값 (소수점 1자리, 반올림 또는 버림)
+const daeyunAge = Number(daeyunAgeRaw.toFixed(2));
+window.daeyunAge = daeyunAge;
+
+console.log('▶ daeyunAge2:', daeyunAge);
+
 
 
     if (!response.ok) throw new Error('서버 오류 발생');
@@ -264,13 +289,34 @@ const timeLines = hiddenStemsMap[timeJiKor] || [];
 // 한자 → 한글 천간 변환 함수 필요 (파일 상단에 선언되어 있어야 함)
 const dayGanKorGan = convertHanToKorStem(dayGanji.gan);
 
-// 대운 시작 방향
+// 당령 구하기
+
+// 출생 월, 일 (전역변수에서)
+const birthMonth = parseInt(window.birthMonth, 10); // 👈 명확히 숫자로 변환
+const birthDay = parseInt(window.birthDay, 10);
+const monthJi = monthGanji.ji;  // 월지(예: '子', '丑' 등)
+
+
+// 당령 구하는 함수 호출 (sajuUtils.js에서 import 되어 있어야 함)
+const dangryeong = getDangryeong(monthGanji.ji, window.birthMonth, window.birthDay);
+console.log('당령:', dangryeong);
+const saryeong = getSaryeong(monthGanji.ji, birthYear, birthMonth, birthDay);
+
+renderDangryeong(dangryeong, saryeong);
+console.log("사령:", saryeong);
+
+// 당령 결과를 UI에 표시하거나 전역 변수로 저장 가능
+window.dangryeong = dangryeong;
 
 
 // 월간/월지 기준 시작 간지
-const yearStemKor = data.yearStemKor; // ✅ 오류 발생 지점 수정됨
+
 // 대운 간지 배열 생성
+
+
 const daYunDirection = getDaYunDirection(gender, yearStemKor);
+console.log('gender:', gender);
+console.log('yearStemKor:', yearStemKor);
 console.log('⚡ daYunDirection (1: 순행, -1: 역행):', daYunDirection);
 const startStemKor = convertHanToKorStem(monthGanji.gan);
 const startBranchKor = normalizeBranch(monthGanji.ji);
@@ -325,7 +371,7 @@ const result = calculateSewonYear(1969, 8, 23, 5.1);
 console.log('계산된 세운 시작년도:', result);
 
 
-const sewonYear = calculateSewonYear(birthYear, birthMonth, birthDay, daeyunAge);
+const sewonYear = calculateSewonYear(birthYear, birthMonth, birthDay, daeyunAgeRaw);
 window.sewonYear = sewonYear; // 여기 추가!
 console.log('🎯 세운 시작년도 (소숫점1):', sewonYear);
 
@@ -434,6 +480,7 @@ window.handleDaeyunClick = handleDaeyunClick;
           margin-left: 20px;
           white-space: pre-line;
         }
+
           
 </style>
 <table class="ganji-table">
@@ -530,9 +577,30 @@ window.handleDaeyunClick = handleDaeyunClick;
 
   </tbody>
 </table>
-<div class="note-box">
-  ※ 태어난 분대가 20~40분(30분 근처)에 있는 분은 정확한 시주가 산출되지 않을 수도 있으니 따로 확인해 주세요! 한국썸머타임은 적용된 상태입니다. 
-</div>
+
+<!-- 당령 표시용 영역 -->
+     <div style="display: flex; justify-content: center; margin-top: 1rem;">
+      <table class="dangryeong-table" style="
+        border-collapse: collapse;
+        font-size: 1rem;
+        text-align: center;
+        width: 100%;
+        max-width: 600px;
+        border: 1px solid #ccc;
+      ">
+        <thead>
+      <tbody>
+        <tr>
+          <td style="border:1px solid #ccc; padding:4px;">당령:${dangryeong || '-'}</td>
+          <td style="border:1px solid #ccc; padding:4px;">사령:${saryeong || '-'}</td>
+          <td style="border:1px solid #ccc; padding:4px;">당령식:${dangryeong && saryeong ? dangryeong + saryeong : '-'}</td>
+          <td style="border:1px solid #ccc; padding:4px;">격국:</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+
 
  <!-- ✅ 대운 테이블 -->
 <div class="daeyun-table-container"></div>
@@ -568,13 +636,13 @@ renderDaeyunTable({
 });
 // 🔥 자동 출력 시작!
  //const birthDate = new Date(window.birthYear, window.birthMonth - 1, window.birthDay);
-const birthDate = {
+const birthDateYMD = {
   year: window.birthYear,
   month: window.birthMonth,
   day: window.birthDay
 };
- const currentDaeyunIndex = getCurrentDaeyunIndexFromStartAge(correctedStartAge, birthDate);
-highlightCurrentDaeyunByAge(correctedStartAge, birthDate);
+ const currentDaeyunIndex = getCurrentDaeyunIndexFromStartAge(correctedStartAge, birthDateYMD);
+highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD);
 window.currentDaeyunIndex = currentDaeyunIndex;
 console.log('📌 현재 대운 인덱스:', currentDaeyunIndex);
 
@@ -609,7 +677,7 @@ const todayPayload = {
   hour: today.getHours(),
   minute: today.getMinutes(),
   calendarType: 'solar',
-  gender: gender.value  // 생일 입력에서 선택한 성별 그대로 사용
+  gender: window.gender || 'male'  // window.gender가 없으면 기본값도 넣기
 };
 
 const todayStr = `${todayPayload.year}-${String(todayPayload.month).padStart(2, '0')}-${String(todayPayload.day).padStart(2, '0')}`;

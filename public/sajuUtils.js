@@ -4,12 +4,17 @@
 // isYangStem, getDaYunDirection, generateDaYunStems, getTenGod, colorize, splitGanji, 
 // getThreeLinesFromArray, generateDaYun, getGanjiByYear, generateYearlyGanjiSeries, 
 // generateYearlyGanjiSeries2, generateDaeyunBy60Gapja, getStartMonthBySewoonStem, 
-// calculateSewonYear, findStartMonthIndex, generateMonthlyGanjiSeriesByGanji, 
+// calculateSewonYear, findStartMonthIndex, generateMonthlyGanjiSeriesByGanji, getDangryeong,
+//getSaryeong,
 
 
 
-import { stemOrder, branchOrder } from './constants.js';
+import { stemOrder, 
+         branchOrder,
+         saryeongMap
+        } from './constants.js';
 import { elementColors } from './renderUtils.js';
+import { getJeolipDate } from './dateUtils.js'; // 절입일 계산 함수
 
 const yangStems = ['갑', '병', '무', '경', '임'];
 
@@ -287,3 +292,72 @@ export function generateMonthlyGanjiSeriesByGanji(startStem, startBranch) {
 
   return { monthlyStems, monthlyBranches };
 }
+
+
+// 1) 상수: dangryeongMap, solarTerms, isBefore 함수 (파일 상단이나 중간 어디든 가능)
+
+export const dangryeongMap = {
+  '子': { beforeDongji: '壬', afterDongji: '癸' },
+  '丑': '癸',
+  '寅': '甲',
+  '卯': { beforeChunbun: '甲', afterChunbun: '乙' },
+  '辰': '乙',
+  '巳': '丙',
+  '午': { beforeHaji: '丙', afterHaji: '丁' },
+  '未': '丁',
+  '申': '庚',
+  '酉': { beforeChubun: '庚', afterChubun: '辛' },
+  '戌': '辛',
+  '亥': '壬'
+};
+
+export const solarTerms = {
+  dongji: { month: 12, day: 22 },
+  chunbun: { month: 3, day: 21 },
+  haji: { month: 6, day: 22 },
+  chubun: { month: 9, day: 24 }
+};
+
+export function isBefore(month, day, term) {
+  if (month < term.month) return true;
+  if (month === term.month && day < term.day) return true;
+  return false;
+}
+
+// 2) 당령 구하는 함수도 추가
+
+export function getDangryeong(monthJi, birthMonth, birthDay) {
+  const d = dangryeongMap[monthJi];
+  if (!d) {
+    console.warn('당령을 찾을 수 없는 월지:', monthJi);
+    return '';
+  }
+  if (typeof d === 'string') return d;
+  if (monthJi === '子') {
+    return isBefore(birthMonth, birthDay, solarTerms.dongji) ? d.beforeDongji : d.afterDongji;
+  }
+  if (monthJi === '卯') {
+    return isBefore(birthMonth, birthDay, solarTerms.chunbun) ? d.beforeChunbun : d.afterChunbun;
+  }
+  if (monthJi === '午') {
+    return isBefore(birthMonth, birthDay, solarTerms.haji) ? d.beforeHaji : d.afterHaji;
+  }
+  if (monthJi === '酉') {
+    return isBefore(birthMonth, birthDay, solarTerms.chubun) ? d.beforeChubun : d.afterChubun;
+  }
+  return '';
+}
+
+
+export function getSaryeong(monthJi, birthYear, birthMonth, birthDay) {
+  const jeolgiDate = getJeolipDate(birthYear, birthMonth); // 절기 시작일
+  if (!jeolgiDate || !saryeongMap[monthJi]) return null;
+
+  const birthDate = new Date(birthYear, birthMonth - 1, birthDay);
+  const dayDiff = (birthDate - jeolgiDate) / (1000 * 60 * 60 * 24);
+
+  const [early, late] = saryeongMap[monthJi];
+
+  return (dayDiff >= 15) ? late : early;  // ✅ 수정 포인트!
+}
+

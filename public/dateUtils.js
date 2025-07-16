@@ -26,7 +26,7 @@ export function calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor) {
   if (age >= 10) {
     age -= 10;
   }
-  return Math.round(age * 10) / 10;
+  return Number(age.toFixed(2));
 }
 
 export function getJeolipDate(year, month) {

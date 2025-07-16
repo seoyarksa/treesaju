@@ -1,8 +1,8 @@
 // renderUtils.js
 //함수종류
 //renderDaeyunTable, renderDaeyunTable, highlightCurrentDaeyunByAge, renderYearlyGanjiSeries,
-//renderMonthlyGanjiSeries, handleDaeyunClick, elementColors, renderTodaySajuBox
-
+//renderMonthlyGanjiSeries, handleDaeyunClick, elementColors, renderTodaySajuBox, renderDangryeong
+//attachSewoonClickListeners, 
 
 
 
@@ -77,7 +77,8 @@ export function renderDaeyunTable({ daeyunAge, ageLabels, pairsToRender, birthYe
 
             const tenGodStem = getTenGod(window.dayGanKorGan, stem);
 
-            const hiddenStems = hiddenStemsMap[branch] || [];
+            const hiddenStems = 
+            [branch] || [];
             let targetStemKor = '';
             if (hiddenStems.length === 3) targetStemKor = hiddenStems[2];
             else if (hiddenStems.length === 2) targetStemKor = hiddenStems[1];
@@ -114,10 +115,11 @@ export function renderDaeyunTable({ daeyunAge, ageLabels, pairsToRender, birthYe
 
 
 //하이라이트 대운셀
-export function highlightCurrentDaeyunByAge(correctedStartAge, birthDate) {
-  const index = getCurrentDaeyunIndexFromStartAge(correctedStartAge, birthDate);
+export function highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD) {
+   console.log('▶ 대운 시작 나이:', correctedStartAge);
+  const index = getCurrentDaeyunIndexFromStartAge(correctedStartAge, birthDateYMD);
   window.currentDaeyunIndex = index;
-
+  console.log('▶ window.daYunDirection:', window.daYunDirection);
   document.querySelectorAll('.daeyun-cell').forEach((cell, idx) => {
     cell.classList.toggle('selected', idx === index);
 
@@ -174,7 +176,7 @@ export function renderYearlyGanjiSeries(baseYear, stems, branches) {
     const year = baseYear + i;
 // 🎯 renderYearlyGanjiSeries 내부 세운 셀 코드
 dataRow.innerHTML += `
-  <td class="sewoon-cell" data-index="${i}" onclick="handleSewoonClick(${year.toFixed(2)}, '${stemKor}', '${branchKor}', ${i})">
+  <td class="sewoon-cell" data-index="${i}" data-year="${year.toFixed(2)}" data-stem="${stemKor}" data-branch="${branchKor}">
     <div style="font-size:0.85rem; color:#999;">${year.toFixed(2)}</div>
     <div style="font-size:0.85rem;">${colorize(stemHan)}</div>
     <div style="font-size:0.75rem; color:#999;">(${tenGodStem})</div>
@@ -231,6 +233,19 @@ export function renderMonthlyGanjiSeries(baseYear, sewoonStem) {
 }
 
 
+
+export function attachSewoonClickListeners() {
+  const cells = document.querySelectorAll('.sewoon-cell');
+  cells.forEach((cell, index) => {
+    cell.addEventListener('click', () => {
+      const year = parseFloat(cell.dataset.year);
+      const stemKor = cell.dataset.stem;
+      const branchKor = cell.dataset.branch;
+      handleSewoonClick(year, stemKor, branchKor, index);
+    });
+  });
+}
+
 //대운 클릭시 세운 렌더링 함수
 export function handleDaeyunClick(birthYear,birthMonth, birthDay,  index) {
     // 월운 출력 영역 초기화
@@ -275,7 +290,10 @@ const baseYear = direction === 1
 
   // 🖼️ 세운 테이블 렌더링
   renderYearlyGanjiSeries(baseYear, yearlyStems, yearlyBranches);
+  // ✅ 클릭 이벤트 다시 연결
+  attachSewoonClickListeners();
 }
+
 
 
 //세운 클릭시 월운렌더링 함수
@@ -302,7 +320,7 @@ export function renderTodaySajuBox({ yearGanji, monthGanji, dayGanji, timeGanji,
   if (!container) return;
 
   container.innerHTML = `
-  <div style="margin-top:2rem;">
+  <div style="margin-top:1rem;">
     <h3 style="font-size:1rem; margin-left:20px;">📆 오늘의 사주 (${todayStr})</h3>
     <table class="ganji-table" style="font-size: 0.8rem; margin-left:20px;">
                <thead>
@@ -335,4 +353,32 @@ export function renderTodaySajuBox({ yearGanji, monthGanji, dayGanji, timeGanji,
   </div>`;
 }
 
+
+// renderUtils.js
+
+export function renderDangryeong(dangryeong, saryeong) {
+  const container = document.getElementById("dangryeong-container");
+  if (!container) return;
+
+  const dangryeongshik = dangryeong && saryeong ? `${dangryeong}${saryeong}` : "-";
+
+  container.innerHTML = `
+    <table class="dangryeong-table" style="margin: 10px 0; border-collapse: collapse; font-size: 1rem;">
+      <thead>
+        <tr>
+          <th style="padding: 6px; border: 1px solid #ccc;">당령</th>
+          <th style="padding: 6px; border: 1px solid #ccc;">사령</th>
+          <th style="padding: 6px; border: 1px solid #ccc;">당령식</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding: 6px; text-align: center; border: 1px solid #ccc;">${dangryeong || "-"}</td>
+          <td style="padding: 6px; text-align: center; border: 1px solid #ccc;">${saryeong || "-"}</td>
+          <td style="padding: 6px; text-align: center; border: 1px solid #ccc;">${dangryeongshik}</td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+}
 

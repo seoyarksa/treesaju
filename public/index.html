@@ -115,6 +115,24 @@
     color: #222;
     text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
   }
+.btn-success {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-success:hover {
+  background-color: #218838;
+}
+.sewoon-cell.selected {
+  background-color: #dff0d8; /* 연한 연두색 */
+  border: 2px solid #28a745;
+  box-shadow: 0 0 4px rgba(40,167,69,0.5);
+}
+
 
 </style>
 </head>
@@ -224,9 +242,13 @@
   <option value="58">58분</option>
   <option value="59">59분</option>
 </select><br />
-    <button type="submit">사주 출력</button>
-  </form>
+<button type="submit" class="btn-success">사주 출력</button>
 
+
+  </form>
+<div class="note-box">
+  ※ 태어난 분대가 20~40분(30분 근처)에 있는 분은 정확한 시주가 산출되지 않을 수도 있으니 따로 확인해 주세요! 한국썸머타임은 적용된 상태입니다. 
+</div>
   <div id="result"></div>
   <div id="sewoon"></div>
   <div id="today-saju-container" style="margin-top:30px;"></div>
