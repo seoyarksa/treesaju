@@ -2,7 +2,16 @@
 
 
 // 상수
-import { stemOrder, branchOrder } from './constants.js';
+import { 
+  stemOrder, 
+  branchOrder, 
+  elementMap, 
+  DANGRYEONGSHIK_MAP,
+  yukshinToKey,  
+  jijiToSibganMap, 
+  GYEOKGUK_TYPES,
+  jijiToSibganMap2 
+} from './constants.js';
 console.log(stemOrder);
 console.log(stemOrder, branchOrder);
 
@@ -40,7 +49,9 @@ import {
   findStartMonthIndex,
   generateMonthlyGanjiSeriesByGanji,
   getDangryeong,
-  getSaryeong
+  getSaryeong,
+  getdangryeongshik, 
+  dangryeongshik
 } from './sajuUtils.js';
 //
 
@@ -53,10 +64,18 @@ import {
   handleSewoonClick,
   elementColors,
   renderTodaySajuBox,
-  renderDangryeong, 
-  attachSewoonClickListeners 
+  createDangryeongTableHtml,
+  renderDangryeongShik
 } from './renderUtils.js';
 
+import {
+  getGyeokForMonth,
+  hasSamhap,
+  getGyeokName,
+  getYukshin 
+} from './gyeokUtils.js';
+
+//
 window.handleDaeyunClick = handleDaeyunClick;
 window.handleSewoonClick = handleSewoonClick;
 
@@ -174,10 +193,10 @@ const calendarType = document.getElementById('calendar-type').value;
   }
    const value = document.getElementById('birth-date').value;
   const inputyear = parseInt(value.split('-')[0]);
-if (inputyear < 1000 || inputyear > 9999) {
-    e.preventDefault();
-    alert("연도는 반드시 4자리로 입력하세요.");
-  }
+//if (inputyear < 1000 || inputyear > 9999) {
+  //  e.preventDefault();
+  //  alert("연도는 반드시 4자리로 입력하세요.");
+ // }
   if (!dateStr || isNaN(hour12) || isNaN(minute)) {
     alert('날짜와 시간을 모두 입력하세요');
     return;
@@ -198,7 +217,20 @@ if (inputyear < 1000 || inputyear > 9999) {
     alert('오전/오후를 선택하세요');
     return;
   }
-  let [year, month, day] = dateStr.split('-').map(Number);
+  let year, month, day;
+
+if (dateStr.includes("-")) {
+  // YYYY-MM-DD 형식
+  [year, month, day] = dateStr.split("-").map(Number);
+} else if (/^\d{8}$/.test(dateStr)) {
+  // YYYYMMDD 형식
+  year = parseInt(dateStr.slice(0, 4));
+  month = parseInt(dateStr.slice(4, 6));
+  day = parseInt(dateStr.slice(6, 8));
+} else {
+  alert("날짜 형식이 잘못되었습니다. YYYY-MM-DD 또는 YYYYMMDD 형식으로 입력하세요.");
+  return;
+}
   let hour = hour12;
   if (ampm === 'PM' && hour12 < 12) hour += 12;
   if (ampm === 'AM' && hour12 === 12) hour = 0;
@@ -295,29 +327,100 @@ const dayGanKorGan = convertHanToKorStem(dayGanji.gan);
 const birthMonth = parseInt(window.birthMonth, 10); // 👈 명확히 숫자로 변환
 const birthDay = parseInt(window.birthDay, 10);
 const monthJi = monthGanji.ji;  // 월지(예: '子', '丑' 등)
-
-
+const daYunDirection = getDaYunDirection(gender, yearStemKor);
+console.log('gender:', gender);
+console.log('yearStemKor:', yearStemKor);
+console.log('⚡ daYunDirection (1: 순행, -1: 역행):', daYunDirection);
+window.daYunDirection = getDaYunDirection(gender, yearStemKor);
 // 당령 구하는 함수 호출 (sajuUtils.js에서 import 되어 있어야 함)
-const dangryeong = getDangryeong(monthGanji.ji, window.birthMonth, window.birthDay);
+const dangryeong = getDangryeong(monthGanji.ji, daeyunAge, daYunDirection);
 console.log('당령:', dangryeong);
-const saryeong = getSaryeong(monthGanji.ji, birthYear, birthMonth, birthDay);
+console.log('▶ before getSaryeong call, daeyunAge:', daeyunAge, 'monthJi:', monthJi);
 
-renderDangryeong(dangryeong, saryeong);
+const saryeong = getSaryeong(monthGanji.ji, daeyunAge, window.daYunDirection);
+
+console.log('▶ after getSaryeong call, saryeong:', saryeong);
+createDangryeongTableHtml(dangryeong, saryeong);
 console.log("사령:", saryeong);
 
 // 당령 결과를 UI에 표시하거나 전역 변수로 저장 가능
 window.dangryeong = dangryeong;
 
+// 사주 천간과 지지를 result에서 추출
+const sajuChungan = [timeGanji.gan, dayGanji.gan, monthGanji.gan, yearGanji.gan];
+const sajuJiji = [timeGanji.ji, dayGanji.ji, monthGanji.ji, yearGanji.ji];
 
+
+
+const chunganList = [timeGanji.gan, dayGanji.gan, monthGanji.gan, yearGanji.gan];
+const dayGan = dayGanji.gan;  // 일간 천간
+
+console.log(yearGanji, monthGanji, dayGanji, timeGanji);
+console.log('사주 천간:', sajuChungan);
+console.log('천간 리스트:', chunganList);
+console.log('일간:', dayGan);
+console.log('대운 나이:', daeyunAge);
+console.log('대운 방향:', daYunDirection);
+console.log('사령:', saryeong);
+
+// 격국 분석 호출
+const gyeok = getGyeokForMonth({
+  monthJi: monthGanji.ji,
+  saryeong,
+  chunganList, // 여기서 위에서 선언한 것을 사용
+  dayGan,
+  daeyunAge,
+  daYunDirection,
+});
+console.log("▶ monthJi:", monthGanji.ji);
+console.log("▶ saryeong:", saryeong);
+console.log("▶ chunganList:", chunganList);
+console.log("▶ dayGan:", dayGan);
+console.log("▶ daeyunAge:", daeyunAge);
+console.log("▶ daYunDirection:", daYunDirection);
+
+console.log("격국:", gyeok);
+
+
+console.log("🧪 getGyeokForMonth 결과:", gyeok);
+// 당령 및 사령 추출 (이미 계산되어 있다면)
+// ✅ 여기서는 바로 호출만 하세요
+renderAllDangryeong(dangryeong, saryeong, sajuChungan, sajuJiji);
 // 월간/월지 기준 시작 간지
+function renderAllDangryeong(dangryeong, saryeong, sajuChungan, sajuJiji) {
+  const dangryeongShikArray = getdangryeongshik(dangryeong);
+  const dangryeongHtml = createDangryeongTableHtml(dangryeong, saryeong, dangryeongShikArray);
+  console.log(dangryeongHtml);
+
+  function doRender() {
+    const container = document.getElementById("result");
+    if (!container) {
+      console.error("#result 요소가 존재하지 않습니다.");
+      return;
+    }
+    //container.innerHTML += dangryeongHtml;
+
+    const mapped = dangryeongshik(dangryeongShikArray, sajuChungan, sajuJiji, jijiToSibganMap);
+    renderDangryeongShik(mapped);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", doRender);
+  } else {
+    setTimeout(doRender, 0);
+
+  }
+}
+
 
 // 대운 간지 배열 생성
+// 1. 먼저 필요한 배열 생성
+const dangryeongShikArray = getdangryeongshik(dangryeong);
+
+// 2. HTML을 생성해서 HTML에 직접 삽입하거나 템플릿에 사용
+const dangryeongHtml = createDangryeongTableHtml(dangryeong, saryeong, dangryeongShikArray);
 
 
-const daYunDirection = getDaYunDirection(gender, yearStemKor);
-console.log('gender:', gender);
-console.log('yearStemKor:', yearStemKor);
-console.log('⚡ daYunDirection (1: 순행, -1: 역행):', daYunDirection);
 const startStemKor = convertHanToKorStem(monthGanji.gan);
 const startBranchKor = normalizeBranch(monthGanji.ji);
   console.log('대운 시작 천간 (한글):', startStemKor);
@@ -580,7 +683,7 @@ window.handleDaeyunClick = handleDaeyunClick;
 
 <!-- 당령 표시용 영역 -->
      <div style="display: flex; justify-content: center; margin-top: 1rem;">
-      <table class="dangryeong-table" style="
+     <table class="dangryeong-table" style="
         border-collapse: collapse;
         font-size: 1rem;
         text-align: center;
@@ -588,18 +691,20 @@ window.handleDaeyunClick = handleDaeyunClick;
         max-width: 600px;
         border: 1px solid #ccc;
       ">
-        <thead>
+        <thead></thead>
       <tbody>
         <tr>
-          <td style="border:1px solid #ccc; padding:4px;">당령:${dangryeong || '-'}</td>
-          <td style="border:1px solid #ccc; padding:4px;">사령:${saryeong || '-'}</td>
-          <td style="border:1px solid #ccc; padding:4px;">당령식:${dangryeong && saryeong ? dangryeong + saryeong : '-'}</td>
-          <td style="border:1px solid #ccc; padding:4px;">격국:</td>
+          <td style="border:1px solid #ccc; padding:4px;">오행${dangryeongHtml || "-"}</td>
+          <td style="border:1px solid #ccc; padding:4px;">육신</td>
+        </tr>
+         <tr>
+          <td style="border:1px solid #ccc; padding:4px;"><div id="dangryeongshik-container" style="margin-top: 0.5rem;"></div></td>
+          <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-display"></div></td>
         </tr>
       </tbody>
     </table>
+      
   </div>
-
 
 
  <!-- ✅ 대운 테이블 -->
@@ -623,6 +728,25 @@ console.log('pairsToRender 전체:', pairsToRender);
 pairsToRender.forEach((p, i) => {
   console.log(`index ${i} 타입: ${typeof p}, 값:`, p);
 });
+
+
+console.log('🧪 getGyeokForMonth 결과:', gyeok);
+
+let gyeokDisplayText = '판별불가';
+
+if (gyeok && typeof gyeok === 'object' && gyeok.stem) {
+  // 격국명 직접 변환
+  gyeokDisplayText = getGyeokName(dayGan, gyeok.stem);
+} else if (typeof gyeok === 'string') {
+  // 문자열이면 그대로 출력 (예: '건록격' 등)
+  gyeokDisplayText = gyeok;
+}
+
+const gyeokDisplayEl = document.getElementById("gyeok-display");
+if (gyeokDisplayEl) {
+  gyeokDisplayEl.textContent = `격국: ${gyeokDisplayText}`;
+}
+
 
 // ✅ 여기서 대운 테이블을 동적으로 렌더링!
 renderDaeyunTable({

@@ -6,7 +6,12 @@
 
 
 
-import { stemOrder, branchOrder } from './constants.js';
+import { stemOrder, 
+        branchOrder, 
+        DANGRYEONGSHIK_MAP,
+         jijiToSibganMap,
+         firstHeesinMap 
+      } from './constants.js';
 
 import {
   convertKorToHanStem,
@@ -29,7 +34,8 @@ import {
   getStartMonthBySewoonStem,
   calculateSewonYear,
   findStartMonthIndex,
-  generateMonthlyGanjiSeriesByGanji
+  generateMonthlyGanjiSeriesByGanji,
+  getdangryeongshik
 } from './sajuUtils.js';
 
 
@@ -356,29 +362,138 @@ export function renderTodaySajuBox({ yearGanji, monthGanji, dayGanji, timeGanji,
 
 // renderUtils.js
 
-export function renderDangryeong(dangryeong, saryeong) {
-  const container = document.getElementById("dangryeong-container");
-  if (!container) return;
+export function createDangryeongTableHtml(dangryeong, saryeong, dangryeongShikArray) {
+  if (!dangryeongShikArray || dangryeongShikArray.length === 0) {
+    return `<div>당령식 데이터가 없습니다.</div>`;
+  }
+const firstHeesin = firstHeesinMap[dangryeong];
+const dangryeongshikHtml = dangryeongShikArray.map((char, i) => {
+  if (char === dangryeong) {
+    return `<span style="color: red; font-weight: bold;">${char}</span>`;
+  } else if (char === firstHeesin) {
+    return `<span style="color: green; font-weight: bold;">${char}</span>`; // 제1희신은 녹색 예시
+  } else {
+    return `<span>${char}</span>`;
+  }
+}).join(' ');
 
-  const dangryeongshik = dangryeong && saryeong ? `${dangryeong}${saryeong}` : "-";
 
-  container.innerHTML = `
-    <table class="dangryeong-table" style="margin: 10px 0; border-collapse: collapse; font-size: 1rem;">
-      <thead>
-        <tr>
-          <th style="padding: 6px; border: 1px solid #ccc;">당령</th>
-          <th style="padding: 6px; border: 1px solid #ccc;">사령</th>
-          <th style="padding: 6px; border: 1px solid #ccc;">당령식</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td style="padding: 6px; text-align: center; border: 1px solid #ccc;">${dangryeong || "-"}</td>
-          <td style="padding: 6px; text-align: center; border: 1px solid #ccc;">${saryeong || "-"}</td>
-          <td style="padding: 6px; text-align: center; border: 1px solid #ccc;">${dangryeongshik}</td>
-        </tr>
-      </tbody>
-    </table>
+  return `
+    <div style="display: flex; justify-content: center; margin-top: 1rem;">
+      <table class="dangryeong-table" style="
+        border-collapse: collapse;
+        font-size: 1rem;
+        text-align: center;
+        width: 100%;
+        max-width: 600px;
+        border: 1px solid #ccc;
+      ">
+        <tbody>
+          <tr>
+            <td style="border:1px solid #ccc; padding:4px;">당령: ${dangryeong || '-'}</td>
+            <td style="border:1px solid #ccc; padding:4px;">사령: ${saryeong || '-'}</td>
+            <td style="border:1px solid #ccc; padding:4px;">당령식: ${dangryeongshikHtml || '-'}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   `;
 }
+
+
+
+export function renderDangryeongShik(mapped) {
+  const container = document.getElementById('dangryeongshik-container');
+  container.innerHTML = ''; // 초기화
+
+  // 라벨 셀 생성 함수
+  const createLabel = (text) => {
+    const label = document.createElement('span');
+    label.style.width = '50px';
+    label.style.textAlign = 'right';
+    label.style.marginRight = '10px';
+    label.style.fontWeight = 'bold';
+    label.textContent = text;
+    return label;
+  };
+
+  // 공통 span 생성 함수
+  const createSpan = (item, show, wrap = false) => {
+    const span = document.createElement('span');
+    span.style.width = '40px';
+    span.style.textAlign = 'center';
+
+    if (!show || item.isDangryeong) {
+      span.textContent = '';
+      span.style.color = 'transparent';
+      return span;
+    }
+
+    const char = wrap ? `(${item.char})` : item.char;
+    span.textContent = char;
+
+    if (item.isFirstHeesin) {
+      span.style.color = 'green';
+      span.style.fontWeight = 'bold';
+    } else {
+      span.style.color = 'black';
+      span.style.fontWeight = 'normal';
+    }
+
+    return span;
+  };
+
+  // 윗줄: 사주 천간
+  const topRow = document.createElement('div');
+  topRow.style.display = 'flex';
+  topRow.style.justifyContent = 'center';
+  topRow.style.marginBottom = '2px';
+  topRow.appendChild(createLabel('干희신'));
+  mapped.forEach(item => {
+    const span = createSpan(item, item.highlightChungan);
+    topRow.appendChild(span);
+  });
+  container.appendChild(topRow);
+
+  // 중간줄: 당령식
+  const midRow = document.createElement('div');
+  midRow.style.display = 'flex';
+  midRow.style.justifyContent = 'center';
+  midRow.style.marginBottom = '2px';
+  midRow.appendChild(createLabel('당령식'));
+  mapped.forEach(item => {
+    const span = document.createElement('span');
+    span.style.width = '40px';
+    span.style.textAlign = 'center';
+    span.textContent = item.char;
+
+    // 색상 처리
+    if (item.isDangryeong) {
+      span.style.color = 'red';
+      span.style.fontWeight = 'bold';
+    } else if (item.isFirstHeesin) {
+      span.style.color = 'green';
+      span.style.fontWeight = 'bold';
+    } else {
+      span.style.color = 'black';
+      span.style.fontWeight = 'normal';
+    }
+
+    midRow.appendChild(span);
+  });
+  container.appendChild(midRow);
+
+  // 아랫줄: 사주 지지에 포함된 천간
+  const bottomRow = document.createElement('div');
+  bottomRow.style.display = 'flex';
+  bottomRow.style.justifyContent = 'center';
+  bottomRow.appendChild(createLabel('支희신'));
+  mapped.forEach(item => {
+    const span = createSpan(item, item.highlightJiji, item.wrapInParens);
+    bottomRow.appendChild(span);
+  });
+  container.appendChild(bottomRow);
+}
+
+
 

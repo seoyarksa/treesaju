@@ -6,7 +6,6 @@
 
 <title>트리 만세력</title>
 
-<script type="module" src="app.js"></script>
 
 <style>
   body {
@@ -135,6 +134,11 @@
 
 
 </style>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+<!-- 2. flatpickr JS (★ 먼저 불러와야 함) -->
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 </head>
 <body>
 
@@ -149,19 +153,21 @@
 
   <h1>트리 만세력</h1>
 
-  <form id="saju-form">
+    <form id="saju-form">
     <label>생년월일:</label> 
-    <input type="date" id="birth-date" required />
+    <input  type="text" id="birth-date" placeholder="YYYYMMDD" class="birthdate-input" />
+ 
+    
     <select id="calendar-type" name="calendar-type">
       <option value="" ></option>
-      <option value="solar" >양력</option>
+      <option value="solar" selected>양력</option>
       <option value="lunar">음력</option>
     </select><br />
     <label>성별:</label>
-    <label><input type="radio" name="gender" value="male" > 남자</label>
+    <label><input type="radio" name="gender" value="male" checked> 남자</label>
     <label><input type="radio" name="gender" value="female"> 여자</label><br />
     <label>출생 시간:</label>
-    <label><input type="radio" name="ampm" value="AM" > 오전</label>
+    <label><input type="radio" name="ampm" value="AM" checked> 오전</label>
     <label><input type="radio" name="ampm" value="PM"> 오후</label>
     <label>+</label>
     <select id="hour-select">
@@ -173,7 +179,7 @@
       <option value="5">5시</option>
       <option value="6">6시</option>
       <option value="7">7시</option>
-      <option value="8">8시</option>
+      <option value="8" selected>8시</option>
       <option value="9">9시</option>
       <option value="10">10시</option>
       <option value="11">11시</option>
@@ -211,7 +217,7 @@
   <option value="27">27분</option>
   <option value="28">28분</option>
   <option value="29">29분</option>
-  <option value="30">30분</option>
+  <option value="30"selected>30분</option>
   <option value="31">31분</option>
   <option value="32">32분</option>
   <option value="33">33분</option>
@@ -246,12 +252,11 @@
 
 
   </form>
+
 <div class="note-box">
   ※ 태어난 분대가 20~40분(30분 근처)에 있는 분은 정확한 시주가 산출되지 않을 수도 있으니 따로 확인해 주세요! 한국썸머타임은 적용된 상태입니다. 
 </div>
   <div id="result"></div>
-  <div id="dangryeong-container"></div>
-
   <div id="sewoon"></div>
   <div id="today-saju-container" style="margin-top:30px;"></div>
 
@@ -263,9 +268,19 @@
   </div>
 </div>
 
+
 <!-- EmailJS SDK 추가 -->
 <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
-
+<script type="module" src="app.js"></script>
+   <script>
+    flatpickr("#birthdate", {
+      dateFormat: "Y-m-d",
+      allowInput: true,
+      //maxDate: "2100-12-31",
+      //minDate: "1900-01-01",
+      defaultDate: "1969-08-23" //초기날짜값
+    });
+  </script>
 </body>
 </html>
 

@@ -11,7 +11,10 @@
 
 import { stemOrder, 
          branchOrder,
-         saryeongMap
+         saryeongMap,
+         DANGRYEONGSHIK_MAP,
+         jijiToSibganMap,
+         firstHeesinMap
         } from './constants.js';
 import { elementColors } from './renderUtils.js';
 import { getJeolipDate } from './dateUtils.js'; // 절입일 계산 함수
@@ -19,7 +22,7 @@ import { getJeolipDate } from './dateUtils.js'; // 절입일 계산 함수
 const yangStems = ['갑', '병', '무', '경', '임'];
 
 // 천간한자 → 한글
-const hanToKorStem = {
+export const hanToKorStem = {
   '甲': '갑', '乙': '을', '丙': '병', '丁': '정', '戊': '무', '己': '기',
   '庚': '경', '辛': '신', '壬': '임', '癸': '계'
 };
@@ -297,18 +300,18 @@ export function generateMonthlyGanjiSeriesByGanji(startStem, startBranch) {
 // 1) 상수: dangryeongMap, solarTerms, isBefore 함수 (파일 상단이나 중간 어디든 가능)
 
 export const dangryeongMap = {
-  '子': { beforeDongji: '壬', afterDongji: '癸' },
-  '丑': '癸',
-  '寅': '甲',
-  '卯': { beforeChunbun: '甲', afterChunbun: '乙' },
-  '辰': '乙',
-  '巳': '丙',
-  '午': { beforeHaji: '丙', afterHaji: '丁' },
-  '未': '丁',
-  '申': '庚',
-  '酉': { beforeChubun: '庚', afterChubun: '辛' },
-  '戌': '辛',
-  '亥': '壬'
+  '子': ['壬', '癸'],  // 전반:壬, 후반:癸
+  '丑': ['癸', '癸'],  // 절기 구분 없으니 동일하게 두 개 넣어도 무방
+  '寅': ['甲', '甲'],
+  '卯': ['甲', '乙'],
+  '辰': ['乙', '乙'],
+  '巳': ['丙', '丙'],
+  '午': ['丙', '丁'],
+  '未': ['丁', '丁'],
+  '申': ['庚', '庚'],
+  '酉': ['庚', '辛'],
+  '戌': ['辛', '辛'],
+  '亥': ['壬', '壬']
 };
 
 export const solarTerms = {
@@ -326,38 +329,94 @@ export function isBefore(month, day, term) {
 
 // 2) 당령 구하는 함수도 추가
 
-export function getDangryeong(monthJi, birthMonth, birthDay) {
+export function getDangryeong(monthJi, daeyunAge, daYunDirection) {
   const d = dangryeongMap[monthJi];
   if (!d) {
     console.warn('당령을 찾을 수 없는 월지:', monthJi);
     return '';
   }
-  if (typeof d === 'string') return d;
-  if (monthJi === '子') {
-    return isBefore(birthMonth, birthDay, solarTerms.dongji) ? d.beforeDongji : d.afterDongji;
+  if (!Array.isArray(d)) {
+    // 배열이 아니면 둘 다 같은 값으로 간주
+    return d;
   }
-  if (monthJi === '卯') {
-    return isBefore(birthMonth, birthDay, solarTerms.chunbun) ? d.beforeChunbun : d.afterChunbun;
+
+  const threshold = 15;
+  const value = daeyunAge * 3;
+
+  let isSecondHalf;
+
+  if (daYunDirection === -1) { // 역행
+    isSecondHalf = value >= threshold;  // 역행이고 15 이상이면 후반
+  } else if (daYunDirection === 1) {  // 순행
+    isSecondHalf = value < threshold;   // 순행이고 15 미만이면 후반
+  } else {
+    console.warn('알 수 없는 대운 방향:', daYunDirection);
+    return '';
   }
-  if (monthJi === '午') {
-    return isBefore(birthMonth, birthDay, solarTerms.haji) ? d.beforeHaji : d.afterHaji;
-  }
-  if (monthJi === '酉') {
-    return isBefore(birthMonth, birthDay, solarTerms.chubun) ? d.beforeChubun : d.afterChubun;
-  }
-  return '';
+
+  return isSecondHalf ? d[1] : d[0];
 }
 
 
-export function getSaryeong(monthJi, birthYear, birthMonth, birthDay) {
-  const jeolgiDate = getJeolipDate(birthYear, birthMonth); // 절기 시작일
-  if (!jeolgiDate || !saryeongMap[monthJi]) return null;
 
-  const birthDate = new Date(birthYear, birthMonth - 1, birthDay);
-  const dayDiff = (birthDate - jeolgiDate) / (1000 * 60 * 60 * 24);
+export function getSaryeong(monthJi, daeyunAge, direction) {
+  console.log('[getSaryeong] monthJi:', monthJi, 'daeyunAge:', daeyunAge, 'direction:', window.daYunDirection);
+  if (direction === undefined) {
+    throw new Error("⚠️ 대운 방향(direction)이 정의되지 않았습니다.");
+  }
+
+
+  if (!saryeongMap[monthJi]) return null;
 
   const [early, late] = saryeongMap[monthJi];
+  const scaledValue = daeyunAge * 3;
+  console.log('[getSaryeong] scaledValue:', scaledValue);
 
-  return (dayDiff >= 15) ? late : early;  // ✅ 수정 포인트!
+  if (direction === -1) {
+    return scaledValue >= 15 ? late : early;
+  } else {
+    return scaledValue >= 15 ? early : late;
+  }
+
 }
+
+export function getdangryeongshik(dangryeong) {
+  return DANGRYEONGSHIK_MAP[dangryeong] || [];
+}
+
+// 천간 배열에 대해 사주 천간, 사주 지지와 매핑 정보 생성
+export function dangryeongshik(tianganArray, sajuChungan, sajuJiji, jijiToSibganMap) {
+const firstHeesin = firstHeesinMap[dangryeong];
+  return tianganArray.map((char, index) => {
+    const highlightChungan = sajuChungan.includes(char);
+
+    let highlightJiji = false;
+    let wrapInParens = false;
+
+    for (const jiji of sajuJiji) {
+      const sibganList = jijiToSibganMap[jiji] || [];
+
+      for (const item of sibganList) {
+        const sibganChar = typeof item === 'string' ? item : item.char;
+        const wrap = typeof item === 'string' ? false : item.wrap;
+
+        if (sibganChar === char) {
+          highlightJiji = true;
+          if (wrap) wrapInParens = true;
+        }
+      }
+    }
+
+    return {
+      char,
+      highlightChungan,
+      highlightJiji,
+      isDangryeong: char === dangryeong,
+      isFirstHeesin: char === firstHeesin,
+      wrapInParens
+    };
+  });
+}
+
+
 
