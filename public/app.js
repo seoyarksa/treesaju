@@ -765,7 +765,7 @@ console.log('✅ dayGan:', dayGan, 'gyeok.stem:', gyeok?.stem);
 
 const flowEl = document.getElementById("gyeok-flow");
 console.log(flowEl); // null이면 요소 못 찾음
-if (flowEl) flowEl.innerHTML = renderGyeokFlowStyled(gyeok, useStem, seekStem);
+if (flowEl) flowEl.innerHTML = renderGyeokFlowStyled(gyeok);
 
 
 // ✅ 여기서 대운 테이블을 동적으로 렌더링!

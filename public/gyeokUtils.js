@@ -186,7 +186,7 @@ export function renderGyeokFlow(gyeok) {
   return `${use.char}(${use.relation}) → [${gyeok.char}(${gyeok.stem})] → ${seek.char}(${seek.relation})`;
 }
 
-export function renderGyeokFlowStyled(gyeok, useStem, seekStem) {
+export function renderGyeokFlowStyled(gyeok) {
   if (!gyeok || !gyeok.char || !gyeok.stem) return '격국 정보 없음';
 
   const charRaw = gyeok.char;
@@ -199,7 +199,13 @@ export function renderGyeokFlowStyled(gyeok, useStem, seekStem) {
   if (!relationInfo) return `[${charRaw}(${stem})]`;
 
   const { use, seek } = relationInfo;
+  const useLabel = use.char;
+  const seekLabel = seek.char;
   const relation = use.relation?.trim();
+
+  console.log("char =", char);
+console.log("GYEOK_RELATIONS[char] =", GYEOK_RELATIONS[char]);
+
 // ✅ 길신격 도식 (상신이 격을 생함)
 if (relation === '생') {
   return `
