@@ -1,6 +1,6 @@
 // app.js
 // git add .
-// git commit -m "폼수정"    
+// git commit -m "격국수정"  
 // git push origin main
 // git push
 
@@ -76,7 +76,9 @@ import {
   hasSamhap,
   getGyeokName,
   getYukshin,
-  getUseGuByGyeok 
+  getUseGuByGyeok,
+  renderGyeokFlow,
+  renderGyeokFlowStyled 
 } from './gyeokUtils.js';
 
 //
@@ -185,8 +187,13 @@ document.getElementById('saju-form').addEventListener('submit', async (e) => {
   e.preventDefault();
 
   const dateStr = document.getElementById('birth-date').value;
-  const ampm = document.querySelector('input[name="ampm"]:checked');
-  const hour12 = parseInt(document.getElementById('hour-select').value);
+const ampmInput = document.querySelector('input[name="ampm"]:checked');
+const ampm = ampmInput ? ampmInput.value : null;
+if (!ampm) {
+  alert('오전/오후를 선택하세요');
+  return;
+}
+const hour12 = parseInt(document.getElementById('hour-select').value);
   const minute = parseInt(document.getElementById('minute-select').value);
 const calendarType = document.getElementById('calendar-type').value;
   const genderInput = document.querySelector('input[name="gender"]:checked');
@@ -692,18 +699,18 @@ window.handleDaeyunClick = handleDaeyunClick;
         font-size: 1rem;
         text-align: center;
         width: 100%;
-        max-width: 600px;
+      <!--   max-width: 600px;-->
         border: 1px solid #ccc;
       ">
         <thead></thead>
       <tbody>
         <tr>
           <td style="border:1px solid #ccc; padding:4px;">오행${dangryeongHtml || "-"}</td>
-          <td style="border:1px solid #ccc; padding:4px;">육신</td>
+          <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-display"></div></td>
         </tr>
          <tr>
           <td style="border:1px solid #ccc; padding:4px;"><div id="dangryeongshik-container" style="margin-top: 0.5rem;"></div></td>
-          <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-display"></div></td>
+          <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-flow"></div></td>
         </tr>
       </tbody>
     </table>
@@ -745,11 +752,18 @@ if (gyeok && typeof gyeok === 'object' && gyeok.stem) {
   // 문자열이면 그대로 출력 (예: '건록격' 등)
   gyeokDisplayText = gyeok;
 }
-
+//격국표시
 const gyeokDisplayEl = document.getElementById("gyeok-display");
 if (gyeokDisplayEl) {
   gyeokDisplayEl.textContent = `격국: ${gyeokDisplayText}`;
 }
+// 상신 구신 표시
+console.log('✅ dayGan:', dayGan, 'gyeok.stem:', gyeok?.stem);
+
+
+const flowEl = document.getElementById("gyeok-flow");
+console.log(flowEl); // null이면 요소 못 찾음
+if (flowEl) flowEl.innerHTML = renderGyeokFlowStyled(gyeok, useStem, seekStem);
 
 
 // ✅ 여기서 대운 테이블을 동적으로 렌더링!

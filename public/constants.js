@@ -142,15 +142,15 @@ export const GYEOKGUK_TYPES = {
 
 export const yukshinToKey = {
   정관: 'JEONGGWANG',
+  식신: 'SIGSIN',
   편관: 'PYEONGGWANG',
   정재: 'JAESUNG',
   편재: 'PYEONJAE',
-  식신: 'SIGSIN',
-  상관: 'SANGGWAN',
-  정인: 'INSEONG',
-  편인: 'PYEONIN',
   비견: 'BIGYEON',
   겁재: 'GEOBJAE',
+  정인: 'INSEONG',
+  편인: 'PYEONIN',
+  상관: 'SANGGWAN',
 };
 
 // 양간인지 판단하는 함수
@@ -158,7 +158,7 @@ export function isYangStem(stem) {
   return ['甲', '丙', '戊', '庚', '壬'].includes(stem);
 }
 
-
+//상신구신상수
 export const GYEOK_USE_GU_MAP = {
   '식신격': { use: '비견', seek: '편재' },
   '편재격': { use: '식신', seek: '편관' },
@@ -169,4 +169,45 @@ export const GYEOK_USE_GU_MAP = {
   '편관격': { use: '식신', seek: '편재' },
   '건록격': { use: '정관', seek: '정인' },
   '양인격': { use: '편관', seek: '편인' },
+};
+
+
+export const GYEOK_RELATIONS = {
+  '식신격': {
+    use: { char: '비견', relation: '생' },
+    seek: { char: '편재', relation: '생' },
+  },
+  '편재격': {
+    use: { char: '식신', relation: '생' },
+    seek: { char: '편관', relation: '생' },
+  },
+  '정재격': {
+    use: { char: '상관', relation: '생' },
+    seek: { char: '정관', relation: '생' },
+  },
+  '편인격': {
+    use: { char: '정관', relation: '생' },
+    seek: { char: '비견', relation: '생' },
+  },
+  '정관격': {
+    use: { char: '정재', relation: '생' },
+    seek: { char: '정인', relation: '생' },
+  },
+  // 흉격 4개
+  '상관격': {
+    use: { char: '정인', relation: '극' },
+    seek: { char: '겁재', relation: '생' },
+  },
+  '편관격': {
+    use: { char: '식신', relation: '극' },
+    seek: { char: '편재', relation: '생' },
+  },
+  '건록격': {
+    use: { char: '정관', relation: '극' },
+    seek: { char: '정인', relation: '생' },
+  },
+  '양인격': {
+    use: { char: '편관', relation: '극' },
+    seek: { char: '편인', relation: '생' },
+  }
 };
