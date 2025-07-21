@@ -46,7 +46,7 @@ import {
   getThreeLinesFromArray,
   generateDaYun,
   getGanjiByYear,
-  generateYearlyGanjiSeries,
+
   generateYearlyGanjiSeries2,
   generateDaeyunBy60Gapja,
   getStartMonthBySewoonStem,
@@ -270,7 +270,7 @@ const data = await response.json();
 console.log('서버에서 받은 data:', data);
 console.log('🎯 birthYear:', data.birthYear);
 
-console.log('🎯 daeyunAge1:', data.daeyunAge);
+console.log('🎯 daeyunAge1[역행적용전]:', data.daeyunAge);
 console.log('ganji:', data.ganji);
 console.log('서버 응답 전체:', JSON.stringify(data, null, 2));
 
@@ -476,6 +476,8 @@ for (let i = 1; i < daeyunPairs.length; i++) {
   ageLabels.push(ageValue.toFixed(2));
 }
 
+// 👉 정렬만 내림차순으로 적용
+ageLabels.sort((a, b) => parseFloat(b) - parseFloat(a));
 
 console.log('daeyunPairs:', daeyunPairs.map(p => p.stem + p.branch).join(', '));
 console.log('pairsToRender:', pairsToRender.map(p => p.stem + p.branch).join(', '));
@@ -785,31 +787,30 @@ const birthDateYMD = {
   month: window.birthMonth,
   day: window.birthDay
 };
- const currentDaeyunIndex = getCurrentDaeyunIndexFromStartAge(correctedStartAge, birthDateYMD);
+
+
+const originalIndex = getCurrentDaeyunIndexFromStartAge(correctedStartAge, birthDateYMD);
+const indexToSelect = 9 - originalIndex; // 순행/역행과 무관하게 항상 뒤집어서 적용
+
+// 🔁 대운 정렬 방향 고려한 인덱스 계산
+const currentDaeyunIndex = getCurrentDaeyunIndexFromStartAge(correctedStartAge, birthDateYMD);
+
+// 🔁 정렬 반영된 index
+const sortedIndex = highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD);
+handleDaeyunClick(window.birthYear, window.birthMonth, window.birthDay, sortedIndex);
+
+
 highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD);
 window.currentDaeyunIndex = currentDaeyunIndex;
-console.log('📌 현재 대운 인덱스:', currentDaeyunIndex);
 
-// 👉 자동 세운 + 월운 출력 실행!
-handleDaeyunClick(window.birthYear, window.birthMonth, window.birthDay, currentDaeyunIndex);
+// 📌 handleDaeyunClick에는 **sortedIndex**를 넣어야 UI와 동기화됨
+handleDaeyunClick(window.birthYear, window.birthMonth, window.birthDay, sortedIndex);
+
+
+
 
 // ✅ 대운 강조 초기화 및 강조 적용
-document.querySelectorAll('.daeyun-cell').forEach((cell, index) => {
-  // 기존 강조 제거
-  cell.classList.remove('selected');
 
-  // 자동 강조 적용
-  if (index === currentDaeyunIndex) {
-    cell.classList.add('selected');
-  }
-
-  // 클릭 이벤트 연결
-  cell.addEventListener('click', () => {
-    document.querySelectorAll('.daeyun-cell').forEach(c => c.classList.remove('selected'));
-    cell.classList.add('selected');
-    window.currentDaeyunIndex = index;
-  });
-});
 // 서버에서 ganji 정보 받은 뒤, 마지막에 추가
 // 오늘 날짜 기준 사주
 // 🎯 생일 사주 출력 완료 후 바로 아래!

@@ -28,7 +28,7 @@ import {
   getThreeLinesFromArray,
   generateDaYun,
   getGanjiByYear,
-  generateYearlyGanjiSeries,
+
   generateYearlyGanjiSeries2,
   generateDaeyunBy60Gapja,
   getStartMonthBySewoonStem,
@@ -76,7 +76,8 @@ export function renderDaeyunTable({ daeyunAge, ageLabels, pairsToRender, birthYe
           ${ageLabels.map(age => `<td style="font-size:0.85rem; color:#999;">${age}</td>`).join('')}
         </tr>
         <tr>
-          ${pairsToRender.map((pair, i) => {
+          ${pairsToRender.slice().reverse().map((pair, i) => {
+
             const { stem, branch } = pair;
             const stemHan = convertKorToHanStem(stem);
             const branchHan = convertKorToHanBranch(branch);
@@ -122,20 +123,43 @@ export function renderDaeyunTable({ daeyunAge, ageLabels, pairsToRender, birthYe
 
 //하이라이트 대운셀
 export function highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD) {
-   console.log('▶ 대운 시작 나이:', correctedStartAge);
-  const index = getCurrentDaeyunIndexFromStartAge(correctedStartAge, birthDateYMD);
-  window.currentDaeyunIndex = index;
-  console.log('▶ window.daYunDirection:', window.daYunDirection);
-  document.querySelectorAll('.daeyun-cell').forEach((cell, idx) => {
-    cell.classList.toggle('selected', idx === index);
+  console.log('--- highlightCurrentDaeyunByAge 호출 ---');
+  console.log('▶ 수정된 대운 시작 나이:', correctedStartAge);
 
+  const originalIndex = getCurrentDaeyunIndexFromStartAge(correctedStartAge, birthDateYMD);
+  console.log('▶ getCurrentDaeyunIndexFromStartAge 결과 (originalIndex):', originalIndex);
+
+  const daeyunCells = document.querySelectorAll('.daeyun-cell');
+  console.log('▶ daeyunCells.length:', daeyunCells.length);
+
+  // 무조건 내림차순 배열 기준 (맨 앞이 마지막 대운)
+  const indexToSelect = daeyunCells.length - 1 - originalIndex;
+  console.log('▶ 계산된 선택 인덱스 (indexToSelect):', indexToSelect);
+
+  daeyunCells.forEach((cell, idx) => {
+    cell.classList.toggle('selected', idx === indexToSelect);
     cell.addEventListener('click', () => {
-      document.querySelectorAll('.daeyun-cell').forEach(c => c.classList.remove('selected'));
+      daeyunCells.forEach(c => c.classList.remove('selected'));
       cell.classList.add('selected');
-      window.currentDaeyunIndex = idx;
+      window.currentDaeyunIndex = daeyunCells.length - 1 - idx; // 다시 원래 인덱스로 변환
+      console.log('🎯 클릭한 대운 간지:', cell.textContent.trim());
     });
   });
+
+  // ✅ 정렬 기준에 맞는 인덱스를 저장
+  window.currentDaeyunIndex = indexToSelect;
+  console.log('📌 현재 대운 인덱스 (정렬 반영):', indexToSelect);
+
+  // 🔄 초기 강조 셀 클릭 이벤트 강제 실행 (내부 상태, UI 완전 동기화)
+  if (daeyunCells[indexToSelect]) {
+    daeyunCells[indexToSelect].click();
+  }
+
+  return indexToSelect;
 }
+
+
+
 
 //세운 테이블 렌더링 함수
 export function renderYearlyGanjiSeries(baseYear, stems, branches) {
@@ -158,7 +182,7 @@ export function renderYearlyGanjiSeries(baseYear, stems, branches) {
   const dataRow = document.createElement('tr');
   dataRow.id = 'yearly-series-row';
 
-  for (let i = 0; i < 10; i++) {
+ for (let i = 9; i >= 0; i--) {
     const stemKor = stems[i];
     const branchKor = branches[i];
 
@@ -211,7 +235,8 @@ export function renderMonthlyGanjiSeries(baseYear, sewoonStem) {
   let html = `<table class="daeyun-table" style="margin-top:1rem;">
    <thead><tr><th colspan="12">월운 (${Math.floor(baseYear)}년)</th></tr>
 
-    <tr>${Array.from({ length: 12 }, (_, i) => `<th style="font-size:0.85rem;">${i + 1}월</th>`).join('')}</tr>
+    <tr>${Array.from({ length: 12 }, (_, i) => `<th style="font-size:0.85rem;">${12 - i}월</th>`).join('')}</tr>
+
     </thead><tbody><tr>`;
 
   for (let i = 0; i < 12; i++) {
@@ -253,52 +278,37 @@ export function attachSewoonClickListeners() {
 }
 
 //대운 클릭시 세운 렌더링 함수
-export function handleDaeyunClick(birthYear,birthMonth, birthDay,  index) {
-    // 월운 출력 영역 초기화
+export function handleDaeyunClick(birthYear, birthMonth, birthDay, index) {
   const monthlyContainer = document.getElementById('yearly-ganji-container');
   if (monthlyContainer) {
     monthlyContainer.innerHTML = '';
   }
-  
-    // 🔧 전역 대운 방향 변수 (1: 순행, -1: 역행)
-   console.log('🎯 birthYear:', birthYear, 'birthMonth:', birthMonth, 'birthDay:', birthDay);
-  const direction = window.daYunDirection || 1;
 
-  // ✅ 방향에 따라 실제 대운 인덱스 보정
-  const trueIndex = direction === -1
-    ? window.daeyunPairs.length - 1 - index
-    : index;
+  // 🔧 대운 데이터 (원래 순서)
+  const daeyunCount = window.daeyunPairs.length;
 
-  // 디버깅 출력
-  console.log('handleDaeyunClick index:', index, 'trueIndex:', trueIndex, 'direction:', direction);
+  // ✅ 현재 대운이 내림차순으로 렌더링된 상태이므로 index 역변환
+  const trueIndex = daeyunCount - 1 - index;
 
-  // 🔎 클릭한 대운 간지 쌍 가져오기
+  // 🔍 클릭한 실제 대운 데이터
   const clickedPair = window.daeyunPairs[trueIndex];
   const { stem: clickedDaeyunStem, branch: clickedDaeyunBranch } = clickedPair;
-  console.log('클릭한 대운 간지:', clickedDaeyunStem, clickedDaeyunBranch);
+  console.log('🎯 클릭한 대운 간지:', clickedDaeyunStem, clickedDaeyunBranch);
 
-  // 🔢 간지 인덱스 가져오기
   const stemIndex = stemOrder.indexOf(clickedDaeyunStem);
   const branchIndex = branchOrder.indexOf(clickedDaeyunBranch);
 
-  // 📅 해당 대운의 시작 기준 연도
-// ✅ 기존 baseYear 계산식 대체
-const baseYear = direction === 1
-  ? sewonYear + (trueIndex * 10)
-  : sewonYear + ((window.daeyunPairs.length - 1 - trueIndex) * 10);
+  // ⚠️ 세운 시작 기준 연도 계산 (direction 사용 X)
+  const baseYear = sewonYear + trueIndex * 10;
 
-  // 📦 10년 세운 간지 시리즈 생성
+  // 🔁 세운 생성
   const { yearlyStems, yearlyBranches } = generateYearlyGanjiSeries2(baseYear, stemIndex, branchIndex);
 
-  // 디버깅
-  console.log('window.daYunDirection:', direction);
-  console.log('clicked index:', index, 'true index:', trueIndex);
-
-  // 🖼️ 세운 테이블 렌더링
+  // 🎨 출력
   renderYearlyGanjiSeries(baseYear, yearlyStems, yearlyBranches);
-  // ✅ 클릭 이벤트 다시 연결
   attachSewoonClickListeners();
 }
+
 
 
 

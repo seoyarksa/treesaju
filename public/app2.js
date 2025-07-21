@@ -1,6 +1,11 @@
 // app.js
 
 
+// git add .
+// git commit -m "격국수정"  
+// git push origin main
+// git push
+
 // 상수
 import { 
   stemOrder, 
@@ -41,7 +46,7 @@ import {
   getThreeLinesFromArray,
   generateDaYun,
   getGanjiByYear,
-  generateYearlyGanjiSeries,
+
   generateYearlyGanjiSeries2,
   generateDaeyunBy60Gapja,
   getStartMonthBySewoonStem,
@@ -72,7 +77,10 @@ import {
   getGyeokForMonth,
   hasSamhap,
   getGyeokName,
-  getYukshin 
+  getYukshin,
+  getUseGuByGyeok,
+  renderGyeokFlow,
+  renderGyeokFlowStyled 
 } from './gyeokUtils.js';
 
 //
@@ -181,8 +189,13 @@ document.getElementById('saju-form').addEventListener('submit', async (e) => {
   e.preventDefault();
 
   const dateStr = document.getElementById('birth-date').value;
-  const ampm = document.querySelector('input[name="ampm"]:checked');
-  const hour12 = parseInt(document.getElementById('hour-select').value);
+const ampmInput = document.querySelector('input[name="ampm"]:checked');
+const ampm = ampmInput ? ampmInput.value : null;
+if (!ampm) {
+  alert('오전/오후를 선택하세요');
+  return;
+}
+const hour12 = parseInt(document.getElementById('hour-select').value);
   const minute = parseInt(document.getElementById('minute-select').value);
 const calendarType = document.getElementById('calendar-type').value;
   const genderInput = document.querySelector('input[name="gender"]:checked');
@@ -257,7 +270,7 @@ const data = await response.json();
 console.log('서버에서 받은 data:', data);
 console.log('🎯 birthYear:', data.birthYear);
 
-console.log('🎯 daeyunAge1:', data.daeyunAge);
+console.log('🎯 daeyunAge1[역행적용전]:', data.daeyunAge);
 console.log('ganji:', data.ganji);
 console.log('서버 응답 전체:', JSON.stringify(data, null, 2));
 
@@ -463,6 +476,8 @@ for (let i = 1; i < daeyunPairs.length; i++) {
   ageLabels.push(ageValue.toFixed(2));
 }
 
+// 👉 정렬만 내림차순으로 적용
+ageLabels.sort((a, b) => parseFloat(b) - parseFloat(a));
 
 console.log('daeyunPairs:', daeyunPairs.map(p => p.stem + p.branch).join(', '));
 console.log('pairsToRender:', pairsToRender.map(p => p.stem + p.branch).join(', '));
@@ -688,18 +703,18 @@ window.handleDaeyunClick = handleDaeyunClick;
         font-size: 1rem;
         text-align: center;
         width: 100%;
-        max-width: 600px;
+      <!--   max-width: 600px;-->
         border: 1px solid #ccc;
       ">
         <thead></thead>
       <tbody>
         <tr>
           <td style="border:1px solid #ccc; padding:4px;">오행${dangryeongHtml || "-"}</td>
-          <td style="border:1px solid #ccc; padding:4px;">육신</td>
+          <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-display"></div></td>
         </tr>
          <tr>
           <td style="border:1px solid #ccc; padding:4px;"><div id="dangryeongshik-container" style="margin-top: 0.5rem;"></div></td>
-          <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-display"></div></td>
+          <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-flow"></div></td>
         </tr>
       </tbody>
     </table>
@@ -741,11 +756,18 @@ if (gyeok && typeof gyeok === 'object' && gyeok.stem) {
   // 문자열이면 그대로 출력 (예: '건록격' 등)
   gyeokDisplayText = gyeok;
 }
-
+//격국표시
 const gyeokDisplayEl = document.getElementById("gyeok-display");
 if (gyeokDisplayEl) {
   gyeokDisplayEl.textContent = `격국: ${gyeokDisplayText}`;
 }
+// 상신 구신 표시
+console.log('✅ dayGan:', dayGan, 'gyeok.stem:', gyeok?.stem);
+
+
+const flowEl = document.getElementById("gyeok-flow");
+console.log(flowEl); // null이면 요소 못 찾음
+if (flowEl) flowEl.innerHTML = renderGyeokFlowStyled(gyeok);
 
 
 // ✅ 여기서 대운 테이블을 동적으로 렌더링!
@@ -765,31 +787,30 @@ const birthDateYMD = {
   month: window.birthMonth,
   day: window.birthDay
 };
- const currentDaeyunIndex = getCurrentDaeyunIndexFromStartAge(correctedStartAge, birthDateYMD);
+
+
+const originalIndex = getCurrentDaeyunIndexFromStartAge(correctedStartAge, birthDateYMD);
+const indexToSelect = 9 - originalIndex; // 순행/역행과 무관하게 항상 뒤집어서 적용
+
+// 🔁 대운 정렬 방향 고려한 인덱스 계산
+const currentDaeyunIndex = getCurrentDaeyunIndexFromStartAge(correctedStartAge, birthDateYMD);
+
+// 🔁 정렬 반영된 index
+const sortedIndex = highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD);
+handleDaeyunClick(window.birthYear, window.birthMonth, window.birthDay, sortedIndex);
+
+
 highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD);
 window.currentDaeyunIndex = currentDaeyunIndex;
-console.log('📌 현재 대운 인덱스:', currentDaeyunIndex);
 
-// 👉 자동 세운 + 월운 출력 실행!
-handleDaeyunClick(window.birthYear, window.birthMonth, window.birthDay, currentDaeyunIndex);
+// 📌 handleDaeyunClick에는 **sortedIndex**를 넣어야 UI와 동기화됨
+handleDaeyunClick(window.birthYear, window.birthMonth, window.birthDay, sortedIndex);
+
+
+
 
 // ✅ 대운 강조 초기화 및 강조 적용
-document.querySelectorAll('.daeyun-cell').forEach((cell, index) => {
-  // 기존 강조 제거
-  cell.classList.remove('selected');
 
-  // 자동 강조 적용
-  if (index === currentDaeyunIndex) {
-    cell.classList.add('selected');
-  }
-
-  // 클릭 이벤트 연결
-  cell.addEventListener('click', () => {
-    document.querySelectorAll('.daeyun-cell').forEach(c => c.classList.remove('selected'));
-    cell.classList.add('selected');
-    window.currentDaeyunIndex = index;
-  });
-});
 // 서버에서 ganji 정보 받은 뒤, 마지막에 추가
 // 오늘 날짜 기준 사주
 // 🎯 생일 사주 출력 완료 후 바로 아래!

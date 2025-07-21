@@ -2,7 +2,7 @@
 //함수종류
 //convertKorToHanStem, convertKorToHanBranch, convertHanToKorStem, normalizeBranch, 
 // isYangStem, getDaYunDirection, generateDaYunStems, getTenGod, colorize, splitGanji, 
-// getThreeLinesFromArray, generateDaYun, getGanjiByYear, generateYearlyGanjiSeries, 
+// getThreeLinesFromArray, generateDaYun, getGanjiByYear,
 // generateYearlyGanjiSeries2, generateDaeyunBy60Gapja, getStartMonthBySewoonStem, 
 // calculateSewonYear, findStartMonthIndex, generateMonthlyGanjiSeriesByGanji, getDangryeong,
 //getSaryeong,
@@ -180,28 +180,15 @@ export function getGanjiByYear(year) {
   return { stem, branch };
 }
 
-export function generateYearlyGanjiSeries(startGan, startJi, count = 10) {
-  const series = [];
 
-  const ganIndex = stemOrder.indexOf(startGan);
-  const jiIndex = branchOrder.indexOf(startJi);
-
-  for (let i = 0; i < count; i++) {
-    const gan = stemOrder[(ganIndex + i) % 10];
-    const ji = branchOrder[(jiIndex + i) % 12];
-    series.push(gan + ji);
-  }
-
-  return series;
-}
 
 export function generateYearlyGanjiSeries2(startYear) {
-  startYear = Math.floor(startYear); // 소숫점 버림 처리
+  startYear = Math.floor(startYear); // 소숫점 버림
   const yearlyStems = [];
   const yearlyBranches = [];
 
   for (let i = 0; i < 10; i++) {
-    const year = startYear + i;
+    const year = startYear - i; // 최신 연도부터 과거 순으로
     const { stem, branch } = getGanjiByYear(year);
     yearlyStems.push(stem);
     yearlyBranches.push(branch);
@@ -288,13 +275,14 @@ export function generateMonthlyGanjiSeriesByGanji(startStem, startBranch) {
   const startStemIndex = stemOrder.indexOf(startStem);
   const startBranchIndex = branchOrder.indexOf(startBranch);
 
-  for (let i = 0; i < 12; i++) {
+  for (let i = 11; i >= 0; i--) {
     monthlyStems.push(stemOrder[(startStemIndex + i) % 10]);
     monthlyBranches.push(branchOrder[(startBranchIndex + i) % 12]);
   }
 
   return { monthlyStems, monthlyBranches };
 }
+
 
 
 // 1) 상수: dangryeongMap, solarTerms, isBefore 함수 (파일 상단이나 중간 어디든 가능)
