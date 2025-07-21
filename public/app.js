@@ -114,12 +114,35 @@ document.getElementById("send-email-button").addEventListener("click", () => {
     return;
   }
 
-  const [year, month, day] = document.getElementById('birth-date').value.split('-');
+  let year = '', month = '', day = '';
+const birthInput = document.getElementById('birth-date');
+if (birthInput && birthInput.value) {
+  const raw = birthInput.value.trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    [year, month, day] = raw.split('-');
+  } else if (/^\d{8}$/.test(raw)) {
+    year = raw.slice(0, 4);
+    month = raw.slice(4, 6);
+    day = raw.slice(6, 8);
+  } else {
+    alert("생년월일 형식이 올바르지 않습니다. 예: 19690823 또는 1969-08-23");
+    return;
+  }
+} else {
+  alert("생년월일을 입력해주세요.");
+  return;
+}
+
   const calendarType = document.getElementById('calendar-type').value;
   const gender = document.querySelector('input[name="gender"]:checked')?.value || "";
   const ampm = document.querySelector('input[name="ampm"]:checked')?.value || "";
   const hour = document.getElementById('hour-select').value;
   const minute = document.getElementById('minute-select').value;
+ // 사주출력 페이지 URL 생성 (필요한 파라미터만 넣으면 됨)
+  // 원본 URL
+const sajuUrl = `https://treesaju.vercel.app/?birth=${year}${month}${day}&calendar=${calendarType}&gender=${gender}&ampm=${ampm}&hour=${hour}&minute=${minute}`;
+
 
   // 사용자 정보 텍스트 (pre로 줄바꿈 보존)
 const birthInfoText = `
@@ -151,18 +174,17 @@ const birthInfoText = `
 
     <h3>사용자 생일 사주</h3>
     <pre style="background:#f9f9f9; padding:10px; border:1px solid #ddd;">${birthInfoText}</pre>
+    <strong>사주출력 페이지 보기:</strong> <a href="${sajuUrl}" target="_blank" rel="noopener noreferrer">${sajuUrl}</a>
+
 
     <hr />
 
-    <h3>대운 정보</h3>
+
+    <h3>사주정보</h3>
     <div>${daeyunHTML}</div>
 
     <hr />
 
-    <h3>세운 정보</h3>
-    <div>${sewunHTML}</div>
-
-    <hr />
 
     <h3>오늘의 사주</h3>
     <div>${sajuHTML}</div>
@@ -183,6 +205,49 @@ const birthInfoText = `
       alert("이메일 전송 중 오류가 발생했습니다.");
     });
 });
+
+//이메일 url클릭 자동입력작용
+window.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  const birth = params.get('birth');
+  const calendar = params.get('calendar');
+  const gender = params.get('gender');
+  const ampm = params.get('ampm');
+  const hour = params.get('hour');
+  const minute = params.get('minute');
+
+  if (birth && calendar && gender && ampm && hour && minute) {
+    // 생년월일
+    const birthInput = document.getElementById('birth-date');
+    if (birthInput) {
+      birthInput.value = `${birth.slice(0,4)}-${birth.slice(4,6)}-${birth.slice(6,8)}`;
+    }
+
+    // 기타 항목들 설정
+    document.getElementById('calendar-type').value = calendar;
+    document.querySelector(`input[name="gender"][value="${gender}"]`).checked = true;
+    document.querySelector(`input[name="ampm"][value="${ampm}"]`).checked = true;
+    document.getElementById('hour-select').value = hour;
+    document.getElementById('minute-select').value = minute;
+
+    // ✅ submit 이벤트 강제 실행 (사주 출력 버튼 클릭 효과)
+    const form = document.getElementById('saju-form');
+    if (form) {
+      setTimeout(() => {
+        form.requestSubmit(); // ✅ 최신 브라우저에서는 이게 더 안전
+      }, 200); // 약간의 지연 (렌더링 완료 후 실행)
+    }
+  }
+});
+
+
+
+
+
+
+
+
+
 
 
 document.getElementById('saju-form').addEventListener('submit', async (e) => {
@@ -557,12 +622,13 @@ window.handleDaeyunClick = handleDaeyunClick;
       gap: 2px;
       font-size: 1.1rem;
     }  
- .sewoon-cell.selected {
-  border: 2px solid #ff8800;
-  border-radius: 9999px; /* 완전히 둥근 테두리 */
-  padding: 6px 12px;     /* 여백도 추가하면 더 부드러움 */
-  background-color: #fff8e1; /* 선택된 느낌 강조 */
+.sewoon-cell.selected {
+  background-color: #ffeaa7 !important;
+  border: 2px solid #fdcb6e !important;
+  border-radius: 6px;
 }
+
+
 
       /* style 영역에 추가 */
     .daeyun-cell.selected {
@@ -781,7 +847,14 @@ renderDaeyunTable({
   sewonYear: window.sewonYear  // ✅ 추가!
 });
 // 🔥 자동 출력 시작!
- //const birthDate = new Date(window.birthYear, window.birthMonth - 1, window.birthDay);
+
+// 결과 영역 보여주기 - 이 부분 추가!
+document.getElementById("result").style.display = "block";
+
+document.getElementById("today-saju-container").style.display = "block";
+
+
+
 const birthDateYMD = {
   year: window.birthYear,
   month: window.birthMonth,

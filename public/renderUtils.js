@@ -267,15 +267,29 @@ export function renderMonthlyGanjiSeries(baseYear, sewoonStem) {
 
 export function attachSewoonClickListeners() {
   const cells = document.querySelectorAll('.sewoon-cell');
+  const total = cells.length;
+
   cells.forEach((cell, index) => {
     cell.addEventListener('click', () => {
+      const correctedIndex = total - 1 - index; // 내림차순 정렬에 맞춘 인덱스 보정
+
+      // 🔹 모든 세운 셀에서 선택 표시 제거
+      cells.forEach(c => c.classList.remove('selected'));
+
+      // 🔹 클릭한 셀 기준으로 정확한 위치 강조
+      cells[index].classList.add('selected');
+
+      console.log('✅ 선택된 세운 셀:', cell.dataset.year); // ← 디버깅 로그
+
+      // 🔹 기존 로직: 인덱스는 보정해서 전달
       const year = parseFloat(cell.dataset.year);
       const stemKor = cell.dataset.stem;
       const branchKor = cell.dataset.branch;
-      handleSewoonClick(year, stemKor, branchKor, index);
+      handleSewoonClick(year, stemKor, branchKor, correctedIndex);
     });
   });
 }
+
 
 //대운 클릭시 세운 렌더링 함수
 export function handleDaeyunClick(birthYear, birthMonth, birthDay, index) {

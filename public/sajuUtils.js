@@ -188,7 +188,7 @@ export function generateYearlyGanjiSeries2(startYear) {
   const yearlyBranches = [];
 
   for (let i = 0; i < 10; i++) {
-    const year = startYear - i; // 최신 연도부터 과거 순으로
+    const year = startYear + i; // 최신 연도부터 과거 순으로
     const { stem, branch } = getGanjiByYear(year);
     yearlyStems.push(stem);
     yearlyBranches.push(branch);

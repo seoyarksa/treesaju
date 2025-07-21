@@ -557,12 +557,13 @@ window.handleDaeyunClick = handleDaeyunClick;
       gap: 2px;
       font-size: 1.1rem;
     }  
- .sewoon-cell.selected {
-  border: 2px solid #ff8800;
-  border-radius: 9999px; /* 완전히 둥근 테두리 */
-  padding: 6px 12px;     /* 여백도 추가하면 더 부드러움 */
-  background-color: #fff8e1; /* 선택된 느낌 강조 */
+.sewoon-cell.selected {
+  background-color: #ffeaa7 !important;
+  border: 2px solid #fdcb6e !important;
+  border-radius: 6px;
 }
+
+
 
       /* style 영역에 추가 */
     .daeyun-cell.selected {
