@@ -15,7 +15,8 @@ import {
   yukshinToKey,  
   jijiToSibganMap, 
   GYEOKGUK_TYPES,
-  jijiToSibganMap2 
+  jijiToSibganMap2,
+  GISIN_BY_DANGRYEONGSHIK 
 } from './constants.js';
 console.log(stemOrder);
 console.log(stemOrder, branchOrder);
@@ -56,7 +57,8 @@ import {
   getDangryeong,
   getSaryeong,
   getdangryeongshik, 
-  dangryeongshik
+  dangryeongshik,
+  extractAllSibgan
 } from './sajuUtils.js';
 //
 
@@ -70,7 +72,8 @@ import {
   elementColors,
   renderTodaySajuBox,
   createDangryeongTableHtml,
-  renderDangryeongShik
+  renderDangryeongShik, 
+  createMappedArray
 } from './renderUtils.js';
 
 import {
@@ -467,28 +470,56 @@ renderAllDangryeong(dangryeong, saryeong, sajuChungan, sajuJiji);
 // 월간/월지 기준 시작 간지
 function renderAllDangryeong(dangryeong, saryeong, sajuChungan, sajuJiji) {
   const dangryeongShikArray = getdangryeongshik(dangryeong);
+  console.log('dangryeong:', dangryeong);
+  console.log('dangryeongShikArray:', dangryeongShikArray);
+  console.log('Array.isArray:', Array.isArray(dangryeongShikArray));
+
   const dangryeongHtml = createDangryeongTableHtml(dangryeong, saryeong, dangryeongShikArray);
   console.log(dangryeongHtml);
 
-  function doRender() {
-    const container = document.getElementById("result");
-    if (!container) {
-      console.error("#result 요소가 존재하지 않습니다.");
-      return;
-    }
-    //container.innerHTML += dangryeongHtml;
-
-    const mapped = dangryeongshik(dangryeongShikArray, sajuChungan, sajuJiji, jijiToSibganMap);
-    renderDangryeongShik(mapped);
+function doRender() {
+  const container = document.getElementById("result");
+  if (!container) {
+    console.error("#result 요소가 존재하지 않습니다.");
+    return;
   }
+
+  // 반환값 구조분해 할당으로 추출
+  const { firstHeesin, list } = dangryeongshik(
+    dangryeong,
+    dangryeongShikArray,
+    sajuChungan,
+    sajuJiji,
+    jijiToSibganMap
+  );
+
+  console.log('mapped list:', list);
+  console.log('firstHeesin:', firstHeesin);
+  // chunganList, jijiSibganList 생성
+  const allSibgan = extractAllSibgan(sajuChungan, sajuJiji, jijiToSibganMap);
+  const chunganList = [...new Set(sajuChungan)];
+  const jijiSibganList = [...new Set(allSibgan.filter(char => !sajuChungan.includes(char)))];
+  // ✅ 추출한 값들로 전달
+renderDangryeongShik(
+  list,
+  sajuChungan,
+  sajuJiji,
+  jijiToSibganMap,
+  dangryeong,
+  firstHeesin,
+  chunganList,
+  jijiSibganList
+);
+}
+
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", doRender);
   } else {
     setTimeout(doRender, 0);
-
   }
 }
+
 
 
 // 대운 간지 배열 생성

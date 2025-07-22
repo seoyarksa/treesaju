@@ -14,9 +14,10 @@ import { stemOrder,
          saryeongMap,
          DANGRYEONGSHIK_MAP,
          jijiToSibganMap,
-         firstHeesinMap
+         firstHeesinMap,
+         GISIN_BY_DANGRYEONGSHIK
         } from './constants.js';
-import { elementColors } from './renderUtils.js';
+import { elementColors, createMappedArray } from './renderUtils.js';
 import { getJeolipDate } from './dateUtils.js'; // 절입일 계산 함수
 
 const yangStems = ['갑', '병', '무', '경', '임'];
@@ -373,21 +374,27 @@ export function getdangryeongshik(dangryeong) {
 }
 
 // 천간 배열에 대해 사주 천간, 사주 지지와 매핑 정보 생성
-export function dangryeongshik(tianganArray, sajuChungan, sajuJiji, jijiToSibganMap) {
-const firstHeesin = firstHeesinMap[dangryeong];
-  return tianganArray.map((char, index) => {
-    const highlightChungan = sajuChungan.includes(char);
+export function dangryeongshik(dangryeong, dangryeongShikArray, sajuChungan, sajuJiji, jijiToSibganMap) {
+  const firstHeesin = firstHeesinMap[dangryeong];
 
+const allSibgan = extractAllSibgan(sajuChungan, sajuJiji, jijiToSibganMap);
+
+const chunganList = [...new Set(sajuChungan)];
+const jijiSibganList = [...new Set(allSibgan.filter(char => !sajuChungan.includes(char)))];
+
+  // GISIN_BY_DANGRYEONGSHIK[dangryeong] 은 당령별 당령식 각 글자별 기신 배열 객체
+  const gisinMap = GISIN_BY_DANGRYEONGSHIK[dangryeong] || {};
+
+  const result = dangryeongShikArray.map(char => {
+    const highlightChungan = chunganList.includes(char);
     let highlightJiji = false;
     let wrapInParens = false;
 
     for (const jiji of sajuJiji) {
       const sibganList = jijiToSibganMap[jiji] || [];
-
       for (const item of sibganList) {
         const sibganChar = typeof item === 'string' ? item : item.char;
         const wrap = typeof item === 'string' ? false : item.wrap;
-
         if (sibganChar === char) {
           highlightJiji = true;
           if (wrap) wrapInParens = true;
@@ -395,16 +402,48 @@ const firstHeesin = firstHeesinMap[dangryeong];
       }
     }
 
+    // 당령식 배열의 현재 char 글자에 대해 기신 배열 추출 (배열 아니면 빈배열)
+   const gisinListRaw = gisinMap[char] || [];
+// 첫 번째 기신만 사용
+const gisinList = gisinListRaw.length > 0 ? [gisinListRaw[0]] : [];
+
+
+    // 사주 천간이나 지지 십간 목록에 기신 배열 중 하나라도 있으면 기신 true
+    const isGisin = gisinList.some(gisinChar =>
+      chunganList.includes(gisinChar) || jijiSibganList.includes(gisinChar)
+    );
+
+    // 디버깅 로그 추가 (여기에)
+console.log(`dangryeong: ${dangryeong}, char: ${char}, gisinList:`, gisinList);
+console.log('chunganList:', chunganList);
+console.log('jijiSibganList:', jijiSibganList);
+console.log(`char: ${char}, isGisin: ${isGisin}`);
+
     return {
       char,
       highlightChungan,
       highlightJiji,
       isDangryeong: char === dangryeong,
       isFirstHeesin: char === firstHeesin,
-      wrapInParens
+      wrapInParens,
+      isGisin,
+      gisinList  // 여기 추가
     };
   });
+
+  return {
+    firstHeesin,
+    list: result
+  };
 }
 
 
-
+// 사주에서 천간과 지지 내 십간 모두 추출
+export function extractAllSibgan(sajuChungan, sajuJiji, jijiToSibganMap) {
+  return [
+    ...sajuChungan,
+    ...sajuJiji.flatMap(jiji =>
+      (jijiToSibganMap[jiji] || []).map(item => typeof item === 'string' ? item : item.char)
+    )
+  ];
+}

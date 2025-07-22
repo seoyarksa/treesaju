@@ -10,7 +10,8 @@ import { stemOrder,
         branchOrder, 
         DANGRYEONGSHIK_MAP,
          jijiToSibganMap,
-         firstHeesinMap 
+         firstHeesinMap, 
+         GISIN_BY_DANGRYEONGSHIK 
       } from './constants.js';
 
 import {
@@ -35,7 +36,8 @@ import {
   calculateSewonYear,
   findStartMonthIndex,
   generateMonthlyGanjiSeriesByGanji,
-  getdangryeongshik
+  getdangryeongshik,
+  extractAllSibgan
 } from './sajuUtils.js';
 
 
@@ -426,11 +428,13 @@ const dangryeongshikHtml = dangryeongShikArray.map((char, i) => {
 
 
 
-export function renderDangryeongShik(mapped) {
-  const container = document.getElementById('dangryeongshik-container');
-  container.innerHTML = ''; // 초기화
+export function renderDangryeongShik(mapped, sajuChungan, sajuJiji, jijiToSibganMap, dangryeong, firstHeesin, chunganList, jijiSibganList) {
+  // 함수 내부에서 chunganList, jijiSibganList 사용 가능
 
-  // 라벨 셀 생성 함수
+
+  const container = document.getElementById('dangryeongshik-container');
+  container.innerHTML = '';
+
   const createLabel = (text) => {
     const label = document.createElement('span');
     label.style.width = '50px';
@@ -441,13 +445,12 @@ export function renderDangryeongShik(mapped) {
     return label;
   };
 
-  // 공통 span 생성 함수
   const createSpan = (item, show, wrap = false) => {
     const span = document.createElement('span');
     span.style.width = '40px';
     span.style.textAlign = 'center';
 
-    if (!show || item.isDangryeong) {
+    if (!show || !item.char) {
       span.textContent = '';
       span.style.color = 'transparent';
       return span;
@@ -456,42 +459,6 @@ export function renderDangryeongShik(mapped) {
     const char = wrap ? `(${item.char})` : item.char;
     span.textContent = char;
 
-    if (item.isFirstHeesin) {
-      span.style.color = 'green';
-      span.style.fontWeight = 'bold';
-    } else {
-      span.style.color = 'black';
-      span.style.fontWeight = 'normal';
-    }
-
-    return span;
-  };
-
-  // 윗줄: 사주 천간
-  const topRow = document.createElement('div');
-  topRow.style.display = 'flex';
-  topRow.style.justifyContent = 'center';
-  topRow.style.marginBottom = '2px';
-  topRow.appendChild(createLabel('干희신'));
-  mapped.forEach(item => {
-    const span = createSpan(item, item.highlightChungan);
-    topRow.appendChild(span);
-  });
-  container.appendChild(topRow);
-
-  // 중간줄: 당령식
-  const midRow = document.createElement('div');
-  midRow.style.display = 'flex';
-  midRow.style.justifyContent = 'center';
-  midRow.style.marginBottom = '2px';
-  midRow.appendChild(createLabel('당령식'));
-  mapped.forEach(item => {
-    const span = document.createElement('span');
-    span.style.width = '40px';
-    span.style.textAlign = 'center';
-    span.textContent = item.char;
-
-    // 색상 처리
     if (item.isDangryeong) {
       span.style.color = 'red';
       span.style.fontWeight = 'bold';
@@ -503,21 +470,125 @@ export function renderDangryeongShik(mapped) {
       span.style.fontWeight = 'normal';
     }
 
-    midRow.appendChild(span);
-  });
-  container.appendChild(midRow);
+    return span;
+  };
 
-  // 아랫줄: 사주 지지에 포함된 천간
+  // ▶ 천간 기신
+const topGisinRow = document.createElement('div');
+topGisinRow.style.display = 'flex';
+topGisinRow.style.justifyContent = 'center';
+topGisinRow.style.marginBottom = '4px';
+topGisinRow.appendChild(createLabel('天기신'));
+
+mapped.forEach(item => {
+  // item.isGisin && item.highlightChungan 조건 만족해야 하며
+  // gisinList 첫 번째 기신이 천간 리스트(chunganList)에 있어야 출력
+  if (item.isGisin && item.highlightChungan && item.gisinList.length > 0) {
+    const gisinChar = item.gisinList[0];
+    if (chunganList.includes(gisinChar)) {
+      const span = createSpan({ char: gisinChar }, true);
+      topGisinRow.appendChild(span);
+    } else {
+      // 자리 맞추기 위해 빈 span 추가
+      const emptySpan = createSpan({ char: '' }, false);
+      topGisinRow.appendChild(emptySpan);
+    }
+  } else {
+    const emptySpan = createSpan({ char: '' }, false);
+    topGisinRow.appendChild(emptySpan);
+  }
+});
+container.appendChild(topGisinRow);
+
+  // ▶ 천간 희신
+  const topRow = document.createElement('div');
+  topRow.style.display = 'flex';
+  topRow.style.justifyContent = 'center';
+  topRow.style.marginBottom = '2px';
+  topRow.appendChild(createLabel('天희신'));
+
+  mapped.forEach(item => {
+    const span = createSpan(item, item.highlightChungan);
+    topRow.appendChild(span);
+  });
+  container.appendChild(topRow);
+
+  // ▶ 당령식
+const midRow = document.createElement('div');
+midRow.style.display = 'flex';
+midRow.style.justifyContent = 'center';
+midRow.style.marginBottom = '2px';
+midRow.style.border = '2px solid #7ab8ff';      // 진한 파랑 테두리
+midRow.style.backgroundColor = '#e0f7ff';       // 연한 하늘색 배경
+midRow.style.padding = '6px 10px';
+midRow.style.borderRadius = '6px';
+
+midRow.appendChild(createLabel('당령식'));
+
+mapped.forEach(item => {
+  const span = createSpan(item, true);
+  midRow.appendChild(span);
+});
+container.appendChild(midRow);
+
+  // ▶ 지지 희신
   const bottomRow = document.createElement('div');
   bottomRow.style.display = 'flex';
   bottomRow.style.justifyContent = 'center';
-  bottomRow.appendChild(createLabel('支희신'));
+  bottomRow.appendChild(createLabel('地희신'));
+
   mapped.forEach(item => {
     const span = createSpan(item, item.highlightJiji, item.wrapInParens);
     bottomRow.appendChild(span);
   });
   container.appendChild(bottomRow);
+
+  // ▶ 지지 기신
+const bottomGisinRow = document.createElement('div');
+bottomGisinRow.style.display = 'flex';
+bottomGisinRow.style.justifyContent = 'center';
+bottomGisinRow.appendChild(createLabel('地기신'));
+
+mapped.forEach(item => {
+  if (item.isGisin && item.highlightJiji && item.gisinList.length > 0) {
+    const gisinChar = item.gisinList[0];
+    if (jijiSibganList.includes(gisinChar)) {
+      const span = createSpan({ char: gisinChar }, true, item.wrapInParens);
+      bottomGisinRow.appendChild(span);
+    } else {
+      const emptySpan = createSpan({ char: '' }, false);
+      bottomGisinRow.appendChild(emptySpan);
+    }
+  } else {
+    const emptySpan = createSpan({ char: '' }, false);
+    bottomGisinRow.appendChild(emptySpan);
+  }
+});
+container.appendChild(bottomGisinRow);
 }
+
+
+export function createMappedArray(elements, dangryeong, chunganList, jijiSibganList, firstHeesin) {
+  const gisinList = GISIN_BY_DANGRYEONGSHIK[dangryeong] || [];
+
+  return elements.map(el => {
+    const char = el.char;
+    const isGisin = gisinList.includes(char); // ⚠️ 정확한 문자 매칭
+
+    return {
+      char,
+      highlightChungan: chunganList.includes(char),
+      highlightJiji: jijiSibganList.includes(char),
+      isDangryeong: char === dangryeong,
+      isFirstHeesin: char === firstHeesin,
+      isGisin,
+      wrapInParens: el.wrap || false
+    };
+  });
+}
+
+
+
 
 
 
