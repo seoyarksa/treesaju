@@ -8,17 +8,73 @@ import { stemOrder,
          DANGRYEONGSHIK_MAP,
          yukshinToKey,
          jijiToSibganMap2,
+         gyeokjijiToSibganMap,
          firstHeesinMap, 
          tenGodMap,
          GYEOKGUK_TYPES,
          samhapGroups,
          isYangStem,
          GYEOK_USE_GU_MAP,
-         GYEOK_RELATIONS
+         GYEOK_RELATIONS,
+         길신격_목록,
+         흉신격_목록,
+         YUKSHIN_COUNTERS
         } from './constants.js';
 
-import { hanToKorStem
+import { hanToKorStem,
+        convertKorToHanStem,
+        convertKorToHanBranch
         } from './sajuUtils.js';
+
+
+export function isCountering(yukshin1, yukshin2) {
+  const counters = YUKSHIN_COUNTERS[yukshin1] || [];
+  return counters.includes(yukshin2);
+}
+
+        // 음양 판단 함수
+// yinYangUtils.js 또는 gyeokUtils.js 상단에 추가
+const YANG_STEMS = ['甲', '丙', '戊', '庚', '壬'];
+const YIN_STEMS = ['乙', '丁', '己', '辛', '癸'];
+
+export function sameYinYang(stem1, stem2) {
+  return (
+    (YANG_STEMS.includes(stem1) && YANG_STEMS.includes(stem2)) ||
+    (YIN_STEMS.includes(stem1) && YIN_STEMS.includes(stem2))
+  );
+}
+
+// 생(생성) 관계 매핑
+const generationMap = {
+  '甲': '丙', '乙': '丁',
+  '丙': '戊', '丁': '己',
+  '戊': '庚', '己': '辛',
+  '庚': '壬', '辛': '癸',
+  '壬': '甲', '癸': '乙',
+};
+
+// 극(제어) 관계 매핑
+const controlMap = {
+  '甲': '戊', '乙': '己',
+  '丙': '庚', '丁': '辛',
+  '戊': '壬', '己': '癸',
+  '庚': '甲', '辛': '乙',
+  '壬': '丙', '癸': '丁',
+};
+
+// 생 관계 함수
+export function isGenerating(fromStem, toStem) {
+  return generationMap[fromStem] === toStem;
+}
+
+// 극 관계 함수
+export function isControlling(fromStem, toStem) {
+  return controlMap[fromStem] === toStem;
+}
+
+
+
+
 
 
 // 1. 격국 종류 상수 정의 
@@ -170,130 +226,289 @@ export function getGyeokForMonth({ monthJi, saryeong, chunganList, dayGan, daeyu
 
 
 /////////////////////상신구신관련
+/////////////////////상신구신관련
 export function getUseGuByGyeok(gyeokChar) {
   return GYEOK_USE_GU_MAP[gyeokChar] || { use: '없음', seek: '없음' };
 }
 
 
-export function renderGyeokFlow(gyeok) {
-  if (!gyeok || !gyeok.char || !gyeok.stem) return '격국 정보 없음';
 
-  const relationInfo = GYEOK_RELATIONS[gyeok.char];
-  if (!relationInfo) return `[${gyeok.char}(${gyeok.stem})]`;
 
-  const { use, seek } = relationInfo;
+export function getStemForYukshin(dayGan, yukshinName) {
+  const map = tenGodMap[dayGan];
+  if (!map) return null;
 
-  return `${use.char}(${use.relation}) → [${gyeok.char}(${gyeok.stem})] → ${seek.char}(${seek.relation})`;
+  for (const [stem, tenGod] of Object.entries(map)) {
+    if (tenGod === yukshinName) {
+      return stem;
+    }
+  }
+  return null;
 }
 
-export function renderGyeokFlowStyled(gyeok) {
-  if (!gyeok || !gyeok.char || !gyeok.stem) return '격국 정보 없음';
+// ✅ 천간 기준으로 육신 이름을 리턴
+export function getYukshinNameFromStems(dayGan, otherStem) {
+  const map = tenGodMap[dayGan];
+  if (!map) return null;
+  return map[otherStem] || null;
+}
 
-  const charRaw = gyeok.char;
-  const char = gyeok.char.replace(/\(.*?\)|\[.*?\]/g, '').trim();
-  const stem = gyeok.stem;
-  const relationInfo = GYEOK_RELATIONS[char];
+// 1. 천간과 지지에서 추출된 지장간을 태그를 붙여 저장
+export function extractTaggedStems(saju) {
+  const { yearGan, monthGan, dayGan, hourGan, yearBranch, monthBranch, dayBranch, hourBranch } = saju;
 
-  console.log("정제된 char =", char);
-  console.log("GYEOK_RELATIONS[char] =", relationInfo);
-  if (!relationInfo) return `[${charRaw}(${stem})]`;
+ // ✅ 한글 → 한자로 변환
+  const cheongans = [
+    convertKorToHanStem(yearGan),
+    convertKorToHanStem(monthGan),
+    convertKorToHanStem(dayGan),
+    convertKorToHanStem(hourGan),
+  ];
 
-  const { use, seek } = relationInfo;
-  const useLabel = use.char;
-  const seekLabel = seek.char;
-  const relation = use.relation?.trim();
+  const jijiList = [
+    convertKorToHanBranch(yearBranch),
+    convertKorToHanBranch(monthBranch),
+    convertKorToHanBranch(dayBranch),
+    convertKorToHanBranch(hourBranch),
+  ];
+  const gyeokjijiHiddenStems = jijiList.map(branch => gyeokjijiToSibganMap[branch] || []);
 
-  console.log("char =", char);
-console.log("GYEOK_RELATIONS[char] =", GYEOK_RELATIONS[char]);
+  const stemsFromSky = cheongans.map(stem => `${stem}(天)`);
+  const stemsFromEarth = gyeokjijiHiddenStems.flat().map(stem => `${stem}(地)`);
 
-// ✅ 길신격 도식 (상신이 격을 생함)
+  const taggedStems = [];
+
+  console.log('🔹 천간 기반(天):', stemsFromSky);
+  console.log('🔹 지지 기반(地):', stemsFromEarth);
+
+  cheongans.forEach(stem => {
+    taggedStems.push({ stem, tag: '天' });
+  });
+
+  gyeokjijiHiddenStems.forEach(hiddenGroup => {
+    hiddenGroup.forEach(stem => {
+      taggedStems.push({ stem, tag: '地' });
+    });
+  });
+
+  console.log('🔹 태그된 간지:', taggedStems);
+  return taggedStems;
+}
+
+// 2. 태그된 천간/지장간에 육신 이름 부여
+export function nameYukshinFromStems(taggedStems, dayGan) {
+  dayGan = convertKorToHanStem(dayGan); // 변환 유지
+  const namedStems = taggedStems.map(({ stem, tag }) => {
+    const yukshin = getYukshinNameFromStems(dayGan, stem); // ✅ 수정된 함수 사용
+    return {
+      yukshin,
+      stem,
+      tag,
+      label: `${yukshin}[${stem}(${tag})]`
+    };
+  });
+
+  console.log('🔹 육신 이름 지정된 간지 목록:', namedStems);
+  return namedStems;
+}
+// 3. 격국에 따라 상신/구신/기신1/기신2/합신 찾기
+export function analyzeGyeokRelations(gyeok, dayGan, saju) {
+    const gyeokNameRaw = gyeok.char || '';
+  const gyeokName = gyeokNameRaw.replace(/\(.*\)/, '').trim();
+
+  const isGoodGyeok = 길신격_목록.includes(gyeokName);
+  const isBadGyeok = 흉신격_목록.includes(gyeokName);
+
+  if (!isGoodGyeok && !isBadGyeok) {
+    console.warn('알 수 없는 격국:', gyeokName);
+    return null;
+  }
+
+  const tagged = extractTaggedStems(saju);
+  const yukshinList = nameYukshinFromStems(tagged, dayGan);
+
+  const rel = GYEOK_RELATIONS[gyeokName];
+  if (!rel) return null;
+
+  const useChar = rel.use.char;
+  const seekChar = rel.seek.char;
+  console.log('🔍 useChar:', useChar, 'seekChar:', seekChar);
+  console.log('🔍 yukshinList 육신 이름들:', yukshinList.map(i => i.yukshin));
+
+  let sangsin, gusin, gisin1, gisin2;
+
+  // 격국 이름 기준 음양 비교 필터 (격국 이름 → 천간으로 변환)
+const gyeokStem = gyeok.stem;
+const sameYinYangFilter = (item) => sameYinYang(item.stem, gyeokStem);
+
+
+
+sangsin = yukshinList.find(item => item.yukshin === useChar);
+gusin = yukshinList.find(item => item.yukshin === seekChar);
+
+
+if (isGoodGyeok) {
+gisin1 = yukshinList.find((item) => {
+  const cond1 = (item.yukshin !== useChar && item.yukshin !== seekChar);
+  const cond2 = sangsin?.yukshin != null;
+  const cond3 = isCountering(item.yukshin, sangsin.yukshin);
+  const result = cond1 && cond2 && cond3;
+  console.log('기신1 조건:', { itemYukshin: item.yukshin, sangsin: sangsin?.yukshin, cond1, cond2, cond3, result });
+  return result;
+});
+
+  console.log('🔹 기신1(gisin1):', gisin1);
+
+  gisin2 = yukshinList.find(
+    (item) =>
+      item.yukshin !== useChar &&
+      item.yukshin !== seekChar &&
+      item.yukshin !== gisin1?.yukshin &&
+      isCountering(item.yukshin, gyeokName)
+  );
+  console.log('🔹 기신2(gisin2):', gisin2);
+}
+
+if (isBadGyeok) {
+  gisin1 = yukshinList.find((item) => {
+    const cond1 = (item.yukshin !== useChar && item.yukshin !== seekChar);
+    const cond2 = sangsin?.yukshin != null;
+    const cond3 = isCountering(item.yukshin, sangsin.yukshin); // 상신을 극하는 기신1
+    const result = cond1 && cond2 && cond3;
+    console.log('기신1 조건 (흉신):', { itemYukshin: item.yukshin, sangsin: sangsin?.yukshin, cond1, cond2, cond3, result });
+    return result;
+  });
+  console.log('🔹 기신1(gisin1) 흉신격:', gisin1);
+
+  gisin2 = yukshinList.find((item) => {
+    const cond1 = (item.yukshin !== useChar && item.yukshin !== seekChar && item.yukshin !== gisin1?.yukshin);
+    const cond2 = gusin?.yukshin != null;
+    const cond3 = isCountering(item.yukshin, gusin.yukshin); // 구신을 극하는 기신2
+    const result = cond1 && cond2 && cond3;
+    console.log('기신2 조건 (흉신):', { itemYukshin: item.yukshin, gusin: gusin?.yukshin, cond1, cond2, cond3, result });
+    return result;
+  });
+  console.log('🔹 기신2(gisin2) 흉신격:', gisin2);
+
+}
+
+  return {
+    gyeok: { char: gyeokName, dayGan },
+    sangsin,
+    gusin,
+    gisin1,
+    gisin2,
+    all: yukshinList,
+  };
+}
+
+
+// 4. 시각화 도식
+export function renderGyeokFlowStyled(gyeok, saju) {
+  if (!gyeok || !saju) return '정보 없음';
+
+  const gyeokNameRaw = gyeok.char || '';
+  const gyeokName = gyeokNameRaw.replace(/\(.*\)/, '').trim();
+  const stem = gyeok.stem || '';
+
+  const { dayGan } = saju;
+  const dayGanHan = convertKorToHanStem(dayGan);
+
+  const analysis = analyzeGyeokRelations(gyeok, dayGanHan, saju);
+  if (!analysis) return '필수 정보 부족';
+
+    const { sangsin, gusin, gisin1, gisin2 } = analysis;
+const gisin1Label = analysis.gisin1?.label || '';
+const gisin2Label = analysis.gisin2?.label || '';
+const sangsinLabel = analysis.sangsin?.label || '';
+const gusinLabel = analysis.gusin?.label || '';
+  if (!sangsin) return '상신 정보 없음';
+
+  const useStem = getStemForYukshin(dayGanHan, sangsin.yukshin);
+  const seekStem = gusin ? getStemForYukshin(dayGanHan, gusin.yukshin) : '?';
+
+  const rel = GYEOK_RELATIONS[gyeokName];
+  if (!rel) return '격국 관계 정보 없음';
+
+  const relation = rel.use.relation;
+  const { use, seek } = rel;
+
+  const gisin1Stem = gisin1 ? gisin1.stem : '';
+  const gisin2Stem = gisin2 ? gisin2.stem : '';
+
 if (relation === '생') {
   return `
-    <div style="
-      display: grid;
-      grid-template-columns: auto 30px auto 30px auto;
-      grid-template-rows: auto auto auto auto auto auto auto auto;
-      justify-content: center;
-      align-items: center;
-      font-family: monospace;
-      font-size: 0.9rem;
-      gap: 4px;
-    ">
-
-      <!-- 기신1(甲) -->
-      <div style="grid-column: 1 / 2; grid-row: 1; color: red;">기신1(甲)</div>
-      <div style="grid-column: 1 / 2; grid-row: 4;">↓</div>
-
-      <!-- 상신 -->
-      <div style="grid-column: 1 / 2; grid-row: 5; color: blue;"><strong>상신(${use.char})</strong></div>
-
-      <!-- 상신 → 격 -->
-      <div style="grid-column: 2 / 3; grid-row: 5;">→</div>
-
-      <!-- 격 -->
-      <div style="grid-column: 3 / 4; grid-row: 5;"><strong>${char}[${stem}]</strong></div>
-
-      <!-- 격 → 구신 -->
-      <div style="grid-column: 4 / 5; grid-row: 5;">→</div>
-
-      <!-- 구신 -->
-      <div style="grid-column: 5 / 6; grid-row: 5; color: green;"><strong>구신(${seek.char})</strong></div>
-
-      <!-- 기신2(丙) -->
-      <div style="grid-column: 3 / 4; grid-row: 6;">↑</div>
-      <div style="grid-column: 3 / 4; grid-row: 8; color: red;">기신2(丙)</div>
-
+    <div style="display: grid; grid-template-columns: auto 30px auto 30px auto; grid-template-rows: repeat(8, auto); justify-content: center; align-items: center; font-family: monospace; font-size: 0.9rem; gap: 4px;">
+      <div style="grid-column: 1 / 2; grid-row: 1;">
+        <span style="color: red;">기신1</span><span>(${gisin1Label})</span>
+      </div>
+      <div style="grid-column: 1 / 2; grid-row: 4;">
+        <span style="color: red;">↓</span>
+      </div>
+      <div style="grid-column: 1 / 2; grid-row: 5;">
+        <strong><span style="color: blue;">상신</span></strong><span>(${sangsinLabel})</span>
+      </div>
+      <div style="grid-column: 2 / 3; grid-row: 5;">
+        <span style="color: blue;">→</span>
+      </div>
+      <div style="grid-column: 3 / 4; grid-row: 5;"><strong>${gyeokName}[${stem}]</strong></div>
+      <div style="grid-column: 4 / 5; grid-row: 5;">
+        <span style="color: blue;">→</span>
+      </div>
+      <div style="grid-column: 5 / 6; grid-row: 5;">
+        <strong><span style="color: green;">구신</span></strong><span>(${gusinLabel})</span>
+      </div>
+      <div style="grid-column: 3 / 4; grid-row: 6;">
+        <span style="color: red;">↑</span>
+      </div>
+      <div style="grid-column: 3 / 4; grid-row: 8;">
+        <span style="color: red;">기신2</span><span>(${gisin2Label})</span>
+      </div>
     </div>
   `;
 }
 
-// ✅ 흉신격 도식 (상신이 격을 극함)
 if (relation === '극') {
   return `
-    <div style="
-      display: grid;
-      grid-template-columns: auto 30px auto 30px auto;
-      grid-template-rows: auto auto auto auto auto auto;
-      justify-content: center;
-      align-items: center;
-      font-family: monospace;
-      font-size: 0.9rem;
-      gap: 4px;
-    ">
-
-      <!-- 기신1(壬) -->
-      <div style="grid-column: 1 / 2; grid-row: 2; color: red;">기신1(壬)</div>
-      <div style="grid-column: 2 / 3; grid-row: 2;">→</div>
-
-      <!-- 상신 -->
-      <div style="grid-column: 3 / 4; grid-row: 2; color: blue;"><strong>상신(${use.char})</strong></div>
-
-      <!-- 상신 → 구신 -->
-      <div style="grid-column: 4 / 5; grid-row: 2;">→</div>
-      <div style="grid-column: 5 / 6; grid-row: 2; color: green;"><strong>구신(${seek.char})</strong></div>
-
-      <!-- 상신 ↓ 격 -->
-      <div style="grid-column: 3 / 4; grid-row: 3;">│</div>
-      <div style="grid-column: 3 / 4; grid-row: 4;">↓</div>
-
-      <!-- 격 -->
-      <div style="grid-column: 3 / 4; grid-row: 5;"><strong>${char}[${stem}]</strong></div>
-
-      <!-- 기신2(甲) -->
-      <div style="grid-column: 5 / 6; grid-row: 3;">↑</div>
-      <div style="grid-column: 5 / 6; grid-row: 4;">│</div>
-      <div style="grid-column: 5 / 6; grid-row: 5; color: red;">기신2(甲)</div>
-
+    <div style="display: grid; grid-template-columns: auto 30px auto 30px auto; grid-template-rows: repeat(6, auto); justify-content: center; align-items: center; font-family: monospace; font-size: 0.9rem; gap: 4px;">
+      <div style="grid-column: 1 / 2; grid-row: 2;">
+        <span style="color: red;">기신1</span><span>(${gisin1Label})</span>
+      </div>
+      <div style="grid-column: 2 / 3; grid-row: 2;">
+        <span style="color: red;">--→</span>
+      </div>
+      <div style="grid-column: 3 / 4; grid-row: 2;">
+        <strong><span style="color: blue;">상신</span></strong><span>(${sangsinLabel})</span>
+      </div>
+      <div style="grid-column: 4 / 5; grid-row: 2;">
+        <span style="color: blue;">→</span>
+      </div>
+      <div style="grid-column: 5 / 6; grid-row: 2;">
+        <strong><span style="color: green;">구신</span></strong><span>(${gusinLabel})</span>
+      </div>
+      <div style="grid-column: 3 / 4; grid-row: 3;">
+        <span style="color: red;">│</span>
+      </div>
+      <div style="grid-column: 3 / 4; grid-row: 4;">
+        <span style="color: red;">↓</span>
+      </div>
+      <div style="grid-column: 3 / 4; grid-row: 5;"><strong>${gyeokName}[${stem}]</strong></div>
+      <div style="grid-column: 5 / 6; grid-row: 3;">
+        <span style="color: red;">↑</span>
+      </div>
+      <div style="grid-column: 5 / 6; grid-row: 4;">
+        <span style="color: red;">│</span>
+      </div>
+      <div style="grid-column: 5 / 6; grid-row: 5;">
+        <span style="color: red;">기신2</span><span>(${gisin2Label})</span>
+      </div>
     </div>
   `;
 }
 
 
-  // 기타 예외
-  return `[${charRaw}(${stem})]`;
+
+  return `[${gyeokName}(${stem})]`;
 }
-
-
-
 
 

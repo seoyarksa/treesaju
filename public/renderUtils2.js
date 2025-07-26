@@ -11,7 +11,9 @@ import { stemOrder,
         DANGRYEONGSHIK_MAP,
          jijiToSibganMap,
          firstHeesinMap, 
-         GISIN_BY_DANGRYEONGSHIK 
+         HEESIN_GISIN_COMBINED, 
+         HEESIN_BY_DANGRYEONG_POSITION, 
+         GISIN_BY_DANGRYEONG_POSITION
       } from './constants.js';
 
 import {
@@ -37,7 +39,7 @@ import {
   findStartMonthIndex,
   generateMonthlyGanjiSeriesByGanji,
   getdangryeongshik,
-  extractAllSibgan
+  extractHeesinGisinByDangryeong, extractSajuCheongansAndJijis, getDangryeongCheongans
 } from './sajuUtils.js';
 
 
@@ -426,169 +428,113 @@ const dangryeongshikHtml = dangryeongShikArray.map((char, i) => {
   `;
 }
 
+export // renderUtils.js
 
-
-export function renderDangryeongShik(mapped, sajuChungan, sajuJiji, jijiToSibganMap, dangryeong, firstHeesin, chunganList, jijiSibganList) {
-  // 함수 내부에서 chunganList, jijiSibganList 사용 가능
-
-
-  const container = document.getElementById('dangryeongshik-container');
-  container.innerHTML = '';
-
-  const createLabel = (text) => {
-    const label = document.createElement('span');
-    label.style.width = '50px';
-    label.style.textAlign = 'right';
-    label.style.marginRight = '10px';
-    label.style.fontWeight = 'bold';
-    label.textContent = text;
-    return label;
-  };
-
-  const createSpan = (item, show, wrap = false) => {
-    const span = document.createElement('span');
-    span.style.width = '40px';
-    span.style.textAlign = 'center';
-
-    if (!show || !item.char) {
-      span.textContent = '';
-      span.style.color = 'transparent';
-      return span;
+// 위치별로 정렬하는 유틸 함수
+function arrangeByPositionFromObjectList(objList) {
+  const arr = [[], [], [], [], []]; // 1~5 자리용
+  objList.forEach(({ char, pos }) => {
+    if (pos >= 1 && pos <= 5) {
+      arr[pos - 1].push(char);
     }
-
-    const char = wrap ? `(${item.char})` : item.char;
-    span.textContent = char;
-
-    if (item.isDangryeong) {
-      span.style.color = 'red';
-      span.style.fontWeight = 'bold';
-    } else if (item.isFirstHeesin) {
-      span.style.color = 'green';
-      span.style.fontWeight = 'bold';
-    } else {
-      span.style.color = 'black';
-      span.style.fontWeight = 'normal';
-    }
-
-    return span;
-  };
-
-  // ▶ 천간 기신
-const topGisinRow = document.createElement('div');
-topGisinRow.style.display = 'flex';
-topGisinRow.style.justifyContent = 'center';
-topGisinRow.style.marginBottom = '4px';
-topGisinRow.appendChild(createLabel('天기신'));
-
-mapped.forEach(item => {
-  // item.isGisin && item.highlightChungan 조건 만족해야 하며
-  // gisinList 첫 번째 기신이 천간 리스트(chunganList)에 있어야 출력
-  if (item.isGisin && item.highlightChungan && item.gisinList.length > 0) {
-    const gisinChar = item.gisinList[0];
-    if (chunganList.includes(gisinChar)) {
-      const span = createSpan({ char: gisinChar }, true);
-      topGisinRow.appendChild(span);
-    } else {
-      // 자리 맞추기 위해 빈 span 추가
-      const emptySpan = createSpan({ char: '' }, false);
-      topGisinRow.appendChild(emptySpan);
-    }
-  } else {
-    const emptySpan = createSpan({ char: '' }, false);
-    topGisinRow.appendChild(emptySpan);
-  }
-});
-container.appendChild(topGisinRow);
-
-  // ▶ 천간 희신
-  const topRow = document.createElement('div');
-  topRow.style.display = 'flex';
-  topRow.style.justifyContent = 'center';
-  topRow.style.marginBottom = '2px';
-  topRow.appendChild(createLabel('天희신'));
-
-  mapped.forEach(item => {
-    const span = createSpan(item, item.highlightChungan);
-    topRow.appendChild(span);
   });
-  container.appendChild(topRow);
+  return arr;
+}
 
-  // ▶ 당령식
-const midRow = document.createElement('div');
-midRow.style.display = 'flex';
-midRow.style.justifyContent = 'center';
-midRow.style.marginBottom = '2px';
-midRow.style.border = '2px solid #7ab8ff';      // 진한 파랑 테두리
-midRow.style.backgroundColor = '#e0f7ff';       // 연한 하늘색 배경
-midRow.style.padding = '6px 10px';
-midRow.style.borderRadius = '6px';
+function arrangeByPositionForDangryeong(dangryeongList) {
+  const posMap = { 1: [], 2: [], 3: [], 4: [], 5: [] };
 
-midRow.appendChild(createLabel('당령식'));
-
-mapped.forEach(item => {
-  const span = createSpan(item, true);
-  midRow.appendChild(span);
-});
-container.appendChild(midRow);
-
-  // ▶ 지지 희신
-  const bottomRow = document.createElement('div');
-  bottomRow.style.display = 'flex';
-  bottomRow.style.justifyContent = 'center';
-  bottomRow.appendChild(createLabel('地희신'));
-
-  mapped.forEach(item => {
-    const span = createSpan(item, item.highlightJiji, item.wrapInParens);
-    bottomRow.appendChild(span);
-  });
-  container.appendChild(bottomRow);
-
-  // ▶ 지지 기신
-const bottomGisinRow = document.createElement('div');
-bottomGisinRow.style.display = 'flex';
-bottomGisinRow.style.justifyContent = 'center';
-bottomGisinRow.appendChild(createLabel('地기신'));
-
-mapped.forEach(item => {
-  if (item.isGisin && item.highlightJiji && item.gisinList.length > 0) {
-    const gisinChar = item.gisinList[0];
-    if (jijiSibganList.includes(gisinChar)) {
-      const span = createSpan({ char: gisinChar }, true, item.wrapInParens);
-      bottomGisinRow.appendChild(span);
-    } else {
-      const emptySpan = createSpan({ char: '' }, false);
-      bottomGisinRow.appendChild(emptySpan);
+  dangryeongList.forEach(({ char }) => {
+    const mapped = DANGRYEONGSHIK_MAP[char];
+    if (mapped) {
+      for (let i = 0; i < 5; i++) {
+        posMap[i + 1].push(mapped[i]);
+      }
     }
-  } else {
-    const emptySpan = createSpan({ char: '' }, false);
-    bottomGisinRow.appendChild(emptySpan);
-  }
-});
-container.appendChild(bottomGisinRow);
+  });
+
+  return posMap;
 }
 
 
-export function createMappedArray(elements, dangryeong, chunganList, jijiSibganList, firstHeesin) {
-  const gisinList = GISIN_BY_DANGRYEONGSHIK[dangryeong] || [];
+export function arrangeByPosition(listOrMap) {
+  const positionMap = [[], [], [], [], []];
 
-  return elements.map(el => {
-    const char = el.char;
-    const isGisin = gisinList.includes(char); // ⚠️ 정확한 문자 매칭
+  if (Array.isArray(listOrMap)) {
+    for (const item of listOrMap) {
+      if (item && item.pos >= 1 && item.pos <= 5) {
+        // item.value 대신 item.char 로 바꾸기 필요 (item 구조 확인 필요)
+        positionMap[item.pos - 1].push(item.char ?? item.value);
+      }
+    }
+  } else if (listOrMap && typeof listOrMap === "object") {
+    for (const [pos, values] of Object.entries(listOrMap)) {
+      const index = Number(pos) - 1;
+      if (index >= 0 && index < 5 && Array.isArray(values)) {
+        positionMap[index].push(...values);
+      }
+    }
+  }
 
-    return {
-      char,
-      highlightChungan: chunganList.includes(char),
-      highlightJiji: jijiSibganList.includes(char),
-      isDangryeong: char === dangryeong,
-      isFirstHeesin: char === firstHeesin,
-      isGisin,
-      wrapInParens: el.wrap || false
-    };
-  });
+  console.log("[DEBUG] arrangeByPosition 결과:", positionMap);
+  return positionMap;
 }
 
 
 
 
+////////////////////////////////////////////출력부분
+export function renderDangryeongHeesinGisin(
+  cheonganGisinList,
+  cheonganHeesinList,
+  dangryeongList,
+  jijiHeesinList,
+  jijiGisinList
+) {
+  const container = document.getElementById("dangryeongshik-container");
+  if (!container) return;
 
+  console.log("[DEBUG] renderDangryeongHeesinGisin 호출됨");
+
+  const cheonganGisinByPos = arrangeByPosition(cheonganGisinList);
+  const cheonganHeesinByPos = arrangeByPosition(cheonganHeesinList);
+  const jijiHeesinByPos = arrangeByPosition(jijiHeesinList);
+  const jijiGisinByPos = arrangeByPosition(jijiGisinList);
+
+  console.log("[DEBUG] 당령 리스트:", dangryeongList);
+
+  const commonStyle = "font-family:Consolas, 'Courier New', monospace; font-size:16px; line-height:1.8;";
+
+  const createSectionLineHTML = (title, posMap) => {
+    let cells = "";
+    for (let pos = 1; pos <= 5; pos++) {
+      const chars = posMap[pos - 1] && posMap[pos - 1].length
+        ? posMap[pos - 1].join("")
+        : "";
+      cells += `<span style="display:inline-block; width:30px; text-align:center;">${chars}</span>`;
+    }
+    return `<div style="${commonStyle}"><strong style="display:inline-block; width:90px;">${title}</strong>${cells}</div>`;
+  };
+
+  const createDangryeongLineHTML = (title, list) => {
+    let cells = "";
+    for (let pos = 1; pos <= 5; pos++) {
+      const item = list.find(x => x.pos === pos);
+      const char = item ? item.char : "";
+      cells += `<span style="display:inline-block; width:30px; text-align:center;">${char}</span>`;
+    }
+    return `<div style="${commonStyle}"><strong style="display:inline-block; width:90px;">${title}</strong>${cells}</div>`;
+  };
+
+  let html = "";
+  html += createSectionLineHTML("천간기신", cheonganGisinByPos);
+  html += createSectionLineHTML("천간희신", cheonganHeesinByPos);
+  html += createDangryeongLineHTML("당령식", dangryeongList);
+  html += createSectionLineHTML("지지희신", jijiHeesinByPos);
+  html += createSectionLineHTML("지지기신", jijiGisinByPos);
+
+  container.innerHTML = html;
+
+  console.log("[DEBUG] 최종 렌더링 HTML:", html);
+}
 

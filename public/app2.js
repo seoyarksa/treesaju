@@ -16,7 +16,9 @@ import {
   jijiToSibganMap, 
   GYEOKGUK_TYPES,
   jijiToSibganMap2,
-  GISIN_BY_DANGRYEONGSHIK 
+  HEESIN_GISIN_COMBINED, 
+  HEESIN_BY_DANGRYEONG_POSITION, 
+  GISIN_BY_DANGRYEONG_POSITION
 } from './constants.js';
 console.log(stemOrder);
 console.log(stemOrder, branchOrder);
@@ -57,8 +59,7 @@ import {
   getDangryeong,
   getSaryeong,
   getdangryeongshik, 
-  dangryeongshik,
-  extractAllSibgan
+  extractHeesinGisinByDangryeong, extractSajuCheongansAndJijis, getDangryeongCheongans
 } from './sajuUtils.js';
 //
 
@@ -72,8 +73,8 @@ import {
   elementColors,
   renderTodaySajuBox,
   createDangryeongTableHtml,
-  renderDangryeongShik, 
-  createMappedArray
+  renderDangryeongHeesinGisin,
+  arrangeByPosition
 } from './renderUtils.js';
 
 import {
@@ -82,8 +83,7 @@ import {
   getGyeokName,
   getYukshin,
   getUseGuByGyeok,
-  renderGyeokFlow,
-  renderGyeokFlowStyled 
+  renderGyeokFlowStyled
 } from './gyeokUtils.js';
 
 //
@@ -476,49 +476,63 @@ function renderAllDangryeong(dangryeong, saryeong, sajuChungan, sajuJiji) {
 
   const dangryeongHtml = createDangryeongTableHtml(dangryeong, saryeong, dangryeongShikArray);
   console.log(dangryeongHtml);
+}
 
 function doRender() {
-  const container = document.getElementById("result");
-  if (!container) {
-    console.error("#result 요소가 존재하지 않습니다.");
-    return;
-  }
+  const dangryeong = getDangryeong(monthJi, daeyunAge, daYunDirection);  // 예: "癸"
+  const { sajuCheonganList, sajuJijiList, sajuJijiCheonganList } = extractSajuCheongansAndJijis(saju);
 
-  // 반환값 구조분해 할당으로 추출
-  const { firstHeesin, list } = dangryeongshik(
-    dangryeong,
-    dangryeongShikArray,
-    sajuChungan,
-    sajuJiji,
-    jijiToSibganMap
+  
+  // 사주 지지 십간 리스트 (지지 속 십간을 중복 포함해 뽑기)
+
+
+const dangryeongArray = DANGRYEONGSHIK_MAP[dangryeong];  // ['己', '辛', '癸', '甲', '丙']
+console.log('[DEBUG] 당령 천간 배열:', dangryeongArray);
+// 배열을 pos와 char 객체 배열로 변환
+const dangryeongList = dangryeongArray.map((char, idx) => ({ pos: idx + 1, char }));
+
+console.log('[DEBUG] 당령 포지션 포함 리스트:', dangryeongList);
+  // 2. 희신/기신 리스트 추출
+  const {
+    cheonganHeesinList,
+    cheonganGisinList,
+    jijiHeesinList,
+    jijiGisinList
+  } = extractHeesinGisinByDangryeong(dangryeong, sajuCheonganList, sajuJijiCheonganList);
+console.log('[DEBUG] 사주 천간 리스트:', sajuCheonganList);
+console.log('[DEBUG] 사주 지지 리스트:', sajuJijiList);
+console.log('[DEBUG] 지지 속 천간 리스트:', sajuJijiCheonganList);
+
+  // 3. 각 리스트를 위치별 배열로 변환 (arrangeByPosition 함수 활용)
+  const cheonganHeesinByPos = arrangeByPosition(cheonganHeesinList);
+  const cheonganGisinByPos = arrangeByPosition(cheonganGisinList);
+  const jijiHeesinByPos = arrangeByPosition(jijiHeesinList);
+  const jijiGisinByPos = arrangeByPosition(jijiGisinList);
+console.log('[DEBUG] 천간 희신 리스트:', cheonganHeesinList);
+console.log('[DEBUG] 천간 기신 리스트:', cheonganGisinList);
+console.log('[DEBUG] 지지 희신 리스트:', jijiHeesinList);
+console.log('[DEBUG] 지지 기신 리스트:', jijiGisinList);
+  // dangryeongList 자체가 {pos: [chars]} 형식이므로 그대로 사용 가능
+
+
+  // 4. 렌더링 호출
+  renderDangryeongHeesinGisin(
+    cheonganGisinList,
+    cheonganHeesinList,
+    dangryeongList,
+    jijiHeesinList,
+    jijiGisinList
   );
+}
 
-  console.log('mapped list:', list);
-  console.log('firstHeesin:', firstHeesin);
-  // chunganList, jijiSibganList 생성
-  const allSibgan = extractAllSibgan(sajuChungan, sajuJiji, jijiToSibganMap);
-  const chunganList = [...new Set(sajuChungan)];
-  const jijiSibganList = [...new Set(allSibgan.filter(char => !sajuChungan.includes(char)))];
-  // ✅ 추출한 값들로 전달
-renderDangryeongShik(
-  list,
-  sajuChungan,
-  sajuJiji,
-  jijiToSibganMap,
-  dangryeong,
-  firstHeesin,
-  chunganList,
-  jijiSibganList
-);
+// 실행 트리거
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", doRender);
+} else {
+  setTimeout(doRender, 0);
 }
 
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", doRender);
-  } else {
-    setTimeout(doRender, 0);
-  }
-}
 
 
 
@@ -613,6 +627,8 @@ window.handleDaeyunClick = handleDaeyunClick;
 
 
     document.getElementById('result').innerHTML = `
+
+    <div style="max-width: 600px; margin-left: 20px;">
       <style>
   .ganji-table {
     border-collapse: collapse;
@@ -792,31 +808,33 @@ window.handleDaeyunClick = handleDaeyunClick;
 
   </tbody>
 </table>
-
+</div>
 <!-- 당령 표시용 영역 -->
-     <div style="display: flex; justify-content: center; margin-top: 1rem;">
-     <table class="dangryeong-table" style="
-        border-collapse: collapse;
-        font-size: 1rem;
-        text-align: center;
-        width: 100%;
-      <!--   max-width: 600px;-->
-        border: 1px solid #ccc;
-      ">
-        <thead></thead>
-      <tbody>
-        <tr>
-          <td style="border:1px solid #ccc; padding:4px;">오행${dangryeongHtml || "-"}</td>
-          <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-display"></div></td>
-        </tr>
-         <tr>
-          <td style="border:1px solid #ccc; padding:4px;"><div id="dangryeongshik-container" style="margin-top: 0.5rem;"></div></td>
-          <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-flow"></div></td>
-        </tr>
-      </tbody>
-    </table>
-      
-  </div>
+<div style="margin-top: 1rem; margin-left: 20px;">
+  <table class="dangryeong-table" style="
+    border-collapse: collapse;
+    font-size: 1rem;
+    text-align: center;
+    width: 100%;
+    border: 1px solid #ccc;
+    table-layout: fixed;
+  ">
+    <thead></thead>
+    <tbody>
+      <tr>
+        <td style="border:1px solid #ccc; padding:4px;">오행${dangryeongHtml || "-"}</td>
+        <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-display"></div></td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #ccc; padding:4px;">
+          <div id="dangryeongshik-container" style="margin-top: 0.5rem;"></div>
+        </td>
+        <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-flow"></div></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
 
 
  <!-- ✅ 대운 테이블 -->
@@ -860,11 +878,29 @@ if (gyeokDisplayEl) {
 }
 // 상신 구신 표시
 console.log('✅ dayGan:', dayGan, 'gyeok.stem:', gyeok?.stem);
+// somewhere in your app.js or main logic
+const saju = {
+  yearGan: '기',
+  monthGan: '임',
+  dayGan: '경',
+  hourGan: '경',
+  yearBranch: '유',
+  monthBranch: '신',
+  dayBranch: '오',
+  hourBranch: '진'
+};
+
+
+
+console.log("🔍 전달된 격국 객체(gyeok):", gyeok);
+console.log("🔍 전달된 격국 이름:", gyeok.char);
+console.log('📦 전달된 saju 객체:', saju);
 
 
 const flowEl = document.getElementById("gyeok-flow");
 console.log(flowEl); // null이면 요소 못 찾음
-if (flowEl) flowEl.innerHTML = renderGyeokFlowStyled(gyeok);
+if (flowEl) flowEl.innerHTML = renderGyeokFlowStyled(gyeok, saju);
+
 
 
 // ✅ 여기서 대운 테이블을 동적으로 렌더링!

@@ -15,9 +15,11 @@ import { stemOrder,
          DANGRYEONGSHIK_MAP,
          jijiToSibganMap,
          firstHeesinMap,
-         GISIN_BY_DANGRYEONGSHIK
+        HEESIN_GISIN_COMBINED, 
+        HEESIN_BY_DANGRYEONG_POSITION, 
+        GISIN_BY_DANGRYEONG_POSITION
         } from './constants.js';
-import { elementColors, createMappedArray } from './renderUtils.js';
+import { elementColors,arrangeByPosition} from './renderUtils.js';
 import { getJeolipDate } from './dateUtils.js'; // 절입일 계산 함수
 
 const yangStems = ['갑', '병', '무', '경', '임'];
@@ -373,79 +375,131 @@ export function getdangryeongshik(dangryeong) {
   return DANGRYEONGSHIK_MAP[dangryeong] || [];
 }
 
+
 // 천간 배열에 대해 사주 천간, 사주 지지와 매핑 정보 생성
-export function dangryeongshik(dangryeong, dangryeongShikArray, sajuChungan, sajuJiji, jijiToSibganMap) {
-  const firstHeesin = firstHeesinMap[dangryeong];
+// HEESIN_GISIN_COMBINED는 위에서 만든 상수맵
 
-  const allSibgan = extractAllSibgan(sajuChungan, sajuJiji, jijiToSibganMap);
+// 1. 당령에 따른 전체 천간 리스트 (중복 포함, 1~5 위치순)
+export function getDangryeongCheongans(dangryeong) {
+  const map = HEESIN_GISIN_COMBINED[dangryeong];
+  if (!map) return [];
 
-  const chunganList = [...new Set(sajuChungan)];
-  const jijiSibganList = [...new Set(allSibgan.filter(char => !sajuChungan.includes(char)))];
-
-  const gisinMap = GISIN_BY_DANGRYEONGSHIK[dangryeong] || {};
-
-  const result = dangryeongShikArray.map(char => {
-    const highlightChungan = chunganList.includes(char);
-    let highlightJiji = false;
-    let wrapInParens = false;
-
-    // ✅ 수정된 로직: wrap=false 우선 처리
-    let foundPlain = false;
-    let foundWrapped = false;
-
-    for (const jiji of sajuJiji) {
-      const sibganList = jijiToSibganMap[jiji] || [];
-      for (const item of sibganList) {
-        const sibganChar = typeof item === 'string' ? item : item.char;
-        const isWrapped = typeof item === 'string' ? false : item.wrap;
-
-        if (sibganChar === char) {
-          if (!isWrapped) {
-            foundPlain = true;
-          } else {
-            foundWrapped = true;
-          }
-        }
-      }
+  const result = [];
+  for (let i = 1; i <= 5; i++) {
+    const cheongans = map[i];
+    if (Array.isArray(cheongans)) {
+      result.push(...cheongans);
     }
+  }
 
-    highlightJiji = foundPlain || foundWrapped;
-    wrapInParens = !foundPlain && foundWrapped;
+  return result;
+}
 
-    // 기신 추출
-    const gisinListRaw = gisinMap[char] || [];
-    const gisinList = gisinListRaw.length > 0 ? [gisinListRaw[0]] : [];
+// 2. 사주팔자에서 천간 리스트와 지지 리스트 추출
+export function extractSajuCheongansAndJijis(saju) {
 
-    const isGisin = gisinList.some(gisinChar =>
-      chunganList.includes(gisinChar) || jijiSibganList.includes(gisinChar)
-    );
+    const { yearGan, monthGan, dayGan, hourGan, yearBranch, monthBranch, dayBranch, hourBranch } = saju;
+  // 한글로 들어온 천간 → 한자로 변환
+  const sajuCheonganList = [
+    convertKorToHanStem(saju.yearGan),
+    convertKorToHanStem(saju.monthGan),
+    convertKorToHanStem(saju.dayGan),
+    convertKorToHanStem(saju.hourGan),
+  ];
 
-    return {
-      char,
-      highlightChungan,
-      highlightJiji,
-      isDangryeong: char === dangryeong,
-      isFirstHeesin: char === firstHeesin,
-      wrapInParens,
-      isGisin,
-      gisinList
-    };
+  // 한글로 들어온 지지 → 한자로 변환
+  const sajuJijiList = [
+    convertKorToHanBranch(saju.yearBranch),
+    convertKorToHanBranch(saju.monthBranch),
+    convertKorToHanBranch(saju.dayBranch),
+    convertKorToHanBranch(saju.hourBranch),
+  ];
+
+  // 지지 속 천간들 (이미 한자로 변환된 지지를 사용하므로, 맵에서 조회)
+  const sajuJijiCheonganList = sajuJijiList.flatMap(jiji => {
+    const sibgans = jijiToSibganMap[jiji] || [];
+    return sibgans.map(s => s.char);
   });
 
   return {
-    firstHeesin,
-    list: result
+    sajuCheonganList,
+    sajuJijiList,
+    sajuJijiCheonganList
   };
 }
 
 
 
-// 사주에서 천간과 지지 내 십간 모두 추출
-export function extractAllSibgan(sajuChungan, sajuJiji, jijiToSibganMap) {
-  return [
-    ...sajuChungan,
-    ...sajuJiji.flatMap(jiji =>
-      (jijiToSibganMap[jiji] || []).map(item => typeof item === 'string' ? item : item.char)
-    )
-  ];
+//희신추출리스트
+// 천간 희신/기신 추출 함수
+export function extractCheonganHeesinGisin(dangryeong, sajuCheonganList) {
+  const heesinMap = HEESIN_BY_DANGRYEONG_POSITION[dangryeong];
+  const gisinMap = GISIN_BY_DANGRYEONG_POSITION[dangryeong];
+
+  // 희신 후보: 위치 정보와 함께 수집
+  const heesinCandidates = Object.entries(heesinMap).map(([pos, char]) => ({ char, pos: Number(pos) }));
+
+  // 기신 후보: 문자마다 위치를 배열로 수집
+  const gisinCharPosMap = {};
+  Object.entries(gisinMap).forEach(([pos, chars]) => {
+    chars.forEach(char => {
+      if (!gisinCharPosMap[char]) gisinCharPosMap[char] = [];
+      gisinCharPosMap[char].push(Number(pos));
+    });
+  });
+
+  // 사주 천간에 존재하는 희신 추출
+  const heesin = heesinCandidates
+    .filter(({ char }) => sajuCheonganList.includes(char));
+
+  // 사주 천간에 존재하는 기신 추출
+  const gisin = Object.entries(gisinCharPosMap)
+    .filter(([char]) => sajuCheonganList.includes(char))
+    .map(([char, posArr]) => ({ char, pos: posArr }));
+
+  // 같은 문자가 희신과 기신에 모두 있을 경우, 기신에서는 제거
+  const heesinChars = new Set(heesin.map(h => h.char));
+  const filteredGisin = gisin.filter(({ char }) => !heesinChars.has(char));
+
+  return {
+    cheonganHeesinList: heesin,
+    cheonganGisinList: filteredGisin
+  };
+}
+
+
+
+
+
+
+
+
+
+
+
+//희신추출리스트
+export function extractJijiHeesinGisin(dangryeong, sajuJijiCheonganList) {
+  const heesinMap = HEESIN_BY_DANGRYEONG_POSITION[dangryeong];
+  const gisinMap = GISIN_BY_DANGRYEONG_POSITION[dangryeong];
+
+  const heesinCandidates = Object.entries(heesinMap).map(([pos, char]) => ({ char, pos: Number(pos) }));
+
+  const gisinCharPosMap = {};
+  Object.entries(gisinMap).forEach(([pos, chars]) => {
+    chars.forEach(char => {
+      if (!gisinCharPosMap[char]) gisinCharPosMap[char] = [];
+      gisinCharPosMap[char].push(Number(pos));
+    });
+  });
+
+  const heesinJiji = heesinCandidates.filter(({ char }) => sajuJijiCheonganList.includes(char));
+
+  const gisinJiji = Object.entries(gisinCharPosMap)
+    .filter(([char]) => sajuJijiCheonganList.includes(char))
+    .map(([char, posArr]) => ({ char, pos: posArr }));
+
+  return {
+    jijiHeesinList: heesinJiji,
+    jijiGisinList: gisinJiji
+  };
 }
