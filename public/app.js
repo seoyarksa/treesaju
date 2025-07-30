@@ -32,7 +32,7 @@ console.log(stemOrder, branchOrder);
 import {
   calculateDaeyunAge,
     getCurrentDaeyunIndexFromStartAge
-} from './dateUtils.js';
+} from '../utils/dateUtils.js';
 
 
 import {
