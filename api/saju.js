@@ -13,6 +13,9 @@ import { calculateDaeyunAge } from '../utils/dateUtils.js';
 import { getJeolipDate } from '../utils/solarTermCalculator.js';
 //import { stemOrder, branchOrder } from './public/constants.js'; // optional
 
+const stemOrder = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+const branchOrder = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+
 const hanToKorStem = {
   '甲': '갑', '乙': '을', '丙': '병', '丁': '정', '戊': '무',
   '己': '기', '庚': '경', '辛': '신', '壬': '임', '癸': '계'
