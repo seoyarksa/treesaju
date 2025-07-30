@@ -13,7 +13,7 @@ import solarlunar from 'solarlunar';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
 import timezone from 'dayjs/plugin/timezone.js';
-import dotenv from 'dotenv';
+//import dotenv from 'dotenv';
 
 import { calculateDaeyunAge } from '../../public/dateUtils.js';
 import { getJeolipDate, getSolarTermDates } from '../../public/solarTermCalculator.js';
