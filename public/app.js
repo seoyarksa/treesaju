@@ -8,8 +8,6 @@
 
 // 상수
 import { 
-  stemOrder, 
-  branchOrder, 
   elementMap, 
   DANGRYEONGSHIK_MAP,
   yukshinToKey,  

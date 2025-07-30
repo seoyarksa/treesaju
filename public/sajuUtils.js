@@ -9,8 +9,7 @@
 
 
 
-import { stemOrder, 
-         branchOrder,
+import { 
          saryeongMap,
          DANGRYEONGSHIK_MAP,
          jijiToSibganMap,

@@ -6,8 +6,7 @@
 
 
 
-import { stemOrder, 
-        branchOrder, 
+import { 
         DANGRYEONGSHIK_MAP,
         HanhiddenStemsMap,
          jijiToSibganMap,
