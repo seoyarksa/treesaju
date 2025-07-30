@@ -13,6 +13,8 @@ import {
   elementMap, 
   DANGRYEONGSHIK_MAP,
   yukshinToKey,  
+  tenGodMap,
+  tenGodMapKor,
   jijiToSibganMap, 
   GYEOKGUK_TYPES,
   jijiToSibganMap2,
@@ -29,8 +31,7 @@ console.log(stemOrder, branchOrder);
 // dateUtils
 import {
   calculateDaeyunAge,
-  getJeolipDate,
-  getCurrentDaeyunIndexFromStartAge
+    getCurrentDaeyunIndexFromStartAge
 } from './dateUtils.js';
 
 
@@ -59,7 +60,7 @@ import {
   getDangryeong,
   getSaryeong,
   getdangryeongshik, 
-extractSajuCheongansAndJijis, getDangryeongCheongans,
+ getDangryeongCheongans,
   extractCheonganHeesinGisin, extractJijiHeesinGisin
 } from './sajuUtils.js';
 //
@@ -86,6 +87,9 @@ import {
   getUseGuByGyeok,
   renderGyeokFlowStyled
 } from './gyeokUtils.js';
+
+
+
 
 //
 window.handleDaeyunClick = handleDaeyunClick;
@@ -246,8 +250,20 @@ window.addEventListener('DOMContentLoaded', () => {
 
 
 
+// 🎯 숫자 두 자리로 포맷 (예: 9 → 09)
+function pad(num) {
+  return String(num).padStart(2, '0');
+}
 
-
+// app.js 상단 혹은 적당한 위치에 추가하세요
+async function getJeolipDateFromAPI(year, month) {
+  const res = await fetch(`/api/jeolip?year=${year}&month=${month}`);
+  if (!res.ok) {
+    throw new Error(`API 요청 실패: ${res.status}`);
+  }
+  const { date } = await res.json();
+  return new Date(date);
+}
 
 
 
@@ -339,18 +355,18 @@ const data = await response.json();
 console.log('서버에서 받은 data:', data);
 console.log('🎯 birthYear:', data.birthYear);
 
-console.log('🎯 daeyunAge1[역행적용전]:', data.daeyunAge);
-console.log('ganji:', data.ganji);
-console.log('서버 응답 전체:', JSON.stringify(data, null, 2));
+
+//console.log('ganji:', data.ganji);
+//console.log('서버 응답 전체:', JSON.stringify(data, null, 2));
 
 // fetch 응답 후에 추가!
 // 서버에서 받은 생년월일 데이터를 전역 변수에 저장
 window.birthYear = data.birthYear || year;
 window.birthMonth = data.solar?.month || month;
 window.birthDay = data.solar?.day || day;
+window.birthHour = data.solar?.hour ?? 0;
+window.birthMinute = data.solar?.minute ?? 0;
 
-console.log('🎯 birthMonth:', window.birthMonth);
-console.log('🎯 birthDay:', window.birthDay);
 // ✅ 직접 받은 birthYear 사용
 birthYear = data.birthYear;
 // 당령 계산에 필요한 값 꺼내기
@@ -359,10 +375,29 @@ birthYear = data.birthYear;
 // ✅ 서버에서 계산한 값을 사용해야 함
 // daeyunAge 계산부 (예시)
 const yearStemKor = data.yearStemKor; // ✅ 오류 발생 지점 수정됨
-const birthDateObj = new Date(window.birthYear, window.birthMonth - 1, window.birthDay);
+const birthDateObj = new Date(window.birthYear, window.birthMonth - 1, window.birthDay, window.birthHour, window.birthMinute);
 console.log('▶ birthDateObj:', birthDateObj);
-const jeolipDate = getJeolipDate(window.birthYear, window.birthMonth);
-console.log('▶ jeolipDate:', jeolipDate);
+//console.log('window.birthYear:', window.birthYear);
+//console.log('window.birthMonth:', window.birthMonth);
+//console.log('window.birthDay:', window.birthDay);
+//console.log('window.birthHour:', window.birthHour);
+//console.log('window.birthMinute:', window.birthMinute);
+
+
+
+  // 절기테스트  임시////////////////////
+
+
+
+
+// 1. 출생일 Date 객체 준비
+// 1. 생일 객체 생성
+const birthDate = new Date(window.birthYear, window.birthMonth - 1, window.birthDay, window.birthHour, window.birthMinute);
+console.log("▶ 생년월일시 (KST):", birthDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }));
+
+// 2. 절입일 구하기 (동기 API 사용 가정)
+const jeolipDate = new Date(await getJeolipDateFromAPI(window.birthYear, window.birthMonth - 1, window.birthDay, window.birthHour, window.birthMinute));
+
 
 // 원본 값 (소수점 유지)
 const daeyunAgeRaw = data.daeyunAge;
@@ -372,7 +407,7 @@ window.daeyunAgeRaw = daeyunAgeRaw;
 const daeyunAge = Number(daeyunAgeRaw.toFixed(2));
 window.daeyunAge = daeyunAge;
 
-console.log('▶ daeyunAge2:', daeyunAge);
+//console.log('▶ daeyunAge2:', daeyunAge);
 
 
 
@@ -406,24 +441,24 @@ const dayGanKorGan = convertHanToKorStem(dayGanji.gan);
 // 당령 구하기
 
 // 출생 월, 일 (전역변수에서)
-const birthMonth = parseInt(window.birthMonth, 10); // 👈 명확히 숫자로 변환
-const birthDay = parseInt(window.birthDay, 10);
+
 const monthJi = monthGanji.ji;  // 월지(예: '子', '丑' 등)
 const daYunDirection = getDaYunDirection(gender, yearStemKor);
 console.log('gender:', gender);
 console.log('yearStemKor:', yearStemKor);
 console.log('⚡ daYunDirection (1: 순행, -1: 역행):', daYunDirection);
+console.log('🎯 daeyunAge1[역행적용전]:', data.daeyunAge);
 window.daYunDirection = getDaYunDirection(gender, yearStemKor);
 // 당령 구하는 함수 호출 (sajuUtils.js에서 import 되어 있어야 함)
 const dangryeong = getDangryeong(monthGanji.ji, daeyunAge, daYunDirection);
-console.log('당령:', dangryeong);
-console.log('▶ before getSaryeong call, daeyunAge:', daeyunAge, 'monthJi:', monthJi);
+
+//console.log('▶ before getSaryeong call, daeyunAge:', daeyunAge, 'monthJi:', monthJi);
 
 const saryeong = getSaryeong(monthGanji.ji, daeyunAge, window.daYunDirection);
 
-console.log('▶ after getSaryeong call, saryeong:', saryeong);
+//console.log('▶ after getSaryeong call, saryeong:', saryeong);
 createDangryeongTableHtml(dangryeong, saryeong);
-console.log("사령:", saryeong);
+//console.log("사령:", saryeong);
 
 // 당령 결과를 UI에 표시하거나 전역 변수로 저장 가능
 window.dangryeong = dangryeong;
@@ -437,12 +472,14 @@ const sajuJiji = [timeGanji.ji, dayGanji.ji, monthGanji.ji, yearGanji.ji];
 const chunganList = [timeGanji.gan, dayGanji.gan, monthGanji.gan, yearGanji.gan];
 const dayGan = dayGanji.gan;  // 일간 천간
 
-console.log(yearGanji, monthGanji, dayGanji, timeGanji);
-console.log('사주 천간:', sajuChungan);
-console.log('천간 리스트:', chunganList);
+//console.log(yearGanji, monthGanji, dayGanji, timeGanji);
+
+
 console.log('일간:', dayGan);
 console.log('대운 나이:', daeyunAge);
 console.log('대운 방향:', daYunDirection);
+console.log("▶ monthJi:", monthGanji.ji);
+console.log('당령:', dangryeong);
 console.log('사령:', saryeong);
 
 // 격국 분석 호출
@@ -454,26 +491,25 @@ const gyeok = getGyeokForMonth({
   daeyunAge,
   daYunDirection,
 });
-console.log("▶ monthJi:", monthGanji.ji);
-console.log("▶ saryeong:", saryeong);
-console.log("▶ chunganList:", chunganList);
-console.log("▶ dayGan:", dayGan);
-console.log("▶ daeyunAge:", daeyunAge);
-console.log("▶ daYunDirection:", daYunDirection);
+
 
 console.log("격국:", gyeok);
 
 
-console.log("🧪 getGyeokForMonth 결과:", gyeok);
+//console.log("🧪 getGyeokForMonth 결과:", gyeok);
+
+
+
+
+
 // 당령 및 사령 추출 (이미 계산되어 있다면)
 // ✅ 여기서는 바로 호출만 하세요
 renderAllDangryeong(dangryeong, saryeong, sajuChungan, sajuJiji);
 // 월간/월지 기준 시작 간지
 function renderAllDangryeong(dangryeong, saryeong, sajuChungan, sajuJiji) {
   const dangryeongShikArray = getdangryeongshik(dangryeong);
-  console.log('dangryeong:', dangryeong);
-  console.log('dangryeongShikArray:', dangryeongShikArray);
-  console.log('Array.isArray:', Array.isArray(dangryeongShikArray));
+    console.log('dangryeongShikArray:', dangryeongShikArray);
+  //console.log('Array.isArray:', Array.isArray(dangryeongShikArray));
 
   const dangryeongHtml = createDangryeongTableHtml(dangryeong, saryeong, dangryeongShikArray);
   console.log(dangryeongHtml);
@@ -481,36 +517,62 @@ function renderAllDangryeong(dangryeong, saryeong, sajuChungan, sajuJiji) {
 
 function doRender() {
   const dangryeong = getDangryeong(monthJi, daeyunAge, daYunDirection);  // 예: "癸"
-  const { sajuCheonganList, sajuJijiList, sajuJijiCheonganList } = extractSajuCheongansAndJijis(saju);
+// 천간 희신, 기신만 추출
 
-  
   // 사주 지지 십간 리스트 (지지 속 십간을 중복 포함해 뽑기)
 // 당령 글자 (진짜 당령)
 const trueDangryeongChar = dangryeong;  // 예: '庚'
 
 const dangryeongArray = DANGRYEONGSHIK_MAP[dangryeong];  // ['己', '辛', '癸', '甲', '丙']
-console.log('[DEBUG] 당령 천간 배열:', dangryeongArray);
+//console.log('[DEBUG] 당령 천간 배열:', dangryeongArray);
 // 배열을 pos와 char 객체 배열로 변환
 const dangryeongList = dangryeongArray.map((char, idx) => ({ pos: idx + 1, char }));
 
 console.log('[DEBUG] 당령 포지션 포함 리스트:', dangryeongList);
   // 2. 희신/기신 리스트 추출
+const sajuCheonganList = [timeGanji.gan, dayGanji.gan, monthGanji.gan, yearGanji.gan];
+const sajuJijiList = [timeGanji.ji, dayGanji.ji, monthGanji.ji, yearGanji.ji];
+const sajuJijiCheonganList = sajuJijiList.flatMap(jiji => 
+  jijiToSibganMap[jiji]?.map(entry => entry.char) || []
+);
+
+
 const { cheonganHeesinList, cheonganGisinList } = extractCheonganHeesinGisin(dangryeong, sajuCheonganList);
 const { jijiHeesinList, jijiGisinList  } = extractJijiHeesinGisin(dangryeong, sajuJijiCheonganList);
 
+console.log('사주 천간:', sajuChungan);
+console.log('사주 지지:', sajuJijiList);
 console.log('[DEBUG] 사주 천간 리스트:', sajuCheonganList);
-console.log('[DEBUG] 사주 지지 리스트:', sajuJijiList);
-console.log('[DEBUG] 지지 속 천간 리스트:', sajuJijiCheonganList);
+console.log('[DEBUG] 사주 지지 리스트:', sajuJijiCheonganList);
+// 기준 희신 리스트 생성 및 출력
+const heesinMap = HEESIN_BY_DANGRYEONG_POSITION[dangryeong] || {};
+const 기준희신리스트 = Object.entries(heesinMap).map(
+  ([pos, char]) => ({ char, pos: Number(pos) })
+);
+console.log('[DEBUG] 기준 희신 리스트:', 기준희신리스트);
+
+// 기준 기신 리스트 생성 및 출력
+const gisinMap = GISIN_BY_DANGRYEONG_POSITION[dangryeong] || {};
+const 기준기신리스트 = [];
+Object.entries(gisinMap).forEach(([pos, chars]) => {
+  const sourcePos = Number(pos);
+  chars.forEach(char => {
+    기준기신리스트.push({ char, pos: Number(pos) });
+  });
+});
+console.log('[DEBUG] 기준 기신 리스트:', 기준기신리스트);
+////console.log('[DEBUG] 지지 속 천간 리스트:', sajuJijiCheonganList);
 
   // 3. 각 리스트를 위치별 배열로 변환 (arrangeByPosition 함수 활용)
-  const cheonganHeesinByPos = arrangeByPosition(cheonganHeesinList);
-  const cheonganGisinByPos = arrangeByPosition(cheonganGisinList);
-  const jijiHeesinByPos = arrangeByPosition(jijiHeesinList);
-  const jijiGisinByPos = arrangeByPosition(jijiGisinList);
-console.log('[DEBUG] 천간 희신 리스트:', cheonganHeesinList);
-console.log('[DEBUG] 천간 기신 리스트:', cheonganGisinList);
-console.log('[DEBUG] 지지 희신 리스트:', jijiHeesinList);
-console.log('[DEBUG] 지지 기신 리스트:', jijiGisinList);
+  /////////////////////////const cheonganGisinByPos = arrangeByPosition(cheonganGisinList);
+  //const cheonganHeesinByPos = arrangeByPosition(cheonganHeesinList);
+
+  //const jijiHeesinByPos = arrangeByPosition(jijiHeesinList);
+  //const jijiGisinByPos = arrangeByPosition(jijiGisinList);
+console.log('[DEBUG] 추출한 천간 희신 리스트:', cheonganHeesinList);
+console.log('[DEBUG] 추출한 천간 기신 리스트:', cheonganGisinList);
+console.log('[DEBUG] 추출한 지지 희신 리스트:', jijiHeesinList);
+console.log('[DEBUG] 추출한 지지 기신 리스트:', jijiGisinList);
   // dangryeongList 자체가 {pos: [chars]} 형식이므로 그대로 사용 가능
 
 
@@ -523,6 +585,8 @@ console.log('[DEBUG] 지지 기신 리스트:', jijiGisinList);
     jijiGisinList,
   trueDangryeongChar
   );
+
+
 }
 
 // 실행 트리거
@@ -531,6 +595,8 @@ if (document.readyState === "loading") {
 } else {
   setTimeout(doRender, 0);
 }
+
+
 
 
 
@@ -595,8 +661,8 @@ console.log('ageLabels:', ageLabels);
 
 
 
-const result = calculateSewonYear(1969, 8, 23, 5.1);
-console.log('계산된 세운 시작년도:', result);
+//const result = calculateSewonYear(1969, 8, 23, 5.1);
+//console.log('계산된 세운 시작년도:', result);
 
 
 const sewonYear = calculateSewonYear(birthYear, birthMonth, birthDay, daeyunAgeRaw);
@@ -724,6 +790,7 @@ window.handleDaeyunClick = handleDaeyunClick;
     </tr>
   </thead>
   <tbody>
+  <div id="birth-info"></div>
     <!-- 천간 -->
     <tr>
       <td>
@@ -945,6 +1012,8 @@ window.currentDaeyunIndex = currentDaeyunIndex;
 
 // 📌 handleDaeyunClick에는 **sortedIndex**를 넣어야 UI와 동기화됨
 handleDaeyunClick(window.birthYear, window.birthMonth, window.birthDay, sortedIndex);
+
+
 
 
 

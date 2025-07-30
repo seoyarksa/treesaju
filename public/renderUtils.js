@@ -9,11 +9,14 @@
 import { stemOrder, 
         branchOrder, 
         DANGRYEONGSHIK_MAP,
+        HanhiddenStemsMap,
          jijiToSibganMap,
          firstHeesinMap, 
          HEESIN_GISIN_COMBINED, 
          HEESIN_BY_DANGRYEONG_POSITION, 
-         GISIN_BY_DANGRYEONG_POSITION
+         GISIN_BY_DANGRYEONG_POSITION,
+         tenGodMap,
+         tenGodMapKor
       } from './constants.js';
 
 import {
@@ -31,7 +34,7 @@ import {
   getThreeLinesFromArray,
   generateDaYun,
   getGanjiByYear,
-
+getDangryeong,
   generateYearlyGanjiSeries2,
   generateDaeyunBy60Gapja,
   getStartMonthBySewoonStem,
@@ -39,7 +42,7 @@ import {
   findStartMonthIndex,
   generateMonthlyGanjiSeriesByGanji,
   getdangryeongshik,
-  extractSajuCheongansAndJijis, getDangryeongCheongans,
+  getDangryeongCheongans,
   extractCheonganHeesinGisin, extractJijiHeesinGisin
 } from './sajuUtils.js';
 
@@ -89,18 +92,24 @@ export function renderDaeyunTable({ daeyunAge, ageLabels, pairsToRender, birthYe
 
             const tenGodStem = getTenGod(window.dayGanKorGan, stem);
 
-            const hiddenStems = 
-            [branch] || [];
-            let targetStemKor = '';
-            if (hiddenStems.length === 3) targetStemKor = hiddenStems[2];
-            else if (hiddenStems.length === 2) targetStemKor = hiddenStems[1];
+// ✅ 지장간 얻기 (기존 구조 유지 + 한글→한자 변환)
+// 지장간은 한글 기반
+const hiddenStems = hiddenStemsMap[branch] || [];
+let targetStemKor = '';
+if (hiddenStems.length === 3) targetStemKor = hiddenStems[2];
+else if (hiddenStems.length === 2) targetStemKor = hiddenStems[1];
 
-            const tenGodBranch = targetStemKor ? getTenGod(window.dayGanKorGan, targetStemKor) : '';
+// 💡 한글 → 한자로 변환
+const targetStemHan = convertKorToHanStem(targetStemKor);
+
+// ⛳️ getTenGod 호출 (한자-한자)
+const tenGodBranch = targetStemKor ? getTenGod(window.dayGanKorGan, targetStemHan) : '';
+
 
             // baseSewonYear가 숫자면 i를 더해 소숫점 1자리까지 표시
             const sewon = !isNaN(baseSewonYear) ? (baseSewonYear + i).toFixed(2) : '';
 
-            console.log(`세운 (${i}):`, sewon);
+            //console.log(`세운 (${i}):`, sewon);
 
             return `
               <td data-index="${i}" onclick="handleDaeyunClick(${birthYear}, ${birthMonth}, ${birthDay}, ${i})">
@@ -128,18 +137,18 @@ export function renderDaeyunTable({ daeyunAge, ageLabels, pairsToRender, birthYe
 
 //하이라이트 대운셀
 export function highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD) {
-  console.log('--- highlightCurrentDaeyunByAge 호출 ---');
-  console.log('▶ 수정된 대운 시작 나이:', correctedStartAge);
+  ////console.log('--- highlightCurrentDaeyunByAge 호출 ---');
+  //console.log('▶ 수정된 대운 시작 나이:', correctedStartAge);
 
   const originalIndex = getCurrentDaeyunIndexFromStartAge(correctedStartAge, birthDateYMD);
-  console.log('▶ getCurrentDaeyunIndexFromStartAge 결과 (originalIndex):', originalIndex);
+  //console.log('▶ getCurrentDaeyunIndexFromStartAge 결과 (originalIndex):', originalIndex);
 
   const daeyunCells = document.querySelectorAll('.daeyun-cell');
-  console.log('▶ daeyunCells.length:', daeyunCells.length);
+  //console.log('▶ daeyunCells.length:', daeyunCells.length);
 
   // 무조건 내림차순 배열 기준 (맨 앞이 마지막 대운)
   const indexToSelect = daeyunCells.length - 1 - originalIndex;
-  console.log('▶ 계산된 선택 인덱스 (indexToSelect):', indexToSelect);
+  //console.log('▶ 계산된 선택 인덱스 (indexToSelect):', indexToSelect);
 
   daeyunCells.forEach((cell, idx) => {
     cell.classList.toggle('selected', idx === indexToSelect);
@@ -147,13 +156,13 @@ export function highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD) {
       daeyunCells.forEach(c => c.classList.remove('selected'));
       cell.classList.add('selected');
       window.currentDaeyunIndex = daeyunCells.length - 1 - idx; // 다시 원래 인덱스로 변환
-      console.log('🎯 클릭한 대운 간지:', cell.textContent.trim());
+      //console.log('🎯 클릭한 대운 간지:', cell.textContent.trim());
     });
   });
 
   // ✅ 정렬 기준에 맞는 인덱스를 저장
   window.currentDaeyunIndex = indexToSelect;
-  console.log('📌 현재 대운 인덱스 (정렬 반영):', indexToSelect);
+ // console.log('📌 현재 대운 인덱스 (정렬 반영):', indexToSelect);
 
   // 🔄 초기 강조 셀 클릭 이벤트 강제 실행 (내부 상태, UI 완전 동기화)
   if (daeyunCells[indexToSelect]) {
@@ -198,14 +207,31 @@ export function renderYearlyGanjiSeries(baseYear, stems, branches) {
     const tenGodStem = getTenGod(window.dayGanKorGan, stemKor);
 
     // 🌟 지지의 지장간에서 육신용 천간 선택
-    const hiddenStems = hiddenStemsMap[branchKor] || [];
-    let targetStemKor = '';
-    if (hiddenStems.length === 3) {
-      targetStemKor = hiddenStems[2]; // 하단 천간
-    } else if (hiddenStems.length === 2) {
-      targetStemKor = hiddenStems[1]; // 중간 천간
-    }
-    const tenGodBranch = targetStemKor ? getTenGod(window.dayGanKorGan, targetStemKor) : '';
+   // branchKor: 현재는 한자 (예: '丑')
+
+
+
+
+// branchKor: 한자 지지 (예: '酉')
+// dayGanKorGan: 일간 한글 (예: '신')
+
+const dayStemHan = convertKorToHanStem(window.dayGanKorGan); // 일간 한글 → 한자
+
+// 지장간(천간) 배열: 한자 키로 HanhiddenStemsMap 접근
+const hiddenStems = HanhiddenStemsMap[branchKor] || [];
+
+let targetStemHan = '';
+if (hiddenStems.length === 3) {
+  targetStemHan = hiddenStems[2]; // 하단 천간(한자)
+} else if (hiddenStems.length === 2) {
+  targetStemHan = hiddenStems[1]; // 중간 천간(한자)
+}
+
+// 십신 계산: 일간 한자, 지장간 한자 사용
+const tenGodBranch = targetStemHan ? getTenGod(dayStemHan, targetStemHan) : '';
+
+
+
 
     // 🎯 출력 HTML 구성
     const year = baseYear + i;
@@ -251,9 +277,15 @@ export function renderMonthlyGanjiSeries(baseYear, sewoonStem) {
     const branchHan = convertKorToHanBranch(branch);
     const tenGodStem = getTenGod(window.dayGanKorGan, stem);
 
-    const hiddenStems = hiddenStemsMap[branch] || [];
-    const targetStemKor = hiddenStems.length >= 2 ? hiddenStems[1] : (hiddenStems[0] || '');
-    const tenGodBranch = targetStemKor ? getTenGod(window.dayGanKorGan, targetStemKor) : '';
+    const hiddenStemsHan = HanhiddenStemsMap[branchHan] || [];
+// 지장간 배열에서 하단 천간 또는 중간 천간 선택
+let targetStemHan = '';
+if (hiddenStemsHan.length === 3) {
+  targetStemHan = hiddenStemsHan[2];
+} else if (hiddenStemsHan.length === 2) {
+  targetStemHan = hiddenStemsHan[1];
+}
+const tenGodBranch = targetStemHan ? getTenGod(window.dayGanKorGan, targetStemHan) : '';
 
     html += `
       <td style="text-align:center;">
@@ -286,11 +318,17 @@ export function attachSewoonClickListeners() {
 
       console.log('✅ 선택된 세운 셀:', cell.dataset.year); // ← 디버깅 로그
 
+
       // 🔹 기존 로직: 인덱스는 보정해서 전달
       const year = parseFloat(cell.dataset.year);
       const stemKor = cell.dataset.stem;
       const branchKor = cell.dataset.branch;
       handleSewoonClick(year, stemKor, branchKor, correctedIndex);
+
+      console.log('1선택 세운 연도:', year);
+console.log('2선택 세운 천간:', stemKor);
+console.log('3선택 세운 지지:', branchKor);
+console.log('4correctedIndex:', correctedIndex);
     });
   });
 }
@@ -311,6 +349,10 @@ export function handleDaeyunClick(birthYear, birthMonth, birthDay, index) {
 
   // 🔍 클릭한 실제 대운 데이터
   const clickedPair = window.daeyunPairs[trueIndex];
+  if (!clickedPair) {
+  console.warn(`대운 쌍이 존재하지 않습니다: trueIndex=${trueIndex}, 전체 개수=${window.daeyunPairs.length}`);
+  return; // 또는 사용자에게 오류 메시지 표시
+}
   const { stem: clickedDaeyunStem, branch: clickedDaeyunBranch } = clickedPair;
   console.log('🎯 클릭한 대운 간지:', clickedDaeyunStem, clickedDaeyunBranch);
 
@@ -333,7 +375,7 @@ export function handleDaeyunClick(birthYear, birthMonth, birthDay, index) {
 
 //세운 클릭시 월운렌더링 함수
 export function handleSewoonClick(year, stemKor, branchKor, index) {
-  console.log('👉 클릭한 세운 연도:', year, '세운 천간:', stemKor);
+  //console.log('👉 클릭한 세운 연도:', year, '세운 천간:', stemKor);
 
   // ✨ 선택 효과 처리
   document.querySelectorAll('.sewoon-cell').forEach(cell => cell.classList.remove('selected'));
@@ -428,7 +470,7 @@ const dangryeongshikHtml = dangryeongShikArray.map((char, i) => {
           </tr>
           <tr> 
            <td style="border:1px solid #ccc; padding:4px;"colspan="2">사령식: </td>
-            <td style="border:1px solid #ccc; padding:4px;font-size:12px;">*빨강색- 당령/초록색- 제1희신</td></tr>
+            <td style="border:1px solid #ccc; padding:4px;font-size:12px;">*빨강색- 당령</br> *초록색- 제1희신</td></tr>
         </tbody>
       </table>
 
@@ -449,20 +491,6 @@ function arrangeByPositionFromObjectList(objList) {
   return arr;
 }
 
-function arrangeByPositionForDangryeong(dangryeongList) {
-  const posMap = { 1: [], 2: [], 3: [], 4: [], 5: [] };
-
-  dangryeongList.forEach(({ char }) => {
-    const mapped = DANGRYEONGSHIK_MAP[char];
-    if (mapped) {
-      for (let i = 0; i < 5; i++) {
-        posMap[i + 1].push(mapped[i]);
-      }
-    }
-  });
-
-  return posMap;
-}
 
 
 export function arrangeByPosition(listOrMap) {
@@ -470,15 +498,28 @@ export function arrangeByPosition(listOrMap) {
 
   if (Array.isArray(listOrMap)) {
     for (const item of listOrMap) {
-      if (item && item.pos >= 1 && item.pos <= 5) {
-        // item.value 대신 item.char 로 바꾸기 필요 (item 구조 확인 필요)
-        positionMap[item.pos - 1].push(item.char ?? item.value);
+      if (!item) continue;
+
+      if (Array.isArray(item.pos)) {
+        for (const p of item.pos) {
+          if (p >= 1 && p <= 5) {
+            // item에 isMiddle 필드가 있으면 유지, 없으면 false 기본값
+            positionMap[p - 1].push({ char: item.char ?? item.value, isMiddle: !!item.isMiddle });
+          }
+        }
+      } else if (typeof item.pos === "number") {
+        const p = item.pos;
+        if (p >= 1 && p <= 5) {
+          positionMap[p - 1].push({ char: item.char ?? item.value, isMiddle: !!item.isMiddle });
+        }
       }
     }
   } else if (listOrMap && typeof listOrMap === "object") {
     for (const [pos, values] of Object.entries(listOrMap)) {
       const index = Number(pos) - 1;
       if (index >= 0 && index < 5 && Array.isArray(values)) {
+        // values가 문자 배열이면 객체로 변환해야 할 수도 있지만
+        // 보통은 이 경우 안 쓰이는 듯? 필요하면 변환 추가 가능
         positionMap[index].push(...values);
       }
     }
@@ -491,6 +532,13 @@ export function arrangeByPosition(listOrMap) {
 
 
 
+
+
+
+
+
+
+
 ////////////////////////////////////////////출력부분
 export function renderDangryeongHeesinGisin(
   cheonganGisinList,
@@ -498,54 +546,76 @@ export function renderDangryeongHeesinGisin(
   dangryeongList,
   jijiHeesinList,
   jijiGisinList,
-  trueDangryeongChar // <-- 진짜 당령 글자, 예: "庚"
+  trueDangryeongChar
 ) {
   const container = document.getElementById("dangryeongshik-container");
   if (!container) return;
 
-  const cheonganGisinByPos = arrangeByPosition(cheonganGisinList);
+  const cheonganGisinByPos = arrangeByPosition(cheonganGisinList); // [{char, pos}]
   const cheonganHeesinByPos = arrangeByPosition(cheonganHeesinList);
-  const jijiHeesinByPos = arrangeByPosition(jijiHeesinList);
+  const jijiHeesinByPos = arrangeByPosition(jijiHeesinList); // [{char, isMiddle, pos}]
   const jijiGisinByPos = arrangeByPosition(jijiGisinList);
 
   const firstHeesinMap = {
-    '癸': '甲',
-    '甲': '癸',
-    '乙': '丙',
-    '丙': '乙',
-    '丁': '庚',
-    '庚': '丁',
-    '辛': '壬',
-    '壬': '辛',
+    '癸': '甲', '甲': '癸', '乙': '丙', '丙': '乙',
+    '丁': '庚', '庚': '丁', '辛': '壬', '壬': '辛',
   };
 
   const firstHeesinChar = firstHeesinMap[trueDangryeongChar] || "";
 
-  console.log("[DEBUG] 진짜 당령 글자:", trueDangryeongChar);
-  console.log("[DEBUG] 진짜 당령 제1희신 글자:", firstHeesinChar);
-
   const commonStyle = "font-family:Consolas, 'Courier New', monospace; font-size:16px; line-height:1.8;";
 
-const highlightIfNeeded = (char) => {
-  if (!char) return char;
-  if (char === trueDangryeongChar) {
-    console.log(`[DEBUG] '${char}'는 당령입니다 → 빨강 굵게`);
-    return `<span style="color:red; font-weight:bold;">${char}</span>`;
-  }
-  if (char === firstHeesinChar) {
-    console.log(`[DEBUG] '${char}'는 제1희신입니다 → 초록 굵게`);
-    return `<span style="color:green; font-weight:bold;">${char}</span>`;
-  }
-  return char;
-};
+  const highlightIfNeeded = (charObj) => {
+    if (!charObj) return "";
 
+    // charObj가 {char, isMiddle} 또는 string일 수 있으므로 처리
+    let char, isMiddle = false;
+    if (typeof charObj === "string") {
+      char = charObj;
+    } else {
+      char = charObj.char;
+      isMiddle = charObj.isMiddle || false;
+    }
+ console.log(`[DEBUG] highlightIfNeeded: char=${char}, isMiddle=${isMiddle}`);
+    if (char === trueDangryeongChar) {
+      return `<span style="color:red; font-weight:bold;">${char}</span>`;
+    }
 
-  const createSectionLineHTML = (title, posMap) => {
+    if (char === firstHeesinChar) {
+      return `<span style="color:green; font-weight:bold;">${char}</span>`;
+    }
+
+    const isCheonganGisin = cheonganGisinList.some(item => item.char === char);
+    const isJijiGisin = jijiGisinList.some(item => item.char === char);
+
+    if (isCheonganGisin || isJijiGisin) {
+      const wrappedChar = isMiddle ? `<span class="wrap">${char}</span>` : char;
+          console.log(`[DEBUG] wrappedChar for ${char}: ${wrappedChar}`);
+      return `<span style="color:#FBC02D;">${wrappedChar}</span>`;
+    }
+
+    return char;
+  };
+
+  const createSectionLineHTML = (title, posMap, sourceList = null) => {
     let cells = "";
     for (let pos = 1; pos <= 5; pos++) {
-      const chars = posMap[pos - 1] && posMap[pos - 1].length
-        ? posMap[pos - 1].map(c => highlightIfNeeded(c)).join("")
-        : "";
+      const items = sourceList?.filter(item => 
+        Array.isArray(item.pos) ? item.pos.includes(pos) : item.pos === pos
+      ) || [];
+
+      // posMap 배열 요소가 객체 또는 string일 수 있으므로 그대로 전달
+      const chars = (posMap[pos - 1] || []).map(charObj => {
+        // sourceList에서 isMiddle 포함된 객체 찾기
+        const matchedItem = items.find(i => i.char === (typeof charObj === "string" ? charObj : charObj.char));
+        if (matchedItem && typeof charObj === "string") {
+          // 원래 string이었으면 isMiddle만 덧붙여 객체로 만들어서 전달
+          return { char: charObj, isMiddle: matchedItem.isMiddle || false };
+        }
+        // 객체면 그대로 넘기거나 없으면 charObj만 넘김
+        return matchedItem || charObj;
+      }).map(highlightIfNeeded).join("");
+
       cells += `<span style="display:inline-block; width:30px; text-align:center;">${chars}</span>`;
     }
     return `<div style="${commonStyle}"><strong style="display:inline-block; width:90px;">${title}</strong>${cells}</div>`;
@@ -565,8 +635,9 @@ const highlightIfNeeded = (char) => {
   html += createSectionLineHTML("천간기신", cheonganGisinByPos);
   html += createSectionLineHTML("천간희신", cheonganHeesinByPos);
   html += createDangryeongLineHTML("당령식", dangryeongList);
-  html += createSectionLineHTML("지지희신", jijiHeesinByPos);
-  html += createSectionLineHTML("지지기신", jijiGisinByPos);
+  html += createSectionLineHTML("지지희신", jijiHeesinByPos, jijiHeesinList);
+  html += createSectionLineHTML("지지기신", jijiGisinByPos, jijiGisinList);
 
   container.innerHTML = html;
 }
+

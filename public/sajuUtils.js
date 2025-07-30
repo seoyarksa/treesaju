@@ -17,10 +17,22 @@ import { stemOrder,
          firstHeesinMap,
         HEESIN_GISIN_COMBINED, 
         HEESIN_BY_DANGRYEONG_POSITION, 
-        GISIN_BY_DANGRYEONG_POSITION
+        GISIN_BY_DANGRYEONG_POSITION,
+        tenGodMap,
+        tenGodMapKor
         } from './constants.js';
 import { elementColors,arrangeByPosition} from './renderUtils.js';
-import { getJeolipDate } from './dateUtils.js'; // 절입일 계산 함수
+
+
+// sajuUtils.js
+
+// 서버에서 절기 날짜 받아오는 함수
+async function getJeolipDateFromAPI(year, month) {
+  const res = await fetch(`/api/jeolip?year=${year}&month=${month}`);
+  const { date } = await res.json();
+  return new Date(date);
+}
+
 
 const yangStems = ['갑', '병', '무', '경', '임'];
 
@@ -64,18 +76,7 @@ export function convertHanToKorStem(han) {
 
 
 
-const tenGodMap = {
-  '갑': { '갑': '비견', '을': '겁재', '병': '식신', '정': '상관', '무': '편재', '기': '정재', '경': '편관', '신': '정관', '임': '편인', '계': '정인' },
-  '을': { '갑': '겁재', '을': '비견', '병': '상관', '정': '식신', '무': '편재', '기': '정재', '경': '정관', '신': '편관', '임': '편인', '계': '정인' },
-  '병': { '갑': '편인', '을': '정인', '병': '비견', '정': '겁재', '무': '식신', '기': '상관', '경': '편재', '신': '정재', '임': '편관', '계': '정관' },
-  '정': { '갑': '편인', '을': '정인', '병': '겁재', '정': '비견', '무': '상관', '기': '식신', '경': '편재', '신': '정재', '임': '정관', '계': '편관' },
-  '무': { '갑': '정관', '을': '편관', '병': '편인', '정': '정인', '무': '비견', '기': '겁재', '경': '식신', '신': '상관', '임': '편재', '계': '정재' },
-  '기': { '갑': '편관', '을': '정관', '병': '편인', '정': '정인', '무': '겁재', '기': '비견', '경': '상관', '신': '식신', '임': '편재', '계': '정재' },
-  '경': { '갑': '편재', '을': '정재', '병': '정관', '정': '편관', '무': '편인', '기': '정인', '경': '비견', '신': '겁재', '임': '식신', '계': '상관' },
-  '신': { '갑': '편재', '을': '정재', '병': '편관', '정': '정관', '무': '편인', '기': '정인', '경': '겁재', '신': '비견', '임': '상관', '계': '식신' },
-  '임': { '갑': '상관', '을': '식신', '병': '편재', '정': '정재', '무': '정관', '기': '편관', '경': '편인', '신': '정인', '임': '비견', '계': '겁재' },
-  '계': { '갑': '식신', '을': '상관', '병': '편재', '정': '정재', '무': '편관', '기': '정관', '경': '편인', '신': '정인', '임': '겁재', '계': '비견' },
-};
+
 
 // 지장간 정의
 export const hiddenStemsMap = {
@@ -100,7 +101,7 @@ export function normalizeBranch(branch) {
 
 // 천간의 음양 여부 판단 (양간이면 true)
 export function isYangStem(stemKor) {
-  const yangStems = ['갑', '병', '무', '경', '임'];
+  const yangStems = ['甲', '丙', '戊', '庚', '壬'];
   return yangStems.includes(stemKor);
 }
 
@@ -112,22 +113,15 @@ export function getDaYunDirection(gender, yearStemKor) {
     : -1;
 }
 
-//대운 천간배열생성
-export function generateDaYunStems(startGan, direction, length = 10) {
-  const startIndex = stemOrder.indexOf(startGan);
-  if (startIndex === -1) return [];
-  const result = [];
-  for (let i = 0; i < length; i++) {
-    const idx = (startIndex + direction * i + 10) % 10;
-    result.push(stemOrder[idx]);
-  }
-  return result;
-}
 
 //육신함수
 export function getTenGod(dayStemKor, targetStemKor) {
-  return tenGodMap[dayStemKor]?.[targetStemKor] || '';
+  const korDayStem = convertHanToKorStem(dayStemKor);
+  const korTargetStem = convertHanToKorStem(targetStemKor);
+
+  return tenGodMapKor[korDayStem]?.[korTargetStem] || '';
 }
+
 // 색상 강조 함수
 export function colorize(char, size = 'inherit') {
   const color = elementColors[char] || 'black';
@@ -159,6 +153,17 @@ export function getThreeLinesFromArray(arr) {
 
 
 
+//대운 천간배열생성
+export function generateDaYunStems(startGan, direction, length = 10) {
+  const startIndex = stemOrder.indexOf(startGan);
+  if (startIndex === -1) return [];
+  const result = [];
+  for (let i = 0; i < length; i++) {
+    const idx = (startIndex + direction * i + 10) % 10;
+    result.push(stemOrder[idx]);
+  }
+  return result;
+}
 // 대운 배열 생성
 export function generateDaYun(startIndex, direction, length = 10) {
   const result = [];
@@ -204,9 +209,9 @@ export function generateYearlyGanjiSeries2(startYear) {
 export function generateDaeyunBy60Gapja(startStemKor, startBranchKor, daYunDirection, count = 10) {
   const ganji60 = [];
   for (let i = 0; i < 60; i++) {
-    const stem = stemOrder[i % 10];
-    const branch = branchOrder[i % 12];
-    ganji60.push(stem + branch);
+const stem = convertHanToKorStem(stemOrder[i % 10]);  // 예: '丙' → '병'
+const branch = normalizeBranch(branchOrder[i % 12]);  // 예: '寅' → '인'
+ganji60.push(stem + branch); // '병인'
   }
 
   const startGanji = startStemKor + startBranchKor;
@@ -237,18 +242,18 @@ export function generateDaeyunBy60Gapja(startStemKor, startBranchKor, daYunDirec
 
 export function getStartMonthBySewoonStem(sewoonStem) {
   const map = {
-    '갑': { stem: '을', branch: '축' }, '甲': { stem: '을', branch: '축' },
-    '기': { stem: '을', branch: '축' }, '己': { stem: '을', branch: '축' },
-    '을': { stem: '정', branch: '축' }, '乙': { stem: '정', branch: '축' },
-    '경': { stem: '정', branch: '축' }, '庚': { stem: '정', branch: '축' },
-    '병': { stem: '기', branch: '축' }, '丙': { stem: '기', branch: '축' },
-    '신': { stem: '기', branch: '축' }, '辛': { stem: '기', branch: '축' },
-    '정': { stem: '신', branch: '축' }, '丁': { stem: '신', branch: '축' },
-    '임': { stem: '신', branch: '축' }, '壬': { stem: '신', branch: '축' },
-    '무': { stem: '계', branch: '축' }, '戊': { stem: '계', branch: '축' },
-    '계': { stem: '계', branch: '축' }, '癸': { stem: '계', branch: '축' },
+    '갑': { stem: '乙', branch: '丑' }, '甲': { stem: '乙', branch: '丑' },
+    '기': { stem: '乙', branch: '丑' }, '己': { stem: '乙', branch: '丑' },
+    '을': { stem: '丁', branch: '丑' }, '乙': { stem: '丁', branch: '丑' },
+    '경': { stem: '丁', branch: '丑' }, '庚': { stem: '丁', branch: '丑' },
+    '병': { stem: '己', branch: '丑' }, '丙': { stem: '己', branch: '丑' },
+    '신': { stem: '己', branch: '丑' }, '辛': { stem: '己', branch: '丑' },
+    '정': { stem: '辛', branch: '丑' }, '丁': { stem: '辛', branch: '丑' },
+    '임': { stem: '辛', branch: '丑' }, '壬': { stem: '辛', branch: '丑' },
+    '무': { stem: '癸', branch: '丑' }, '戊': { stem: '癸', branch: '丑' },
+    '계': { stem: '癸', branch: '丑' }, '癸': { stem: '癸', branch: '丑' },
   };
-  return map[sewoonStem] || { stem: '갑', branch: '자' }; // 기본값
+  return map[sewoonStem] || { stem: '甲', branch: '子' }; // 기본값
 }
 
 export function calculateSewonYear(birthYear, birthMonth, birthDay, daeyunAge) {
@@ -395,51 +400,30 @@ export function getDangryeongCheongans(dangryeong) {
   return result;
 }
 
-// 2. 사주팔자에서 천간 리스트와 지지 리스트 추출
-export function extractSajuCheongansAndJijis(saju) {
 
-    const { yearGan, monthGan, dayGan, hourGan, yearBranch, monthBranch, dayBranch, hourBranch } = saju;
-  // 한글로 들어온 천간 → 한자로 변환
-  const sajuCheonganList = [
-    convertKorToHanStem(saju.yearGan),
-    convertKorToHanStem(saju.monthGan),
-    convertKorToHanStem(saju.dayGan),
-    convertKorToHanStem(saju.hourGan),
-  ];
 
-  // 한글로 들어온 지지 → 한자로 변환
-  const sajuJijiList = [
-    convertKorToHanBranch(saju.yearBranch),
-    convertKorToHanBranch(saju.monthBranch),
-    convertKorToHanBranch(saju.dayBranch),
-    convertKorToHanBranch(saju.hourBranch),
-  ];
+//1. 사주천간,지지리스트 뽑기
 
-  // 지지 속 천간들 (이미 한자로 변환된 지지를 사용하므로, 맵에서 조회)
-  const sajuJijiCheonganList = sajuJijiList.flatMap(jiji => {
-    const sibgans = jijiToSibganMap[jiji] || [];
-    return sibgans.map(s => s.char);
-  });
 
-  return {
-    sajuCheonganList,
-    sajuJijiList,
-    sajuJijiCheonganList
-  };
-}
+// 2. 사주팔자에서 천간 리스트와 지지 리스트 배열
 
 
 
-//희신추출리스트
-// 천간 희신/기신 추출 함수
+
+//3.희기신추출리스트
+// 1) 천간 희기신 추출 함수
 export function extractCheonganHeesinGisin(dangryeong, sajuCheonganList) {
   const heesinMap = HEESIN_BY_DANGRYEONG_POSITION[dangryeong];
   const gisinMap = GISIN_BY_DANGRYEONG_POSITION[dangryeong];
 
-  // 희신 후보: 위치 정보와 함께 수집
-  const heesinCandidates = Object.entries(heesinMap).map(([pos, char]) => ({ char, pos: Number(pos) }));
+  // 희신 후보: 문자별 위치 배열 저장
+  const heesinCharPosMap = {};
+  Object.entries(heesinMap).forEach(([pos, char]) => {
+    if (!heesinCharPosMap[char]) heesinCharPosMap[char] = [];
+    heesinCharPosMap[char].push(Number(pos));
+  });
 
-  // 기신 후보: 문자마다 위치를 배열로 수집
+  // 기신 후보: 문자별 위치 배열 저장
   const gisinCharPosMap = {};
   Object.entries(gisinMap).forEach(([pos, chars]) => {
     chars.forEach(char => {
@@ -448,58 +432,94 @@ export function extractCheonganHeesinGisin(dangryeong, sajuCheonganList) {
     });
   });
 
-  // 사주 천간에 존재하는 희신 추출
-  const heesin = heesinCandidates
-    .filter(({ char }) => sajuCheonganList.includes(char));
-
-  // 사주 천간에 존재하는 기신 추출
-  const gisin = Object.entries(gisinCharPosMap)
+  // 사주 천간에 포함된 희신만 추출
+  const cheonganHeesinList = Object.entries(heesinCharPosMap)
     .filter(([char]) => sajuCheonganList.includes(char))
     .map(([char, posArr]) => ({ char, pos: posArr }));
 
-  // 같은 문자가 희신과 기신에 모두 있을 경우, 기신에서는 제거
-  const heesinChars = new Set(heesin.map(h => h.char));
-  const filteredGisin = gisin.filter(({ char }) => !heesinChars.has(char));
+  // 사주 천간에 포함된 기신만 추출
+  const rawGisinList = Object.entries(gisinCharPosMap)
+    .filter(([char]) => sajuCheonganList.includes(char))
+    .map(([char, posArr]) => ({ char, pos: posArr }));
+
+  // 희신 문자 집합
+  const heesinChars = new Set(cheonganHeesinList.map(h => h.char));
+
+  // 기신 리스트에서 희신 문자 제거
+  const cheonganGisinList = rawGisinList.filter(({ char }) => !heesinChars.has(char));
 
   return {
-    cheonganHeesinList: heesin,
-    cheonganGisinList: filteredGisin
+    cheonganHeesinList,
+    cheonganGisinList
   };
 }
 
 
+//사주지지천간리스트 뽑기
+export function extractJijiSibgansWithMiddleInfo(sajuJijiArray) {
+  const sibganList = [];
 
+  sajuJijiArray.forEach(jijiChar => {
+    const sibgans = jijiToSibganMap[jijiChar] || [];
 
-
-
-
-
-
-
-
-//희신추출리스트
-export function extractJijiHeesinGisin(dangryeong, sajuJijiCheonganList) {
-  const heesinMap = HEESIN_BY_DANGRYEONG_POSITION[dangryeong];
-  const gisinMap = GISIN_BY_DANGRYEONG_POSITION[dangryeong];
-
-  const heesinCandidates = Object.entries(heesinMap).map(([pos, char]) => ({ char, pos: Number(pos) }));
-
-  const gisinCharPosMap = {};
-  Object.entries(gisinMap).forEach(([pos, chars]) => {
-    chars.forEach(char => {
-      if (!gisinCharPosMap[char]) gisinCharPosMap[char] = [];
-      gisinCharPosMap[char].push(Number(pos));
+    sibgans.forEach((item, index) => {
+      if (item.char) {
+        sibganList.push({
+          char: item.char,
+          isMiddle: index === 1,
+        });
+      }
     });
   });
 
-  const heesinJiji = heesinCandidates.filter(({ char }) => sajuJijiCheonganList.includes(char));
+  return sibganList;
+}
 
-  const gisinJiji = Object.entries(gisinCharPosMap)
-    .filter(([char]) => sajuJijiCheonganList.includes(char))
-    .map(([char, posArr]) => ({ char, pos: posArr }));
+
+
+
+// 2) 지지 희기신 추출 함수
+export function extractJijiHeesinGisin(dangryeong, sajuJijiList) {
+  const heesinMap = HEESIN_BY_DANGRYEONG_POSITION[dangryeong] || {};
+  const gisinMap = GISIN_BY_DANGRYEONG_POSITION[dangryeong] || {};
+  const sajuSet = new Set(sajuJijiList);
+
+  const jijiHeesinList = [];
+  const jijiGisinList = [];
+
+  Object.entries(heesinMap).forEach(([posStr, char]) => {
+    const pos = Number(posStr);
+    const jijiChar = sajuJijiList[pos - 1];
+    const sibganList = jijiToSibganMap[jijiChar] || [];
+console.log(`[DEBUG][희신] pos:${pos}, jijiChar:${jijiChar}, char:${char}, sibganList:`, sibganList);
+    const isMiddle = sibganList[1]?.char === char;
+
+    if (sajuSet.has(char)) {
+      jijiHeesinList.push({ char, pos, isMiddle });
+    }
+  });
+
+  Object.entries(gisinMap).forEach(([posStr, chars]) => {
+    const pos = Number(posStr);
+    const jijiChar = sajuJijiList[pos - 1];
+    const sibganList = jijiToSibganMap[jijiChar] || [];
+
+    chars.forEach(char => {
+      const isHeesin = jijiHeesinList.some(h => h.char === char);
+      const isMiddle = sibganList[1]?.char === char;
+console.log(`[DEBUG][기신] pos:${pos}, jijiChar:${jijiChar}, char:${char}, isHeesin:${isHeesin}, isMiddle:${isMiddle}`);
+
+      if (sajuSet.has(char) && !isHeesin) {
+        jijiGisinList.push({ char, pos, isMiddle });
+      }
+    });
+  });
 
   return {
-    jijiHeesinList: heesinJiji,
-    jijiGisinList: gisinJiji
+    jijiHeesinList,
+    jijiGisinList
   };
 }
+
+
+

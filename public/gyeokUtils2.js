@@ -313,7 +313,9 @@ export function nameYukshinFromStems(taggedStems, dayGan) {
 }
 // 3. 격국에 따라 상신/구신/기신1/기신2/합신 찾기
 export function analyzeGyeokRelations(gyeok, dayGan, saju) {
-  const gyeokName = gyeok.char;
+    const gyeokNameRaw = gyeok.char || '';
+  const gyeokName = gyeokNameRaw.replace(/\(.*\)/, '').trim();
+
   const isGoodGyeok = 길신격_목록.includes(gyeokName);
   const isBadGyeok = 흉신격_목록.includes(gyeokName);
 
@@ -405,7 +407,8 @@ if (isBadGyeok) {
 export function renderGyeokFlowStyled(gyeok, saju) {
   if (!gyeok || !saju) return '정보 없음';
 
-  const gyeokName = gyeok.char;
+  const gyeokNameRaw = gyeok.char || '';
+  const gyeokName = gyeokNameRaw.replace(/\(.*\)/, '').trim();
   const stem = gyeok.stem || '';
 
   const { dayGan } = saju;
@@ -472,7 +475,7 @@ if (relation === '극') {
         <span style="color: red;">기신1</span><span>(${gisin1Label})</span>
       </div>
       <div style="grid-column: 2 / 3; grid-row: 2;">
-        <span style="color: blue;">→</span>
+        <span style="color: red;">--→</span>
       </div>
       <div style="grid-column: 3 / 4; grid-row: 2;">
         <strong><span style="color: blue;">상신</span></strong><span>(${sangsinLabel})</span>

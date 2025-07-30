@@ -7,36 +7,68 @@
 
 
 // saju.js (vercel serverless function)
-
+// server.js 
+import express from 'express';
+import cors from 'cors';
+import bodyParser from 'body-parser';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import solarlunar from 'solarlunar';
-import { calculateDaeyunAge } from '../public/dateUtils.js';
-import { getJeolipDate } from '../public/dateUtils.js';
-import { stemOrder, branchOrder } from '../public/constants.js'; // optional
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc.js';
+import timezone from 'dayjs/plugin/timezone.js';
+import dotenv from 'dotenv';  // ✅ dotenv 추가
 
+// dotenv 설정
+dotenv.config();
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+// 유틸 import
+import { calculateDaeyunAge } from './public/dateUtils.js';
+import { getSolarTermDates, getJeolipDate, getAccurateSolarLongitude } from './public/solarTermCalculator.js';
+import { stemOrder, branchOrder } from './public/constants.js';
+
+function formatDateKST(date) {
+  return new Date(date.getTime() + 9 * 60 * 60 * 1000)
+    .toISOString()
+    .replace('Z', '+09:00');
+}
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// 절입일 API
+app.get('/api/jeolip', (req, res) => {
+  const { year, month } = req.query;
+
+  try {
+    const dateObj = new Date(parseInt(year), parseInt(month) - 1, 1);
+    const date = getJeolipDate(dateObj);
+    res.json({ date: date.toISOString() });
+  } catch (e) {
+    res.status(500).send({ error: e.message });
+  }
+});
+
+// __dirname 설정
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// 미들웨어
+app.use(cors());
+app.use(bodyParser.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+// 한자 <-> 한글 변환
 const hanToKorStem = {
   '甲': '갑', '乙': '을', '丙': '병', '丁': '정', '戊': '무',
   '己': '기', '庚': '경', '辛': '신', '壬': '임', '癸': '계'
 };
-const korToHanStem = {
-  '갑': '甲', '을': '乙', '병': '丙', '정': '丁', '무': '戊',
-  '기': '己', '경': '庚', '신': '辛', '임': '壬', '계': '癸'
-};
-const hanEarthlyBranches = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
 const hanToKor = (han) => hanToKorStem[han] || han;
 
-const timeGanTable = {
-  '갑': ['갑','을','병','정','무','기','경','신','임','계','갑','을'],
-  '을': ['병','정','무','기','경','신','임','계','갑','을','병','정'],
-  '병': ['무','기','경','신','임','계','갑','을','병','정','무','기'],
-  '정': ['경','신','임','계','갑','을','병','정','무','기','경','신'],
-  '무': ['임','계','갑','을','병','정','무','기','경','신','임','계'],
-  '기': ['갑','을','병','정','무','기','경','신','임','계','갑','을'],
-  '경': ['병','정','무','기','경','신','임','계','갑','을','병','정'],
-  '신': ['무','기','경','신','임','계','갑','을','병','정','무','기'],
-  '임': ['경','신','임','계','갑','을','병','정','무','기','경','신'],
-  '계': ['임','계','갑','을','병','정','무','기','경','신','임','계'],
-};
-
+// 한국 DST 여부 판단
 function isDSTKorea(year, month, day) {
   const date = new Date(Date.UTC(year, month - 1, day));
   const dstPeriods = [
@@ -53,6 +85,7 @@ function isDSTKorea(year, month, day) {
   return dstPeriods.some(({ start, end }) => date >= start && date < end);
 }
 
+// 시지 계산
 function getTimeIndexByHourMinute(hour, minute) {
   const totalMinutes = hour * 60 + minute;
   const startMinutesArr = [
@@ -61,38 +94,101 @@ function getTimeIndexByHourMinute(hour, minute) {
   ];
   const modTotalMinutes = totalMinutes % 1440;
 
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < startMinutesArr.length; i++) {
     let start = startMinutesArr[i];
     let end = startMinutesArr[(i + 1) % 12] - 1;
+
     if (end < start) {
-      if ((modTotalMinutes >= start && modTotalMinutes <= 1439) || (modTotalMinutes >= 0 && modTotalMinutes <= end)) return i;
+      if ((modTotalMinutes >= start && modTotalMinutes <= 1439) || (modTotalMinutes >= 0 && modTotalMinutes <= end)) {
+        return i;
+      }
     } else {
-      if (modTotalMinutes >= start && modTotalMinutes <= end) return i;
+      if (modTotalMinutes >= start && modTotalMinutes <= end) {
+        return i;
+      }
     }
   }
   return 0;
 }
 
-function getGanji(year, month, day, hour, minute) {
+// 절기월 인덱스 계산
+function getSolarTermMonthIndex(date) {
+  const year = date.getFullYear()
+  const solarTerms = getSolarTermDates(year);
+  const termNames = ['입춘','경칩','청명','입하','망종','소서','입추','백로','한로','입동','대설','소한']
+  const monthStartDates = termNames.map(name => {
+    const term = solarTerms.find(t => t.name === name);
+    if (!term) throw new Error(`${name} 절기 데이터 없음`);
+    return new Date(term.date);
+  });
+
+  const dateKST = dayjs(date).tz('Asia/Seoul');
+  for(let i=0; i<monthStartDates.length; i++){
+    const start = dayjs(monthStartDates[i]).tz('Asia/Seoul');
+    const end = dayjs(monthStartDates[(i+1) % 12]).tz('Asia/Seoul');
+    if(dateKST.isAfter(start) || dateKST.isSame(start)){
+      if(dateKST.isBefore(end)) return i;
+    }
+  }
+  return 11;
+}
+
+const monthGanTable = {
+  '甲': ['丙','丁','戊','己','庚','辛','壬','癸','甲','乙','丙','丁'],
+  '乙': ['戊','己','庚','辛','壬','癸','甲','乙','丙','丁','戊','己'],
+  '丙': ['庚','辛','壬','癸','甲','乙','丙','丁','戊','己','庚','辛'],
+  '丁': ['壬','癸','甲','乙','丙','丁','戊','己','庚','辛','壬','癸'],
+  '戊': ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸','甲','乙'],
+  '己': ['丙','丁','戊','己','庚','辛','壬','癸','甲','乙','丙','丁'],
+  '庚': ['戊','己','庚','辛','壬','癸','甲','乙','丙','丁','戊','己'],
+  '辛': ['庚','辛','壬','癸','甲','乙','丙','丁','戊','己','庚','辛'],
+  '壬': ['壬','癸','甲','乙','丙','丁','戊','己','庚','辛','壬','癸'],
+  '癸': ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸','甲','乙'],
+};
+
+function getMonthGan(yearGanjiYear, solarTermMonthIndex) {
+  if (!monthGanTable[yearGanjiYear]) {
+    throw new Error(`유효하지 않은 연간 천간: ${yearGanjiYear}`);
+  }
+  return monthGanTable[yearGanjiYear][solarTermMonthIndex];
+}
+
+// 간지 계산
+export function getGanji(year, month, day, hour, minute) {
   const lunarDate = solarlunar.solar2lunar(year, month, day);
   const dayGanji = lunarDate.gzDay;
-  const dayGanKor = hanToKor(dayGanji.charAt(0));
+  const dayGanHan = dayGanji.charAt(0);
+  const dayGanKor = hanToKor(dayGanHan);
+  const yearGanji = lunarDate.gzYear;
+  const yearGanHan = yearGanji.charAt(0);
+
+  const solarTermMonthIndex = getSolarTermMonthIndex(new Date(year, month - 1, day, hour, minute));
+  const monthGanHan = getMonthGan(yearGanHan, solarTermMonthIndex);
+
+  const earthlyBranchesSolarTerm = ['寅','卯','辰','巳','午','未','申','酉','戌','亥','子','丑'];
+  const monthJiHan = earthlyBranchesSolarTerm[solarTermMonthIndex];
+  const monthGanji = monthGanHan + monthJiHan;
+
+  const heavenlyStems = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
+  const earthlyBranches = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+
   const timeIndex = getTimeIndexByHourMinute(hour, minute);
-  const timeGanKor = timeGanTable[dayGanKor]?.[timeIndex] || '오류';
-  const timeGanji = (korToHanStem[timeGanKor] || '?') + hanEarthlyBranches[timeIndex];
+  const dayStemIndex = heavenlyStems.indexOf(dayGanHan);
+  const timeStemIndex = (dayStemIndex * 2 + timeIndex) % 10;
+  const timeStemHan = heavenlyStems[timeStemIndex];
+  const timeBranchHan = earthlyBranches[timeIndex];
+  const timeGanji = timeStemHan + timeBranchHan;
+
   return {
-    year: lunarDate.gzYear,
-    month: lunarDate.gzMonth,
+    year: yearGanji,
+    month: monthGanji,
     day: dayGanji,
-    time: timeGanji
+    time: timeGanji,
   };
 }
 
-export default function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
-  }
-
+// 사주 API
+app.post('/api/saju', (req, res) => {
   let { year, month, day, hour, minute, calendarType, gender } = req.body;
 
   if (!year || !month || !day || hour === undefined || minute === undefined || !calendarType) {
@@ -101,7 +197,7 @@ export default function handler(req, res) {
 
   if (calendarType === 'lunar') {
     const converted = solarlunar.lunar2solar(year, month, day, false);
-    if (!converted?.cYear) {
+    if (!converted || !converted.cYear) {
       return res.status(400).json({ error: '음력을 양력으로 변환하는 데 실패했습니다.' });
     }
     year = converted.cYear;
@@ -120,11 +216,16 @@ export default function handler(req, res) {
     }
   }
 
-  const birthDate = new Date(`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00+09:00`);
-  const jeolipDate = getJeolipDate(year, month);
+  const birthDate = new Date(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00+09:00`);
+
+  if (isNaN(birthDate.getTime())) {
+    return res.status(500).json({ error: '유효하지 않은 생년월일입니다.' });
+  }
+
+  const jeolipDate = getJeolipDate(birthDate);
   const ganji = getGanji(year, month, day, hour, minute);
   const yearStemKor = hanToKor(ganji.year.charAt(0));
-  const daeyunAge = parseFloat(calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor).toFixed(2));
+  const daeyunAge = calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor);
   const lunar = solarlunar.solar2lunar(year, month, day);
 
   res.json({
@@ -140,8 +241,11 @@ export default function handler(req, res) {
     daeyunAge,
     yearStemKor,
     ganji,
-    birthYear: birthDate.getFullYear(),
-    month,
-    day
+    birthYear: birthDate.getFullYear()
   });
-}
+});
+
+// 서버 실행
+app.listen(PORT, () => {
+  console.log(`✅ 서버 실행 중: http://localhost:${PORT}`);
+});

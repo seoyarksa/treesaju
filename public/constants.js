@@ -1,7 +1,9 @@
 // constants.js
 
-export const stemOrder = ['갑', '을', '병', '정', '무', '기', '경', '신', '임', '계'];
-export const branchOrder = ['자', '축', '인', '묘', '진', '사', '오', '미', '신', '유', '술', '해'];
+// 한자 기준으로 바꾸기 (서버와 일치시킴)
+export const stemOrder = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+export const branchOrder = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+
 // (필요하면 다른 상수도 여기에 추가)
 export const elementMap = {
   甲: '木', 乙: '木',
@@ -34,6 +36,21 @@ export const hiddenStemsMap = {
   '해': ['무', '갑', '임']
 };
 
+export const HanhiddenStemsMap = {
+  '子': ['壬', '癸'],
+  '丑': ['癸', '辛', '己'],
+  '寅': ['戊', '丙', '甲'],
+  '卯': ['甲', '乙'],
+  '辰': ['乙', '癸', '戊'],
+  '巳': ['戊', '庚', '丙'],
+  '午': ['丙', '己', '丁'],
+  '未': ['丁', '乙', '己'],
+  '申': ['戊', '壬', '庚'],
+  '酉': ['庚', '辛'],
+  '戌': ['辛', '丁', '戊'],
+  '亥': ['戊', '甲', '壬']
+};
+
 export const tenGodMap = {
   '甲': { '甲': '비견', '乙': '겁재', '丙': '식신', '丁': '상관', '戊': '편재', '己': '정재', '庚': '편관', '辛': '정관', '壬': '편인', '癸': '정인' },
   '乙': { '甲': '겁재', '乙': '비견', '丙': '상관', '丁': '식신', '戊': '정재', '己': '편재', '庚': '정관', '辛': '편관', '壬': '정인', '癸': '편인' },
@@ -47,6 +64,19 @@ export const tenGodMap = {
   '癸': { '甲': '상관', '乙': '식신', '丙': '정재', '丁': '편재', '戊': '정관', '己': '편관', '庚': '정인', '辛': '편인', '壬': '겁재', '癸': '비견' },
 };
 
+
+export const tenGodMapKor = {
+  '갑': { '갑': '비견', '을': '겁재', '병': '식신', '정': '상관', '무': '편재', '기': '정재', '경': '편관', '신': '정관', '임': '편인', '계': '정인' },
+  '을': { '갑': '겁재', '을': '비견', '병': '상관', '정': '식신', '무': '정재', '기': '편재', '경': '정관', '신': '편관', '임': '정인', '계': '편인' },
+  '병': { '갑': '편인', '을': '정인', '병': '비견', '정': '겁재', '무': '식신', '기': '상관', '경': '편재', '신': '정재', '임': '편관', '계': '정관' },
+  '정': { '갑': '정인', '을': '편인', '병': '겁재', '정': '비견', '무': '상관', '기': '식신', '경': '정재', '신': '편재', '임': '정관', '계': '편관' },
+  '무': { '갑': '편관', '을': '정관', '병': '편인', '정': '정인', '무': '비견', '기': '겁재', '경': '식신', '신': '상관', '임': '편재', '계': '정재' },
+  '기': { '갑': '정관', '을': '편관', '병': '정인', '정': '편인', '무': '겁재', '기': '비견', '경': '상관', '신': '식신', '임': '정재', '계': '편재' },
+  '경': { '갑': '편재', '을': '정재', '병': '편관', '정': '정관', '무': '편인', '기': '정인', '경': '비견', '신': '겁재', '임': '식신', '계': '상관' },
+  '신': { '갑': '정재', '을': '편재', '병': '정관', '정': '편관', '무': '정인', '기': '편인', '경': '겁재', '신': '비견', '임': '상관', '계': '식신' },
+  '임': { '갑': '식신', '을': '상관', '병': '편재', '정': '정재', '무': '편관', '기': '정관', '경': '편인', '신': '정인', '임': '비견', '계': '겁재' },
+  '계': { '갑': '상관', '을': '식신', '병': '정재', '정': '편재', '무': '정관', '기': '편관', '경': '정인', '신': '편인', '임': '겁재', '계': '비견' },
+};
 
 // 월지(月支)에 따른 사령의 앞/뒤 천간
 export const saryeongMap = {
@@ -165,18 +195,18 @@ export const SARYEONGSHIK_MAP = {
 
 
 export const jijiToSibganMap = {
-  子: [ { char: '壬', wrap: false }, { char: '癸', wrap: false } ],
-  丑: [ { char: '癸', wrap: false }, { char: '辛', wrap: true }, { char: '己', wrap: false } ],
-  寅: [ { char: '丙', wrap: true }, { char: '甲', wrap: false } ],
-  卯: [ { char: '甲', wrap: false }, { char: '乙', wrap: false } ],
-  辰: [ { char: '乙', wrap: false }, { char: '癸', wrap: true }, { char: '戊', wrap: false } ],
-  巳: [ { char: '庚', wrap: true }, { char: '丙', wrap: false } ],
-  午: [ { char: '丙', wrap: false }, { char: '丁', wrap: false } ],
-  未: [ { char: '丁', wrap: false }, { char: '乙', wrap: true }, { char: '己', wrap: false } ],
-  申: [ { char: '壬', wrap: true }, { char: '庚', wrap: false } ],
-  酉: [ { char: '庚', wrap: false }, { char: '辛', wrap: false } ],
-  戌: [ { char: '辛', wrap: false }, { char: '丁', wrap: true }, { char: '戊', wrap: false } ],
-  亥: [ { char: '甲', wrap: true }, { char: '壬', wrap: false } ]
+  子: [ { char: '壬', isMiddle: false, wrap: false }, { }, { char: '癸', isMiddle: false, wrap: false } ],
+  丑: [ { char: '癸', isMiddle: false, wrap: false }, { char: '辛', wrap: true }, { char: '己', isMiddle: false, wrap: false } ],
+  寅: [  { }, { char: '丙', isMiddle: true, wrap: true }, { char: '甲', isMiddle: false, wrap: false } ],
+  卯: [ { char: '甲', isMiddle: false, wrap: false },  { }, { char: '乙', isMiddle: false, wrap: false } ],
+  辰: [ { char: '乙', isMiddle: false, wrap: false }, { char: '癸', isMiddle: true, wrap: true}, { char: '戊', isMiddle: false, wrap: false } ],
+  巳: [  { }, { char: '庚', isMiddle: true, wrap: true }, { char: '丙', wrap: false } ],
+  午: [ { char: '丙', isMiddle: false, wrap: false },  { }, { char: '丁', isMiddle: false, wrap: false } ],
+  未: [ { char: '丁', isMiddle: false, wrap: false }, { char: '乙', isMiddle: true, wrap: true}, { char: '己', isMiddle: false, wrap: false } ],
+  申: [  { }, { char: '壬', isMiddle: true, wrap: true }, { char: '庚', wrap: false } ],
+  酉: [ { char: '庚', isMiddle: false, wrap: false },  { }, { char: '辛', isMiddle: false, wrap: false} ],
+  戌: [ { char: '辛', isMiddle: false, wrap: false }, { char: '丁', isMiddle: true, wrap: true }, { char: '戊', isMiddle: false, wrap: false } ],
+  亥: [  { }, { char: '甲', isMiddle: true, wrap: true }, { char: '壬', isMiddle: false, wrap: false } ]
 };
 
 export const jijiToSibganMap2 = {
