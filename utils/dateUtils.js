@@ -49,34 +49,3 @@ export function calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor) {
 
 
 
-export function getCurrentDaeyunIndexFromStartAge(correctedStartAge, inputBirthDate, inputDecimalYear) {
-  let currentDecimalYear = inputDecimalYear;
-
-  // decimalYear가 주어지지 않았으면 오늘 날짜 기준으로 계산
-  if (typeof currentDecimalYear !== 'number' || isNaN(currentDecimalYear)) {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth() + 1;
-    const day = today.getDate();
-    currentDecimalYear = year + (month - 1) / 12 + (day / 30) / 12;
-  }
-
-  // 생일 정보가 누락되면 종료
-  if (!inputBirthDate || !inputBirthDate.year || !inputBirthDate.month || !inputBirthDate.day) {
-    console.warn("생년월일 정보가 필요합니다.");
-    return 0;
-  }
-
-  // 현재 나이(소수점 포함)를 계산
-  const birthDecimalYear =
-    inputBirthDate.year +
-    (inputBirthDate.month - 1) / 12 +
-    (inputBirthDate.day / 30) / 12;
-
-  const currentAge = currentDecimalYear - birthDecimalYear;
-
-  if (currentAge < correctedStartAge) return 0; // 월주
-
-  const index = Math.floor((currentAge - correctedStartAge) / 10) + 1; // 월주 이후부터 1대운
-  return index;
-}

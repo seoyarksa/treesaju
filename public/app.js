@@ -29,10 +29,10 @@ console.log(stemOrder, branchOrder);
 // app.js
 
 // dateUtils
-import {
-  calculateDaeyunAge,
-    getCurrentDaeyunIndexFromStartAge
-} from '../utils/dateUtils.js';
+//import {
+//  calculateDaeyunAge,
+//    getCurrentDaeyunIndexFromStartAge
+//} from './utils/dateUtils.js';
 
 
 import {
@@ -50,7 +50,7 @@ import {
   getThreeLinesFromArray,
   generateDaYun,
   getGanjiByYear,
-
+getCurrentDaeyunIndexFromStartAge,
   generateYearlyGanjiSeries2,
   generateDaeyunBy60Gapja,
   getStartMonthBySewoonStem,

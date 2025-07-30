@@ -24,6 +24,7 @@ import {
   convertKorToHanBranch,
   convertHanToKorStem,
   normalizeBranch,
+  getCurrentDaeyunIndexFromStartAge,
   isYangStem,
   hiddenStemsMap,
   getDaYunDirection,
@@ -52,7 +53,7 @@ getDangryeong,
 // generateYearlyGanjiSeries2, generateDaeyunBy60Gapja, getStartMonthBySewoonStem, 
 // calculateSewonYear, findStartMonthIndex, generateMonthlyGanjiSeriesByGanji, 
 // dateUtils.js에서 필요한 함수 import
-import { getCurrentDaeyunIndexFromStartAge } from './dateUtils.js';
+//import { getCurrentDaeyunIndexFromStartAge } from './utils/dateUtils.js';
 
 // 오행 색상
 export const elementColors = {

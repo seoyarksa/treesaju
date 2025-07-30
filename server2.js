@@ -14,8 +14,8 @@ dayjs.extend(timezone);
 
 
 // 수정된 유틸 import
-import { calculateDaeyunAge } from './public/dateUtils.js';
-import { getSolarTermDates, getJeolipDate, getAccurateSolarLongitude } from './public/solarTermCalculator.js';
+import { calculateDaeyunAge } from './utils/dateUtils.js';
+import { getSolarTermDates, getJeolipDate, getAccurateSolarLongitude } from './utils/solarTermCalculator.js';
 import { stemOrder, branchOrder } from './public/constants.js';  // 사용 중이면 유지
 
 // server.js 또는 solarTermCalculator.js 파일 상단 어딘가에

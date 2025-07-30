@@ -9,9 +9,9 @@
 // saju.js (vercel serverless function)
 
 import solarlunar from 'solarlunar';
-import { calculateDaeyunAge } from '../public/dateUtils.js';
-import { getJeolipDate, getAccurateSolarLongitude, findSolarTermDate, getSolarTermDates, getSolarTermDate  } from '../utils/solarTermCalculator.js';
-import { stemOrder, branchOrder } from '../public/constants.js'; // optional
+import { calculateDaeyunAge } from '../utils/dateUtils.js';
+import { getJeolipDate } from '../utils/solarTermCalculator.js';
+import { stemOrder, branchOrder } from './public/constants.js'; // optional
 
 const hanToKorStem = {
   '甲': '갑', '乙': '을', '丙': '병', '丁': '정', '戊': '무',
