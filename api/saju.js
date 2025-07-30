@@ -10,7 +10,7 @@
 
 import solarlunar from 'solarlunar';
 import { calculateDaeyunAge } from '../public/dateUtils.js';
-import { getJeolipDate } from '../utils/solarTermCalculator.js';
+import { getJeolipDate, getAccurateSolarLongitude, findSolarTermDate, getSolarTermDates, getSolarTermDate  } from '../utils/solarTermCalculator.js';
 import { stemOrder, branchOrder } from '../public/constants.js'; // optional
 
 const hanToKorStem = {
