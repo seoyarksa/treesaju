@@ -1,7 +1,7 @@
 // saju.js
 
 // git add .
-// git commit -m "폼수정"    
+// git commit -m "오행식 수정"   
 // git push origin main
 // git push
 
@@ -20,7 +20,7 @@ import { getJeolipDate, getSolarTermDates } from '../../public/solarTermCalculat
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
-dotenv.config();
+//dotenv.config();
 
 const hanToKorStem = {
   '甲': '갑', '乙': '을', '丙': '병', '丁': '정', '戊': '무',
