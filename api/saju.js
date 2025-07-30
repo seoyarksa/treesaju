@@ -15,7 +15,7 @@ import utc from 'dayjs/plugin/utc.js';
 import timezone from 'dayjs/plugin/timezone.js';
 //import dotenv from 'dotenv';
 
-import { calculateDaeyunAge } from '../utils/dateUtils.js';
+import { calculateDaeyunAge } from '../public/dateUtils.js';
 import { getJeolipDate, getSolarTermDates } from '../utils/solarTermCalculator.js';
 
 dayjs.extend(utc);
