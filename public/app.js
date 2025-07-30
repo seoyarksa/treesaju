@@ -20,8 +20,7 @@ import {
   HEESIN_BY_DANGRYEONG_POSITION, 
   GISIN_BY_DANGRYEONG_POSITION
 } from './constants.js';
-console.log(stemOrder);
-console.log(stemOrder, branchOrder);
+
 
 // 날짜 관련 함수들
 // app.js
