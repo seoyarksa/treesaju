@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic&display=swap" rel="stylesheet" />
+
+<title>트리 만세력</title>
+
+
+<style>
+  body {
+    font-family: 'Nanum Gothic', sans-serif;
+    margin: 0; padding: 0;
+    background-color: #f8f8f8;
+  }
+
+  /* 덩굴 테두리 컨테이너 전체 감싸기 */
+  .vine-border-container {
+    position: relative;
+    padding: 40px;
+    max-width: 800px;
+    margin: 40px auto 80px auto;
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    overflow: visible; /* 넝쿨 이미지가 영역 밖에 있을 수 있게 */
+  }
+
+  /* 흐릿한 배경 (내용 전체 배경 역할) */
+  .text-bg {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(255, 255, 255, 0.7);
+    border-radius: 10px;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  /* 덩굴 이미지 4모서리 */
+  .vine-deco {
+    position: absolute;
+    width: 100px; height: 100px;
+    background-image: url('https://www.pngkey.com/png/detail/187-1870678_-vine-border-paper-background-printable-flower-leaves.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    opacity: 0.85;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .vine-top-left {
+    top: 0; left: 0;
+    transform: rotate(180deg);
+  }
+  .vine-top-right {
+    top: 0; right: 0;
+    transform: scaleX(-1) rotate(180deg);
+  }
+  .vine-bottom-left {
+    bottom: 0; left: 0;
+    transform: scaleY(-1) rotate(180deg);
+  }
+  .vine-bottom-right {
+    bottom: 0; right: 0;
+    transform: scaleX(-1) scaleY(-1) rotate(180deg);
+  }
+
+  /* 내부 콘텐츠 영역 - 덩굴보다 위에 표시 */
+  .vine-border-container > *:not(.text-bg):not(.vine-deco) {
+    position: relative;
+    z-index: 3;
+  }
+
+  /* 제목, 폼 스타일 */
+  h1 {
+    margin-top: 0;
+    color: #222;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.25);
+  }
+
+  form#saju-form {
+    margin-top: 20px;
+  }
+
+  /* 결과 및 질문 박스 스타일 */
+  #result,
+  #sewoon,
+  #today-saju-container,
+  #question-box {
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 15px;
+    margin-top: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    color: #222;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+  }
+
+  /* 테이블 스타일 (결과 내부 테이블용) */
+  #result table,
+  #sewoon table,
+  #today-saju-container table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  #result table th,
+  #result table td,
+  #sewoon table th,
+  #sewoon table td,
+  #today-saju-container table th,
+  #today-saju-container table td {
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    background-color: transparent;
+    color: #222;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+  }
+.btn-success {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-success:hover {
+  background-color: #218838;
+}
+.sewoon-cell.selected {
+  background-color: #dff0d8; /* 연한 연두색 */
+  border: 2px solid #28a745;
+  box-shadow: 0 0 4px rgba(40,167,69,0.5);
+}
+
+  .green { color: green; font-weight: bold; }
+  .red { color: red; font-weight: bold; }
+
+
+
+</style>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+<!-- 2. flatpickr JS (★ 먼저 불러와야 함) -->
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+</head>
+<body>
+
+<!-- 덩굴 테두리 컨테이너가 페이지 내용 전체 감싸기 -->
+<div class="vine-border-container">
+  <div class="text-bg"></div>
+
+  <div class="vine-deco vine-top-left"></div>
+  <div class="vine-deco vine-top-right"></div>
+  <div class="vine-deco vine-bottom-left"></div>
+  <div class="vine-deco vine-bottom-right"></div>
+
+  <h1>트리 만세력</h1>
+
+    <form id="saju-form">
+    <label>생년월일:</label> 
+    <input  type="text" id="birth-date" placeholder="YYYYMMDD" class="birthdate-input" />
+ 
+    
+    <select id="calendar-type" name="calendar-type">
+      <option value="" ></option>
+      <option value="solar"  >양력</option>
+      <option value="lunar"selected="">음력</option>
+    </select><br />
+    <label>성별:</label>
+    <label><input type="radio" name="gender" value="male" > 남자</label>
+    <label><input type="radio" name="gender" value="female"checked> 여자</label><br />
+    <label>출생 시간:</label>
+    <label><input type="radio" name="ampm" value="AM" > 오전</label>
+    <label><input type="radio" name="ampm" value="PM"checked> 오후</label>
+    <label>+</label>
+    <select id="hour-select">
+      <option value=""></option>
+      <option value="1">1시</option>
+      <option value="2">2시</option>
+      <option value="3">3시</option>
+      <option value="4">4시</option>
+      <option value="5"selected>5시</option>
+      <option value="6">6시</option>
+      <option value="7">7시</option>
+      <option value="8" >8시</option>
+      <option value="9">9시</option>
+      <option value="10">10시</option>
+      <option value="11">11시</option>
+      <option value="12">12시</option>
+    </select>
+<select id="minute-select">
+  <option value=""></option>
+  <option value="0"selected>0분</option>
+  <option value="1">1분</option>
+  <option value="2">2분</option>
+  <option value="3">3분</option>
+  <option value="4">4분</option>
+  <option value="5">5분</option>
+  <option value="6">6분</option>
+  <option value="7">7분</option>
+  <option value="8">8분</option>
+  <option value="9">9분</option>
+  <option value="10">10분</option>
+  <option value="11">11분</option>
+  <option value="12">12분</option>
+  <option value="13">13분</option>
+  <option value="14">14분</option>
+  <option value="15">15분</option>
+  <option value="16">16분</option>
+  <option value="17">17분</option>
+  <option value="18">18분</option>
+  <option value="19">19분</option>
+  <option value="20">20분</option>
+  <option value="21">21분</option>
+  <option value="22">22분</option>
+  <option value="23">23분</option>
+  <option value="24">24분</option>
+  <option value="25">25분</option>
+  <option value="26">26분</option>
+  <option value="27">27분</option>
+  <option value="28">28분</option>
+  <option value="29">29분</option>
+  <option value="30">30분</option>
+  <option value="31">31분</option>
+  <option value="32">32분</option>
+  <option value="33">33분</option>
+  <option value="34">34분</option>
+  <option value="35">35분</option>
+  <option value="36">36분</option>
+  <option value="37">37분</option>
+  <option value="38">38분</option>
+  <option value="39">39분</option>
+  <option value="40">40분</option>
+  <option value="41">41분</option>
+  <option value="42">42분</option>
+  <option value="43">43분</option>
+  <option value="44">44분</option>
+  <option value="45">45분</option>
+  <option value="46">46분</option>
+  <option value="47">47분</option>
+  <option value="48">48분</option>
+  <option value="49">49분</option>
+  <option value="50">50분</option>
+  <option value="51">51분</option>
+  <option value="52">52분</option>
+  <option value="53">53분</option>
+  <option value="54">54분</option>
+  <option value="55">55분</option>
+  <option value="56">56분</option>
+  <option value="57">57분</option>
+  <option value="58">58분</option>
+  <option value="59">59분</option>
+</select><br />
+<button type="submit" class="btn-success">사주 출력</button>
+
+
+  </form>
+
+<div class="note-box">
+  ※ 태어난 분대가 20~40분(30분 근처)에 있는 분은 정확한 시주가 산출되지 않을 수도 있으니 따로 확인해 주세요! 한국썸머타임은 적용된 상태입니다. 
+</div>
+  <div id="result" style="display: none;"></div>
+
+  <div id="today-saju-container" style="margin-top:30px;display: none;"></div>
+
+  <div id="question-box" style="margin-top: 40px; padding: 20px; border-top: 1px solid #ccc;">
+    <h3>질문하기</h3>
+    <textarea id="question-input" placeholder="궁금한 점을 입력하세요...(반드시 사주출력후 질문하세요)" rows="8" style="width: 100%; padding: 10px;"></textarea>
+    <br />
+    <button id="send-email-button" style="margin-top: 10px; padding: 10px 20px;">보내기 (이메일)</button>
+  </div>
+</div>
+
+
+<!-- EmailJS SDK 추가 -->
+<script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+<script type="module" src="app.js"></script>
+   <script>
+    flatpickr("#birthdate", {
+      dateFormat: "Y-m-d",
+      allowInput: true,
+      //maxDate: "2100-12-31",
+      //minDate: "1900-01-01",
+      defaultDate: "1969-08-23" //초기날짜값
+    });
+  </script>
+</body>
+</html>
+
+
+
