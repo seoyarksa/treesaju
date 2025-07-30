@@ -8,7 +8,7 @@
 
 // saju.js (vercel serverless function)
 
-import solarlunar from 'solarlunar';
+//import solarlunar from 'solarlunar';
 import { calculateDaeyunAge } from '../utils/dateUtils.js';
 import { getJeolipDate } from '../utils/solarTermCalculator.js';
 //import { stemOrder, branchOrder } from './public/constants.js'; // optional
@@ -91,11 +91,11 @@ function getGanji(year, month, day, hour, minute) {
   };
 }
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
-
+   const solarlunar = (await import('solarlunar')).default;
   let { year, month, day, hour, minute, calendarType, gender } = req.body;
 
   if (!year || !month || !day || hour === undefined || minute === undefined || !calendarType) {
