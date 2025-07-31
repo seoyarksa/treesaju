@@ -505,13 +505,13 @@ export function arrangeByPosition(listOrMap) {
         for (const p of item.pos) {
           if (p >= 1 && p <= 5) {
             // item에 isMiddle 필드가 있으면 유지, 없으면 false 기본값
-            positionMap[p - 1].push({ char: item.char ?? item.value, isMiddle: !!item.isMiddle });
+            positionMap[p - 1].push(item);
           }
         }
       } else if (typeof item.pos === "number") {
         const p = item.pos;
         if (p >= 1 && p <= 5) {
-          positionMap[p - 1].push({ char: item.char ?? item.value, isMiddle: !!item.isMiddle });
+          positionMap[p - 1].push(item);
         }
       }
     }
@@ -525,6 +525,8 @@ export function arrangeByPosition(listOrMap) {
       }
     }
   }
+console.log("[DEBUG] 위치 1 아이템:", positionMap[0]);
+console.log("[DEBUG] 위치 4 아이템:", positionMap[3]);
 
   console.log("[DEBUG] arrangeByPosition 결과:", positionMap);
   return positionMap;
@@ -552,10 +554,11 @@ export function renderDangryeongHeesinGisin(
   const container = document.getElementById("dangryeongshik-container");
   if (!container) return;
 
-  const cheonganGisinByPos = arrangeByPosition(cheonganGisinList); // [{char, pos}]
+  const cheonganGisinByPos = arrangeByPosition(cheonganGisinList);
   const cheonganHeesinByPos = arrangeByPosition(cheonganHeesinList);
-  const jijiHeesinByPos = arrangeByPosition(jijiHeesinList); // [{char, isMiddle, pos}]
+  const jijiHeesinByPos = arrangeByPosition(jijiHeesinList);
   const jijiGisinByPos = arrangeByPosition(jijiGisinList);
+console.log("[DEBUG] jijiHeesinByPos at pos 4:", jijiHeesinByPos[3]);
 
   const firstHeesinMap = {
     '癸': '甲', '甲': '癸', '乙': '丙', '丙': '乙',
@@ -566,79 +569,99 @@ export function renderDangryeongHeesinGisin(
 
   const commonStyle = "font-family:Consolas, 'Courier New', monospace; font-size:16px; line-height:1.8;";
 
-  const highlightIfNeeded = (charObj) => {
-    if (!charObj) return "";
+const highlightIfNeeded = (charObj) => {
+  if (!charObj) return "";
 
-    // charObj가 {char, isMiddle} 또는 string일 수 있으므로 처리
-    let char, isMiddle = false;
-    if (typeof charObj === "string") {
-      char = charObj;
-    } else {
-      char = charObj.char;
-      isMiddle = charObj.isMiddle || false;
+  let char, isMiddle = false;
+  if (typeof charObj === "string") {
+    char = charObj;
+  } else {
+    char = charObj.char;
+    isMiddle = charObj.isMiddle || false;
+  }
+
+  const isJijiHeesin = jijiHeesinList.some(item =>
+    item.char === char && !!item.isMiddle === !!isMiddle
+  );
+  const isCheonganGisin = cheonganGisinList.some(item => item.char === char);
+  const isJijiGisin = jijiGisinList.some(item => item.char === char);
+  const isDangryeong = char === trueDangryeongChar;
+  const isFirstHeesin = char === firstHeesinChar;
+
+  // 1. 괄호 래핑은 맨 먼저 결정
+  const wrappedChar = isMiddle ? `(${char})` : char;
+
+  // 2. 스타일 우선순위: 진짜당령 > 제1희신 > 기신
+  if (isDangryeong) {
+    return `<span style="color:red; font-weight:bold;">${wrappedChar}</span>`;
+  }
+
+  if (isFirstHeesin) {
+    return `<span style="color:green; font-weight:bold;">${wrappedChar}</span>`;
+  }
+
+  if (isCheonganGisin || isJijiGisin) {
+    return `<span style="color:#FBC02D;">${wrappedChar}</span>`;
+  }
+
+  // 3. 지지희신이지만 다른 스타일 없으면 괄호만 유지
+  if (isJijiHeesin) {
+    return wrappedChar;
+  }
+
+  return char;
+};
+
+
+const createSectionLineHTML = (title, posMap, sourceList = null) => {
+  const commonStyle = "font-family:Consolas, 'Courier New', monospace; font-size:16px; line-height:1.8;";
+  const cellWidth = 30;
+  const cellStyle = `display:inline-block; width:${cellWidth}px; text-align:center; margin-right:4px;`;
+  const titleWidth = 90;
+
+  const maxLines = Math.max(...posMap.map(arr => arr.length));
+
+  let html = `<div style="${commonStyle}">`;
+
+  for (let line = 0; line < maxLines; line++) {
+    let cells = `<strong style="display:inline-block; width:${titleWidth}px; text-align:left;">${line === 0 ? title : ''}</strong>`;
+    for (let pos = 0; pos < 5; pos++) {
+      const charObj = posMap[pos][line];
+      if (charObj) {
+        cells += `<span style="${cellStyle}">${highlightIfNeeded(charObj)}</span>`;
+      } else {
+        cells += `<span style="${cellStyle}"></span>`;
+      }
     }
- console.log(`[DEBUG] highlightIfNeeded: char=${char}, isMiddle=${isMiddle}`);
-    if (char === trueDangryeongChar) {
-      return `<span style="color:red; font-weight:bold;">${char}</span>`;
-    }
+    html += `<div>${cells}</div>`;
+  }
 
-    if (char === firstHeesinChar) {
-      return `<span style="color:green; font-weight:bold;">${char}</span>`;
-    }
+  html += `</div>`;
+  return html;
+};
 
-    const isCheonganGisin = cheonganGisinList.some(item => item.char === char);
-    const isJijiGisin = jijiGisinList.some(item => item.char === char);
 
-    if (isCheonganGisin || isJijiGisin) {
-      const wrappedChar = isMiddle ? `<span class="wrap">${char}</span>` : char;
-          console.log(`[DEBUG] wrappedChar for ${char}: ${wrappedChar}`);
-      return `<span style="color:#FBC02D;">${wrappedChar}</span>`;
-    }
 
-    return char;
-  };
+const createDangryeongLineHTML = (title, list) => {
+  const cellWidth = 30;
+  const cellStyle = `display:inline-block; width:${cellWidth}px; text-align:center; margin-right:4px;`;
+  const titleWidth = 90;
 
-  const createSectionLineHTML = (title, posMap, sourceList = null) => {
-    let cells = "";
-    for (let pos = 1; pos <= 5; pos++) {
-      const items = sourceList?.filter(item => 
-        Array.isArray(item.pos) ? item.pos.includes(pos) : item.pos === pos
-      ) || [];
-
-      // posMap 배열 요소가 객체 또는 string일 수 있으므로 그대로 전달
-      const chars = (posMap[pos - 1] || []).map(charObj => {
-        // sourceList에서 isMiddle 포함된 객체 찾기
-        const matchedItem = items.find(i => i.char === (typeof charObj === "string" ? charObj : charObj.char));
-        if (matchedItem && typeof charObj === "string") {
-          // 원래 string이었으면 isMiddle만 덧붙여 객체로 만들어서 전달
-          return { char: charObj, isMiddle: matchedItem.isMiddle || false };
-        }
-        // 객체면 그대로 넘기거나 없으면 charObj만 넘김
-        return matchedItem || charObj;
-      }).map(highlightIfNeeded).join("");
-
-      cells += `<span style="display:inline-block; width:30px; text-align:center;">${chars}</span>`;
-    }
-    return `<div style="${commonStyle}"><strong style="display:inline-block; width:90px;">${title}</strong>${cells}</div>`;
-  };
-
-  const createDangryeongLineHTML = (title, list) => {
-    let cells = "";
-    for (let pos = 1; pos <= 5; pos++) {
-      const item = list.find(x => x.pos === pos);
-      const char = item ? highlightIfNeeded(item.char) : "";
-      cells += `<span style="display:inline-block; width:30px; text-align:center;">${char}</span>`;
-    }
-    return `<div style="${commonStyle}"><strong style="display:inline-block; width:90px;">${title}</strong>${cells}</div>`;
-  };
+  let cells = "";
+  for (let pos = 1; pos <= 5; pos++) {
+    const item = list.find(x => x.pos === pos);
+    const char = item ? highlightIfNeeded(item.char) : "";
+    cells += `<span style="${cellStyle}">${char}</span>`;
+  }
+  return `<div style="${commonStyle}"><strong style="display:inline-block; width:${titleWidth}px;">${title}</strong>${cells}</div>`;
+};
 
   let html = "";
-  html += createSectionLineHTML("천간기신", cheonganGisinByPos);
-  html += createSectionLineHTML("천간희신", cheonganHeesinByPos);
-  html += createDangryeongLineHTML("당령식", dangryeongList);
-  html += createSectionLineHTML("지지희신", jijiHeesinByPos, jijiHeesinList);
-  html += createSectionLineHTML("지지기신", jijiGisinByPos, jijiGisinList);
+html += createSectionLineHTML("천간기신", cheonganGisinByPos);
+html += createSectionLineHTML("천간희신", cheonganHeesinByPos);
+html += createDangryeongLineHTML("당령식", dangryeongList);
+html += createSectionLineHTML("지지희신", jijiHeesinByPos); // ✅ sourceList 전달 제거
+html += createSectionLineHTML("지지기신", jijiGisinByPos); // ✅ sourceList 전달 제거
 
   container.innerHTML = html;
 }
-

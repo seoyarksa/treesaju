@@ -59,6 +59,7 @@ getCurrentDaeyunIndexFromStartAge,
   getSaryeong,
   getdangryeongshik, 
  getDangryeongCheongans,
+ extractJijiSibgansWithMiddleInfo,
   extractCheonganHeesinGisin, extractJijiHeesinGisin
 } from './sajuUtils.js';
 //
@@ -524,18 +525,21 @@ console.log('[DEBUG] 당령 포지션 포함 리스트:', dangryeongList);
   // 2. 희신/기신 리스트 추출
 const sajuCheonganList = [timeGanji.gan, dayGanji.gan, monthGanji.gan, yearGanji.gan];
 const sajuJijiList = [timeGanji.ji, dayGanji.ji, monthGanji.ji, yearGanji.ji];
-const sajuJijiCheonganList = sajuJijiList.flatMap(jiji => 
+const sajuJijiCheonganListraw = sajuJijiList.flatMap(jiji => 
   jijiToSibganMap[jiji]?.map(entry => entry.char) || []
 );
 
 
 const { cheonganHeesinList, cheonganGisinList } = extractCheonganHeesinGisin(dangryeong, sajuCheonganList);
-const { jijiHeesinList, jijiGisinList  } = extractJijiHeesinGisin(dangryeong, sajuJijiCheonganList);
+const sajuJijiArray =[timeGanji.ji, dayGanji.ji, monthGanji.ji, yearGanji.ji];
+const flatSibganList = extractJijiSibgansWithMiddleInfo(sajuJijiArray);
+const { jijiHeesinList, jijiGisinList } = extractJijiHeesinGisin(dangryeong, sajuJijiArray);
+
 
 console.log('사주 천간:', sajuChungan);
 console.log('사주 지지:', sajuJijiList);
 console.log('[DEBUG] 사주 천간 리스트:', sajuCheonganList);
-console.log('[DEBUG] 사주 지지 리스트:', sajuJijiCheonganList);
+console.log('[DEBUG] 사주 지지 리스트[raw]:', sajuJijiCheonganListraw);
 // 기준 희신 리스트 생성 및 출력
 const heesinMap = HEESIN_BY_DANGRYEONG_POSITION[dangryeong] || {};
 const 기준희신리스트 = Object.entries(heesinMap).map(

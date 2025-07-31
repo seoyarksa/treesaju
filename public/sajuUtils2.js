@@ -491,63 +491,82 @@ export function extractCheonganHeesinGisin(dangryeong, sajuCheonganList) {
 }
 
 
-//사주지지천간리스트 뽑기
+
+
 export function extractJijiSibgansWithMiddleInfo(sajuJijiArray) {
+  console.log('[DEBUG] extractJijiSibgansWithMiddleInfo 호출됨, 입력값:', sajuJijiArray);
   const sibganList = [];
 
-  sajuJijiArray.forEach(jijiChar => {
-    const sibgans = jijiToSibganMap[jijiChar] || [];
+  sajuJijiArray
+    .filter(jijiChar => typeof jijiChar === 'string' && jijiChar.trim() !== '')
+    .forEach(jijiChar => {
+      const sibgans = jijiToSibganMap[jijiChar] || [];
 
-    sibgans.forEach((item, index) => {
-      if (item.char) {
-        sibganList.push({
-          char: item.char,
-          isMiddle: index === 1,
-        });
-      }
+      sibgans.forEach((item, index) => {
+        if (item && item.char) {
+          sibganList.push({
+            char: item.char,
+            isMiddle: index === 1,
+          });
+        }
+      });
     });
-  });
 
+  console.log('[DEBUG] 지지희기신 추출전 지장간 리스트:', sibganList);
   return sibganList;
 }
 
 
 
 
-// 2) 지지 희기신 추출 함수
-export function extractJijiHeesinGisin(dangryeong, sajuJijiList) {
+
+
+
+//사주지지천간리스트 뽑기
+export function extractJijiHeesinGisin(dangryeong, sajuJijiArray) {
   const heesinMap = HEESIN_BY_DANGRYEONG_POSITION[dangryeong] || {};
   const gisinMap = GISIN_BY_DANGRYEONG_POSITION[dangryeong] || {};
-  const sajuSet = new Set(sajuJijiList);
+
+  if (!Array.isArray(sajuJijiArray)) {
+    console.error('[ERROR] sajuJijiArray가 유효하지 않음:', sajuJijiArray);
+    throw new Error('sajuJijiArray는 배열이어야 합니다.');
+  }
+
+  const flatSibganList = extractJijiSibgansWithMiddleInfo(sajuJijiArray);
 
   const jijiHeesinList = [];
   const jijiGisinList = [];
 
+  // 희신 추출
   Object.entries(heesinMap).forEach(([posStr, char]) => {
     const pos = Number(posStr);
-    const jijiChar = sajuJijiList[pos - 1];
-    const sibganList = jijiToSibganMap[jijiChar] || [];
-console.log(`[DEBUG][희신] pos:${pos}, jijiChar:${jijiChar}, char:${char}, sibganList:`, sibganList);
-    const isMiddle = sibganList[1]?.char === char;
-
-    if (sajuSet.has(char)) {
-      jijiHeesinList.push({ char, pos, isMiddle });
-    }
+    flatSibganList.forEach(item => {
+      if (item.char === char) {
+        const alreadyExists = jijiHeesinList.some(
+          h => h.char === char && h.pos === pos && h.isMiddle === item.isMiddle
+        );
+        if (!alreadyExists) {
+          jijiHeesinList.push({ char, pos, isMiddle: item.isMiddle });
+        }
+      }
+    });
   });
 
-  Object.entries(gisinMap).forEach(([posStr, chars]) => {
+  // 기신 추출
+  Object.entries(gisinMap).forEach(([posStr, charList]) => {
     const pos = Number(posStr);
-    const jijiChar = sajuJijiList[pos - 1];
-    const sibganList = jijiToSibganMap[jijiChar] || [];
-
-    chars.forEach(char => {
-      const isHeesin = jijiHeesinList.some(h => h.char === char);
-      const isMiddle = sibganList[1]?.char === char;
-console.log(`[DEBUG][기신] pos:${pos}, jijiChar:${jijiChar}, char:${char}, isHeesin:${isHeesin}, isMiddle:${isMiddle}`);
-
-      if (sajuSet.has(char) && !isHeesin) {
-        jijiGisinList.push({ char, pos, isMiddle });
-      }
+    charList.forEach(char => {
+      flatSibganList.forEach(item => {
+        const isAlreadyHeesin = jijiHeesinList.some(
+          h => h.char === char && h.isMiddle === item.isMiddle
+        );
+        const alreadyExists = jijiGisinList.some(
+          g => g.char === char && g.pos === pos && g.isMiddle === item.isMiddle
+        );
+        if (item.char === char && !isAlreadyHeesin && !alreadyExists) {
+          jijiGisinList.push({ char, pos, isMiddle: item.isMiddle });
+        }
+      });
     });
   });
 
@@ -556,6 +575,4 @@ console.log(`[DEBUG][기신] pos:${pos}, jijiChar:${jijiChar}, char:${char}, isH
     jijiGisinList
   };
 }
-
-
 
