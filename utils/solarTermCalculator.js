@@ -109,12 +109,8 @@ const MONTH_TO_SOLAR_TERM = {
  * @param {Date} date - 년월일시 포함 Date 객체
  * @returns {Date} - 적용 절기의 절입일시 (Date 객체)
  */
-export function getJeolipDate(date) {
-  console.log('🔧 [getJeolipDate] 입력:', date);
-
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  console.log('📆 year:', year, 'month:', month);
+export function getJeolipDate(year, month) {
+  console.log('🔧 [getJeolipDate] 입력:', { year, month });
 
   const thisTermName = MONTH_TO_SOLAR_TERM[month];
   const prevMonth = month === 1 ? 12 : month - 1;
@@ -126,17 +122,16 @@ export function getJeolipDate(date) {
   const thisTerm = getSolarTermDate(year, thisTermName);
   const prevTerm = getSolarTermDate(prevYear, prevTermName);
 
-console.log('☀️ thisTerm:', {
-  name: thisTerm.name,
-  dateKST: dayjs(thisTerm.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss')
-});
-console.log('☀️ prevTerm:', {
-  name: prevTerm.name,
-  dateKST: dayjs(prevTerm.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss')
-});
+  console.log('☀️ thisTerm:', {
+    name: thisTerm.name,
+    dateKST: dayjs(thisTerm.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss')
+  });
+  console.log('☀️ prevTerm:', {
+    name: prevTerm.name,
+    dateKST: dayjs(prevTerm.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss')
+  });
 
-
-  const current = dayjs(date).tz('Asia/Seoul');
+  const current = dayjs(`${year}-${String(month).padStart(2, '0')}-01T00:00:00+09:00`).tz('Asia/Seoul');
   const thisTermKST = dayjs(thisTerm.date).tz('Asia/Seoul');
 
   console.log('⏱ current:', current.format(), 'thisTermKST:', thisTermKST.format());
