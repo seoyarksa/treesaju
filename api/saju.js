@@ -142,7 +142,8 @@ export default async function handler(req, res) {
       throw new Error(`Invalid birthDate: ${dateString}`);
     }
 
-    const jeolipDate = getJeolipDate(birthDate);
+    const jeolipDate = getJeolipDate(birthDate.getFullYear(), birthDate.getMonth() + 1);  // ✔️
+
     const ganji = getGanji(year, month, day, hour, minute, solarlunar);
     const yearStemKor = hanToKor(ganji.year.charAt(0));
     const daeyunAge = parseFloat(calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor).toFixed(2));
