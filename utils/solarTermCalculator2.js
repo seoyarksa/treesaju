@@ -71,11 +71,16 @@ export function findSolarTermDate(year, targetDeg) {
  */
 export function getSolarTermDates(year) {
   return SOLAR_TERMS.map(([name, longitude]) => {
-    const dateObj = findSolarTermDate(year, longitude)
-    const date = dayjs(dateObj).toISOString()
-    return { name, date }
-  })
+    const dateObj = findSolarTermDate(year, longitude);
+    if (!dateObj || isNaN(new Date(dateObj))) {
+      console.warn(`⚠️ 절기 계산 실패: ${year}, ${name} (${longitude})`);
+      return null; // 혹은 { name, date: null }
+    }
+    const date = dayjs(dateObj).toISOString();
+    return { name, date };
+  }).filter(Boolean); // null 제거
 }
+
 
 /**
  * 단일 절기명으로 절기 날짜를 반환
@@ -109,12 +114,21 @@ const MONTH_TO_SOLAR_TERM = {
  * @param {Date} date - 년월일시 포함 Date 객체
  * @returns {Date} - 적용 절기의 절입일시 (Date 객체)
  */
-export function getJeolipDate(date) {
-  console.log('🔧 [getJeolipDate] 입력:', date);
+export function getJeolipDate(input1, input2) {
+  let year, month;
 
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  console.log('📆 year:', year, 'month:', month);
+  // ✅ 입력 타입 분기
+  if (input1 instanceof Date) {
+    year = input1.getFullYear();
+    month = input1.getMonth() + 1;
+  } else if (typeof input1 === 'number' && typeof input2 === 'number') {
+    year = input1;
+    month = input2;
+  } else {
+    throw new Error(`getJeolipDate: 잘못된 입력 형식입니다. Date 또는 (year:number, month:number) 형식을 사용하세요. 받은 값: ${input1}, ${input2}`);
+  }
+
+  console.log('🔧 [getJeolipDate] 입력:', { year, month });
 
   const thisTermName = MONTH_TO_SOLAR_TERM[month];
   const prevMonth = month === 1 ? 12 : month - 1;
@@ -126,17 +140,28 @@ export function getJeolipDate(date) {
   const thisTerm = getSolarTermDate(year, thisTermName);
   const prevTerm = getSolarTermDate(prevYear, prevTermName);
 
-console.log('☀️ thisTerm:', {
-  name: thisTerm.name,
-  dateKST: dayjs(thisTerm.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss')
-});
-console.log('☀️ prevTerm:', {
-  name: prevTerm.name,
-  dateKST: dayjs(prevTerm.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss')
-});
+  if (!thisTerm || !thisTerm.date || !prevTerm || !prevTerm.date) {
+    console.error('❌ [getJeolipDate] 절기 정보가 유효하지 않음', {
+      year,
+      month,
+      thisTermName,
+      prevTermName,
+      thisTerm,
+      prevTerm,
+    });
+    throw new Error('절기 데이터를 찾을 수 없습니다.');
+  }
 
+  console.log('☀️ thisTerm:', {
+    name: thisTerm.name,
+    dateKST: dayjs(thisTerm.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss'),
+  });
+  console.log('☀️ prevTerm:', {
+    name: prevTerm.name,
+    dateKST: dayjs(prevTerm.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss'),
+  });
 
-  const current = dayjs(date).tz('Asia/Seoul');
+  const current = dayjs(`${year}-${String(month).padStart(2, '0')}-01T00:00:00+09:00`).tz('Asia/Seoul');
   const thisTermKST = dayjs(thisTerm.date).tz('Asia/Seoul');
 
   console.log('⏱ current:', current.format(), 'thisTermKST:', thisTermKST.format());

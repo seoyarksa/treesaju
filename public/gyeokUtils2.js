@@ -1,8 +1,7 @@
 // gyeokUtils.js
 
 
-import { stemOrder, 
-         branchOrder,
+import { 
          elementMap,
          saryeongMap,
          DANGRYEONGSHIK_MAP,
