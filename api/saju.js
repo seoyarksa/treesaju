@@ -142,7 +142,9 @@ export default async function handler(req, res) {
       throw new Error(`Invalid birthDate: ${dateString}`);
     }
 
-    const jeolipDate = getJeolipDate(birthDate.getFullYear(), birthDate.getMonth() + 1);  // ✔️
+    // getJeolipDate 함수는 (year, month) 두 개 인자를 받도록 정의돼 있으므로,
+    // birthDate의 년도, 월(0-based이므로 +1)으로 호출
+    const jeolipDate = getJeolipDate(birthDate.getFullYear(), birthDate.getMonth() + 1);
 
     const ganji = getGanji(year, month, day, hour, minute, solarlunar);
     const yearStemKor = hanToKor(ganji.year.charAt(0));
@@ -171,3 +173,4 @@ export default async function handler(req, res) {
     res.status(500).json({ error: '서버 내부 오류가 발생했습니다.', details: error.message });
   }
 }
+
