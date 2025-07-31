@@ -106,88 +106,175 @@ export const DANGRYEONGSHIK_MAP = {
   // 필요시 더 추가 가능
 };
 
-export const SARYEONGSHIK_MAP = {
+export const SARYEONGSHIK_MAP_WITH_ROLE = {
   子: {
-    saryeong: ['壬', '癸'],       // 사령 (1개 또는 2개)
     formula: {
-      계: '기신계',               // 계수에 해당하는 식 (예: 기신계)
-      임: '경임갑',               // 임수에 해당하는 식 (예: 경임갑)
-    }
+      壬: [
+        { char: '辛', role: '일반' },
+        { char: '壬', role: '사령' },
+        { char: '甲', role: '보좌' },
+      ],
+      癸: [
+        { char: '辛', role: '보좌' },
+        { char: '癸', role: '사령' },
+        { char: '甲', role: '일반' },
+      ],
+    },
   },
-  축: {
-    saryeong: ['기', '계'],
+  丑: {
     formula: {
-      기: '기신정',
-      계: '계신임',
-    }
+      癸: [
+        { char: '辛', role: '일반' },
+        { char: '癸', role: '사령' },
+        { char: '甲', role: '보좌' },
+      ],
+      辛: [
+        { char: '辛', role: '사령' },
+        { char: '癸', role: '보좌' },
+        { char: '甲', role: '일반' },
+      ],
+    },
   },
-  인: {
-    saryeong: ['갑', '병'],
+  寅: {
     formula: {
-      갑: '갑병무',
-      병: '병갑무',
-    }
+      丙: [
+        { char: '癸', role: '일반' },
+        { char: '甲', role: '보좌' },
+        { char: '丙', role: '사령' },
+      ],
+      甲: [
+        { char: '癸', role: '보좌' },
+        { char: '甲', role: '사령' },
+        { char: '丙', role: '일반' },
+      ],
+    },
   },
-  묘: {
-    saryeong: ['을'],
+  卯: {
     formula: {
-      을: '을정기',
-    }
+      甲: [
+        { char: '癸', role: '일반' },
+        { char: '甲', role: '사령' },
+        { char: '丙', role: '보좌' },
+      ],
+      乙: [
+        { char: '癸', role: '보좌' },
+        { char: '乙', role: '사령' },
+        { char: '丙', role: '일반' },
+      ],
+    },
   },
-  진: {
-    saryeong: ['무', '을'],
+  辰: {
     formula: {
-      무: '무을계',
-      을: '을계무',
-    }
+      乙: [
+        { char: '癸', role: '일반' },
+        { char: '乙', role: '사령' },
+        { char: '丙', role: '보좌' },
+      ],
+      癸: [
+        { char: '癸', role: '사령' },
+        { char: '乙', role: '보좌' },
+        { char: '丙', role: '일반' },
+      ],
+    },
   },
-  사: {
-    saryeong: ['병', '무'],
+  巳: {
     formula: {
-      병: '병무경',
-      무: '무경병',
-    }
+      庚: [
+        { char: '乙', role: '일반' },
+        { char: '丙', role: '보좌' },
+        { char: '庚', role: '사령' },
+      ],
+      丙: [
+        { char: '乙', role: '보좌' },
+        { char: '丙', role: '사령' },
+        { char: '庚', role: '일반' },
+      ],
+    },
   },
-  오: {
-    saryeong: ['정'],
+  午: {
     formula: {
-      정: '정기경',
-    }
+      丙: [
+        { char: '乙', role: '일반' },
+        { char: '丙', role: '사령' },
+        { char: '庚', role: '보좌' },
+      ],
+      丁: [
+        { char: '乙', role: '보좌' },
+        { char: '丁', role: '사령' },
+        { char: '庚', role: '일반' },
+      ],
+    },
   },
-  미: {
-    saryeong: ['기', '정'],
+  未: {
     formula: {
-      기: '기정을',
-      정: '정을기',
-    }
+      丁: [
+        { char: '乙', role: '일반' },
+        { char: '丁', role: '사령' },
+        { char: '庚', role: '보좌' },
+      ],
+      乙: [
+        { char: '乙', role: '사령' },
+        { char: '丁', role: '보좌' },
+        { char: '庚', role: '일반' },
+      ],
+    },
   },
-  신: {
-    saryeong: ['경', '임'],
+  申: {
     formula: {
-      경: '경임무',
-      임: '임무경',
-    }
+      壬: [
+        { char: '丁', role: '일반' },
+        { char: '庚', role: '보좌' },
+        { char: '壬', role: '사령' },
+      ],
+      庚: [
+        { char: '丁', role: '보좌' },
+        { char: '庚', role: '사령' },
+        { char: '壬', role: '일반' },
+      ],
+    },
   },
-  유: {
-    saryeong: ['신'],
+  酉: {
     formula: {
-      신: '신경임',
-    }
+      庚: [
+        { char: '丁', role: '일반' },
+        { char: '庚', role: '사령' },
+        { char: '壬', role: '보좌' },
+      ],
+      辛: [
+        { char: '丁', role: '보좌' },
+        { char: '辛', role: '사령' },
+        { char: '壬', role: '일반' },
+      ],
+    },
   },
-  술: {
-    saryeong: ['무', '신'],
+  戌: {
     formula: {
-      무: '무신정',
-      신: '신정무',
-    }
+      辛: [
+        { char: '丁', role: '일반' },
+        { char: '辛', role: '사령' },
+        { char: '壬', role: '보좌' },
+      ],
+      丁: [
+        { char: '丁', role: '사령' },
+        { char: '辛', role: '보좌' },
+        { char: '壬', role: '일반' },
+      ],
+    },
   },
-  해: {
-    saryeong: ['임', '갑'],
+  亥: {
     formula: {
-      임: '임갑병',
-      갑: '갑병임',
-    }
-  }
+      甲: [
+        { char: '辛', role: '일반' },
+        { char: '壬', role: '보좌' },
+        { char: '甲', role: '사령' },
+      ],
+      壬: [
+        { char: '辛', role: '보좌' },
+        { char: '壬', role: '사령' },
+        { char: '甲', role: '일반' },
+      ],
+    },
+  },
 };
 
 

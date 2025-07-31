@@ -449,8 +449,8 @@ const dangryeong = getDangryeong(monthGanji.ji, daeyunAge, daYunDirection);
 
 const saryeong = getSaryeong(monthGanji.ji, daeyunAge, window.daYunDirection);
 
-//console.log('▶ after getSaryeong call, saryeong:', saryeong);
-createDangryeongTableHtml(dangryeong, saryeong);
+
+//createDangryeongTableHtml(dangryeong, saryeong, dangryeongShikArray, monthJi);
 //console.log("사령:", saryeong);
 
 // 당령 결과를 UI에 표시하거나 전역 변수로 저장 가능
@@ -504,7 +504,7 @@ function renderAllDangryeong(dangryeong, saryeong, sajuChungan, sajuJiji) {
     console.log('dangryeongShikArray:', dangryeongShikArray);
   //console.log('Array.isArray:', Array.isArray(dangryeongShikArray));
 
-  const dangryeongHtml = createDangryeongTableHtml(dangryeong, saryeong, dangryeongShikArray);
+  const dangryeongHtml = createDangryeongTableHtml(dangryeong, saryeong, dangryeongShikArray, monthJi);
   console.log(dangryeongHtml);
 }
 
@@ -603,7 +603,7 @@ if (document.readyState === "loading") {
 const dangryeongShikArray = getdangryeongshik(dangryeong);
 
 // 2. HTML을 생성해서 HTML에 직접 삽입하거나 템플릿에 사용
-const dangryeongHtml = createDangryeongTableHtml(dangryeong, saryeong, dangryeongShikArray);
+const dangryeongHtml = createDangryeongTableHtml(dangryeong, saryeong, dangryeongShikArray, monthJi);
 
 
 const startStemKor = convertHanToKorStem(monthGanji.gan);
