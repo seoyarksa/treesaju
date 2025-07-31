@@ -327,6 +327,7 @@ if (dateStr.includes("-")) {
   return;
 }
   let hour = hour12;
+
   if (ampm === 'PM' && hour12 < 12) hour += 12;
   if (ampm === 'AM' && hour12 === 12) hour = 0;
 console.log('보내는 데이터:', { year, month, day, hour, minute, calendarType });

@@ -24,7 +24,8 @@ import { elementColors,arrangeByPosition} from './renderUtils.js';
 
 
 // sajuUtils.js
-
+const stemOrder = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+const branchOrder = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
 // 서버에서 절기 날짜 받아오는 함수
 async function getJeolipDateFromAPI(year, month) {
   const res = await fetch(`/api/jeolip?year=${year}&month=${month}`);
