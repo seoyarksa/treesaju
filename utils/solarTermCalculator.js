@@ -115,32 +115,29 @@ const MONTH_TO_SOLAR_TERM = {
  * @returns {Date} - 적용 절기의 절입일시 (Date 객체)
  */
 export function getJeolipDate(input1, input2) {
-  let year, month;
+  let birthDate;
 
   // ✅ 입력 타입 분기
   if (input1 instanceof Date) {
-    year = input1.getFullYear();
-    month = input1.getMonth() + 1;
+    birthDate = input1;
   } else if (typeof input1 === 'number' && typeof input2 === 'number') {
-    year = input1;
-    month = input2;
+    birthDate = new Date(input1, input2 - 1); // JS 월은 0부터 시작
   } else {
     throw new Error(`getJeolipDate: 잘못된 입력 형식입니다. Date 또는 (year:number, month:number) 형식을 사용하세요. 받은 값: ${input1}, ${input2}`);
   }
 
-  console.log('🔧 [getJeolipDate] 입력:', { year, month });
+  const year = birthDate.getFullYear();
+  const month = birthDate.getMonth() + 1;
 
   const thisTermName = MONTH_TO_SOLAR_TERM[month];
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear = month === 1 ? year - 1 : year;
   const prevTermName = MONTH_TO_SOLAR_TERM[prevMonth];
 
-  console.log('📛 thisTermName:', thisTermName, 'prevTermName:', prevTermName);
-
   const thisTerm = getSolarTermDate(year, thisTermName);
   const prevTerm = getSolarTermDate(prevYear, prevTermName);
 
-  if (!thisTerm || !thisTerm.date || !prevTerm || !prevTerm.date) {
+  if (!thisTerm?.date || !prevTerm?.date) {
     console.error('❌ [getJeolipDate] 절기 정보가 유효하지 않음', {
       year,
       month,
@@ -152,22 +149,15 @@ export function getJeolipDate(input1, input2) {
     throw new Error('절기 데이터를 찾을 수 없습니다.');
   }
 
-  console.log('☀️ thisTerm:', {
-    name: thisTerm.name,
-    dateKST: dayjs(thisTerm.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss'),
-  });
-  console.log('☀️ prevTerm:', {
-    name: prevTerm.name,
-    dateKST: dayjs(prevTerm.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss'),
-  });
-
-  const current = dayjs(`${year}-${String(month).padStart(2, '0')}-01T00:00:00+09:00`).tz('Asia/Seoul');
+  const birth = dayjs(birthDate).tz('Asia/Seoul');
   const thisTermKST = dayjs(thisTerm.date).tz('Asia/Seoul');
 
-  console.log('⏱ current:', current.format(), 'thisTermKST:', thisTermKST.format());
+  const result = birth.isBefore(thisTermKST) ? new Date(prevTerm.date) : new Date(thisTerm.date);
 
-  const result = current.isBefore(thisTermKST) ? new Date(prevTerm.date) : new Date(thisTerm.date);
-  console.log('✅ 최종 반환:', result);
+  console.log('🔧 [getJeolipDate] 출생일:', birth.format('YYYY-MM-DD HH:mm'));
+  console.log('☀️ thisTerm:', thisTerm.name, thisTermKST.format('YYYY-MM-DD HH:mm'));
+  console.log('☀️ prevTerm:', prevTerm.name, dayjs(prevTerm.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm'));
+  console.log('✅ 선택된 절입일:', result.toISOString());
 
   return result;
 }

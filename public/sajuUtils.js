@@ -18,7 +18,8 @@ import {
         HEESIN_BY_DANGRYEONG_POSITION, 
         GISIN_BY_DANGRYEONG_POSITION,
         tenGodMap,
-        tenGodMapKor
+        tenGodMapKor,
+        SARYEONGSHIK_MAP_WITH_ROLE
         } from './constants.js';
 import { elementColors,arrangeByPosition} from './renderUtils.js';
 
@@ -438,10 +439,28 @@ export function getDangryeongCheongans(dangryeong) {
 
 
 
-//1. 사주천간,지지리스트 뽑기
+//사령식 출력
+ export function getSaryeongshikHtml(monthJi, saryeong) {
+  const monthData = SARYEONGSHIK_MAP_WITH_ROLE[monthJi];
+  if (!monthData?.formula?.[saryeong]) return '사령식 정보 없음';
 
+  const formula = monthData.formula[saryeong];
 
-// 2. 사주팔자에서 천간 리스트와 지지 리스트 배열
+  const roleClassMap = {
+    사령: 'saryeong-char',
+    보좌: 'bojo-char',
+    일반: 'normal-char',
+  };
+
+  const styled = formula
+    .map(({ char, role }) => {
+      const className = roleClassMap[role] || 'normal-char';
+      return `<span class="${className}">${char}</span>`;
+    })
+    .join('');
+
+  return `사령식: ${styled}`;
+}
 
 
 

@@ -42,6 +42,7 @@ getDangryeong,
   findStartMonthIndex,
   generateMonthlyGanjiSeriesByGanji,
   getdangryeongshik,
+  getSaryeongshikHtml,
   getDangryeongCheongans,
   extractCheonganHeesinGisin, extractJijiHeesinGisin
 } from './sajuUtils.js';
@@ -437,7 +438,7 @@ export function renderTodaySajuBox({ yearGanji, monthGanji, dayGanji, timeGanji,
 
 // renderUtils.js
 
-export function createDangryeongTableHtml(dangryeong, saryeong, dangryeongShikArray) {
+export function createDangryeongTableHtml(dangryeong, saryeong, dangryeongShikArray, monthJi) {
   if (!dangryeongShikArray || dangryeongShikArray.length === 0) {
     return `<div>당령식 데이터가 없습니다.</div>`;
   }
@@ -452,37 +453,62 @@ const dangryeongshikHtml = dangryeongShikArray.map((char, i) => {
   }
 }).join(' ');
 
-
-  return `
-    <div style="display: flex; justify-content: center; margin-top: 1rem;">
-      <table class="dangryeong-table" style="
-        border-collapse: collapse;
-        font-size: 1rem;
-        text-align: center;
-        width: 100%;
-        max-width: 600px;
-        border: 1px solid #ccc;
-      ">
-        <tbody>
-          <tr>
-            <td style="border:1px solid #ccc; padding:4px;">당령: ${dangryeong || '-'}</td>
-            <td style="border:1px solid #ccc; padding:4px;">사령: ${saryeong || '-'}</td>
-            <td style="border:1px solid #ccc; padding:4px;">당령식: ${dangryeongshikHtml || '-'}</td>
-          </tr>
-          <tr> 
-           <td style="border:1px solid #ccc; padding:4px;"colspan="2">사령식: </td>
-            <td style="border:1px solid #ccc; padding:4px;font-size:12px;">*빨강색- 당령</br> *초록색- 제1희신</td></tr>
-        </tbody>
-      </table>
-
-    </div>
-  `;
+  // 여기서 사령식 HTML 문자열 생성
+  const styledSaryeongshik = getSaryeongshikHtml(monthJi, saryeong);
+return `
+  <style>
+.saryeong-char {
+  color: blue;
+  text-decoration-line: underline;
+  text-decoration-color: black;
+  /* font-weight: bold; 삭제 */
+}
+.bojo-char {
+  color: rgb(14, 90, 24);
+  text-decoration-line: underline;
+  text-decoration-color: black;
+}
+.normal-char {
+  /* 기본색 */
 }
 
-export // renderUtils.js
+  </style>
+  <div style="display: flex; justify-content: center; margin-top: 1rem;">
+    <table class="dangryeong-table" style="border-collapse: collapse; font-size: 1rem; text-align: center; width: 100%; max-width: 600px; border: 1px solid #ccc;">
+      <tbody>
+        <tr>
+<td style="border:1px solid #ccc; padding:4px;">
+  <span style="background-color:#f0f0f0; padding:2px 4px;">당령:</span>
+  <span style="color: red; font-weight: bold;">${dangryeong || '-'}</span>
+</td>
+<td style="border:1px solid #ccc; padding:4px;">
+  <span style="background-color:#f0f0f0; padding:2px 4px;">사령:</span>
+  <span style="color: blue;">${saryeong || '-'}</span>
+</td>
+
+
+          <td style="border:1px solid #ccc; padding:4px;">당령식: ${dangryeongshikHtml || '-'}</td>
+        </tr>
+        <tr> 
+          <td style="border:1px solid #ccc; padding:4px;" colspan="2">${styledSaryeongshik}</td>
+          <td style="border:1px solid #ccc; padding:4px; font-size:12px;">
+            *당령[빨강], 제1희신[녹색], 사령[파랑], 사령보좌[녹색], 기신[오렌지색]
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+`;
+
+
+
+}
+
+
+// renderUtils.js
 
 // 위치별로 정렬하는 유틸 함수
-function arrangeByPositionFromObjectList(objList) {
+export function arrangeByPositionFromObjectList(objList) {
   const arr = [[], [], [], [], []]; // 1~5 자리용
   objList.forEach(({ char, pos }) => {
     if (pos >= 1 && pos <= 5) {
@@ -601,7 +627,7 @@ const highlightIfNeeded = (charObj) => {
   }
 
   if (isCheonganGisin || isJijiGisin) {
-    return `<span style="color:#FBC02D;">${wrappedChar}</span>`;
+    return `<span style="color:orange;font-weight:bold;">${wrappedChar}</span>`;
   }
 
   // 3. 지지희신이지만 다른 스타일 없으면 괄호만 유지

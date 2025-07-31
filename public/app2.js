@@ -2,7 +2,7 @@
 
 
 // git add .
-// git commit -m "격국식"  
+// git commit -m "격국식수정중"  
 // git push origin main
 // git push
 
