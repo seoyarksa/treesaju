@@ -71,11 +71,16 @@ export function findSolarTermDate(year, targetDeg) {
  */
 export function getSolarTermDates(year) {
   return SOLAR_TERMS.map(([name, longitude]) => {
-    const dateObj = findSolarTermDate(year, longitude)
-    const date = dayjs(dateObj).toISOString()
-    return { name, date }
-  })
+    const dateObj = findSolarTermDate(year, longitude);
+    if (!dateObj || isNaN(new Date(dateObj))) {
+      console.warn(`⚠️ 절기 계산 실패: ${year}, ${name} (${longitude})`);
+      return null; // 혹은 { name, date: null }
+    }
+    const date = dayjs(dateObj).toISOString();
+    return { name, date };
+  }).filter(Boolean); // null 제거
 }
+
 
 /**
  * 단일 절기명으로 절기 날짜를 반환
@@ -122,13 +127,26 @@ export function getJeolipDate(year, month) {
   const thisTerm = getSolarTermDate(year, thisTermName);
   const prevTerm = getSolarTermDate(prevYear, prevTermName);
 
+  // ✅ 유효성 검사
+  if (!thisTerm || !thisTerm.date || !prevTerm || !prevTerm.date) {
+    console.error('❌ [getJeolipDate] 절기 정보가 유효하지 않음', {
+      year,
+      month,
+      thisTermName,
+      prevTermName,
+      thisTerm,
+      prevTerm,
+    });
+    throw new Error('절기 데이터를 찾을 수 없습니다.'); // 예외 발생
+  }
+
   console.log('☀️ thisTerm:', {
     name: thisTerm.name,
-    dateKST: dayjs(thisTerm.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss')
+    dateKST: dayjs(thisTerm.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss'),
   });
   console.log('☀️ prevTerm:', {
     name: prevTerm.name,
-    dateKST: dayjs(prevTerm.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss')
+    dateKST: dayjs(prevTerm.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss'),
   });
 
   const current = dayjs(`${year}-${String(month).padStart(2, '0')}-01T00:00:00+09:00`).tz('Asia/Seoul');

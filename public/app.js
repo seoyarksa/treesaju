@@ -47,6 +47,7 @@ import {
   getThreeLinesFromArray,
   generateDaYun,
   getGanjiByYear,
+  getJeolipDateFromAPI,
 getCurrentDaeyunIndexFromStartAge,
   generateYearlyGanjiSeries2,
   generateDaeyunBy60Gapja,
@@ -253,14 +254,6 @@ function pad(num) {
 }
 
 // app.js 상단 혹은 적당한 위치에 추가하세요
-async function getJeolipDateFromAPI(year, month) {
-  const res = await fetch(`/api/jeolip?year=${year}&month=${month}`);
-  if (!res.ok) {
-    throw new Error(`API 요청 실패: ${res.status}`);
-  }
-  const { date } = await res.json();
-  return new Date(date);
-}
 
 
 
@@ -394,7 +387,8 @@ const birthDate = new Date(window.birthYear, window.birthMonth - 1, window.birth
 console.log("▶ 생년월일시 (KST):", birthDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }));
 
 // 2. 절입일 구하기 (동기 API 사용 가정)
-const jeolipDate = new Date(await getJeolipDateFromAPI(window.birthYear, window.birthMonth - 1, window.birthDay, window.birthHour, window.birthMinute));
+// ✅ 올바른 방식으로 호출
+const jeolipDate = new Date(await getJeolipDateFromAPI(window.birthYear, window.birthMonth));
 
 
 // 원본 값 (소수점 유지)

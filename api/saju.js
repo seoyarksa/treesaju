@@ -8,10 +8,8 @@
 
 // saju.js (vercel serverless function)
 
-//import solarlunar from 'solarlunar';
 import { calculateDaeyunAge } from '../utils/dateUtils.js';
 import { getJeolipDate } from '../utils/solarTermCalculator.js';
-//import { stemOrder, branchOrder } from './public/constants.js'; // optional
 
 const stemOrder = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
 const branchOrder = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
@@ -20,12 +18,9 @@ const hanToKorStem = {
   '甲': '갑', '乙': '을', '丙': '병', '丁': '정', '戊': '무',
   '己': '기', '庚': '경', '辛': '신', '壬': '임', '癸': '계'
 };
-const korToHanStem = {
-  '갑': '甲', '을': '乙', '병': '丙', '정': '丁', '무': '戊',
-  '기': '己', '경': '庚', '신': '辛', '임': '壬', '계': '癸'
-};
-const hanEarthlyBranches = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
-const hanToKor = (han) => hanToKorStem[han] || han;
+const korToHanStem = Object.fromEntries(Object.entries(hanToKorStem).map(([k, v]) => [v, k]));
+
+const hanEarthlyBranches = branchOrder;
 
 const timeGanTable = {
   '갑': ['갑','을','병','정','무','기','경','신','임','계','갑','을'],
@@ -76,7 +71,11 @@ function getTimeIndexByHourMinute(hour, minute) {
   return 0;
 }
 
-function getGanji(year, month, day, hour, minute) {
+function hanToKor(han) {
+  return hanToKorStem[han] || han;
+}
+
+function getGanji(solarlunar, year, month, day, hour, minute) {
   const lunarDate = solarlunar.solar2lunar(year, month, day);
   const dayGanji = lunarDate.gzDay;
   const dayGanKor = hanToKor(dayGanji.charAt(0));
@@ -96,8 +95,8 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') {
       return res.status(405).json({ error: 'Method Not Allowed' });
     }
-    const solarlunar = (await import('solarlunar')).default;
 
+    const solarlunar = (await import('solarlunar')).default;
     let { year, month, day, hour, minute, calendarType, gender } = req.body;
 
     if (!year || !month || !day || hour === undefined || minute === undefined || !calendarType) {
@@ -125,10 +124,14 @@ export default async function handler(req, res) {
       }
     }
 
-    const birthDate = new Date(`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00+09:00`);
-    const jeolipDate = getJeolipDate(new Date(year, month - 1, 1));
+    const dateString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00+09:00`;
+    const birthDate = new Date(dateString);
+    if (isNaN(birthDate.getTime())) {
+      throw new Error(`Invalid birthDate: ${dateString}`);
+    }
 
-    const ganji = getGanji(year, month, day, hour, minute);
+    const jeolipDate = getJeolipDate(birthDate); // ⬅️ 정확하게 수정된 절기 계산 사용
+    const ganji = getGanji(solarlunar, year, month, day, hour, minute);
     const yearStemKor = hanToKor(ganji.year.charAt(0));
     const daeyunAge = parseFloat(calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor).toFixed(2));
     const lunar = solarlunar.solar2lunar(year, month, day);
@@ -155,4 +158,3 @@ export default async function handler(req, res) {
     res.status(500).json({ error: '서버 내부 오류가 발생했습니다.', details: error.message });
   }
 }
-
