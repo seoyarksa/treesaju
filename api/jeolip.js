@@ -1,4 +1,4 @@
-import { getJeolipDate } from '../utils/solarTermCalculator'; // 경로는 실제 위치에 맞게 조정하세요
+import { getJeolipDate } from '../../utils/solarTermCalculator'; // 경로는 실제 위치에 맞게 조정하세요
 
 export default async function handler(req, res) {
   try {
