@@ -126,7 +126,8 @@ export default async function handler(req, res) {
     }
 
     const birthDate = new Date(`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00+09:00`);
-    const jeolipDate = getJeolipDate(year, month);
+    const jeolipDate = getJeolipDate(new Date(year, month - 1, 1));
+
     const ganji = getGanji(year, month, day, hour, minute);
     const yearStemKor = hanToKor(ganji.year.charAt(0));
     const daeyunAge = parseFloat(calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor).toFixed(2));
