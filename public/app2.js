@@ -389,7 +389,8 @@ console.log("▶ 생년월일시 (KST):", birthDate.toLocaleString('ko-KR', { ti
 
 // 2. 절입일 구하기 (동기 API 사용 가정)
 // ✅ 올바른 방식으로 호출
-const jeolipDate = new Date(await getJeolipDateFromAPI(window.birthYear, window.birthMonth, window.birthDay));
+//const jeolipDate = new Date(await getJeolipDateFromAPI(window.birthYear, window.birthMonth, window.birthDay));
+
 
 
 
@@ -684,29 +685,70 @@ if (daYunDirection === -1) {
 
 // 이제 stemsToRender, branchesToRender를 화면에 렌더링할 때 사용
 async function showBirthInfo(data) {
+  console.log('🚀 showBirthInfo 호출됨');
+  console.log('📦 전달받은 data:', data);
+
+  if (!data.jeolipDate) {
+    try {
+      const jeolipDateStr = await getJeolipDateFromAPI(window.birthYear, window.birthMonth, window.birthDay);
+      console.log('API에서 받은 jeolipDateStr:', jeolipDateStr);
+      if (jeolipDateStr) {
+        data.jeolipDate = jeolipDateStr;
+      } else {
+        console.warn('API에서 절입일을 받지 못했습니다.');
+      }
+    } catch (error) {
+      console.error('❌ 절입일 API 호출 실패:', error);
+    }
+  }
+
+  if (data.jeolipDate) {
+    const jeolipDateObj = new Date(data.jeolipDate);
+    if (isNaN(jeolipDateObj)) {
+      console.error('❌ jeolipDate가 유효하지 않은 날짜입니다.');
+    } else {
+      console.log('🕒 jeolipDateObj:', jeolipDateObj);
+      // 여기에 jeolipDateObj를 이용한 표시 코드 추가
+    }
+  } else {
+    console.warn('⚠️ jeolipDate가 존재하지 않습니다.');
+  }
+
   const pad = (n) => n.toString().padStart(2, '0');
 
   const solarDate = `${window.birthYear}-${pad(window.birthMonth)}-${pad(window.birthDay)} ${pad(window.birthHour)}:${pad(window.birthMinute)}`;
+  console.log('🌞 solarDate:', solarDate);
 
   const lunar = data.lunar;
   const lunarDate = lunar
     ? `${lunar.lunarYear}년 ${pad(lunar.lunarMonth)}월 ${pad(lunar.lunarDay)}일 ${pad(lunar.hour)}시 ${pad(lunar.minute)}분`
     : "정보 없음";
+  console.log('🌙 lunarDate:', lunarDate);
 
-  const jeolipDate = new Date(await getJeolipDateFromAPI(window.birthYear, window.birthMonth, window.birthDay));
-  const jeolipName = data.solarTermName || "절입시";
-  const jeolipStr = `${jeolipDate.getMonth() + 1}월 ${pad(jeolipDate.getDate())}일 ${pad(jeolipDate.getHours())}:${pad(jeolipDate.getMinutes())}`;
-  const solarTerm = `${jeolipName} (${jeolipStr})`;
+  // 만약 jeolipDate가 유효하면 포맷팅 시도, 없으면 기본 텍스트
+  let solarTerm = "절입시 정보 없음";
+  if (data.jeolipDate) {
+    const jeolipDateObj = new Date(data.jeolipDate);
+    if (!isNaN(jeolipDateObj)) {
+      const jeolipName = data.solarTermName || "절입시";
+      const jeolipStr = `${jeolipDateObj.getMonth() + 1}월 ${pad(jeolipDateObj.getDate())}일 ${pad(jeolipDateObj.getHours())}:${pad(jeolipDateObj.getMinutes())}`;
+      solarTerm = `${jeolipName} (${jeolipStr})`;
+      console.log('☀️ solarTerm:', solarTerm);
+    }
+  }
 
   const birthInfoText = `[양력] ${solarDate}  ||  [음력] ${lunarDate}  <br>  [절입시] ${solarTerm}`;
+  console.log('📝 birthInfoText:', birthInfoText);
 
   const birthInfoDiv = document.getElementById('birth-info');
   if (birthInfoDiv) {
-    birthInfoDiv.innerHTML = birthInfoText;  // ← innerText → innerHTML 로 바꿔야 <br> 먹힘
+    birthInfoDiv.innerHTML = birthInfoText;  // <br>이 제대로 적용되도록 innerHTML 사용
+    console.log('✅ birth-info 요소에 텍스트 출력 완료');
   } else {
     console.error("⚠️ birth-info 요소를 찾을 수 없습니다.");
   }
 }
+
 
 
 

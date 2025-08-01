@@ -33,10 +33,10 @@ export async function getJeolipDateFromAPI(year, month, day) {
   if (!res.ok) {
     throw new Error(`API 요청 실패: ${res.status}`);
   }
-  const { jeolipDate } = await res.json();  // <-- 여기를 수정
-  return new Date(jeolipDate);
+  const data = await res.json();
+  console.log("getJeolipDateFromAPI response:", data);
+  return new Date(data.date);  // ✅ 올바른 키로 수정
 }
-
 
 
 const yangStems = ['갑', '병', '무', '경', '임'];

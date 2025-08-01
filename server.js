@@ -35,7 +35,7 @@ app.get('/api/jeolip', (req, res) => {
   const { year, month, day } = req.query;
 
   console.log('📥 [/api/jeolip] 요청 받음');
-  console.log('➡️ 입력값 year:', year, 'month:', month);
+console.log('➡️ 입력값 year:', year, 'month:', month, 'day:', day);
 
   try {
     const y = parseInt(year);
