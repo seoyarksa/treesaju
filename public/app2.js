@@ -698,17 +698,16 @@ async function showBirthInfo(data) {
   const jeolipStr = `${jeolipDate.getMonth() + 1}월 ${pad(jeolipDate.getDate())}일 ${pad(jeolipDate.getHours())}:${pad(jeolipDate.getMinutes())}`;
   const solarTerm = `${jeolipName} (${jeolipStr})`;
 
-  // ✅ 여기 줄바꿈 포함된 HTML 문자열
-  const birthInfoText = `[양력] ${solarDate}  |  [음력] ${lunarDate}<br>[기준절기] ${solarTerm}`;
+  const birthInfoText = `[양력] ${solarDate}  ||  [음력] ${lunarDate}  <br>  [절입시] ${solarTerm}`;
 
   const birthInfoDiv = document.getElementById('birth-info');
   if (birthInfoDiv) {
-    // ✅ 줄바꿈이 적용되도록 innerHTML 사용
-    birthInfoDiv.innerHTML = birthInfoText;
+    birthInfoDiv.innerHTML = birthInfoText;  // ← innerText → innerHTML 로 바꿔야 <br> 먹힘
   } else {
     console.error("⚠️ birth-info 요소를 찾을 수 없습니다.");
   }
 }
+
 
 
 // ✅ 전역 등록 (중요!)
