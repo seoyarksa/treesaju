@@ -389,7 +389,8 @@ console.log("▶ 생년월일시 (KST):", birthDate.toLocaleString('ko-KR', { ti
 
 // 2. 절입일 구하기 (동기 API 사용 가정)
 // ✅ 올바른 방식으로 호출
-const jeolipDate = new Date(await getJeolipDateFromAPI(window.birthYear, window.birthMonth));
+const jeolipDate = new Date(await getJeolipDateFromAPI(window.birthYear, window.birthMonth, window.birthDay));
+
 
 
 // 원본 값 (소수점 유지)
