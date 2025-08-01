@@ -389,7 +389,8 @@ console.log("▶ 생년월일시 (KST):", birthDate.toLocaleString('ko-KR', { ti
 
 // 2. 절입일 구하기 (동기 API 사용 가정)
 // ✅ 올바른 방식으로 호출
-const jeolipDate = new Date(await getJeolipDateFromAPI(window.birthYear, window.birthMonth));
+const jeolipDate = new Date(await getJeolipDateFromAPI(window.birthYear, window.birthMonth, window.birthDay));
+
 
 
 // 원본 값 (소수점 유지)
@@ -682,6 +683,32 @@ if (daYunDirection === -1) {
 }
 
 // 이제 stemsToRender, branchesToRender를 화면에 렌더링할 때 사용
+async function showBirthInfo(data) {
+  const pad = (n) => n.toString().padStart(2, '0');
+
+  const solarDate = `${window.birthYear}-${pad(window.birthMonth)}-${pad(window.birthDay)} ${pad(window.birthHour)}:${pad(window.birthMinute)}`;
+
+  const lunar = data.lunar;
+  const lunarDate = lunar
+    ? `${lunar.lunarYear}년 ${pad(lunar.lunarMonth)}월 ${pad(lunar.lunarDay)}일 ${pad(lunar.hour)}시 ${pad(lunar.minute)}분`
+    : "정보 없음";
+
+  const jeolipDate = new Date(await getJeolipDateFromAPI(window.birthYear, window.birthMonth, window.birthDay));
+  const jeolipName = data.solarTermName || "절입시";
+  const jeolipStr = `${jeolipDate.getMonth() + 1}월 ${pad(jeolipDate.getDate())}일 ${pad(jeolipDate.getHours())}:${pad(jeolipDate.getMinutes())}`;
+  const solarTerm = `${jeolipName} (${jeolipStr})`;
+
+  // ✅ 여기 줄바꿈 포함된 HTML 문자열
+  const birthInfoText = `[양력] ${solarDate}  |  [음력] ${lunarDate}<br>[기준절기] ${solarTerm}`;
+
+  const birthInfoDiv = document.getElementById('birth-info');
+  if (birthInfoDiv) {
+    // ✅ 줄바꿈이 적용되도록 innerHTML 사용
+    birthInfoDiv.innerHTML = birthInfoText;
+  } else {
+    console.error("⚠️ birth-info 요소를 찾을 수 없습니다.");
+  }
+}
 
 
 // ✅ 전역 등록 (중요!)
@@ -689,6 +716,7 @@ window.handleDaeyunClick = handleDaeyunClick;
 
 
     document.getElementById('result').innerHTML = `
+<div id="birth-info" style="max-width: 600px; margin-left: 20px; font-family: 'Nanum Gothic', sans-serif; font-size: 0.85rem; color: #333; margin-bottom: 8px;"></div>
 
     <div style="max-width: 600px; margin-left: 20px;">
       <style>
@@ -980,6 +1008,8 @@ renderDaeyunTable({
 
 // 결과 영역 보여주기 - 이 부분 추가!
 document.getElementById("result").style.display = "block";
+
+await showBirthInfo(data);  // 이 위치가 딱 좋아요!
 
 document.getElementById("today-saju-container").style.display = "block";
 

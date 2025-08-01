@@ -1,3 +1,7 @@
+// api/jeolip.js
+
+
+
 import { getJeolipDate } from '../utils/solarTermCalculator.js';
  // 경로는 실제 위치에 맞게 조정하세요
 
@@ -9,16 +13,19 @@ export default async function handler(req, res) {
 
     const year = parseInt(req.query.year, 10);
     const month = parseInt(req.query.month, 10);
+    const day = parseInt(req.query.day, 10);
 
-    if (isNaN(year) || isNaN(month)) {
-      return res.status(400).json({ error: 'year와 month 쿼리 파라미터가 필요합니다.' });
+   if (isNaN(year) || isNaN(month) || isNaN(day)) {
+     return res.status(400).json({ error: 'year, month, day 쿼리 파라미터가 필요합니다.' });
     }
 
-    const jeolipDate = getJeolipDate(year, month);
+
+    const jeolipDate = getJeolipDate(year, month, day);
 
     return res.status(200).json({
       year,
       month,
+      day,
       jeolipDate: jeolipDate.toISOString(),
     });
   } catch (error) {

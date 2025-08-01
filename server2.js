@@ -32,27 +32,26 @@ const PORT = 3000;
 
 
 app.get('/api/jeolip', (req, res) => {
-  const { year, month } = req.query;
+  const { year, month, day } = req.query;
 
   console.log('📥 [/api/jeolip] 요청 받음');
   console.log('➡️ 입력값 year:', year, 'month:', month);
 
   try {
-const y = parseInt(year);
-const m = parseInt(month);
-  if (isNaN(y) || isNaN(m)) {
-      throw new Error('year 또는 month가 유효한 숫자가 아닙니다.');
+    const y = parseInt(year);
+    const m = parseInt(month);
+    const d = parseInt(day);
+
+    if (isNaN(y) || isNaN(m) || isNaN(d)) {
+      throw new Error('year, month, day 중 하나 이상이 유효한 숫자가 아닙니다.');
     }
 
-const date = getJeolipDate(y, m);
+    const date = getJeolipDate(y, m, d);
     console.log('✅ getJeolipDate 반환값:', date);
-
-    
-    res.json({ date: date.toISOString() });  // Date → ISO 문자열로 보내기
-  } catch (e) {
-    console.error('❌ [/api/jeolip] 에러 발생:', e.message);
-    console.error(e.stack); // 에러 스택까지 출력
-    res.status(500).send({ error: e.message });
+    res.json({ date: date.toISOString() });
+  } catch (error) {
+    console.error(error);
+    res.status(400).json({ error: error.message });
   }
 });
 
@@ -387,7 +386,7 @@ if (isNaN(birthDate.getTime())) {
   console.error('❌ birthDate 생성 실패:', year, month, day, hour, minute);
   return res.status(500).json({ error: '유효하지 않은 생년월일입니다.' });
 }
-const jeolipDate = getJeolipDate(year, month);
+const jeolipDate = getJeolipDate(year, month, day);
 
 
 console.log('✅ 최종 birthDate:', formatDateKST(birthDate));

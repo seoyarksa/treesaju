@@ -98,3 +98,7 @@ button:hover {
   text-align: center;
   user-select: text;
 }
+
+#birth-info {
+  font-size: 0.75rem;
+}
