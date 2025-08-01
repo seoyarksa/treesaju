@@ -33,10 +33,9 @@ export async function getJeolipDateFromAPI(year, month, day) {
   if (!res.ok) {
     throw new Error(`API 요청 실패: ${res.status}`);
   }
-  const { date } = await res.json();
-  return new Date(date);
+  const { jeolipDate } = await res.json();  // <-- 여기를 수정
+  return new Date(jeolipDate);
 }
-
 
 
 

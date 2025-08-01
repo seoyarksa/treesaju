@@ -693,7 +693,7 @@ async function showBirthInfo(data) {
     ? `${lunar.lunarYear}년 ${pad(lunar.lunarMonth)}월 ${pad(lunar.lunarDay)}일 ${pad(lunar.hour)}시 ${pad(lunar.minute)}분`
     : "정보 없음";
 
-  const jeolipDate = new Date(await getJeolipDateFromAPI(window.birthYear, window.birthMonth, window.birthDay));
+ // const jeolipDate = new Date(await getJeolipDateFromAPI(window.birthYear, window.birthMonth, window.birthDay));
   const jeolipName = data.solarTermName || "절입시";
   const jeolipStr = `${jeolipDate.getMonth() + 1}월 ${pad(jeolipDate.getDate())}일 ${pad(jeolipDate.getHours())}:${pad(jeolipDate.getMinutes())}`;
   const solarTerm = `${jeolipName} (${jeolipStr})`;
