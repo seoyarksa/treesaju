@@ -14,7 +14,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'year와 month 쿼리 파라미터가 필요합니다.' });
     }
 
-    const jeolipDate = getJeolipDate(year, month);
+    const jeolipDate = getJeolipDate(year, month, day);
 
     return res.status(200).json({
       year,
