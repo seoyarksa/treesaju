@@ -88,7 +88,20 @@ import {
 } from './gyeokUtils.js';
 
 
-
+const MONTH_TO_SOLAR_TERM = {
+  1: '소한',   // 1월 시작 절기 (소한) → 입춘 이전 절기
+  2: '입춘',   // 2월 시작 절기 (입춘)
+  3: '경칩',
+  4: '청명',
+  5: '입하',
+  6: '망종',
+  7: '소서',
+  8: '입추',
+  9: '백로',
+  10: '한로',
+  11: '입동',
+  12: '대설',
+};
 
 //
 window.handleDaeyunClick = handleDaeyunClick;
@@ -683,11 +696,44 @@ if (daYunDirection === -1) {
   branchesToRender = [...branchesToRender].reverse();
 }
 
+
+
+
+
+// ✅ 절기명 매칭해서 입력하기
+function findSolarTermNameByMonth(jeolipDateStr, solarTermsList) {
+  const jeolipDate = new Date(jeolipDateStr);
+  const jeolipMonth = jeolipDate.getMonth() + 1;
+
+  for (const entry of solarTermsList) {
+    const [termName, termDateStr] = entry.split(':').map(str => str.trim());
+    const termDate = new Date(termDateStr);
+    const termMonth = termDate.getMonth() + 1;
+
+    if (termMonth === jeolipMonth) {
+      return termName;
+    }
+  }
+
+  return null;
+}
+
+
+
+
+
+
+
+
+
+
+
 // 이제 stemsToRender, branchesToRender를 화면에 렌더링할 때 사용
 async function showBirthInfo(data) {
   console.log('🚀 showBirthInfo 호출됨');
   console.log('📦 전달받은 data:', data);
 
+  // 절입일이 없으면 API로 받아오기
   if (!data.jeolipDate) {
     try {
       const jeolipDateStr = await getJeolipDateFromAPI(window.birthYear, window.birthMonth, window.birthDay);
@@ -702,13 +748,23 @@ async function showBirthInfo(data) {
     }
   }
 
+  let solarTerm = "절입시 정보 없음";
+
   if (data.jeolipDate) {
     const jeolipDateObj = new Date(data.jeolipDate);
     if (isNaN(jeolipDateObj)) {
       console.error('❌ jeolipDate가 유효하지 않은 날짜입니다.');
     } else {
       console.log('🕒 jeolipDateObj:', jeolipDateObj);
-      // 여기에 jeolipDateObj를 이용한 표시 코드 추가
+
+      // 절입월로 절기명 찾기
+      const month = jeolipDateObj.getMonth() + 1;
+      const jeolipName = MONTH_TO_SOLAR_TERM[month] || "절입시";
+
+      const pad = (n) => n.toString().padStart(2, '0');
+      const jeolipStr = `${month}월 ${pad(jeolipDateObj.getDate())}일 ${pad(jeolipDateObj.getHours())}:${pad(jeolipDateObj.getMinutes())}`;
+      solarTerm = `${jeolipName} (${jeolipStr})`;
+      console.log('☀️ solarTerm:', solarTerm);
     }
   } else {
     console.warn('⚠️ jeolipDate가 존재하지 않습니다.');
@@ -725,30 +781,17 @@ async function showBirthInfo(data) {
     : "정보 없음";
   console.log('🌙 lunarDate:', lunarDate);
 
-  // 만약 jeolipDate가 유효하면 포맷팅 시도, 없으면 기본 텍스트
-  let solarTerm = "절입시 정보 없음";
-  if (data.jeolipDate) {
-    const jeolipDateObj = new Date(data.jeolipDate);
-    if (!isNaN(jeolipDateObj)) {
-      const jeolipName = data.solarTermName || "절입시";
-      const jeolipStr = `${jeolipDateObj.getMonth() + 1}월 ${pad(jeolipDateObj.getDate())}일 ${pad(jeolipDateObj.getHours())}:${pad(jeolipDateObj.getMinutes())}`;
-      solarTerm = `${jeolipName} (${jeolipStr})`;
-      console.log('☀️ solarTerm:', solarTerm);
-    }
-  }
-
   const birthInfoText = `[양력] ${solarDate}  ||  [음력] ${lunarDate}  <br>  [절입시] ${solarTerm}`;
   console.log('📝 birthInfoText:', birthInfoText);
 
   const birthInfoDiv = document.getElementById('birth-info');
   if (birthInfoDiv) {
-    birthInfoDiv.innerHTML = birthInfoText;  // <br>이 제대로 적용되도록 innerHTML 사용
+    birthInfoDiv.innerHTML = birthInfoText;
     console.log('✅ birth-info 요소에 텍스트 출력 완료');
   } else {
     console.error("⚠️ birth-info 요소를 찾을 수 없습니다.");
   }
 }
-
 
 
 
