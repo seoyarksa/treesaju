@@ -695,6 +695,8 @@ async function showBirthInfo(data) {
 
   const { date } = await getJeolipDateFromAPI(window.birthYear, window.birthMonth, window.birthDay);
 const jeolipDate = new Date(date);
+console.log("🌞 getJeolipDateFromAPI 결과:", await getJeolipDateFromAPI(...));
+
   const jeolipName = data.solarTermName || "절입시";
   const jeolipStr = `${jeolipDate.getMonth() + 1}월 ${pad(jeolipDate.getDate())}일 ${pad(jeolipDate.getHours())}:${pad(jeolipDate.getMinutes())}`;
   const solarTerm = `${jeolipName} (${jeolipStr})`;
