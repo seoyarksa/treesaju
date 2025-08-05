@@ -321,7 +321,7 @@ export const gyeokjijiToSibganMap = {
   巳: ['庚','丙'],
   午: ['丙', '丁'],
   未: ['丁', '乙', '己'],
-  申: [ '壬','庚'],
+  申: ['壬','庚'],
   酉: ['庚','辛'],
   戌: ['辛', '丁', '戊'],
   亥: ['甲', '壬']
@@ -539,6 +539,8 @@ export const GYEOKGUK_TYPES = {
   INSEONG: '정인격',
   PYEONIN: '편인격',
   SANGGWAN: '상관격',
+    WOLBIGYEOK: '월비격',    // ✅ 추가
+  WOLGEOPGYEOK: '월겁격',  // ✅ 추가
 };
 
 export const yukshinToKey = {
@@ -570,6 +572,8 @@ export const GYEOK_USE_GU_MAP = {
   '편관격': { use: '식신', seek: '편재' },
   '건록격': { use: '정관', seek: '정인' },
   '양인격': { use: '편관', seek: '편인' },
+  '월비격': { use: '정관', seek: '정인' },
+  '월겁격': { use: '편관', seek: '편인' },
 };
 
 
@@ -587,8 +591,12 @@ export const GYEOK_RELATIONS = {
     seek: { char: '정관', relation: '생' },
   },
   '편인격': {
-    use: { char: '정관', relation: '생' },
+    use: { char: '편관', relation: '생' },
     seek: { char: '비견', relation: '생' },
+  },
+  '정인격': {
+    use: { char: '정관', relation: '생' },
+    seek: { char: '겁재', relation: '생' },
   },
   '정관격': {
     use: { char: '정재', relation: '생' },
@@ -597,19 +605,27 @@ export const GYEOK_RELATIONS = {
   // 흉격 4개
   '상관격': {
     use: { char: '정인', relation: '극' },
-    seek: { char: '겁재', relation: '생' },
+    seek: { char: '겁재', relation: '극' },
   },
   '편관격': {
     use: { char: '식신', relation: '극' },
-    seek: { char: '편재', relation: '생' },
+    seek: { char: '편재', relation: '극' },
   },
   '건록격': {
     use: { char: '정관', relation: '극' },
-    seek: { char: '정인', relation: '생' },
+    seek: { char: '정인', relation: '극' },
   },
   '양인격': {
     use: { char: '편관', relation: '극' },
-    seek: { char: '편인', relation: '생' },
+    seek: { char: '편인', relation: '극' },
+  },
+   '월비격': {
+    use: { char: '정관', relation: '극' },
+    seek: { char: '정인', relation: '극' },
+  },
+  '월겁격': {
+    use: { char: '편관', relation: '극' },
+    seek: { char: '편인', relation: '극' },
   }
 };
 
@@ -619,7 +635,7 @@ export const 길신격_목록 = [
 ];
 
 export const 흉신격_목록 = [
-  '상관격', '편관격', '건록격', '양인격',
+  '상관격', '편관격', '건록격', '양인격', '월비격', '월겁격',
 ];
 
 
@@ -634,4 +650,93 @@ export const YUKSHIN_COUNTERS = {
   '정관': ['겁재'],
   '편인': ['식신'],
   '정인': ['상관']
+};
+
+
+
+export const GYEOK_YUKSHIN_MAP = {
+  '식신격': {
+    sangsin: '비견',
+    gusin: '편재',
+    gisin1: '편관',  // 예시로 임의 지정 (실제는 분석 데이터 필요)
+    gisin2: '편인',
+    gyeokname2: '식신',
+  },
+  '편재격': {
+    sangsin: '식신',
+    gusin: '편관',
+    gisin1: '편인',
+    gisin2: '비견',
+    gyeokname2: '편재',
+  },
+  '정재격': {
+    sangsin: '상관',
+    gusin: '정관',
+    gisin1: '정인',
+    gisin2: '겁재',
+    gyeokname2: '정재',
+  },
+  '정관격': {
+    sangsin: '정재',
+    gusin: '정인',
+    gisin1: '겁재',
+    gisin2: '상관',
+    gyeokname2: '정관',
+  },
+   '편인격': {
+    sangsin: '편관',
+    gusin: '비견',
+    gisin1: '식신',
+    gisin2: '편재',
+    gyeokname2: '편인',
+  },
+    '정인격': {
+    sangsin: '정관',
+    gusin: '겁재',
+    gisin1: '상관',
+    gisin2: '정재',
+    gyeokname2: '정인',
+  },
+  '상관격': {
+    sangsin: '정인',
+    gusin: '겁재',
+    gisin1: '정재',
+    gisin2: '정관',
+    gyeokname2: '상관',
+  },
+  '편관격': {
+    sangsin: '식신',
+    gusin: '편재',
+    gisin1: '편인',
+    gisin2: '비견',
+    gyeokname2: '편관',
+  },
+  '건록격': {
+    sangsin: '정관',
+    gusin: '정인',
+    gisin1: '상관',
+    gisin2: '정재',
+    gyeokname2: '비견',
+  },
+  '양인격': {
+    sangsin: '편관',
+    gusin: '편인',
+    gisin1: '식신',
+    gisin2: '편재',
+    gyeokname2: '겁재',
+  },
+    '월비격': {
+    sangsin: '정관',
+    gusin: '정인',
+    gisin1: '상관',
+    gisin2: '정재',
+    gyeokname2: '비견',
+  },
+  '월겁격': {
+    sangsin: '편관',
+    gusin: '편인',
+    gisin1: '식신',
+    gisin2: '편재',
+    gyeokname2: '겁재',
+  },
 };

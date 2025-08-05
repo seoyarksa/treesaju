@@ -84,11 +84,25 @@ import {
   getGyeokName,
   getYukshin,
   getUseGuByGyeok,
-  renderGyeokFlowStyled
+  renderGyeokFlowStyled,
+  getSecondaryGyeok
 } from './gyeokUtils.js';
 
 
-
+const MONTH_TO_SOLAR_TERM = {
+  1: '소한',   // 1월 시작 절기 (소한) → 입춘 이전 절기
+  2: '입춘',   // 2월 시작 절기 (입춘)
+  3: '경칩',
+  4: '청명',
+  5: '입하',
+  6: '망종',
+  7: '소서',
+  8: '입추',
+  9: '백로',
+  10: '한로',
+  11: '입동',
+  12: '대설',
+};
 
 //
 window.handleDaeyunClick = handleDaeyunClick;
@@ -264,6 +278,8 @@ function pad(num) {
 document.getElementById('saju-form').addEventListener('submit', async (e) => {
   e.preventDefault();
 
+
+
   const dateStr = document.getElementById('birth-date').value;
 const ampmInput = document.querySelector('input[name="ampm"]:checked');
 const ampm = ampmInput ? ampmInput.value : null;
@@ -413,9 +429,9 @@ window.daeyunAge = daeyunAge;
     const monthGanji = splitGanji(data.ganji.month);
     const dayGanji = splitGanji(data.ganji.day);
     const timeGanji = splitGanji(data.ganji.time);
-  console.log('월간 천간:', monthGanji.gan);
-  console.log('월지 지지:', monthGanji.ji);
-  // ✅ 일간(한자)을 한글로 변환하여 전역 변수로 저장
+
+
+
 
 window.dayGanKorGan = convertHanToKorStem(dayGanji.gan); // ✅ 일간 한글 천간을 전역에 저장
 
@@ -438,6 +454,7 @@ const dayGanKorGan = convertHanToKorStem(dayGanji.gan);
 // 출생 월, 일 (전역변수에서)
 
 const monthJi = monthGanji.ji;  // 월지(예: '子', '丑' 등)
+
 const daYunDirection = getDaYunDirection(gender, yearStemKor);
 console.log('gender:', gender);
 console.log('yearStemKor:', yearStemKor);
@@ -459,14 +476,66 @@ const saryeong = getSaryeong(monthGanji.ji, daeyunAge, window.daYunDirection);
 window.dangryeong = dangryeong;
 
 // 사주 천간과 지지를 result에서 추출
+
+
+  console.log('월간 천간:', monthGanji.gan);
+  console.log('월지 지지:', monthGanji.ji);
+  // ✅ 일간(한자)을 한글로 변환하여 전역 변수로 저장
+
+
+
+
 const sajuChungan = [timeGanji.gan, dayGanji.gan, monthGanji.gan, yearGanji.gan];
 const sajuJiji = [timeGanji.ji, dayGanji.ji, monthGanji.ji, yearGanji.ji];
 
 
 
-const chunganList = [timeGanji.gan, dayGanji.gan, monthGanji.gan, yearGanji.gan];
+const chunganList = [timeGanji.gan, monthGanji.gan, yearGanji.gan]; //격을 구분할때는 일간을 제외
 const dayGan = dayGanji.gan;  // 일간 천간
+// 격국 분석 호출
+const saju = {
+  yearGan: yearGanji.gan,
+  monthGan: monthGanji.gan,
+  dayGan: dayGanji.gan,
+  hourGan: timeGanji.gan,
+  yearBranch: yearGanji.ji,
+  monthBranch: monthGanji.ji,
+  dayBranch: dayGanji.ji,
+  hourBranch: timeGanji.ji,
+};
 
+const sajuCheonganList = [timeGanji.gan, dayGanji.gan, monthGanji.gan, yearGanji.gan];
+const sajuJijiList = [timeGanji.ji, dayGanji.ji, monthGanji.ji, yearGanji.ji];
+const otherJijiArr = sajuJijiList.filter(ji => ji !== monthJi);
+
+const gyeok = getGyeokForMonth({
+  monthJi: monthGanji.ji,
+  saryeong,
+  chunganList, // 여기서 위에서 선언한 것을 사용
+  dayGan,
+  daeyunAge,
+  daYunDirection,
+  saju,
+  otherJijiArr  
+});
+
+const jijiSibgans = jijiToSibganMap2[monthJi] || [];
+// 2. 보조격 결정 (주격과 동일한 사주 정보 사용!)
+const secondaryGyeokResult = getSecondaryGyeok({
+  monthJi,
+  saryeong,
+  jijiSibgans,
+  chunganList,
+  dayGan,
+  primaryStem: gyeok?.stem,    // 이 위치에서 값 세팅!
+  daeyunAge,
+  daYunDirection,
+  primaryChar: gyeok?.char,     // 이 위치에서 값 세팅!,
+  otherJijiArr  
+});
+
+
+console.log("격국:", gyeok);
 //console.log(yearGanji, monthGanji, dayGanji, timeGanji);
 
 
@@ -477,21 +546,18 @@ console.log("▶ monthJi:", monthGanji.ji);
 console.log('당령:', dangryeong);
 console.log('사령:', saryeong);
 
-// 격국 분석 호출
-const gyeok = getGyeokForMonth({
-  monthJi: monthGanji.ji,
-  saryeong,
-  chunganList, // 여기서 위에서 선언한 것을 사용
-  dayGan,
-  daeyunAge,
-  daYunDirection,
-});
 
 
-console.log("격국:", gyeok);
+
+  console.log('폼 제출 실행!');
+  console.log('saju:', saju);
+  console.log('gyeok:', gyeok);
+// DOM이 준비된 상태라면 바로 실행
+
 
 
 //console.log("🧪 getGyeokForMonth 결과:", gyeok);
+
 
 
 
@@ -525,8 +591,7 @@ const dangryeongList = dangryeongArray.map((char, idx) => ({ pos: idx + 1, char 
 
 console.log('[DEBUG] 당령 포지션 포함 리스트:', dangryeongList);
   // 2. 희신/기신 리스트 추출
-const sajuCheonganList = [timeGanji.gan, dayGanji.gan, monthGanji.gan, yearGanji.gan];
-const sajuJijiList = [timeGanji.ji, dayGanji.ji, monthGanji.ji, yearGanji.ji];
+
 const sajuJijiCheonganListraw = sajuJijiList.flatMap(jiji => 
   jijiToSibganMap[jiji]?.map(entry => entry.char) || []
 );
@@ -683,11 +748,44 @@ if (daYunDirection === -1) {
   branchesToRender = [...branchesToRender].reverse();
 }
 
+
+
+
+
+// ✅ 절기명 매칭해서 입력하기
+function findSolarTermNameByMonth(jeolipDateStr, solarTermsList) {
+  const jeolipDate = new Date(jeolipDateStr);
+  const jeolipMonth = jeolipDate.getMonth() + 1;
+
+  for (const entry of solarTermsList) {
+    const [termName, termDateStr] = entry.split(':').map(str => str.trim());
+    const termDate = new Date(termDateStr);
+    const termMonth = termDate.getMonth() + 1;
+
+    if (termMonth === jeolipMonth) {
+      return termName;
+    }
+  }
+
+  return null;
+}
+
+
+
+
+
+
+
+
+
+
+
 // 이제 stemsToRender, branchesToRender를 화면에 렌더링할 때 사용
 async function showBirthInfo(data) {
   console.log('🚀 showBirthInfo 호출됨');
   console.log('📦 전달받은 data:', data);
 
+  // 절입일이 없으면 API로 받아오기
   if (!data.jeolipDate) {
     try {
       const jeolipDateStr = await getJeolipDateFromAPI(window.birthYear, window.birthMonth, window.birthDay);
@@ -702,13 +800,23 @@ async function showBirthInfo(data) {
     }
   }
 
+  let solarTerm = "절입시 정보 없음";
+
   if (data.jeolipDate) {
     const jeolipDateObj = new Date(data.jeolipDate);
     if (isNaN(jeolipDateObj)) {
       console.error('❌ jeolipDate가 유효하지 않은 날짜입니다.');
     } else {
       console.log('🕒 jeolipDateObj:', jeolipDateObj);
-      // 여기에 jeolipDateObj를 이용한 표시 코드 추가
+
+      // 절입월로 절기명 찾기
+      const month = jeolipDateObj.getMonth() + 1;
+      const jeolipName = MONTH_TO_SOLAR_TERM[month] || "절입시";
+
+      const pad = (n) => n.toString().padStart(2, '0');
+      const jeolipStr = `${month}월 ${pad(jeolipDateObj.getDate())}일 ${pad(jeolipDateObj.getHours())}:${pad(jeolipDateObj.getMinutes())}`;
+      solarTerm = `${jeolipName} (${jeolipStr})`;
+      console.log('☀️ solarTerm:', solarTerm);
     }
   } else {
     console.warn('⚠️ jeolipDate가 존재하지 않습니다.');
@@ -725,30 +833,17 @@ async function showBirthInfo(data) {
     : "정보 없음";
   console.log('🌙 lunarDate:', lunarDate);
 
-  // 만약 jeolipDate가 유효하면 포맷팅 시도, 없으면 기본 텍스트
-  let solarTerm = "절입시 정보 없음";
-  if (data.jeolipDate) {
-    const jeolipDateObj = new Date(data.jeolipDate);
-    if (!isNaN(jeolipDateObj)) {
-      const jeolipName = data.solarTermName || "절입시";
-      const jeolipStr = `${jeolipDateObj.getMonth() + 1}월 ${pad(jeolipDateObj.getDate())}일 ${pad(jeolipDateObj.getHours())}:${pad(jeolipDateObj.getMinutes())}`;
-      solarTerm = `${jeolipName} (${jeolipStr})`;
-      console.log('☀️ solarTerm:', solarTerm);
-    }
-  }
-
   const birthInfoText = `[양력] ${solarDate}  ||  [음력] ${lunarDate}  <br>  [절입시] ${solarTerm}`;
   console.log('📝 birthInfoText:', birthInfoText);
 
   const birthInfoDiv = document.getElementById('birth-info');
   if (birthInfoDiv) {
-    birthInfoDiv.innerHTML = birthInfoText;  // <br>이 제대로 적용되도록 innerHTML 사용
+    birthInfoDiv.innerHTML = birthInfoText;
     console.log('✅ birth-info 요소에 텍스트 출력 완료');
   } else {
     console.error("⚠️ birth-info 요소를 찾을 수 없습니다.");
   }
 }
-
 
 
 
@@ -982,6 +1077,11 @@ window.handleDaeyunClick = handleDaeyunClick;
 
 
 `;
+
+
+
+
+
 console.log('renderDaeyunTable pairsToRender:', pairsToRender.map(p => p.stem + p.branch));
 console.log('daYunDirection:', daYunDirection);
 console.log('daeyunPairs:', daeyunPairs.map(p => p.stem + p.branch).join(', '));
@@ -994,44 +1094,113 @@ pairsToRender.forEach((p, i) => {
 
 console.log('🧪 getGyeokForMonth 결과:', gyeok);
 
+// 3. 주격+보조격 출력
 let gyeokDisplayText = '판별불가';
 
-if (gyeok && typeof gyeok === 'object' && gyeok.stem) {
-  // 격국명 직접 변환
-  gyeokDisplayText = getGyeokName(dayGan, gyeok.stem);
+if (secondaryGyeokResult?.primary && secondaryGyeokResult?.secondary) {
+  // 생지(복수격)
+  gyeokDisplayText = `
+    <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;"><b>
+      ${secondaryGyeokResult.primary.char}</b>
+    </span>
+    <span style="font-size:0.92em;"> (보조격: </span>
+    <span id="gyeok-secondary" style="cursor:pointer; color:#ff8844;">
+      <b>${secondaryGyeokResult.secondary.char}</b>
+    </span>
+    <span style="font-size:0.92em;">)</span>
+        <div style="font-size:0.85em; color:#888; margin-top:2px;">
+      (격이름을 클릭시 격국식을 볼 수 있습니다)
+    </div>
+  `;
+} else if (secondaryGyeokResult && secondaryGyeokResult.char && secondaryGyeokResult.stem) {
+  // 왕지/고지: 단일 보조격
+  if (gyeok && typeof gyeok === 'object' && gyeok.stem) {
+    gyeokDisplayText = `
+      <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;">
+        ${getGyeokName(dayGan, gyeok.stem)}
+      </span>
+      <span style="font-size:0.92em;"> (보조격: </span>
+      <span id="gyeok-secondary" style="cursor:pointer; color:#ff8844;">
+        ${secondaryGyeokResult.char}
+      </span>
+      <span style="font-size:0.92em;">)</span>
+          <div style="font-size:0.85em; color:#888; margin-top:2px;">
+      (격이름을 클릭시 격국식을 볼 수 있습니다)
+    </div>
+    `;
+  } else if (typeof gyeok === 'string') {
+    gyeokDisplayText = `
+      <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;">
+        ${gyeok}
+      </span>
+      <span style="font-size:0.92em;"> (보조격: </span>
+      <span id="gyeok-secondary" style="cursor:pointer; color:#ff8844;">
+        ${secondaryGyeokResult.char}
+      </span>
+      <span style="font-size:0.92em;">)</span>
+          <div style="font-size:0.85em; color:#888; margin-top:2px;">
+      (격이름을 클릭시 격국식을 볼 수 있습니다)
+    </div>
+    `;
+  }
+} else if (gyeok && typeof gyeok === 'object' && gyeok.stem) {
+  if (gyeok.char === '월비격' || gyeok.char === '월겁격') {
+    gyeokDisplayText = `
+      <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;">
+        ${gyeok.char}(${gyeok.stem})
+      </span>
+    `;
+  } else {
+    gyeokDisplayText = `
+      <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;">
+        ${getGyeokName(dayGan, gyeok.stem)}
+      </span>
+    `;
+  }
 } else if (typeof gyeok === 'string') {
-  // 문자열이면 그대로 출력 (예: '건록격' 등)
-  gyeokDisplayText = gyeok;
+  gyeokDisplayText = `
+    <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;">
+      ${gyeok}
+    </span>
+  `;
 }
-//격국표시
+
+// 격국 표시
 const gyeokDisplayEl = document.getElementById("gyeok-display");
 if (gyeokDisplayEl) {
-  gyeokDisplayEl.textContent = `격국: ${gyeokDisplayText}`;
+  gyeokDisplayEl.innerHTML = `격국: ${gyeokDisplayText}`;
 }
+
+if (gyeok && saju) {
+  renderGyeokFlowStyled(gyeok, saju, secondaryGyeokResult);
+}
+
+// ▶ 클릭 이벤트 연결!
+document.getElementById('gyeok-primary')?.addEventListener('click', () => {
+  renderGyeokFlowStyled(gyeok, saju, secondaryGyeokResult);
+});
+document.getElementById('gyeok-secondary')?.addEventListener('click', () => {
+  if (secondaryGyeokResult?.primary && secondaryGyeokResult?.secondary) {
+    renderGyeokFlowStyled(secondaryGyeokResult.secondary, saju, secondaryGyeokResult.primary);
+  } else {
+    renderGyeokFlowStyled(secondaryGyeokResult, saju, gyeok);
+  }
+});
+
+
+
+
+
 // 상신 구신 표시
 console.log('✅ dayGan:', dayGan, 'gyeok.stem:', gyeok?.stem);
 // somewhere in your app.js or main logic
-const saju = {
-  yearGan: '기',
-  monthGan: '임',
-  dayGan: '경',
-  hourGan: '경',
-  yearBranch: '유',
-  monthBranch: '신',
-  dayBranch: '오',
-  hourBranch: '진'
-};
 
 
 
 console.log("🔍 전달된 격국 객체(gyeok):", gyeok);
 console.log("🔍 전달된 격국 이름:", gyeok.char);
-console.log('📦 전달된 saju 객체:', saju);
+//console.log('📦 전달된 saju 객체:', saju);
 
-
-const flowEl = document.getElementById("gyeok-flow");
-console.log(flowEl); // null이면 요소 못 찾음
-if (flowEl) flowEl.innerHTML = renderGyeokFlowStyled(gyeok, saju);
 
 
 
@@ -1051,6 +1220,17 @@ renderDaeyunTable({
 document.getElementById("result").style.display = "block";
 
 await showBirthInfo(data);  // 이 위치가 딱 좋아요!
+
+
+// 여기서 바로!
+renderGyeokFlowStyled(gyeok, saju, secondaryGyeokResult);
+
+
+
+
+
+
+
 
 document.getElementById("today-saju-container").style.display = "block";
 
@@ -1079,7 +1259,6 @@ window.currentDaeyunIndex = currentDaeyunIndex;
 
 // 📌 handleDaeyunClick에는 **sortedIndex**를 넣어야 UI와 동기화됨
 handleDaeyunClick(window.birthYear, window.birthMonth, window.birthDay, sortedIndex);
-
 
 
 

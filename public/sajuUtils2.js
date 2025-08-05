@@ -29,13 +29,16 @@ const stemOrder = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬'
 const branchOrder = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
 // 서버에서 절기 날짜 받아오는 함수
 export async function getJeolipDateFromAPI(year, month, day) {
-  const res = await fetch(`/api/jeolip?year=${year}&month=${month}&day=${day}`);
+  const baseUrl = window.location.origin;
+  const res = await fetch(`${baseUrl}/api/jeolip?year=${year}&month=${month}&day=${day}`);
   if (!res.ok) {
     throw new Error(`API 요청 실패: ${res.status}`);
   }
   const data = await res.json();
   console.log("getJeolipDateFromAPI response:", data);
-  return new Date(data.date);  // ✅ 올바른 키로 수정
+
+  // 로컬: data.date, 서버: data.jeolipDate 대응
+  return new Date(data.jeolipDate || data.date);
 }
 
 

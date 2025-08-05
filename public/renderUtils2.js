@@ -460,13 +460,15 @@ return `
 .saryeong-char {
   color: blue;
   text-decoration-line: underline;
-  text-decoration-color: black;
+  text-decoration-style: wavy;
+  text-decoration-color: yellow;
   /* font-weight: bold; 삭제 */
 }
 .bojo-char {
   color: rgb(14, 90, 24);
   text-decoration-line: underline;
-  text-decoration-color: black;
+  text-decoration-style: wavy;
+  text-decoration-color: yellow;
 }
 .normal-char {
   /* 기본색 */
