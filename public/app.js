@@ -88,6 +88,8 @@ import {
   getSecondaryGyeok
 } from './gyeokUtils.js';
 
+import { renderSinsalTable, getUnseong, getSinsal, getSamhapKeyByJiji } from './sinsalUtils.js';
+
 
 const MONTH_TO_SOLAR_TERM = {
   1: '소한',   // 1월 시작 절기 (소한) → 입춘 이전 절기
@@ -774,6 +776,19 @@ function findSolarTermNameByMonth(jeolipDateStr, solarTermsList) {
 
 
 
+// 12운성, 12신살클릭 시 변경용 (이 함수는 그대로)
+function updateResultRow({ type, gan, samhap }) {
+  const jijiArr = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+  if (type === 'unseong' && gan) {
+    const unseongArr = jijiArr.map(jiji => getUnseong(gan, jiji));
+    document.getElementById('unseong-row').innerHTML =
+      `<th>12운성</th>${unseongArr.map(txt => `<td>${txt}</td>`).join('')}`;
+  } else if (type === 'sinsal' && samhap) {
+    const sinsalArr = jijiArr.map(jiji => getSinsal(samhap, jiji));
+    document.getElementById('sinsal-row').innerHTML =
+      `<th>12신살</th>${sinsalArr.map(txt => `<td>${txt}</td>`).join('')}`;
+  }
+}
 
 
 
@@ -938,6 +953,19 @@ window.handleDaeyunClick = handleDaeyunClick;
           white-space: pre-line;
         }
 
+  .sinsal-highlight {
+    background: #ffe97a !important;
+    color: #b85c00 !important;
+    font-weight: bold;
+    border: 2px solid #ffba22 !important;
+    border-radius: 8px;
+    transition: background 0.1s;
+  }
+      .saju-blue {
+    color: #1976d2 !important;
+    font-weight: bold;
+    text-shadow: 0 1px 0 #e6f3ff;
+  }
           
 </style>
 <table class="ganji-table">
@@ -1062,6 +1090,9 @@ window.handleDaeyunClick = handleDaeyunClick;
   </table>
 </div>
 
+ <!-- ✅신살테이블 -->
+<div style="height:16px;"></div>
+<div id="sinsal-box"></div>
 
 
  <!-- ✅ 대운 테이블 -->
@@ -1188,18 +1219,96 @@ document.getElementById('gyeok-secondary')?.addEventListener('click', () => {
 });
 
 
+///////////////////////// 12운성, 12신살 출력부//////////////////////////////////////
+
+const ilgan = saju.dayGan;
+const sajuGanArr = [saju.yearGan, saju.monthGan, saju.dayGan, saju.hourGan];
+const samhapKey = getSamhapKeyByJiji(saju.yearBranch);
+const sajuJijiArr = [saju.yearBranch, saju.monthBranch, saju.dayBranch, saju.hourBranch];
+
+document.getElementById('sinsal-box').innerHTML = renderSinsalTable({ sajuGanArr, samhapKey, sajuJijiArr });
 
 
 
-// 상신 구신 표시
-console.log('✅ dayGan:', dayGan, 'gyeok.stem:', gyeok?.stem);
-// somewhere in your app.js or main logic
+// 2. 클릭 이벤트 연결
+document.querySelectorAll('.clickable').forEach(el => {
+  el.onclick = function() {
+    const type = this.dataset.type;
+    // 같은 타입만 하이라이트 해제
+    document.querySelectorAll('.clickable[data-type="' + type + '"]').forEach(e => e.classList.remove('sinsal-highlight'));
+    // 자기 자신만 하이라이트
+    this.classList.add('sinsal-highlight');
+    // 표 갱신
+    updateResultRow(this.dataset);
+  };
+});
 
 
 
-console.log("🔍 전달된 격국 객체(gyeok):", gyeok);
-console.log("🔍 전달된 격국 이름:", gyeok.char);
-//console.log('📦 전달된 saju 객체:', saju);
+// 3. 초기 추출값
+
+const yeonji = saju.yearBranch;
+
+// 4. **일간, 년지에 해당하는 셀 하이라이트 추가**
+// - 천간
+const el1 = document.querySelector(`.clickable[data-type="unseong"][data-gan="${ilgan}"]`);
+if (el1) el1.classList.add('sinsal-highlight');
+// - 삼합 (년지로 삼합키 추출)
+
+const el2 = document.querySelector(`.clickable[data-type="sinsal"][data-samhap="${samhapKey}"]`);
+if (el2) el2.classList.add('sinsal-highlight');
+
+// 5. 아래쪽 표 실제 데이터 삽입
+const jijiArr = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+const unseongArr = jijiArr.map(jiji => getUnseong(ilgan, jiji));
+document.getElementById('unseong-row').innerHTML =
+  `<th>12운성</th>${unseongArr.map(txt => `<td>${txt}</td>`).join('')}`;
+const sinsalArr = jijiArr.map(jiji => getSinsal(samhapKey, jiji));
+document.getElementById('sinsal-row').innerHTML =
+  `<th>12신살</th>${sinsalArr.map(txt => `<td>${txt}</td>`).join('')}`;
+
+
+// 8. 지지 td에 마우스 오버/아웃 이벤트로 미니표 안내
+const miniUnseongRow = document.getElementById('mini-unseong-row');
+const miniUnseongTd = miniUnseongRow.firstElementChild;
+
+document.querySelectorAll('.jiji-clickable').forEach(td => {
+  td.addEventListener('mouseenter', function() {
+    const hoverJiji = this.dataset.jiji;
+    const ganList = ['甲','乙','丙','丁','庚','辛','壬','癸'];
+    // 사주 천간 4자, 이 스코프에 있어야 함!
+    // const sajuGanArr = [saju.yearGan, saju.monthGan, saju.dayGan, saju.hourGan];
+
+    // 사주천간일 때만 파랑색, 나머지는 그대로
+const firstRow = `<tr>${ganList.map(gan =>
+  `<td style="${sajuGanArr.includes(gan) ? 'color:#1976d2;' : ''}">${gan}</td>`
+).join('')}</tr>`;
+
+    const secondRow = `<tr>${ganList.map(gan => `<td>${getUnseong(gan, hoverJiji)}</td>`).join('')}</tr>`;
+    miniUnseongTd.innerHTML = `
+      <div style="margin-bottom:2px;">
+        <b style="color:red;">${hoverJiji}</b>에 대한 천간별 12운성
+      </div>
+      <table style="border-collapse:collapse; margin:auto;">
+        ${firstRow}
+        ${secondRow}
+      </table>
+    `;
+    miniUnseongRow.style.display = "";   // 행 보이기
+  });
+  td.addEventListener('mouseleave', function() {
+    miniUnseongTd.innerHTML = '';        // 내용 비우기
+    miniUnseongRow.style.display = "none"; // 행 자체 숨기기
+  });
+});
+
+
+
+/////////////////12신살,12운성출력 끝 /////////////////////////////////////
+
+
+
+
 
 
 
@@ -1216,6 +1325,7 @@ renderDaeyunTable({
 });
 // 🔥 자동 출력 시작!
 
+
 // 결과 영역 보여주기 - 이 부분 추가!
 document.getElementById("result").style.display = "block";
 
@@ -1224,7 +1334,6 @@ await showBirthInfo(data);  // 이 위치가 딱 좋아요!
 
 // 여기서 바로!
 renderGyeokFlowStyled(gyeok, saju, secondaryGyeokResult);
-
 
 
 
