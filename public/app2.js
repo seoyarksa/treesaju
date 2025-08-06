@@ -2,7 +2,7 @@
 
 
 // git add .
-// git commit -m "격국식수정중"  
+// git commit -m "신살적용중"   
 // git push origin main
 // git push
 
@@ -88,7 +88,7 @@ import {
   getSecondaryGyeok
 } from './gyeokUtils.js';
 
-import { renderSinsalTable, getUnseong, getSinsal, getSamhapKeyByJiji } from './sinsalUtils.js';
+import { renderSinsalTable, getUnseong, getSinsal, getSamhapKeyByJiji, renderEtcSinsalTable } from './sinsalUtils.js';
 
 
 const MONTH_TO_SOLAR_TERM = {
@@ -105,6 +105,10 @@ const MONTH_TO_SOLAR_TERM = {
   11: '입동',
   12: '대설',
 };
+
+
+
+
 
 //
 window.handleDaeyunClick = handleDaeyunClick;
@@ -920,7 +924,7 @@ window.handleDaeyunClick = handleDaeyunClick;
 
       /* style 영역에 추가 */
     .daeyun-cell.selected {
-      border: 2px solid #007bff;
+      border: 2px solidrgb(225, 231, 167);
       border-radius: 6px;
   } 
   .note-box {
@@ -1090,9 +1094,7 @@ window.handleDaeyunClick = handleDaeyunClick;
   </table>
 </div>
 
- <!-- ✅신살테이블 -->
-<div style="height:16px;"></div>
-<div id="sinsal-box"></div>
+
 
 
  <!-- ✅ 대운 테이블 -->
@@ -1105,7 +1107,9 @@ window.handleDaeyunClick = handleDaeyunClick;
 <!-- 세운 표시 영역 -->
 <div id="yearly-ganji-container" style="margin-top: 20px;"></div>
 
-
+ <!-- ✅신살테이블 -->
+<div style="height:16px;"></div>
+<div id="sinsal-box"></div>
 
 `;
 
@@ -1219,13 +1223,19 @@ document.getElementById('gyeok-secondary')?.addEventListener('click', () => {
 });
 
 
-///////////////////////// 12운성, 12신살 출력부//////////////////////////////////////
+///////////////////////// 12운성, 12신살  기타 신살류 출력부//////////////////////////////////////
+
 
 const ilgan = saju.dayGan;
-const sajuGanArr = [saju.yearGan, saju.monthGan, saju.dayGan, saju.hourGan];
+const sajuGanArr = [saju.hourGan,  saju.dayGan,  saju.monthGan,  saju.yearGan];
 const samhapKey = getSamhapKeyByJiji(saju.yearBranch);
-const sajuJijiArr = [saju.yearBranch, saju.monthBranch, saju.dayBranch, saju.hourBranch];
-
+const sajuJijiArr = [saju.hourBranch,  saju.dayBranch,  saju.monthBranch,  saju.yearBranch];
+const sajuGanjiArr = [
+  saju.hourGan + saju.hourBranch,
+  saju.dayGan + saju.dayBranch,
+  saju.monthGan + saju.monthBranch,
+  saju.yearGan + saju.yearBranch
+];
 document.getElementById('sinsal-box').innerHTML = renderSinsalTable({ sajuGanArr, samhapKey, sajuJijiArr });
 
 

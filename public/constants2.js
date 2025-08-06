@@ -779,3 +779,19 @@ export const sinsalMap12 = {
   
 
 };
+
+// 천간별(甲~癸) 천을귀인: [음, 양] (지지 한자)
+export const cheonEulMap = {
+  '甲': [{ jiji: '丑', yinYang: '-' }, { jiji: '未', yinYang: '+' }],
+  '乙': [{ jiji: '子', yinYang: '-' }, { jiji: '申', yinYang: '+' }],
+  '丙': [{ jiji: '亥', yinYang: '-' }, { jiji: '酉', yinYang: '+' }],
+  '丁': [{ jiji: '酉', yinYang: '-' }, { jiji: '亥', yinYang: '+' }],
+  '戊': [{ jiji: '未', yinYang: '-' }, { jiji: '丑', yinYang: '+' }],
+  '己': [{ jiji: '申', yinYang: '-' }, { jiji: '子', yinYang: '+' }],
+  '庚': [{ jiji: '未', yinYang: '-' }, { jiji: '丑', yinYang: '+' }],
+  '辛': [{ jiji: '午', yinYang: '-' }, { jiji: '寅', yinYang: '+' }],
+  '壬': [{ jiji: '巳', yinYang: '-' }, { jiji: '卯', yinYang: '+' }],
+  '癸': [{ jiji: '卯', yinYang: '-' }, { jiji: '巳', yinYang: '+' }],
+};
+
+
