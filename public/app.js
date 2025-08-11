@@ -920,6 +920,16 @@ window.handleDaeyunClick = handleDaeyunClick;
   border-radius: 6px;
 }
 
+/* td는 그대로 두고 */
+.daeyun-table tbody tr:nth-child(2) td.daeyun-selected { background: transparent !important; outline: 0 !important; }
+
+/* 내부 div만 칠하기 */
+.daeyun-table tbody tr:nth-child(2) td.daeyun-selected .daeyun-cell {
+  background: rgba(255, 235, 59, 0.45) !important;
+  box-shadow: inset 0 0 0 2px #f1c40f !important;
+  border-radius: 6px;
+}
+
 
 
       /* style 영역에 추가 */
@@ -1324,6 +1334,8 @@ const firstRow = `<tr>${ganList.map(gan =>
 
 
 // ✅ 여기서 대운 테이블을 동적으로 렌더링!
+// ✅ 대운 테이블 렌더
+// ✅ 대운 테이블 렌더
 renderDaeyunTable({
   daeyunAge,
   ageLabels,
@@ -1331,63 +1343,47 @@ renderDaeyunTable({
   birthYear: window.birthYear,
   birthMonth: window.birthMonth,
   birthDay: window.birthDay,
-  sewonYear: window.sewonYear  // ✅ 추가!
+  sewonYear: window.sewonYear  // ✅ 유지
 });
+
 // 🔥 자동 출력 시작!
 
-
-// 결과 영역 보여주기 - 이 부분 추가!
+// 결과 영역 보여주기
 document.getElementById("result").style.display = "block";
 
-await showBirthInfo(data);  // 이 위치가 딱 좋아요!
+// 기본 정보 출력
+await showBirthInfo(data);
 
-
-// 여기서 바로!
+// 사주 흐름(격) 렌더
 renderGyeokFlowStyled(gyeok, saju, secondaryGyeokResult);
 
-
-
-
-
-
-
+// 오늘 사주 영역 표시
 document.getElementById("today-saju-container").style.display = "block";
 
-
-
+// ✅ 생년 정보 객체 (하이라이트 계산에 사용)
 const birthDateYMD = {
   year: window.birthYear,
   month: window.birthMonth,
   day: window.birthDay
 };
 
+// ✅ 하이라이트 1회만! (함수 내부에서 클릭 이벤트 dispatch 가정)
+//    highlight 함수가 선택된 td에 'click'을 날리므로,
+//    inline onclick="handleDaeyunClick(...)" 도 자동으로 실행됩니다.
+const sortedIndex = highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD, {
+  // 필요시 특정 컨테이너로 범위 제한 가능
+  container: document,       // 또는 document.querySelector('.daeyun-wrapper') 처럼 좁힐 수 있음
+  clsSelected: 'daeyun-selected'
+});
 
-const originalIndex = getCurrentDaeyunIndexFromStartAge(correctedStartAge, birthDateYMD);
-const indexToSelect = 9 - originalIndex; // 순행/역행과 무관하게 항상 뒤집어서 적용
+// 선택 실패시 로깅 (디버깅용)
+if (sortedIndex < 0) {
+  console.warn('[daeyun] highlight failed: sortedIndex', sortedIndex);
+}
 
-// 🔁 대운 정렬 방향 고려한 인덱스 계산
-const currentDaeyunIndex = getCurrentDaeyunIndexFromStartAge(correctedStartAge, birthDateYMD);
-
-// 🔁 정렬 반영된 index
-const sortedIndex = highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD);
-handleDaeyunClick(window.birthYear, window.birthMonth, window.birthDay, sortedIndex);
-
-
-highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD);
-window.currentDaeyunIndex = currentDaeyunIndex;
-
-// 📌 handleDaeyunClick에는 **sortedIndex**를 넣어야 UI와 동기화됨
-handleDaeyunClick(window.birthYear, window.birthMonth, window.birthDay, sortedIndex);
-
-
-
-
-
-// ✅ 대운 강조 초기화 및 강조 적용
-
-// 서버에서 ganji 정보 받은 뒤, 마지막에 추가
-// 오늘 날짜 기준 사주
-// 🎯 생일 사주 출력 완료 후 바로 아래!
+// -------------------------------
+// ✅ 오늘 날짜 기준 사주 요청 및 렌더
+// -------------------------------
 const today = new Date();
 const todayPayload = {
   year: today.getFullYear(),
@@ -1396,7 +1392,7 @@ const todayPayload = {
   hour: today.getHours(),
   minute: today.getMinutes(),
   calendarType: 'solar',
-  gender: window.gender || 'male'  // window.gender가 없으면 기본값도 넣기
+  gender: window.gender || 'male'  // window.gender가 없으면 기본값
 };
 
 const todayStr = `${todayPayload.year}-${String(todayPayload.month).padStart(2, '0')}-${String(todayPayload.day).padStart(2, '0')}`;
@@ -1407,8 +1403,13 @@ const todayResponse = await fetch('/api/saju', {
   body: JSON.stringify(todayPayload),
 });
 
+if (!todayResponse.ok) {
+  throw new Error(`오늘 사주 요청 실패: ${todayResponse.status}`);
+}
+
 const todayData = await todayResponse.json();
 
+// 간지 분해
 const yearGanji2 = splitGanji(todayData.ganji.year);
 const monthGanji2 = splitGanji(todayData.ganji.month);
 const dayGanji2 = splitGanji(todayData.ganji.day);
@@ -1424,7 +1425,6 @@ renderTodaySajuBox({
   dayGanKorGan: dayGanKorGan2,
   todayStr
 });
-
 
 
 

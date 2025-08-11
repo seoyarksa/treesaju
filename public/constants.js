@@ -795,3 +795,24 @@ export const cheonEulMap = {
 };
 
 
+// 백호살 간지 (한자) - 객체(맵)
+export const BAEKHO_SAL_GANJI_MAP = {
+  '甲辰': true,
+  '戊辰': true,
+  '乙未': true,
+  '丙戌': true,
+  '壬戌': true,
+  '丁丑': true,
+  '癸丑': true,
+};
+
+// 괴강살 간지 (한자)
+export const GWAIGANG_SAL_GANJI = {
+  '庚辰': true,  // 경진
+  '庚戌': true,  // 경술
+  '壬辰': true,  // 임진
+  '壬戌': true,  // 임술
+  '戊戌': true,  // 무술
+  '戊辰': true,  // 무진
+};
+

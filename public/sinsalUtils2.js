@@ -1,9 +1,10 @@
 // sinsalUtils.js
 
 import { samhapGroups, UNSEONG_LIST, unseongMap12, sinsal_LIST, sinsalMap12,
-         cheonEulMap, 
+         cheonEulMap, BAEKHO_SAL_GANJI_MAP,
          
-        
+         GWAIGANG_SAL_GANJI, 
+
        } from './constants.js';
 
 
@@ -58,7 +59,8 @@ const guide = `
   <tr>
     <td colspan="13" style="font-size:13px; text-align:left; padding:5px;">
       아래 표는 해당 천간이나 삼합국을 클릭시 생성되는 12운성,12신살내용입니다[
-      <span style="color:red;">戊,己는 제외</span>]
+      <span style="color:red;">戊,己는 제외</span>]<br>아래 "지지"에 <span style="color:orange;">마우스오버</span>시 천간에 따른 12운성 확인가능/
+      <span style="color:blue;">파란색 간지</span>는 내 사주팔자 간지들</br>
     </td>
   </tr>
 `;
@@ -150,9 +152,9 @@ export function getSamhapKeyByJiji(jiji) {
 
 // 기타 신살류표
 //////////////////////////////////////////////////////////////////////////////////////////////
-//'형충회합', '천을귀인', '백호살', '원진살', '재고귀인','전지살','간여지동', '효신살', '소실살','육해살',
+//'형충회합', '원진살', '재고귀인','전지살','간여지동', '효신살', '소실살','육해살',
 //     '도화살','홍염살', '귀문살', '격각살', '낙정관살',
- //       '공망살',  '금여록', '천덕귀인', '월덕귀인', '괴강살','문창귀인', '학당귀인', '급각살', '상문살', '조객살','암록살','비인살',
+ //       '공망살',  '금여록', '천덕귀인', '월덕귀인', '문창귀인', '학당귀인', '급각살', '상문살', '조객살','암록살','비인살',
 //     '천의성', '음양차착살', '고란살', '태극귀인', '천라지망', '병부살', '사부살','현침살', '십악대패살', '단교관살'
 //////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -246,25 +248,19 @@ return `
 </tr>
   <tr>
     <td style="background:#f7f7f7;">기준간지</td>
-    ${sajuGanArr.map((g, i) => {
-      let style = '';
-      if (i === 1) style = 'background:#fff59d;';     // 일
-      if (i === 3) style = 'background:#90caf9;';     // 년
-      return `<td style="${style}">${g}</td>`;
-    }).join('')}
-    ${sajuJijiArr.map((j, i) => {
-      let style = '';
-      if (i === 1) style = 'background:#fff59d;';
-      if (i === 3) style = 'background:#90caf9;';
-      return `<td style="${style}">${j}</td>`;
-    }).join('')}
-    ${sajuGanjiArr.map((gj, i) => {
-      let style = '';
-      if (i === 1) style = 'background:#fff59d;';
-      if (i === 3) style = 'background:#90caf9;';
-      return `<td style="${style}">${gj}</td>`;
-    }).join('')}
-  </tr>
+${sajuGanArr.map((g, i) => {
+  let style = 'color:blue;';
+  return `<td style="${style}">${g}</td>`;
+}).join('')}
+${sajuJijiArr.map((j, i) => {
+  let style = 'color:blue;';
+  return `<td style="${style}">${j}</td>`;
+}).join('')}
+${sajuGanjiArr.map((gj, i) => {
+  let style = 'color:blue;';
+  return `<td style="${style}">${gj}</td>`;
+}).join('')}
+
 ${sinsalRows
   .split('</tr>')
   .filter(row => row.trim())
@@ -315,10 +311,13 @@ export function getSinsalForJiji(jiji, sinsalName) {
 
 /////간지기준 신살류///////////
 export function getSinsalForGanji(ganji, sinsalName) {
-  // 예시
-  if (sinsalName === '천을귀인') {
-    // ...
-     return '';
+  if (sinsalName === '백호살') {
+    // ganji가 백호살 간지에 해당하면 해당 간지 반환, 아니면 빈 배열
+    return BAEKHO_SAL_GANJI_MAP[ganji] ? [ganji] : [];
   }
+    if (sinsalName === '괴강살') {
+    return GWAIGANG_SAL_GANJI[ganji] ? [ganji] : [];
+  }
+
   return [];
 }

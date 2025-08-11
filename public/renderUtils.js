@@ -138,37 +138,81 @@ const tenGodBranch = targetStemKor ? getTenGod(window.dayGanKorGan, targetStemHa
 
 
 //하이라이트 대운셀
-export function highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD) {
-  ////console.log('--- highlightCurrentDaeyunByAge 호출 ---');
-  //console.log('▶ 수정된 대운 시작 나이:', correctedStartAge);
+// 대운 하이라이트(충돌 방지·안전 버전)
+// 대운 하이라이트(충돌 방지·안전 버전) - td 기준
+export function highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD, opts = {}) {
+  const {
+    container = document,
+    clsSelected = 'daeyun-selected'
+  } = opts;
 
   const originalIndex = getCurrentDaeyunIndexFromStartAge(correctedStartAge, birthDateYMD);
-  //console.log('▶ getCurrentDaeyunIndexFromStartAge 결과 (originalIndex):', originalIndex);
+  if (!Number.isInteger(originalIndex) || originalIndex < 0) {
+    console.warn('[daeyun] invalid originalIndex:', originalIndex);
+    return -1;
+  }
 
-  const daeyunCells = document.querySelectorAll('.daeyun-cell');
-  //console.log('▶ daeyunCells.length:', daeyunCells.length);
+  const tableRoot = container.querySelector('.daeyun-table-container');
+  if (!tableRoot) {
+    console.warn('[daeyun] .daeyun-table-container not found.');
+    return -1;
+  }
 
-  // 무조건 내림차순 배열 기준 (맨 앞이 마지막 대운)
-  const indexToSelect = daeyunCells.length - 1 - originalIndex;
-  //console.log('▶ 계산된 선택 인덱스 (indexToSelect):', indexToSelect);
+  const tds = tableRoot.querySelectorAll('.daeyun-table tbody tr:nth-child(2) td'); // 대운 줄 td
+  if (!tds.length) {
+    console.warn('[daeyun] daeyun tds not found. Make sure to call after rendering.');
+    return -1;
+  }
 
-  daeyunCells.forEach((cell, idx) => {
-    cell.classList.toggle('selected', idx === indexToSelect);
-    cell.addEventListener('click', () => {
-      daeyunCells.forEach(c => c.classList.remove('selected'));
-      cell.classList.add('selected');
-      window.currentDaeyunIndex = daeyunCells.length - 1 - idx; // 다시 원래 인덱스로 변환
-      //console.log('🎯 클릭한 대운 간지:', cell.textContent.trim());
-    });
+  // ---- 최소 로그: 하이라이트만 확인 ----
+  const logSelected = (label) => {
+    const arr = Array.from(tds);
+    const tdIdx  = arr.findIndex(td => td.classList.contains(clsSelected));
+    const cellIdx = arr.findIndex(td => td.querySelector('.daeyun-cell')?.classList.contains(clsSelected));
+    console.log(`[daeyun] ${label} selected -> td:${tdIdx} / .daeyun-cell:${cellIdx}`);
+    const el = tdIdx > -1 ? arr[tdIdx] : (cellIdx > -1 ? arr[cellIdx].querySelector('.daeyun-cell') : null);
+    if (el) {
+      const cs = getComputedStyle(el);
+      console.log('[daeyun] computed:', { background: cs.backgroundColor, outline: cs.outline, border: cs.border });
+    }
+  };
+  // -----------------------------------
+
+  // 화면은 역순(뒤집어 렌더) → 보정
+  let indexToSelect = tds.length - 1 - originalIndex;
+
+  // 범위 보정
+  if (indexToSelect < 0 || indexToSelect >= tds.length) {
+    if (originalIndex >= 0 && originalIndex < tds.length) indexToSelect = originalIndex;
+    else indexToSelect = Math.max(0, Math.min(tds.length - 1, indexToSelect));
+  }
+
+  console.log('[daeyun] before-toggle:', { originalIndex, indexToSelect, tdsLen: tds.length });
+  logSelected('before HIGHLIGHT');
+
+  // 바인딩 & 초기 표시
+  tds.forEach((td, idx) => {
+    if (!td.dataset.boundDaeyunClick) {
+      td.addEventListener('click', () => {
+        tds.forEach(x => x.classList.remove(clsSelected));
+        td.classList.add(clsSelected);
+        window.currentDaeyunIndex = tds.length - 1 - idx;
+        logSelected('after CLICK'); // ← 클릭 후 선택 상태만 찍음
+      }, false);
+      td.dataset.boundDaeyunClick = '1';
+    }
+    td.classList.toggle(clsSelected, idx === indexToSelect);
   });
 
-  // ✅ 정렬 기준에 맞는 인덱스를 저장
-  window.currentDaeyunIndex = indexToSelect;
- // console.log('📌 현재 대운 인덱스 (정렬 반영):', indexToSelect);
+  logSelected('after HIGHLIGHT');
 
-  // 🔄 초기 강조 셀 클릭 이벤트 강제 실행 (내부 상태, UI 완전 동기화)
-  if (daeyunCells[indexToSelect]) {
-    daeyunCells[indexToSelect].click();
+  // 내부 상태 일치
+  window.currentDaeyunIndex = tds.length - 1 - indexToSelect;
+
+  const target = tds[indexToSelect];
+  if (target) {
+    console.log('[daeyun] dispatch initial click ->', indexToSelect);
+    target.dispatchEvent(new Event('click', { bubbles: true }));
   }
 
   return indexToSelect;
