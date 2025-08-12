@@ -88,7 +88,12 @@ import {
   getSecondaryGyeok
 } from './gyeokUtils.js';
 
-import { renderSinsalTable, getUnseong, getSinsal, getSamhapKeyByJiji, renderEtcSinsalTable } from './sinsalUtils.js';
+import { renderSinsalTable, 
+         getUnseong, 
+         getSinsal, 
+         getSamhapKeyByJiji, 
+         renderEtcSinsalTable
+      } from './sinsalUtils.js';
 
 
 const MONTH_TO_SOLAR_TERM = {
@@ -113,6 +118,21 @@ const MONTH_TO_SOLAR_TERM = {
 //
 window.handleDaeyunClick = handleDaeyunClick;
 window.handleSewoonClick = handleSewoonClick;
+// 기존 할당 보존
+const _origDaeyunClick = handleDaeyunClick;
+const _origSewoonClick = handleSewoonClick;
+
+// 대운 클릭 시 원래 로직 실행 후 신살 갱신
+window.handleDaeyunClick = function(...args) {
+  _origDaeyunClick(...args);
+  setTimeout(() => rerenderSinsal(), 0);
+};
+
+// 세운 클릭 시 원래 로직 실행 후 신살 갱신
+window.handleSewoonClick = function(...args) {
+  _origSewoonClick(...args);
+  setTimeout(() => rerenderSinsal(), 0);
+};
 
 ///////////////getGanjiByYear
 
@@ -914,11 +934,6 @@ window.handleDaeyunClick = handleDaeyunClick;
       gap: 2px;
       font-size: 1.1rem;
     }  
-.sewoon-cell.selected {
-  background-color: #ffeaa7 !important;
-  border: 2px solid #fdcb6e !important;
-  border-radius: 6px;
-}
 
 /* td는 그대로 두고 */
 .daeyun-table tbody tr:nth-child(2) td.daeyun-selected { background: transparent !important; outline: 0 !important; }
@@ -937,6 +952,21 @@ window.handleDaeyunClick = handleDaeyunClick;
       border: 2px solidrgb(225, 231, 167);
       border-radius: 6px;
   } 
+
+
+.sewoon-cell.selected {
+  background-color: #ffeaa7 !important;
+  border: 2px solid #fdcb6e !important;
+  border-radius: 6px;
+}
+
+#yearly-ganji-container .wolwoon-cell.selected {
+  background: #ffeaa7 !important;
+  border: 2px solid #fdcb6e !important;
+  border-radius: 6px;
+}
+
+
   .note-box {
     font-size: 0.75rem;
     color: #555;
@@ -982,6 +1012,8 @@ window.handleDaeyunClick = handleDaeyunClick;
   }
           
 </style>
+
+
 <table class="ganji-table">
   <thead>
     <tr>
@@ -1119,7 +1151,8 @@ window.handleDaeyunClick = handleDaeyunClick;
 
  <!-- ✅신살테이블 -->
 <div style="height:16px;"></div>
-<div id="sinsal-box"></div>
+<div id="sinsal-box"></div>       <!-- 기본 신살표 -->
+<div id="etc-sinsal-box"></div>   <!-- 기타 신살표 -->
 
 `;
 
@@ -1234,6 +1267,47 @@ document.getElementById('gyeok-secondary')?.addEventListener('click', () => {
 
 
 ///////////////////////// 12운성, 12신살  기타 신살류 출력부//////////////////////////////////////
+// app.js — 한글→한자 보정 (이미 있으면 생략)
+// (app.js 상단 어딘가) 한글→한자 폴백 맵
+const KOR_HAN_STEM   = { 갑:'甲', 을:'乙', 병:'丙', 정:'丁', 무:'戊', 기:'己', 경:'庚', 신:'辛', 임:'壬', 계:'癸' };
+const KOR_HAN_BRANCH = { 자:'子', 축:'丑', 인:'寅', 묘:'卯', 진:'辰', 사:'巳', 오:'午', 미:'未', 신:'申', 유:'酉', 술:'戌', 해:'亥' };
+const toHanStem   = v => !v ? '' : /[甲乙丙丁戊己庚辛壬癸]/.test(v) ? v : (window.convertKorToHanStem?.(v) || KOR_HAN_STEM[v] || '');
+const toHanBranch = v => !v ? '' : /[子丑寅卯辰巳午未申酉戌亥]/.test(v) ? v : (window.convertKorToHanBranch?.(v) || KOR_HAN_BRANCH[v] || '');
+
+// (app.js) 현재 대운/세운을 “한자”로 리턴
+function getCurrentRunContext() {
+  let dStem='', dBranch='';
+  if (window.daeyunPairs && Number.isInteger(window.currentDaeyunIndex)) {
+    const p = window.daeyunPairs[window.currentDaeyunIndex] || {};
+    dStem = toHanStem(p.stem || '');
+    dBranch = toHanBranch(p.branch || '');
+  }
+
+  let sStem='', sBranch='';
+  let sel = document.querySelector('.sewoon-cell.selected');
+  if (!sel) {
+    const y = new Date().getFullYear();
+    sel = Array.from(document.querySelectorAll('.sewoon-cell[data-year]'))
+      .find(c => parseInt(c.dataset.year, 10) === y) || null;
+  }
+  if (sel) {
+    sStem = toHanStem(sel.dataset.stem || '');
+    sBranch = toHanBranch(sel.dataset.branch || '');
+  }
+
+  const ctx = {
+    daeyun: { stem: dStem, branch: dBranch, ganji: (dStem && dBranch) ? dStem + dBranch : '' },
+    sewoon: { stem: sStem, branch: sBranch, ganji: (sStem && sBranch) ? sStem + sBranch : '' }
+  };
+
+  console.log('[CTX] getCurrentRunContext →', ctx); // ✅ 여기서 context 값 전체 확인
+  return ctx;
+}
+
+
+
+// app.js — 신살표 렌더 함수 (컨텍스트를 util에 전달)
+
 
 
 const ilgan = saju.dayGan;
@@ -1279,14 +1353,36 @@ const el2 = document.querySelector(`.clickable[data-type="sinsal"][data-samhap="
 if (el2) el2.classList.add('sinsal-highlight');
 
 // 5. 아래쪽 표 실제 데이터 삽입
+const UNSEONG_GREEN = new Set(['장생', '제왕', '묘']);
+const SINSAL_GREEN  = new Set(['지살', '장성살', '화개살']);
+
 const jijiArr = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+
+// 12운성
 const unseongArr = jijiArr.map(jiji => getUnseong(ilgan, jiji));
 document.getElementById('unseong-row').innerHTML =
-  `<th>12운성</th>${unseongArr.map(txt => `<td>${txt}</td>`).join('')}`;
+  `<th>12운성</th>${
+    unseongArr
+      .map(txt => {
+        const v = (txt ?? '').toString().trim();
+        const cls = UNSEONG_GREEN.has(v) ? ' class="green-mark"' : '';
+        return `<td${cls}>${v}</td>`;
+      })
+      .join('')
+  }`;
+
+// 12신살
 const sinsalArr = jijiArr.map(jiji => getSinsal(samhapKey, jiji));
 document.getElementById('sinsal-row').innerHTML =
-  `<th>12신살</th>${sinsalArr.map(txt => `<td>${txt}</td>`).join('')}`;
-
+  `<th>12신살</th>${
+    sinsalArr
+      .map(txt => {
+        const v = (txt ?? '').toString().trim();
+        const cls = SINSAL_GREEN.has(v) ? ' class="green-mark"' : '';
+        return `<td${cls}>${v}</td>`;
+      })
+      .join('')
+  }`;
 
 // 8. 지지 td에 마우스 오버/아웃 이벤트로 미니표 안내
 const miniUnseongRow = document.getElementById('mini-unseong-row');
@@ -1295,16 +1391,41 @@ const miniUnseongTd = miniUnseongRow.firstElementChild;
 document.querySelectorAll('.jiji-clickable').forEach(td => {
   td.addEventListener('mouseenter', function() {
     const hoverJiji = this.dataset.jiji;
-    const ganList = ['甲','乙','丙','丁','庚','辛','壬','癸'];
-    // 사주 천간 4자, 이 스코프에 있어야 함!
-    // const sajuGanArr = [saju.yearGan, saju.monthGan, saju.dayGan, saju.hourGan];
+    const ganList = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
+    const UNSEONG_GREEN = new Set(['장생', '제왕', '묘']);
+    const myGanSet = new Set(sajuGanArr); // 내 사주 천간 조회용
 
-    // 사주천간일 때만 파랑색, 나머지는 그대로
-const firstRow = `<tr>${ganList.map(gan =>
-  `<td style="${sajuGanArr.includes(gan) ? 'color:#1976d2;' : ''}">${gan}</td>`
-).join('')}</tr>`;
+    // 1) 첫 번째 행: 천간 (내 사주 천간 = 분홍 배경 + 파란 글씨)
+    const firstRow = `<tr>${
+      ganList.map(gan => {
+        const isMyGan = myGanSet.has(gan);
+        const style =
+          (isMyGan
+            ? 'background:#ffe3ef;box-shadow:inset 0 0 0 9999px rgba(255,105,180,.12);color:#1976d2;font-weight:bold;'
+            : '') +
+          'padding:2px 6px;text-align:center;';
+        return `<td style="${style}">${gan}</td>`;
+      }).join('')
+    }</tr>`;
 
-    const secondRow = `<tr>${ganList.map(gan => `<td>${getUnseong(gan, hoverJiji)}</td>`).join('')}</tr>`;
+    // 2) 두 번째 행: 운성
+    //    - 내 사주 천간 열: 분홍 배경
+    //    - 장생/제왕/묘: 배경 없이 글자만 녹색+굵게
+    const secondRow = `<tr>${
+      ganList.map(gan => {
+        const v = (getUnseong(gan, hoverJiji) ?? '').toString().trim();
+        const isMyGan = myGanSet.has(gan);
+        let style = (isMyGan
+          ? 'background:#ffe3ef;box-shadow:inset 0 0 0 9999px rgba(255,105,180,.12);'
+          : '');
+        if (UNSEONG_GREEN.has(v)) {
+          style += 'color:#0b5e0b;font-weight:bold;';
+        }
+        style += 'padding:2px 6px;text-align:center;';
+        return `<td style="${style}">${v}</td>`;
+      }).join('')
+    }</tr>`;
+
     miniUnseongTd.innerHTML = `
       <div style="margin-bottom:2px;">
         <b style="color:red;">${hoverJiji}</b>에 대한 천간별 12운성
@@ -1316,11 +1437,60 @@ const firstRow = `<tr>${ganList.map(gan =>
     `;
     miniUnseongRow.style.display = "";   // 행 보이기
   });
+
   td.addEventListener('mouseleave', function() {
-    miniUnseongTd.innerHTML = '';        // 내용 비우기
-    miniUnseongRow.style.display = "none"; // 행 자체 숨기기
+    miniUnseongTd.innerHTML = '';
+    miniUnseongRow.style.display = "none";
   });
 });
+
+
+
+
+// 기타 신살표 전용 영역
+// 기타 신살표 전용 래퍼
+let etcWrap = document.getElementById('etc-sinsal-box');
+if (!etcWrap) {
+  // 없으면 sinsal-box 바로 뒤에 동적으로 만들어 둡니다(1회)
+  const wrap = document.getElementById('sinsal-box');
+  etcWrap = document.createElement('div');
+  etcWrap.id = 'etc-sinsal-box';
+  if (wrap && wrap.parentNode) {
+    wrap.parentNode.insertBefore(etcWrap, wrap.nextSibling);
+  }
+}
+
+// ✅ 기본 신살표는 app.js 초기 렌더에서 기존대로 ↓↓↓
+// document.getElementById('sinsal-box').innerHTML = renderSinsalTable({ ... });
+
+function rerenderSinsal() {
+  // 🔹 대운/세운 컨텍스트 (한자 변환 포함)
+  const context = getCurrentRunContext();
+
+  // 🔹 사주 배열(etc용) — 전역 saju 사용
+  const sajuGanArr = [saju.hourGan, saju.dayGan, saju.monthGan, saju.yearGan];
+  const sajuJijiArr = [saju.hourBranch, saju.dayBranch, saju.monthBranch, saju.yearBranch];
+  const sajuGanjiArr = [
+    saju.hourGan + saju.hourBranch,
+    saju.dayGan + saju.dayBranch,
+    saju.monthGan + saju.monthBranch,
+    saju.yearGan + saju.yearBranch
+  ];
+
+  // 🔹 기타 신살표만 다시 그림 (기본 신살표는 건드리지 않음!)
+  if (etcWrap) {
+    etcWrap.innerHTML = renderEtcSinsalTable({
+      sajuGanArr,
+      sajuJijiArr,
+      sajuGanjiArr,
+      context
+    });
+  }
+}
+
+// 전역 노출
+window.rerenderSinsal = rerenderSinsal;
+
 
 
 

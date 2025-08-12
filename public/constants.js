@@ -780,7 +780,7 @@ export const sinsalMap12 = {
 
 };
 
-// 천간별(甲~癸) 천을귀인: [음, 양] (지지 한자)
+// 천간신살///////////////////////////////////////////////////////////////////
 export const cheonEulMap = {
   '甲': [{ jiji: '丑', yinYang: '-' }, { jiji: '未', yinYang: '+' }],
   '乙': [{ jiji: '子', yinYang: '-' }, { jiji: '申', yinYang: '+' }],
@@ -794,7 +794,176 @@ export const cheonEulMap = {
   '癸': [{ jiji: '卯', yinYang: '-' }, { jiji: '巳', yinYang: '+' }],
 };
 
+//////지지신살/////////////////////////////////////////////////////////////////////
+export const 형충회합Map = {
+  '子': [
+    { target: '丑', tags: ['육합/방합/배열'] },
+    { target: '酉', tags: ['파'] },
+    { target: '午', tags: ['충'] },
+    { target: '申', tags: ['삼합'] },
+    { target: '辰', tags: ['삼합'] },
+    { target: '亥', tags: ['방합'] },
+    { target: '卯', tags: ['형'] }
+  ],
+  '丑': [
+    { target: '子', tags: ['육합/방합/배열'] },
+    { target: '未', tags: ['충/형'] },
+    { target: '戌', tags: ['형'] },
+    { target: '酉', tags: ['삼합'] },
+    { target: '巳', tags: ['삼합'] },
+    { target: '亥', tags: ['방합'] },
+    { target: '辰', tags: ['파'] }
+  ],
+  '寅': [
+    { target: '亥', tags: ['육합/파'] },
+    { target: '申', tags: ['충/형'] },
+    { target: '午', tags: ['삼합'] },
+    { target: '戌', tags: ['삼합'] },
+    { target: '卯', tags: ['방합/배열'] },
+    { target: '辰', tags: ['방합'] },
+    { target: '巳', tags: ['형'] }
+  ],
+  '卯': [
+    { target: '戌', tags: ['육합'] },
+    { target: '酉', tags: ['충'] },
+    { target: '亥', tags: ['삼합'] },
+    { target: '未', tags: ['삼합'] },
+    { target: '寅', tags: ['방합/배열'] },
+    { target: '辰', tags: ['방합'] },
+    { target: '子', tags: ['형'] },
+    { target: '午', tags: ['파'] }
+  ],
+  '辰': [
+    { target: '酉', tags: ['육합'] },
+    { target: '戌', tags: ['충'] },
+    { target: '申', tags: ['삼합'] },
+    { target: '寅', tags: ['방합'] },
+    { target: '卯', tags: ['방합'] },
+    { target: '辰', tags: ['형'] },
+    { target: '子', tags: ['삼합'] },
+    { target: '巳', tags: ['배열'] },
+    { target: '丑', tags: ['파'] }
+  ],
+  '巳': [
+    { target: '申', tags: ['육합/형/파'] },
+    { target: '亥', tags: ['충'] },
+    { target: '酉', tags: ['삼합'] },
+    { target: '丑', tags: ['삼합'] },
+    { target: '午', tags: ['방합'] },
+    { target: '未', tags: ['방합'] },
+    { target: '辰', tags: ['배열'] },
+    { target: '寅', tags: ['형'] }
+  ],
+  '午': [
+    { target: '未', tags: ['육합/방합/배열'] },
+    { target: '子', tags: ['충'] },
+    { target: '寅', tags: ['삼합'] },
+    { target: '戌', tags: ['삼합'] },
+    { target: '巳', tags: ['방합'] },
+    { target: '午', tags: ['형'] },
+    { target: '卯', tags: ['파'] }
+  ],
+  '未': [
+    { target: '午', tags: ['육합/방합/배열'] },
+    { target: '丑', tags: ['충/형'] },
+    { target: '子', tags: ['해'] },
+    { target: '亥', tags: ['삼합'] },
+    { target: '卯', tags: ['삼합'] },
+    { target: '巳', tags: ['방합'] },
+    { target: '戌', tags: ['형/파'] }
+  ],
+  '申': [
+    { target: '巳', tags: ['육합/형/파'] },
+    { target: '寅', tags: ['충/형'] },
+    { target: '亥', tags: ['해'] },
+    { target: '子', tags: ['삼합'] },
+    { target: '辰', tags: ['삼합'] },
+    { target: '酉', tags: ['방합/배열'] },
+    { target: '戌', tags: ['방합'] },
+    { target: '寅', tags: ['형'] }
+  ],
+  '酉': [
+    { target: '辰', tags: ['육합'] },
+    { target: '卯', tags: ['충'] },
+    { target: '巳', tags: ['삼합'] },
+    { target: '丑', tags: ['삼합'] },
+    { target: '申', tags: ['방합/배열'] },
+    { target: '酉', tags: ['형'] },
+    { target: '戌', tags: ['방합'] },
+    { target: '子', tags: ['파'] }
+  ],
+  '戌': [
+    { target: '卯', tags: ['육합'] },
+    { target: '辰', tags: ['충'] },
+    { target: '寅', tags: ['삼합'] },
+    { target: '午', tags: ['삼합'] },
+    { target: '申', tags: ['방합'] },
+    { target: '酉', tags: ['방합'] },
+    { target: '丑', tags: ['형'] },
+    { target: '亥', tags: ['배열'] },
+    { target: '未', tags: ['형/파'] }
+  ],
+  '亥': [
+    { target: '寅', tags: ['육합/파'] },
+    { target: '巳', tags: ['충'] },
+    { target: '卯', tags: ['삼합'] },
+    { target: '未', tags: ['삼합'] },
+    { target: '子', tags: ['방합'] },
+    { target: '丑', tags: ['방합'] },
+    { target: '戌', tags: ['배열'] },
+    { target: '亥', tags: ['형'] }
+  ]
+};
 
+
+export const 원진육해Map = {
+  '子': [
+    { target: '丑', tags: ['원진/육해(丑午,子未)'] }
+  ],
+  '丑': [
+    { target: '子', tags: ['원진/육해(丑午,子未)'] }
+  ],
+  '寅': [
+    { target: '亥', tags: ['육해(寅巳,亥申)'] },
+    { target: '卯', tags: ['원진(寅酉,卯申)'] }
+  ],
+  '卯': [
+    { target: '戌', tags: ['육해(卯辰,戌酉)'] },
+    { target: '寅', tags: ['원진(卯申,寅酉)'] }
+  ],
+  '辰': [
+    { target: '酉', tags: ['육해(辰卯,酉戌)'] },
+    { target: '巳', tags: ['원진(辰亥,巳戌)'] }
+  ],
+  '巳': [
+    { target: '申', tags: ['육해(巳寅,申亥)'] },
+    { target: '辰', tags: ['원진(巳戌,辰亥)'] }
+  ],
+  '午': [
+    { target: '未', tags: ['원진/육해(午丑,未子)'] }
+  ],
+  '未': [
+    { target: '午', tags: ['원진/육해(午丑,未子)'] }
+  ],
+  '申': [
+    { target: '巳', tags: ['육해(申亥,巳寅)'] },
+    { target: '酉', tags: ['원진(申卯,酉寅)'] }
+  ],
+  '酉': [
+    { target: '辰', tags: ['육해(酉戌,辰卯)'] },
+    { target: '申', tags: ['원진(酉寅,申卯)'] }
+  ],
+  '戌': [
+    { target: '卯', tags: ['육해(戌酉,卯辰)'] },
+    { target: '亥', tags: ['원진(戌巳,亥辰)'] }
+  ],
+  '亥': [
+    { target: '寅', tags: ['육해(亥申,寅巳)'] },
+    { target: '戌', tags: ['원진(亥辰,戌巳)'] }
+  ]
+};
+
+////간지신살///////////////////////////////////////////////////////////////////////
 // 백호살 간지 (한자) - 객체(맵)
 export const BAEKHO_SAL_GANJI_MAP = {
   '甲辰': true,
@@ -816,3 +985,48 @@ export const GWAIGANG_SAL_GANJI = {
   '戊辰': true,  // 무진
 };
 
+export const 간여지동Map = {
+  '甲寅': '불통살',
+  '乙卯': '불통살',
+  '丙午': '불통살',
+  '丁巳': '불통살',
+  '戊辰': '불통살',
+  '戊戌': '불통살',
+  '己未': '불통살',
+  '己丑': '불통살',
+  '庚申': '불통살',
+  '辛酉': '불통살',
+  '壬子': '불통살',
+  '癸亥': '불통살'
+};
+
+export const 효신살Map = {
+  '丙寅': true,  
+  '丁卯': true, 
+  '壬申': true,  
+  '癸酉': true
+};
+
+export const 소실살Map = {
+  '甲午': true,  
+  '乙巳': true, 
+  '丙戌': true,  
+  '丁亥': true,  
+  '戊子': true,  
+  '戊辰': true,  
+  '己亥': true,  
+  '庚辰': true,  
+  '辛巳': true,  
+  '壬午': true,  
+  '丁亥': true
+};
+
+export const 재고귀인Map = {
+  '甲辰': true,  
+  '丙戌': true, 
+  '丁丑': true, 
+  '戊辰': true, 
+  '己丑': true, 
+  '辛未': true, 
+  '壬戌': true
+};

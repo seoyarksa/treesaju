@@ -295,7 +295,37 @@ dataRow.innerHTML += `
 
   // 🎯 세운 데이터 행 삽입
   daeyunTable.appendChild(dataRow);
+
+  // ① 세운 클릭 리스너 등록
+attachSewoonClickListeners();
+
+// 현재년도 세운 자동 선택 로직 + 로그
+  // ===============================
+  const currentYear = new Date().getFullYear();
+  console.log("[세운] 현재년도:", currentYear);
+
+  const cells = dataRow.querySelectorAll('.sewoon-cell');
+  console.log("[세운] 생성된 세운 셀 개수:", cells.length);
+
+  const currentCell = Array.from(cells).find(cell => {
+    console.log("[세운] 셀 연도:", cell.dataset.year);
+    return cell.dataset.year.startsWith(String(currentYear));
+  });
+
+  if (currentCell) {
+    console.log("[세운] 현재년도 셀 발견:", currentCell.dataset.year);
+    currentCell.click(); // attachSewoonClickListeners 통해 월운 렌더링
+  } else {
+    console.warn("[세운] 현재년도 셀을 찾지 못했습니다.");
+  }
+
+
 }
+
+
+
+
+
 
 //월운 테이블 렌더링 함수
 export function renderMonthlyGanjiSeries(baseYear, sewoonStem) {
@@ -311,9 +341,7 @@ export function renderMonthlyGanjiSeries(baseYear, sewoonStem) {
   // 3. HTML 출력
   let html = `<table class="daeyun-table" style="margin-top:1rem;">
    <thead><tr><th colspan="12">월운 (${Math.floor(baseYear)}년)</th></tr>
-
     <tr>${Array.from({ length: 12 }, (_, i) => `<th style="font-size:0.85rem;">${12 - i}월</th>`).join('')}</tr>
-
     </thead><tbody><tr>`;
 
   for (let i = 0; i < 12; i++) {
@@ -324,17 +352,20 @@ export function renderMonthlyGanjiSeries(baseYear, sewoonStem) {
     const tenGodStem = getTenGod(window.dayGanKorGan, stem);
 
     const hiddenStemsHan = HanhiddenStemsMap[branchHan] || [];
-// 지장간 배열에서 하단 천간 또는 중간 천간 선택
-let targetStemHan = '';
-if (hiddenStemsHan.length === 3) {
-  targetStemHan = hiddenStemsHan[2];
-} else if (hiddenStemsHan.length === 2) {
-  targetStemHan = hiddenStemsHan[1];
-}
-const tenGodBranch = targetStemHan ? getTenGod(window.dayGanKorGan, targetStemHan) : '';
+    // 지장간 배열에서 하단 천간 또는 중간 천간 선택
+    let targetStemHan = '';
+    if (hiddenStemsHan.length === 3) {
+      targetStemHan = hiddenStemsHan[2];
+    } else if (hiddenStemsHan.length === 2) {
+      targetStemHan = hiddenStemsHan[1];
+    }
+    const tenGodBranch = targetStemHan ? getTenGod(window.dayGanKorGan, targetStemHan) : '';
+
+    // ✅ 월 번호(표가 12→1 역순이라 12-i)
+    const monthNum = 12 - i;
 
     html += `
-      <td style="text-align:center;">
+      <td class="wolwoon-cell" data-month="${monthNum}" style="text-align:center;">
         <div style="font-size:0.85rem;">${colorize(stemHan)}</div>
         <div style="font-size:0.75rem; color:#999;">(${tenGodStem})</div>
         <div style="font-size:0.85rem;">${colorize(branchHan)}</div>
@@ -344,7 +375,20 @@ const tenGodBranch = targetStemHan ? getTenGod(window.dayGanKorGan, targetStemHa
 
   html += '</tr></tbody></table>';
   container.innerHTML = html;
+
+  // ✅ 최소 변경: 올해면 현재 월 자동 선택
+  const now = new Date();                          // 필요시 Asia/Seoul로 바꾸려면 toLocaleString 사용
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth() + 1;             // 1~12
+  if (Math.floor(baseYear) === curYear) {
+    const target = container.querySelector(`.wolwoon-cell[data-month="${curMonth}"]`);
+    if (target) target.classList.add('selected');  // 스타일은 CSS에서 .wolwoon-cell.selected로 지정
+  }
 }
+
+
+
+
 
 
 
@@ -432,6 +476,8 @@ export function handleSewoonClick(year, stemKor, branchKor, index) {
 
   // 월운 렌더링
   renderMonthlyGanjiSeries(year, stemKor);
+   // ✅ 신살표는 세운 선택이 확정된 이후 갱신
+   rerenderSinsal();
 }
 
 
