@@ -1276,33 +1276,47 @@ const toHanBranch = v => !v ? '' : /[子丑寅卯辰巳午未申酉戌亥]/.test
 
 // (app.js) 현재 대운/세운을 “한자”로 리턴
 function getCurrentRunContext() {
-  let dStem='', dBranch='';
+  // ---------- 대운 ----------
+  let dStem = '';
+  let dBranch = '';
   if (window.daeyunPairs && Number.isInteger(window.currentDaeyunIndex)) {
     const p = window.daeyunPairs[window.currentDaeyunIndex] || {};
     dStem = toHanStem(p.stem || '');
     dBranch = toHanBranch(p.branch || '');
   }
 
-  let sStem='', sBranch='';
-  let sel = document.querySelector('.sewoon-cell.selected');
-  if (!sel) {
-    const y = new Date().getFullYear();
-    sel = Array.from(document.querySelectorAll('.sewoon-cell[data-year]'))
-      .find(c => parseInt(c.dataset.year, 10) === y) || null;
+  // ---------- 세운 ----------
+  let sewoon = null;
+  const sel = document.querySelector('.sewoon-cell.selected');
+  if (sel?.dataset.stem && sel?.dataset.branch) {
+    const sStem = toHanStem(sel.dataset.stem);
+    const sBranch = toHanBranch(sel.dataset.branch);
+    sewoon = {
+      stem: sStem,
+      branch: sBranch,
+      ganji: sStem + sBranch
+    };
   }
-  if (sel) {
-    sStem = toHanStem(sel.dataset.stem || '');
-    sBranch = toHanBranch(sel.dataset.branch || '');
-  }
+  // 🚫 선택 없으면 null 유지 → 이후 '無' 처리
 
+  // ---------- 컨텍스트 ----------
   const ctx = {
-    daeyun: { stem: dStem, branch: dBranch, ganji: (dStem && dBranch) ? dStem + dBranch : '' },
-    sewoon: { stem: sStem, branch: sBranch, ganji: (sStem && sBranch) ? sStem + sBranch : '' }
+    daeyun: {
+      stem: dStem,
+      branch: dBranch,
+      ganji: (dStem && dBranch) ? dStem + dBranch : ''
+    },
+    sewoon
   };
 
-  console.log('[CTX] getCurrentRunContext →', ctx); // ✅ 여기서 context 값 전체 확인
+  console.log('[CTX] getCurrentRunContext →', ctx);
   return ctx;
 }
+
+
+
+
+
 
 
 
@@ -1465,7 +1479,8 @@ if (!etcWrap) {
 
 function rerenderSinsal() {
   // 🔹 대운/세운 컨텍스트 (한자 변환 포함)
-  const context = getCurrentRunContext();
+  const context = getCurrentRunContext({ disableSewoonFallback: true });
+
 
   // 🔹 사주 배열(etc용) — 전역 saju 사용
   const sajuGanArr = [saju.hourGan, saju.dayGan, saju.monthGan, saju.yearGan];
@@ -1483,7 +1498,7 @@ function rerenderSinsal() {
       sajuGanArr,
       sajuJijiArr,
       sajuGanjiArr,
-      context
+        context: {gender}
     });
   }
 }

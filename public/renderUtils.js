@@ -437,12 +437,15 @@ export function handleDaeyunClick(birthYear, birthMonth, birthDay, index) {
   // ✅ 현재 대운이 내림차순으로 렌더링된 상태이므로 index 역변환
   const trueIndex = daeyunCount - 1 - index;
 
+  // 🔹 현재 클릭한 대운 인덱스를 전역에 저장 (대운 변경 즉시 반영)
+  window.currentDaeyunIndex = trueIndex;
+
   // 🔍 클릭한 실제 대운 데이터
   const clickedPair = window.daeyunPairs[trueIndex];
   if (!clickedPair) {
-  console.warn(`대운 쌍이 존재하지 않습니다: trueIndex=${trueIndex}, 전체 개수=${window.daeyunPairs.length}`);
-  return; // 또는 사용자에게 오류 메시지 표시
-}
+    console.warn(`대운 쌍이 존재하지 않습니다: trueIndex=${trueIndex}, 전체 개수=${window.daeyunPairs.length}`);
+    return; // 또는 사용자에게 오류 메시지 표시
+  }
   const { stem: clickedDaeyunStem, branch: clickedDaeyunBranch } = clickedPair;
   console.log('🎯 클릭한 대운 간지:', clickedDaeyunStem, clickedDaeyunBranch);
 
@@ -458,6 +461,9 @@ export function handleDaeyunClick(birthYear, birthMonth, birthDay, index) {
   // 🎨 출력
   renderYearlyGanjiSeries(baseYear, yearlyStems, yearlyBranches);
   attachSewoonClickListeners();
+
+  // ✅ 신살표는 세운 선택이 확정된 이후 갱신
+  rerenderSinsal();
 }
 
 

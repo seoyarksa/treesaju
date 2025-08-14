@@ -794,6 +794,85 @@ export const cheonEulMap = {
   '癸': [{ jiji: '卯', yinYang: '-' }, { jiji: '巳', yinYang: '+' }],
 };
 
+export const 홍염Map = {
+  '甲': [{ jiji: '午', tags: ['홍염'] }],
+  '乙': [{ jiji: '申', tags: ['홍염'] }],
+  '丙': [{ jiji: '寅', tags: ['홍염'] }],
+  '丁': [{ jiji: '未', tags: ['홍염'] }],
+  '戊': [{ jiji: '辰', tags: ['홍염'] }],
+  '己': [{ jiji: '辰', tags: ['홍염'] }],
+  '庚': [{ jiji: '戌', tags: ['홍염'] }],
+  '辛': [{ jiji: '酉', tags: ['홍염'] }],
+  '壬': [{ jiji: '子', tags: ['홍염'] }],
+  '癸': [{ jiji: '申', tags: ['홍염'] }],
+};
+
+export const 낙정관살Map = {
+  '甲': ['巳'],
+  '乙': ['子'],
+  '丙': ['申'],
+  '丁': ['戌'],
+  '戊': ['卯'],
+  '己': ['巳'],
+  '庚': ['子'],
+  '辛': ['申'],
+  '壬': ['戌'],
+  '癸': ['卯'],
+};
+
+export const 건록_암록_금여록MAP = {
+  '甲': [
+    { target: '寅', tags: ['건록'] },
+    { target: '亥', tags: ['암록'] },
+    { target: '辰', tags: ['금여'] },
+  ],
+  '乙': [
+    { target: '卯', tags: ['건록'] },
+    { target: '戌', tags: ['암록'] },
+    { target: '巳', tags: ['금여'] },
+  ],
+  '丙': [
+    { target: '巳', tags: ['건록'] },
+    { target: '申', tags: ['암록'] },
+    { target: '未', tags: ['금여'] },
+  ],
+  '丁': [
+    { target: '午', tags: ['건록'] },
+    { target: '未', tags: ['암록'] },
+    { target: '申', tags: ['금여'] },
+  ],
+  '戊': [
+    { target: '巳', tags: ['건록'] },
+    { target: '申', tags: ['암록'] },
+    { target: '未', tags: ['금여'] },
+  ],
+  '己': [
+    { target: '午', tags: ['건록'] },
+    { target: '未', tags: ['암록'] },
+    { target: '申', tags: ['금여'] },
+  ],
+  '庚': [
+    { target: '申', tags: ['건록'] },
+    { target: '巳', tags: ['암록'] },
+    { target: '戌', tags: ['금여'] },
+  ],
+  '辛': [
+    { target: '酉', tags: ['건록'] },
+    { target: '辰', tags: ['암록'] },
+    { target: '亥', tags: ['금여'] },
+  ],
+  '壬': [
+    { target: '亥', tags: ['건록'] },
+    { target: '寅', tags: ['암록'] },
+    { target: '丑', tags: ['금여'] },
+  ],
+  '癸': [
+    { target: '子', tags: ['건록'] },
+    { target: '丑', tags: ['암록'] },
+    { target: '寅', tags: ['금여'] },
+  ],
+};
+
 //////지지신살/////////////////////////////////////////////////////////////////////
 export const 형충회합Map = {
   '子': [
@@ -961,6 +1040,184 @@ export const 원진육해Map = {
     { target: '寅', tags: ['육해(亥申,寅巳)'] },
     { target: '戌', tags: ['원진(亥辰,戌巳)'] }
   ]
+};
+
+export const 도화살MAP = {
+  '卯': '도화(火)',
+  '午': '도화(金)',
+  '酉': '도화(水)',
+  '子': '도화(木)',
+};
+
+export const 귀문살MAP = {
+  '子': [{ target: '酉', tags: ['귀문'] }],
+  '寅': [{ target: '未', tags: ['귀문'] }],
+  '辰': [{ target: '亥', tags: ['귀문'] }],
+  '午': [{ target: '丑', tags: ['귀문'] }],
+  '申': [{ target: '卯', tags: ['귀문'] }],
+  '戌': [{ target: '巳', tags: ['귀문'] }],
+  '酉': [{ target: '子', tags: ['귀문'] }],
+  '未': [{ target: '寅', tags: ['귀문'] }],
+  '亥': [{ target: '辰', tags: ['귀문'] }],
+  '丑': [{ target: '午', tags: ['귀문'] }],
+  '卯': [{ target: '申', tags: ['귀문'] }],
+  '巳': [{ target: '戌', tags: ['귀문'] }],
+};
+
+export const 격각살MAP = {
+  '子': [
+    { target: '寅', tags: ['격각'] },
+    { target: '戌', tags: ['격각'] }],
+  '丑': [
+    { target: '亥', tags: ['격각'] },
+    { target: '卯', tags: ['격각'] }],
+  '寅': [
+    { target: '子', tags: ['격각'] },
+    { target: '辰', tags: ['격각'] }],
+  '卯':  [
+    { target: '丑', tags: ['격각'] },
+    { target: '巳', tags: ['격각'] }],
+  '辰': [
+    { target: '寅', tags: ['격각'] },
+    { target: '午', tags: ['격각'] }],
+  '巳': [
+    { target: '卯', tags: ['격각'] },
+    { target: '未', tags: ['격각'] }],
+  '午':  [
+    { target: '辰', tags: ['격각'] },
+    { target: '申', tags: ['격각'] }],
+  '未': [
+    { target: '巳', tags: ['격각'] },
+    { target: '酉', tags: ['격각'] }],
+  '申': [
+    { target: '午', tags: ['격각'] },
+    { target: '戌', tags: ['격각'] }],
+  '酉': [
+    { target: '未', tags: ['격각'] },
+    { target: '亥', tags: ['격각'] }],
+  '戌': [
+    { target: '申', tags: ['격각'] },
+    { target: '子', tags: ['격각'] }],
+  '亥': [
+    { target: '酉', tags: ['격각'] },
+    { target: '丑', tags: ['격각'] }],
+   
+};
+
+export const 합방_공방살MAP = {
+  '子': [
+    { target: '未', tags: ['합방'], gender: 'male' },
+    { target: '丑', tags: ['공방'], gender: 'male' },
+    { target: '巳', tags: ['합방'], gender: 'female' },
+    { target: '亥', tags: ['공방'], gender: 'female' }
+  ],
+  '丑': [
+    { target: '申', tags: ['합방'], gender: 'male' },
+    { target: '寅', tags: ['공방'], gender: 'male' },
+    { target: '午', tags: ['합방'], gender: 'female' },
+    { target: '子', tags: ['공방'], gender: 'female' }
+  ],
+  '寅': [
+    { target: '酉', tags: ['합방'], gender: 'male' },
+    { target: '卯', tags: ['공방'], gender: 'male' },
+    { target: '未', tags: ['합방'], gender: 'female' },
+    { target: '丑', tags: ['공방'], gender: 'female' }
+  ],
+  '卯':  [
+    { target: '戌', tags: ['합방'], gender: 'male' },
+    { target: '辰', tags: ['공방'], gender: 'male' },
+    { target: '申', tags: ['합방'], gender: 'female' },
+    { target: '寅', tags: ['공방'], gender: 'female' }
+  ],
+  '辰': [
+    { target: '亥', tags: ['합방'], gender: 'male' },
+    { target: '巳', tags: ['공방'], gender: 'male' },
+    { target: '酉', tags: ['합방'], gender: 'female' },
+    { target: '卯', tags: ['공방'], gender: 'female' }
+  ],
+  '巳': [
+    { target: '子', tags: ['합방'], gender: 'male' },
+    { target: '午', tags: ['공방'], gender: 'male' },
+    { target: '戌', tags: ['합방'], gender: 'female' },
+    { target: '辰', tags: ['공방'], gender: 'female' }
+  ],
+  '午':  [
+    { target: '丑', tags: ['합방'], gender: 'male' },
+    { target: '未', tags: ['공방'], gender: 'male' },
+    { target: '亥', tags: ['합방'], gender: 'female' },
+    { target: '巳', tags: ['공방'], gender: 'female' }
+  ],
+  '未': [
+    { target: '寅', tags: ['합방'], gender: 'male' },
+    { target: '申', tags: ['공방'], gender: 'male' },
+    { target: '子', tags: ['합방'], gender: 'female' },
+    { target: '午', tags: ['공방'], gender: 'female' }
+  ],
+  '申': [
+    { target: '卯', tags: ['합방'], gender: 'male' },
+    { target: '酉', tags: ['공방'], gender: 'male' },
+    { target: '丑', tags: ['합방'], gender: 'female' },
+    { target: '未', tags: ['공방'], gender: 'female' }
+  ],
+  '酉': [
+    { target: '辰', tags: ['합방'], gender: 'male' },
+    { target: '戌', tags: ['공방'], gender: 'male' },
+    { target: '寅', tags: ['합방'], gender: 'female' },
+    { target: '申', tags: ['공방'], gender: 'female' }
+  ],
+  '戌': [
+    { target: '巳', tags: ['합방'], gender: '남male' },
+    { target: '亥', tags: ['공방'], gender: 'male' },
+    { target: '卯', tags: ['합방'], gender: 'female' },
+    { target: '酉', tags: ['공방'], gender: 'female' }
+  ],
+  '亥': [
+    { target: '午', tags: ['합방'], gender: 'male' },
+    { target: '子', tags: ['공방'], gender: 'male' },
+    { target: '辰', tags: ['합방'], gender: 'female' },
+    { target: '戌', tags: ['공방'], gender: 'female' }
+  ],
+   
+};
+
+export const 천덕_월덕MAP = {
+  '子': [
+    { target: '巳', tags: ['천덕'] },
+    { target: '壬', tags: ['월덕'] }],
+  '丑': [
+    { target: '庚', tags: ['천덕'] },
+    { target: '庚', tags: ['월덕'] }],
+  '寅': [
+    { target: '丁', tags: ['천덕'] },
+    { target: '丙', tags: ['월덕'] }],
+  '卯': [
+    { target: '申', tags: ['천덕'] },
+    { target: '甲', tags: ['월덕'] }],
+  '辰': [
+    { target: '壬', tags: ['천덕'] },
+    { target: '壬', tags: ['월덕'] }],
+  '巳': [
+    { target: '辛', tags: ['천덕'] },
+    { target: '庚', tags: ['월덕'] }],
+  '午': [
+    { target: '亥', tags: ['천덕'] },
+    { target: '丙', tags: ['월덕'] }],
+  '未': [
+    { target: '甲', tags: ['천덕'] },
+    { target: '甲', tags: ['월덕'] }],
+  '申': [
+    { target: '癸', tags: ['천덕'] },
+    { target: '壬', tags: ['월덕'] }],
+  '酉': [
+    { target: '寅', tags: ['천덕'] },
+    { target: '庚', tags: ['월덕'] }],
+  '戌': [
+    { target: '丙', tags: ['천덕'] },
+    { target: '丙', tags: ['월덕'] }],
+  '亥': [
+    { target: '乙', tags: ['천덕'] },
+    { target: '甲', tags: ['월덕'] }],
+   
 };
 
 ////간지신살///////////////////////////////////////////////////////////////////////
