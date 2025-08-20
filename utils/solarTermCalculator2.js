@@ -93,7 +93,7 @@ export function getSolarTermDate(year, termName) {
   return allTerms.find(term => term.name === termName)
 }
 
-const MONTH_TO_SOLAR_TERM = {
+export const MONTH_TO_SOLAR_TERM = {
   1: '소한',   // 1월 시작 절기 (소한) → 입춘 이전 절기
   2: '입춘',   // 2월 시작 절기 (입춘)
   3: '경칩',
@@ -166,14 +166,26 @@ export function getJeolipDate(input1, input2, input3) {
     dateKST: dayjs(prevTerm.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss'),
   });
 
-  // 변경된 부분: 'current'를 월 1일 → 출생일(day)로 변경
+  // ✅ nextTerm만 추가
+  const termNames = Object.values(MONTH_TO_SOLAR_TERM);
+  const thisIndex = termNames.indexOf(thisTermName);
+  const nextTermName = termNames[(thisIndex + 1) % termNames.length];
+  const nextYear = month === 12 ? year + 1 : year;
+  const nextTerm = getSolarTermDate(nextYear, nextTermName);
+
+  // 기존 로직 그대로 둠
   const current = dayjs(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00+09:00`).tz('Asia/Seoul');
   const thisTermKST = dayjs(thisTerm.date).tz('Asia/Seoul');
 
   console.log('⏱ current:', current.format(), 'thisTermKST:', thisTermKST.format());
 
-  const result = current.isBefore(thisTermKST) ? new Date(prevTerm.date) : new Date(thisTerm.date);
-  console.log('✅ 최종 반환:', result);
+const result = current.isBefore(thisTermKST) ? new Date(prevTerm.date) : new Date(thisTerm.date);
 
-  return result;
+// ✅ Date 객체 그대로 두고 속성만 추가
+result.thisTerm = thisTerm;
+result.nextTerm = nextTerm;
+
+console.log('✅ 최종 반환:', result);
+return result;
 }
+

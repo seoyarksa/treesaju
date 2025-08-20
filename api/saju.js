@@ -1,7 +1,8 @@
-// api/saju.js (서버용)
+// api/saju.js (배포용, server.js 수정사항 반영)
 
+// utils
 import { calculateDaeyunAge } from '../utils/dateUtils.js';
-import { getSolarTermDates, getJeolipDate } from '../utils/solarTermCalculator.js';
+import { getSolarTermDates, getJeolipDate, getSolarTermDate, MONTH_TO_SOLAR_TERM } from '../utils/solarTermCalculator.js';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
 import timezone from 'dayjs/plugin/timezone.js';
@@ -9,6 +10,7 @@ import timezone from 'dayjs/plugin/timezone.js';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+// 천간, 지지
 const heavenlyStems = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
 const earthlyBranches = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
 
@@ -16,25 +18,13 @@ const hanToKorStem = {
   '甲': '갑','乙': '을','丙': '병','丁': '정','戊': '무',
   '己': '기','庚': '경','辛': '신','壬': '임','癸': '계'
 };
-const korToHanStem = {
-  '갑':'甲','을':'乙','병':'丙','정':'丁','무':'戊',
-  '기':'己','경':'庚','신':'辛','임':'壬','계':'癸'
-};
-const hanEarthlyBranches = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
 const hanToKor = (han) => hanToKorStem[han] || han;
 
-// 시주 천간표 (일간 기준)
-const timeGanTable = {
-  '갑': ['갑','을','병','정','무','기','경','신','임','계','갑','을'],
-  '을': ['병','정','무','기','경','신','임','계','갑','을','병','정'],
-  '병': ['무','기','경','신','임','계','갑','을','병','정','무','기'],
-  '정': ['경','신','임','계','갑','을','병','정','무','기','경','신'],
-  '무': ['임','계','갑','을','병','정','무','기','경','신','임','계'],
-  '기': ['갑','을','병','정','무','기','경','신','임','계','갑','을'],
-  '경': ['병','정','무','기','경','신','임','계','갑','을','병','정'],
-  '신': ['무','기','경','신','임','계','갑','을','병','정','무','기'],
-  '임': ['경','신','임','계','갑','을','병','정','무','기','경','신'],
-  '계': ['임','계','갑','을','병','정','무','기','경','신','임','계'],
+// 절기 → 다음 절기 매핑
+const SOLAR_TERM_NEXT = {
+  '입춘': '경칩','경칩': '청명','청명': '입하','입하': '망종',
+  '망종': '소서','소서': '입추','입추': '백로','백로': '한로',
+  '한로': '입동','입동': '대설','대설': '소한','소한': '입춘'
 };
 
 // 한국 DST 여부 판단
@@ -77,7 +67,7 @@ function getTimeIndexByHourMinute(hour, minute) {
 // 일주 계산 (1900-02-02 갑자일 기준)
 function getDayGanji(year, month, day) {
   const baseDate = new Date(1900, 1, 19);
-  const targetDate = new Date(year, month - 1, day);
+  const targetDate = new Date(`${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}T00:00:00+09:00`);
   const diffDays = Math.floor((targetDate - baseDate) / (1000 * 60 * 60 * 24));
   const stemIndex = diffDays % 10;
   const branchIndex = diffDays % 12;
@@ -134,22 +124,26 @@ function getMonthGan(yearGanjiYear, idx) {
 // ganji 전체 계산
 function getGanji(year, month, day, hour, minute, solarlunar) {
   const birthDate = new Date(year, month - 1, day, hour, minute);
-  const lunarDate = solarlunar.solar2lunar(year, month, day);
-  let yearGanji = lunarDate.gzYear;
 
-  const ipchun = getJeolipDate(new Date(year, 2, 4));
-  if (birthDate < ipchun) {
-    yearGanji = solarlunar.solar2lunar(year - 1, 6, 1).gzYear;
-  }
-
+  // 일주
   const dayGanji = getDayGanji(year, month, day);
   const dayGanHan = dayGanji.charAt(0);
 
+  // 년주 (입춘 보정)
+  const lunarDate = solarlunar.solar2lunar(year, month, day);
+  let yearGanji = lunarDate.gzYear;
+  const ipchunDate = getJeolipDate(new Date(year, 2, 4));
+  if (birthDate < ipchunDate) {
+    yearGanji = solarlunar.solar2lunar(year - 1, 6, 1).gzYear;
+  }
+
+  // 월주
   const idx = getSolarTermMonthIndex(birthDate);
   const monthGan = getMonthGan(yearGanji.charAt(0), idx);
   const monthJi = ['寅','卯','辰','巳','午','未','申','酉','戌','亥','子','丑'][idx];
   const monthGanji = monthGan + monthJi;
 
+  // 시주
   const timeIndex = getTimeIndexByHourMinute(hour, minute);
   const dayStemIndex = heavenlyStems.indexOf(dayGanHan);
   const timeStemIndex = (dayStemIndex * 2 + timeIndex) % 10;
@@ -189,11 +183,20 @@ export default async function handler(req, res) {
     const birthDate = new Date(`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00+09:00`);
     if (isNaN(birthDate.getTime())) throw new Error('유효하지 않은 날짜');
 
+    // 절기 관련
     const jeolipDate = getJeolipDate(year, month, day);
+    const thisTerm = getSolarTermDate(year, MONTH_TO_SOLAR_TERM[month]);
+    const nextTermName = SOLAR_TERM_NEXT[thisTerm.name];
+    const nextTerm = getSolarTermDate(month === 12 ? year + 1 : year, nextTermName);
+
+    // 간지
     const ganji = getGanji(year, month, day, hour, minute, solarlunar);
     const yearStemKor = hanToKor(ganji.year.charAt(0));
+
+    // 대운
     const daeyunAge = calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor);
 
+    // 음력 변환
     const lunar = solarlunar.solar2lunar(year, month, day);
 
     res.json({
@@ -208,7 +211,10 @@ export default async function handler(req, res) {
       daeyunAge,
       yearStemKor,
       ganji,
-      birthYear: birthDate.getFullYear()
+      birthYear: birthDate.getFullYear(),
+      jeolipDate,
+      thisTerm: thisTerm ? { name: thisTerm.name, date: thisTerm.date } : null,
+      nextTerm: nextTerm ? { name: nextTerm.name, date: nextTerm.date } : null
     });
   } catch (e) {
     console.error('API 처리 오류:', e);
