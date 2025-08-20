@@ -1,36 +1,39 @@
 // sinsalUtils.js
 
-import { samhapGroups, UNSEONG_LIST, unseongMap12, sinsal_LIST, sinsalMap12,
+import { branchOrder,samhapGroups, UNSEONG_LIST, unseongMap12, sinsal_LIST, sinsalMap12, 충MAP,
          cheonEulMap, BAEKHO_SAL_GANJI_MAP,형충회합Map,원진육해Map,간여지동Map,효신살Map,소실살Map,재고귀인Map,
          홍염Map, 도화살MAP,귀문살MAP, 낙정관살Map,격각살MAP,합방_공방살MAP,
-         GWAIGANG_SAL_GANJI, 건록_암록_금여록MAP,천덕_월덕MAP,
+         GWAIGANG_SAL_GANJI, 건록_암록_금여록MAP,천덕_월덕MAP,문창_학당MAP,상문_조객MAP, 양인_비인MAP, 급각살MAP, 
+         천의성MAP, 음양차착살Map,고란살Map,태극귀인MAP,천라지망MAP,단교관살MAP, HYUNCHIM_SAL_MAP, 십악대패살MAP
 
-       } from './constants.js';
-
+} from './constants.js';
 
 
 
 ///////////기타 신살류 명칭 등록//////////////////
 const etcSinsalList = ['형충회합', '원진/육해','간여지동', '효신살', '소실살','백호살',  '천을귀인', '재고귀인',
                       '도화살','홍염살', '귀문살', '격각살', '낙정관살', '합방/공방살', 
-                      '공망살',  '건록/암록/금여록', '천덕/월덕', '괴강살','문창귀인', '학당귀인', '급각살', '상문살', '조객살','암록살','비인살',
+                      '공망살',  '건록/암록/금여록', '천덕/월덕', '괴강살','문창/학당', '급각살', '상문/조객','양인/비인',
                       '천의성', '음양차착살', '고란살', '태극귀인', '천라지망', '병부살', '사부살','현침살', '십악대패살', '단교관살'
                       ];
 //////////////////////////////////////////////////////////////////////////////////////////////
- //'천덕귀인', '월덕귀인', '문창귀인', '학당귀인', '급각살', '상문살', '조객살','암록살','비인살',
-//     '천의성', '음양차착살', '고란살', '태극귀인', '천라지망', '병부살', '사부살','현침살', '십악대패살', '단교관살'
+//''십악대패살', 
 //////
 // ////////////////////////////////////////////////////////////////////////////////////////
 // 신살 표시 구역 타입 분류
-const GAN_SINSAL   = new Set(['천을귀인', '홍염살', '낙정관살', '건록/암록/금여록' ]);    // 필요 시 추가
-const JIJI_SINSAL  = new Set(['형충회합', '원진/육해', '도화살', '귀문살', '격각살','합방/공방살','천덕/월덕']); // 필요 시 추가
-const GANJI_SINSAL = new Set(['간여지동', '백호살', '괴강살', '효신살', '소실살', '재고귀인','공망살']);                         // 필요 시 추가
+const GAN_SINSAL   = new Set(['천을귀인', '홍염살', '낙정관살', '건록/암록/금여록','문창/학당','양인/비인',
+                              '태극귀인']);    // 필요 시 추가
+const JIJI_SINSAL  = new Set(['형충회합', '원진/육해', '도화살', '귀문살', '격각살','합방/공방살','천덕/월덕',
+                              '상문/조객','급각살', '천의성', '천라지망','병부살', '사부살','단교관살' ]); // 필요 시 추가
+const GANJI_SINSAL = new Set(['간여지동', '백호살', '괴강살', '효신살', '소실살', '재고귀인','공망살','음양차착살',
+                               '고란살', '현침살', '십악대패살' ]);                         // 필요 시 추가
 
 function getSinsalType(name) {
   if (name === '천덕/월덕')    return 'mixed'; // ← 이 줄이 반드시 위 조건들보다 먼저 실행되게
   if (GAN_SINSAL.has(name))   return 'gan';
   if (JIJI_SINSAL.has(name))  return 'jiji';
   if (GANJI_SINSAL.has(name)) return 'ganji';
+    if (name === '현침살') return 'ganji';
  
 }
 
@@ -274,7 +277,7 @@ export function renderEtcSinsalTable({ sajuGanArr, sajuJijiArr, sajuGanjiArr, co
       const pair = window.daeyunPairs[window.currentDaeyunIndex] || {};
       dGan  = dGan  || (pair.stem   || '');
       dJiji = dJiji || (pair.branch || '');
-      console.log('[신살] 대운 from window:', window.currentDaeyunIndex, dGan, dJiji);
+      
     } else {
       const tds = document.querySelectorAll('.daeyun-table-container .daeyun-table tbody tr:nth-child(2) td');
       const selTd = Array.from(tds).find(td => td.classList.contains('daeyun-selected'));
@@ -284,13 +287,13 @@ export function renderEtcSinsalTable({ sajuGanArr, sajuJijiArr, sajuGanjiArr, co
         const pair = window.daeyunPairs[trueIdx] || {};
         dGan  = dGan  || (pair.stem   || '');
         dJiji = dJiji || (pair.branch || '');
-        console.log('[신살] 대운 from DOM:', { idx, trueIdx, dGan, dJiji });
+        //console.log('[신살] 대운 from DOM:', { idx, trueIdx, dGan, dJiji });
       } else {
-        console.warn('[신살] 대운 미확정: context/window/DOM 모두 값 없음');
+        //console.warn('[신살] 대운 미확정: context/window/DOM 모두 값 없음');
       }
     }
   } else {
-    console.log('[신살] 대운 from context:', dGan, dJiji);
+   
   }
 
  // ---------- 세운 ----------
@@ -303,15 +306,15 @@ if (!sGan || !sJiji) {
   if (seSel) {
     sGan  = sGan  || seSel.dataset.stem   || '';
     sJiji = sJiji || seSel.dataset.branch || '';
-    console.log('[신살] 세운 stem/branch:', sGan, sJiji, 'year=', seSel?.dataset.year);
+   
   } else {
     // 🔹 선택된 세운이 없으면 무조건 '無'
     sGan = '無';
     sJiji = '無';
-    console.warn('[신살] 세운 미확정 → 無 처리');
+    
   }
 } else {
-  console.log('[신살] 세운 from context:', sGan, sJiji);
+  
 }
 
 // ---------- 한자 정규화 ----------
@@ -322,31 +325,30 @@ const dJijiHan = toHanBranch(dJiji);
 const sGanHan  = sGan ? toHanStem(sGan) : '無';
 const sJijiHan = sJiji ? toHanBranch(sJiji) : '無';
 
-console.log('[신살] 대운(한자):', dGanHan, dJijiHan);
-console.log('[신살] 세운(한자):', sGanHan, sJijiHan);
+///console.log('[신살] 대운(한자):', dGanHan, dJijiHan);
+//console.log('[신살] 세운(한자):', sGanHan, sJijiHan);
 
 // ---------- 간지 조합 ----------
 const dGanjiHan = (dGanHan && dJijiHan) ? dGanHan + dJijiHan : '';
 const sGanjiHan = (sGan && sJiji) ? (sGanHan + sJijiHan) : '無';
 
-console.log('[신살] 대운 간지(한자):', dGanjiHan);
-console.log('[신살] 세운 간지(한자):', sGanjiHan);
+//console.log('[신살] 대운 간지(한자):', dGanjiHan);
+//console.log('[신살] 세운 간지(한자):', sGanjiHan);
 
 // ---------- 확장 배열 ----------
 const extGanArr   = [...sajuGanArr,   dGanHan,   sGanHan];
 const extJijiArr  = [...sajuJijiArr,  dJijiHan,  sJijiHan];
 const extGanjiArr = [...sajuGanjiArr, dGanjiHan, sGanjiHan];
 
-console.log('[신살] 확장 GanArr  :', extGanArr);
-console.log('[신살] 확장 JijiArr :', extJijiArr);
-console.log('[신살] 확장 GanjiArr:', extGanjiArr);
+//console.log('[신살] 확장 GanArr  :', extGanArr);
+//console.log('[신살] 확장 JijiArr :', extJijiArr);
+//console.log('[신살] 확장 GanjiArr:', extGanjiArr);
 
 
   // ▲▲▲ ADD 끝 ▲▲▲
 
   const sinsalRows = etcSinsalList.map(sinsalName => {
-  console.log('[천덕/월덕 type 체크]', sinsalName, getSinsalType(sinsalName));
-
+  
 
     // ========= 1) 천간 신살 (6칸) =========///////////////////////////////////////////////////////////////////////////////////
     // 기존: 사주간 4칸만 → 변경: extGanArr(6칸) 기준으로 계산
@@ -383,11 +385,50 @@ if (sinsalName === '건록/암록/금여록') {
     ? hits.map(r => `${r.target}[${r.tags?.[0] || ''}]`).join(',')
     : 'X';
 }
+//천덕월덕
 if (sinsalName === '천덕/월덕') {
   if (!monthJiji) return 'X';
   const rels = 천덕_월덕MAP[monthJiji] || [];
   const hit = rels.find(r => r.target === gan); // 천간만 비교
   return hit ? `${hit.target}[${hit.tags?.[0] || ''}]` : 'X';
+}
+// 문창/학당
+if (sinsalName === '문창/학당') {
+  const rels = 문창_학당MAP[gan] || []; // gan: 현재 칸의 천간
+  // target이 extJijiArr(사주 전체 지지)에 포함되는 경우만
+  const hits = rels.filter(r => extJijiArr.includes(r.target));
+
+  return hits.length
+    ? hits.map(r => `${r.target}[${r.tags?.[0] || ''}]`).join(',')
+    : 'X';
+}
+// 양인/비인살
+if (sinsalName === '양인/비인') {
+  const rels = 양인_비인MAP[gan] || []; // gan: 현재 칸의 천간
+  // target이 extJijiArr(사주 전체 지지)에 포함되는 경우만
+  const hits = rels.filter(r => extJijiArr.includes(r.target));
+
+  return hits.length
+    ? hits.map(r => `${r.target}[${r.tags?.[0] || ''}]`).join(',')
+    : 'X';
+}
+// 태극귀인
+if (sinsalName === '태극귀인') {
+  const dayGan = sajuGanArr[1];   // 기준: 일간
+  const rels = 태극귀인MAP[dayGan] || [];
+
+  const jiji = extJijiArr[idx];   // 현재 칸의 지지
+  if (idx === 0 || idx === 2) return 'X'; // 시지, 월지 제외
+
+  const hit = rels.find(r => r.target === jiji);
+  const content = hit ? `${jiji}[${hit.tags?.[0] || ''}]` : 'X';
+
+  // 👉 일간칸은 내용 밑에 [기준]을 빨간색으로 추가
+  if (idx === 1) {
+    return `${content}<br><span style="color:red;">[기준]</span>`;
+  }
+
+  return content;
 }
 
 
@@ -401,77 +442,255 @@ if (sinsalName === '천덕/월덕') {
 
     // ========= 2) 지지 신살 (6칸) =========///////////////////////////////////////////////////////////////////////////////////
     // 기존: 사주지지 4칸만 → 변경: extJijiArr(6칸) 기준으로 계산
-    const jijiResults = extJijiArr.map((jiji, idx) => {
-      if (sinsalName === '형충회합') {
-        const rels = 형충회합Map[monthJiji] || []; // [{target, tags}]
-        // 월지 자신은 제외 (사주 4칸 중 월지 칸만 제외 의미, 대운/세운 칸은 그냥 검사)
-        const isSajuMonthCell = (jiji === monthJiji);
-        if (isSajuMonthCell) return 'X';
-        const hit = rels.find(r => r.target === jiji);
-        return hit ? `${monthJiji}${jiji}(${hit.tags?.[0] || ''})` : 'X';
-      }
-      if (sinsalName === '원진/육해') {
-        const rels = (원진육해Map[monthJiji] || []); // [{target, tags}]
-        const hit = rels.find(r => r.target === jiji);
-        return hit ? `${hit.tags?.[0] || ''}` : 'X';
-      }
-      if (sinsalName === '도화살') {
-        const label = 도화살MAP[jiji];
-        return label ? `${label}` : 'X';
-   }
- if (sinsalName === '귀문살') {
-  const rels = 귀문살MAP[jiji] || [];
-  const hit = rels.find(r => extJijiArr.includes(r.target));
-  return hit ? `${jiji}[${hit.tags?.[0] || ''}]` : 'X';
-}
-if (sinsalName === '격각살') {
-  const rels = 격각살MAP[jiji] || [];
-  const hit = rels.find(r => extJijiArr.includes(r.target));
-  return hit ? `${hit.target}` : 'X';
-}
-if (sinsalName === '합방/공방살') {
-  const dayJiji = sajuJijiArr[1]; // 기준: 일지
-  const gender = context.gender;
+ const jijiResults = extJijiArr.map((jiji, idx) => {
+  if (sinsalName === '형충회합') {
+    const rels = 형충회합Map[monthJiji] || []; // [{target, tags}]
+    const hit = rels.find(r => r.target === jiji);
+    // 월지 칸 && 사주 4칸 중 월지 칸(idx === 2)만 기준 표시
+    const isSajuMonthCell = (idx === 2 && jiji === monthJiji);
+    if (isSajuMonthCell) return `<span style="color:red;">기준</span>`;
+    return hit ? `${monthJiji}${jiji}(${hit.tags?.[0] || ''})` : 'X';
+  }
 
-  // 일지 칸은 그냥 빈 칸으로 표시
-  if (idx === 1) {
+  if (sinsalName === '원진/육해') {
+    const rels = 원진육해Map[monthJiji] || []; // [{target, tags}]
+    const hit = rels.find(r => r.target === jiji);
+    const isSajuMonthCell = (idx === 2 && jiji === monthJiji);
+    if (isSajuMonthCell) return `<span style="color:red;">기준</span>`;
+    return hit ? `${hit.tags?.[0] || ''}` : 'X';
+  }
 
-    return 'X';
-}
-  const rels = 합방_공방살MAP[dayJiji] || [];
-  const hits = rels.filter(r => r.gender === gender && jiji === r.target);
-  return hits.length
-    ? `${jiji}[${hits[0].tags?.[0] || ''}]`
+  if (sinsalName === '도화살') {
+    const label = 도화살MAP[jiji];
+    return label ? `${label}` : 'X';
+  }
+
+  if (sinsalName === '귀문살') {
+    const rels = 귀문살MAP[jiji] || [];
+    const hit = rels.find(r => extJijiArr.includes(r.target));
+    return hit ? `${jiji}(${hit.tags?.[0] || ''})` : 'X';
+  }
+
+  if (sinsalName === '격각살') {
+    const rels = 격각살MAP[jiji] || [];
+    const hit = rels.find(r => extJijiArr.includes(r.target));
+    return hit ? `${hit.target}` : 'X';
+  }
+
+  if (sinsalName === '합방/공방살') {
+    const dayJiji = sajuJijiArr[1]; // 기준: 일지
+    const gender = context.gender;
+    const rels = 합방_공방살MAP[dayJiji] || [];
+    const hits = rels.filter(r => r.gender === gender && jiji === r.target);
+    if (idx === 1) return `<span style="color:red;">기준</span>`;
+    return hits.length ? `${jiji}[${hits[0].tags?.[0] || ''}]` : 'X';
+  }
+
+  if (sinsalName === '천덕/월덕') {
+    if (!monthJiji) return 'X';
+    const rels = 천덕_월덕MAP[monthJiji] || [];
+    const hit = rels.find(r => r.target === jiji);
+    if (idx === 2 && jiji === monthJiji) return `<span style="color:red;">기준</span>`;
+    return hit ? `${hit.target}[${hit.tags?.[0] || ''}]` : 'X';
+  }
+
+  // 상문/조객살 (년지 기준)
+  if (sinsalName === '상문/조객') {
+    const yearJiji = sajuJijiArr[3]; // 기준: 년지
+    if (!yearJiji) return 'X';
+    const rels = 상문_조객MAP[yearJiji] || [];
+    const hit = rels.find(r => r.target === jiji);
+    if (idx === 3 && jiji === yearJiji) return `<span style="color:red;">기준</span>`;
+    return hit ? `${hit.target}[${hit.tags?.[0] || ''}]` : 'X';
+  }
+//급각살
+  if (sinsalName === '급각살') {
+    const rels = 급각살MAP[monthJiji] || []; // [{target, tags}]
+    const hit = rels.find(r => r.target === jiji);
+    const isSajuMonthCell = (idx === 2 && jiji === monthJiji);
+    if (isSajuMonthCell) return `<span style="color:red;">기준</span>`;
+    return hit ? `${hit.target}[${hit.tags?.[0] || ''}]` : 'X';
+  }
+//천의성
+  if (sinsalName === '천의성') {
+    const rels = 천의성MAP[monthJiji] || []; // [{target, tags}]
+    const hit = rels.find(r => r.target === jiji);
+    const isSajuMonthCell = (idx === 2 && jiji === monthJiji);
+    if (isSajuMonthCell) return `<span style="color:red;">기준</span>`;
+    return hit ? `${hit.target}[${hit.tags?.[0] || ''}]` : 'X';
+  }
+
+//천라지망살
+if (sinsalName === '천라지망') {
+  const rels = 천라지망MAP[jiji] || [];
+  const hit = rels.find(r => extJijiArr.includes(r.target));
+
+  return hit 
+    ? `${jiji}${hit.target}(${hit.tags?.[0] || ''})` 
     : 'X';
 }
 
+// 병부살 ///////////////////////////////////////////////
+if (sinsalName === '병부살') {
+  let results = [];
 
-if (sinsalName === '천덕/월덕') {
-  if (!monthJiji) return 'X';
-  const rels = 천덕_월덕MAP[monthJiji] || [];
-  const hit = rels.find(r => r.target === jiji); // 지지만 비교
-  return hit ? `${hit.target}[${hit.tags?.[0] || ''}]` : 'X';
+  // ① 년지 기준
+  const yearIdx = 3; 
+  const yearBase = extJijiArr[yearIdx];
+  if (idx !== yearIdx) {   // 기준칸은 제외
+    const baseIdx = branchOrder.indexOf(yearBase);
+    const prev = branchOrder[(baseIdx - 1 + 12) % 12];
+    if (jiji === prev) {
+      results.push(`${jiji}(병부)<span style="color:red;">[년지]</span>`);
+    }
+  }
+
+  // ② 대운지 기준
+  const daeyunIdx = 4;
+  if (extJijiArr[daeyunIdx] && idx !== daeyunIdx) {
+    const baseIdx = branchOrder.indexOf(extJijiArr[daeyunIdx]);
+    const prev = branchOrder[(baseIdx - 1 + 12) % 12];
+    if (jiji === prev) {
+      results.push(`${jiji}(병부)<span style="color:red;">[대운]</span>`);
+    }
+  }
+
+  // ③ 세운지 기준
+  const seunIdx = 5;
+  if (extJijiArr[seunIdx] && idx !== seunIdx) {
+    const baseIdx = branchOrder.indexOf(extJijiArr[seunIdx]);
+    const prev = branchOrder[(baseIdx - 1 + 12) % 12];
+    if (jiji === prev) {
+      results.push(`${jiji}(병부)<span style="color:red;">[세운]</span>`);
+    }
+  }
+
+  return results.length ? results.join(',') : 'X';
 }
 
 
 
+// 사부살 ///////////////////////////////////////////////
+if (sinsalName === '사부살') {
+  let results = [];
+
+  // ① 년지 기준
+  const yearIdx = 3;
+  const yearBase = extJijiArr[yearIdx];
+  if (idx !== yearIdx) {
+    const baseIdx = branchOrder.indexOf(yearBase);
+    const prev = branchOrder[(baseIdx - 1 + 12) % 12];
+    const 충자 = 충MAP[prev];
+    if (jiji === 충자) {
+      results.push(`${jiji}(사부)<span style="color:red;">[년지]</span>`);
+    }
+  }
+
+  // ② 대운지 기준
+  const daeyunIdx = 4;
+  if (extJijiArr[daeyunIdx] && idx !== daeyunIdx) {
+    const baseIdx = branchOrder.indexOf(extJijiArr[daeyunIdx]);
+    const prev = branchOrder[(baseIdx - 1 + 12) % 12];
+    const 충자 = 충MAP[prev];
+    if (jiji === 충자) {
+      results.push(`${jiji}(사부)<span style="color:red;">[대운]</span>`);
+    }
+  }
+
+  // ③ 세운지 기준
+  const seunIdx = 5;
+  if (extJijiArr[seunIdx] && idx !== seunIdx) {
+    const baseIdx = branchOrder.indexOf(extJijiArr[seunIdx]);
+    const prev = branchOrder[(baseIdx - 1 + 12) % 12];
+    const 충자 = 충MAP[prev];
+    if (jiji === 충자) {
+      results.push(`${jiji}(사부)<span style="color:red;">[세운]</span>`);
+    }
+  }
+
+  return results.length ? results.join(',') : 'X';
+}
+
+// 단교관살
+if (sinsalName === '단교관살') {
+  if (!monthJiji) return 'X';
+
+  const rels = 단교관살MAP[monthJiji] || [];
+
+  // 월지 칸 → 기준
+  if (idx === 2 && jiji === monthJiji) {
+    return `<span style="color:red;">기준</span>`;
+  }
+
+  // 일지, 시지 칸만 검사
+  if (idx === 0 || idx === 1) {
+    const hit = rels.find(r => r.target === jiji);
+    return hit ? `${hit.target}[${hit.tags?.[0] || ''}]` : 'X';
+  }
+
+  // 그 외 (년, 대운, 세운 등)
+  return 'X';
+}
 
 
+  const candidates = getSinsalForJiji(jiji, sinsalName, { monthJiji }) || [];
+  const exists = candidates.some(t => extJijiArr.includes(t));
+  return exists ? candidates.filter(t => extJijiArr.includes(t)).join(',') : 'X';
+});
 
-      const candidates = getSinsalForJiji(jiji, sinsalName, { monthJiji }) || [];
-      const exists = candidates.some(t => extJijiArr.includes(t));
-      return exists ? candidates.filter(t => extJijiArr.includes(t)).join(',') : 'X';
-    });
 
     // ========= 3) 간지 신살 (6칸) =========///////////////////////////////////////////////////////////////////////////////////
     // 기존: 사주간지 4칸만 → 변경: extGanjiArr(6칸) 기준으로 계산
 
-    const ganjiResults = extGanjiArr.map(ganji => {
+    const ganjiResults = extGanjiArr.map((ganji, idx) => {
   if (sinsalName === '공망살') {
     const dayGan  = sajuGanArr?.[1];
     const dayJiji = sajuJijiArr?.[1];
     const r = getSinsalForGanji(ganji, '공망살', { dayGan, dayBranch: dayJiji });
     return r.length ? r[0] : 'X'; // r[0]에 "공망[辰,巳]" 같은 완성 문자열이 들어 있음
+  }
+
+// 음양차착살
+if (sinsalName === '음양차착살') {
+  // 현재 ganji가 extGanjiArr에서 몇 번째인지 찾음
+  const idx = extGanjiArr.indexOf(ganji);
+
+  // 월지(idx===2), 일지(idx===1) 칸은 제외
+  if (idx === 3 || idx === 2) return 'X';
+
+  return 음양차착살Map[ganji]
+    ? `${ganji}(${음양차착살Map[ganji]})`
+    : 'X';
+}
+
+// 고란살
+  if (sinsalName === '고란살') {
+    // 년주(idx===3), 월주(idx===2), 시주(idx===0) 제외
+    const excluded = [0, 2, 3];
+    if (excluded.includes(idx)) return 'X';
+
+    return 고란살Map[ganji]
+      ? `${ganji}(${고란살Map[ganji]})`
+      : 'X';
+  }
+// 현침살
+  if (sinsalName === '현침살') {
+    const gan = (ganji || '').trim().charAt(0);
+    const ji  = (ganji || '').trim().charAt(1);
+
+
+    if (HYUNCHIM_SAL_MAP[gan] && HYUNCHIM_SAL_MAP[ji]) {
+      return `${ganji}(현침살)`; 
+    }
+    return 'X';
+  }
+
+    // 십악대패살
+  if (sinsalName === '십악대패살') {
+    if (십악대패살MAP[ganji]) {
+      return `${ganji}(십악대패살)`; 
+    }
+    return 'X';
   }
 
 
@@ -482,6 +701,10 @@ if (sinsalName === '천덕/월덕') {
         ? candidates.filter(gj => extGanjiArr.includes(stripTag(gj))).join(',')
         : 'X';
     });
+
+
+
+//////////////////////////////////////////////////////////////////////////////////끝//////////
 
     // 모두 X면 생략
 const type = getSinsalType(sinsalName);
@@ -494,8 +717,13 @@ const maskedGanji = (type === 'ganji' || (type === 'mixed' && sinsalName !== '�
                     : ganjiResults.map(() => '');
 
 // 모두 비거나 X면 행 생략 (빈칸도 생략 판정에 포함)
-const allX = [...maskedGan, ...maskedJiji, ...maskedGanji].every(v => !v || v === 'X');
+// 모두 비거나 X면 행 생략
+const allX = [...maskedGan, ...maskedJiji, ...maskedGanji].every(v => {
+  const txt = (v || '').replace(/<[^>]+>/g, '').trim(); // 태그 제거
+  return !txt || txt === 'X' || txt === '기준'; // 기준도 X 취급
+});
 if (allX) return '';
+
 
     // ▼ 데이터 행도 6칸씩 맞춰 출력 (천간/지지/간지 블록)
 return `
@@ -550,9 +778,9 @@ return `
 <tr>
 <td style="background:#efefef; color:red;">기준간지</td>
 
-  ${extGanArr.map(g  => `<td style="color:blue; background:#cfebfd;">${g  || '-'}</td>`).join('')}
-  ${extJijiArr.map(j  => `<td style="color:blue; background:#efcffd;">${j  || '-'}</td>`).join('')}
-  ${extGanjiArr.map(gj => `<td style="color:blue; background:#fdebcf;">${gj || '-'}</td>`).join('')}
+  ${extGanArr.map(g  => `<td style="color:red; background:#cfebfd;">${g  || '-'}</td>`).join('')}
+  ${extJijiArr.map(j  => `<td style="color:red; background:#efcffd;">${j  || '-'}</td>`).join('')}
+  ${extGanjiArr.map(gj => `<td style="color:red; background:#fdebcf;">${gj || '-'}</td>`).join('')}
 </tr>
 
 
@@ -583,6 +811,8 @@ ${sinsalRows
       if (YELLOW.includes(tdIdx)) baseStyle += 'background:#fff59d;';
       if (BLUE.includes(tdIdx))   baseStyle += 'background:#90caf9;';
       if (GREEN.includes(tdIdx))  baseStyle += 'background:#c8e6c9;'; // 연녹(#c8e6c9) 톤
+  // ✅ 글자 크기 줄이기
+  baseStyle += 'font-size:12px;';
 
       return `<td${attrs} style="${baseStyle}">`;
     }) + '</tr>';
@@ -591,7 +821,7 @@ ${sinsalRows
   
 </table>
 <div class="note-box" style="text-align:center">
-  ※ 일간,일지,일주 / 년간,년지,년주 / 대운,세운 칸들은 각각 노랑, 파랑, 초록 색깔로 구분함. 기준간지를 기준으로 신살적용됨.
+  ※ 일간,일지,일주 / 년간,년지,년주 / 대운,세운 칸들은 각각 노랑, 파랑, 초록 색깔로 구분함. <br>일반적으로 기준간지[<span style="color:red;">빨강</span>]를 기준으로 신살적용됨. 특정 간,지가 기준[<span style="color:red;">빨강</span>]인 경우 해당칸에 기준을 표기하였음.
 </div>
 `;
 
@@ -623,14 +853,48 @@ export function getSinsalForGan(gan, sinsalName) {
     if (sinsalName === '낙정관살') {
     return 낙정관살Map[gan] || [];
   }
+  ///건록/암록/금여록
 if (sinsalName === '건록/암록/금여록') {
   const rels = 건록_암록_금여록MAP[gan] || [];
   const hits = rels.filter(r => r.target === jiji); // 현재 칸 지지와 target 매칭
 
   return hits.length
+    ? hits.map(h => `${jiji}(${h.tags?.[0] || ''})`).join(',')
+    : 'X';
+}
+// 문창/학당
+if (sinsalName === '문창/학당') {
+  const rels = 문창_학당MAP[gan] || [];
+  // 현재 칸의 지지(jiji)와 target 매칭
+  const hits = rels.filter(r => r.target === jiji);
+
+  return hits.length
     ? hits.map(h => `${jiji}[${h.tags?.[0] || ''}]`).join(',')
     : 'X';
 }
+// 양인/비인
+if (sinsalName === '양인/비인') {
+  const rels = 양인_비인MAP[gan] || [];
+  // 현재 칸의 지지(jiji)와 target 매칭
+  const hits = rels.filter(r => r.target === jiji);
+
+  return hits.length
+    ? hits.map(h => `${jiji}[${h.tags?.[0] || ''}]`).join(',')
+    : 'X';
+}
+
+// 태극귀인
+if (sinsalName === '태극귀인') {
+  const rels = 태극귀인MAP[gan] || [];
+  // 현재 칸의 지지(jiji)와 target 매칭
+  const hits = rels.filter(r => r.target === jiji);
+
+  return hits.length
+    ? hits.map(h => `${jiji}[${h.tags?.[0] || ''}]`).join(',')
+    : 'X';
+}
+
+
 
   return [];
 }
@@ -640,7 +904,11 @@ if (sinsalName === '건록/암록/금여록') {
 /////지지기준 신살류///////////
 // 
 // 
-export function getSinsalForJiji(jiji, sinsalName, { monthJiji } = {}) {
+export function getSinsalForJiji(
+  jiji,
+  sinsalName,
+  { monthJiji, yearJiji, seunJiji, daeyunJiji } = {}
+) {
   //형충회합
   if (sinsalName === '형충회합') {
     if (!monthJiji) return []; // 안전망
@@ -677,7 +945,7 @@ if (sinsalName === '합방/공방살') {
 
   // 출력: target(태그) 형식
   return hits.length
-    ? hits.map(r => `${r.target}[${r.tags?.[0] || ''}]`)
+    ? hits.map(r => `${r.target}(${r.tags?.[0] || ''})`)
     : [];
 }
 //천덕월덕
@@ -688,14 +956,88 @@ if (sinsalName === '천덕/월덕') {
   const hit = rels.find(r => r.target === currentValue);
   return hit ? `${hit.target}[${hit.tags?.[0] || ''}]` : '';
 }
+// 상문/조객살 (년지 기준)
+if (sinsalName === '상문/조객') {
+  const yearJiji = sajuJijiArr[3]; // 기준: 년지 (인덱스 3)
+  if (!yearJiji) return '';
 
+  const rels = 상문_조객MAP[yearJiji] || [];
+
+  // 사주 원국의 년지 칸일 경우 '기준' 표기 (빨간색)
+  const isSajuYearCell = (idx === 3 && jiji === yearJiji);
+  if (isSajuYearCell) return `<span style="color:red;">기준</span>`;
+
+
+  const hit = rels.find(r => r.target === jiji);
+  return hit ? `${hit.target}[${hit.tags?.[0] || ''}]` : '';
+}
+
+  //급각살
+    if (sinsalName === '급각살') {
+    if (!monthJiji) return []; // 안전망
+    // 월지를 기준으로 target만 추출 → 문자열 배열
+    return (급각살MAP[monthJiji] || []).map(item =>
+      typeof item === 'string' ? item : item.target
+    );
+  }
+  //천의성
+    if (sinsalName === '천의성') {
+    if (!monthJiji) return []; // 안전망
+    // 월지를 기준으로 target만 추출 → 문자열 배열
+    return (천의성MAP[monthJiji] || []).map(item =>
+      typeof item === 'string' ? item : item.target
+    );
+  }
+
+      //천라지망
+    if (sinsalName === '천라지망') {
+    return 천라지망MAP[jiji] ? [`${jiji}(${천라지망MAP[jiji]})`] : [];
+  }
+
+ // 병부살 (년지, 세운지, 대운 기준)
+  if (sinsalName === '병부살') {
+    const 기준지지들 = [yearJiji, seunJiji, daeyunJiji].filter(Boolean);
+
+    for (const 기준 of 기준지지들) {
+      const 기준Idx = branchOrder.indexOf(기준);
+      if (기준Idx === -1) continue;
+
+      const prev = branchOrder[(기준Idx + 11) % 12]; // 이전 글자
+      if (prev === jiji) return [`${jiji}(병부살)`];
+    }
+    return [];
+  }
+
+  // 사부살 (병부살의 충 글자)
+  if (sinsalName === '사부살') {
+    const 기준지지들 = [yearJiji, seunJiji, daeyunJiji].filter(Boolean);
+
+    for (const 기준 of 기준지지들) {
+      const 기준Idx = branchOrder.indexOf(기준);
+      if (기준Idx === -1) continue;
+
+      const prev = branchOrder[(기준Idx + 11) % 12];
+      const 충자 = 충MAP[prev];
+      if (충자 === jiji) return [`${jiji}(사부살)`];
+    }
+    return [];
+  }
+
+//단교관살
+if (sinsalName === '단교관살') {
+  if (!monthJiji) return '';
+  const rels = 단교관살MAP[monthJiji] || [];
+  const currentValue = jiji; // gan 참조 제거
+  const hit = rels.find(r => r.target === currentValue);
+  return hit ? `${hit.target}[${hit.tags?.[0] || ''}]` : '';
+}
 
   //// 기타 신살은 빈 배열 반환
   return [];
 }
 
 
-/////간지기준 신살류///////////
+/////간지기준 신살류///////////////////////////////////////////////////////////
 
 export function getSinsalForGanji(ganji, sinsalName, context = {}) {
   // 내부 유틸
@@ -749,11 +1091,36 @@ if (sinsalName === '공망살') {
 
   // 현재 간지의 지지가 공망이면 '공망[지지,지지]' 출력
   if (voidBranches.includes(ji)) {
-    return [`공망[${voidBranches.join(',')}]`];
+    return [`공망(${voidBranches.join(',')})`];
   }
   return [];
 }
 
+  //음양차착살
+  if (sinsalName === '음양차착살') {
+    // 간여지동에 해당하면 "간지(불통살)" 형태로 반환
+    return 음양차착살Map[ganji] ? [`${ganji}(${음양차착살Map[ganji]})`] : [];
+  }
+  //고란살
+  if (sinsalName === '고란살') {
+    // 간여지동에 해당하면 "간지(불통살)" 형태로 반환
+    return 고란살Map[ganji] ? [`${ganji}(${고란살Map[ganji]})`] : [];
+  }
+
+  // ✅ 현침살 전용
+  if (sinsalName === '현침살') {
+
+    if (HYUNCHIM_SAL_MAP[gan] && HYUNCHIM_SAL_MAP[ji]) {
+      return [`${ganji}(현침살)`];   // ✅ 간지와 함께 출력
+    }
+    return []; // 없으면 빈 배열
+  }
+//십악대패살
+  if (십악대패살MAP[ganji]) {
+    return [`${ganji}(십악대패살)`]; // 배열로 반환 (다른 신살 추출 함수 스타일과 통일)
+  }
+  return [];
 
     return [];
   }
+

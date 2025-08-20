@@ -69,7 +69,7 @@ export function renderDaeyunTable({ daeyunAge, ageLabels, pairsToRender, birthYe
   const container = document.querySelector('.daeyun-table-container');
   if (!container) return;
 
-  console.log('✅ renderDaeyunTable: 전달된 sewonYear =', sewonYear);
+  //console.log('✅ renderDaeyunTable: 전달된 sewonYear =', sewonYear);
 
   // sewonYear가 숫자면 그대로, 문자열이면 parseFloat로 변환, 아니면 NaN 처리
   const baseSewonYear = typeof sewonYear === 'number'
@@ -148,19 +148,19 @@ export function highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD, opt
 
   const originalIndex = getCurrentDaeyunIndexFromStartAge(correctedStartAge, birthDateYMD);
   if (!Number.isInteger(originalIndex) || originalIndex < 0) {
-    console.warn('[daeyun] invalid originalIndex:', originalIndex);
+    //console.warn('[daeyun] invalid originalIndex:', originalIndex);
     return -1;
   }
 
   const tableRoot = container.querySelector('.daeyun-table-container');
   if (!tableRoot) {
-    console.warn('[daeyun] .daeyun-table-container not found.');
+    //console.warn('[daeyun] .daeyun-table-container not found.');
     return -1;
   }
 
   const tds = tableRoot.querySelectorAll('.daeyun-table tbody tr:nth-child(2) td'); // 대운 줄 td
   if (!tds.length) {
-    console.warn('[daeyun] daeyun tds not found. Make sure to call after rendering.');
+    //console.warn('[daeyun] daeyun tds not found. Make sure to call after rendering.');
     return -1;
   }
 
@@ -169,11 +169,11 @@ export function highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD, opt
     const arr = Array.from(tds);
     const tdIdx  = arr.findIndex(td => td.classList.contains(clsSelected));
     const cellIdx = arr.findIndex(td => td.querySelector('.daeyun-cell')?.classList.contains(clsSelected));
-    console.log(`[daeyun] ${label} selected -> td:${tdIdx} / .daeyun-cell:${cellIdx}`);
+    //console.log(`[daeyun] ${label} selected -> td:${tdIdx} / .daeyun-cell:${cellIdx}`);
     const el = tdIdx > -1 ? arr[tdIdx] : (cellIdx > -1 ? arr[cellIdx].querySelector('.daeyun-cell') : null);
     if (el) {
       const cs = getComputedStyle(el);
-      console.log('[daeyun] computed:', { background: cs.backgroundColor, outline: cs.outline, border: cs.border });
+     // console.log('[daeyun] computed:', { background: cs.backgroundColor, outline: cs.outline, border: cs.border });
     }
   };
   // -----------------------------------
@@ -187,7 +187,7 @@ export function highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD, opt
     else indexToSelect = Math.max(0, Math.min(tds.length - 1, indexToSelect));
   }
 
-  console.log('[daeyun] before-toggle:', { originalIndex, indexToSelect, tdsLen: tds.length });
+ //console.log('[daeyun] before-toggle:', { originalIndex, indexToSelect, tdsLen: tds.length });
   logSelected('before HIGHLIGHT');
 
   // 바인딩 & 초기 표시
@@ -211,7 +211,7 @@ export function highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD, opt
 
   const target = tds[indexToSelect];
   if (target) {
-    console.log('[daeyun] dispatch initial click ->', indexToSelect);
+   
     target.dispatchEvent(new Event('click', { bubbles: true }));
   }
 
@@ -219,8 +219,23 @@ export function highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD, opt
 }
 
 
+// ✅ 함수 밖 (같은 파일 상단 쯤에 두면 좋아요)
+function convertYearFractionToDate(yearFraction) {
+  const year = Math.floor(yearFraction);
+  const fraction = yearFraction - year;
+  const isLeap = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+  const daysInYear = isLeap ? 366 : 365;
 
+  const dayOfYear = Math.round(fraction * daysInYear);
+  const date = new Date(year, 0);
+  date.setDate(dayOfYear);
 
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+
+  return `${yyyy}.${mm}.${dd}`;
+}
 //세운 테이블 렌더링 함수
 export function renderYearlyGanjiSeries(baseYear, stems, branches) {
   const daeyunTable = document.querySelector('.daeyun-table tbody');
@@ -235,7 +250,11 @@ export function renderYearlyGanjiSeries(baseYear, stems, branches) {
   // 🎯 세운 제목 행 생성
   const titleRow = document.createElement('tr');
   titleRow.id = 'yearly-title-row';
-  titleRow.innerHTML = `<th colspan="10">세운시작년도: ${baseYear.toFixed(2)}</th>`;
+
+    // 🎯 날짜 변환 사용
+  const displayDate = convertYearFractionToDate(baseYear);
+  titleRow.innerHTML = `<th colspan="10">세운시작년도: ${baseYear.toFixed(2)} (대략${displayDate})</th>`;
+
   daeyunTable.appendChild(titleRow);
 
   // 🎯 세운 데이터 행 생성
@@ -302,21 +321,21 @@ attachSewoonClickListeners();
 // 현재년도 세운 자동 선택 로직 + 로그
   // ===============================
   const currentYear = new Date().getFullYear();
-  console.log("[세운] 현재년도:", currentYear);
+  //console.log("[세운] 현재년도:", currentYear);
 
   const cells = dataRow.querySelectorAll('.sewoon-cell');
-  console.log("[세운] 생성된 세운 셀 개수:", cells.length);
+  //console.log("[세운] 생성된 세운 셀 개수:", cells.length);
 
   const currentCell = Array.from(cells).find(cell => {
-    console.log("[세운] 셀 연도:", cell.dataset.year);
+    //console.log("[세운] 셀 연도:", cell.dataset.year);
     return cell.dataset.year.startsWith(String(currentYear));
   });
 
   if (currentCell) {
-    console.log("[세운] 현재년도 셀 발견:", currentCell.dataset.year);
+    //console.log("[세운] 현재년도 셀 발견:", currentCell.dataset.year);
     currentCell.click(); // attachSewoonClickListeners 통해 월운 렌더링
   } else {
-    console.warn("[세운] 현재년도 셀을 찾지 못했습니다.");
+   // console.warn("[세운] 현재년도 셀을 찾지 못했습니다.");
   }
 
 
@@ -406,7 +425,7 @@ export function attachSewoonClickListeners() {
       // 🔹 클릭한 셀 기준으로 정확한 위치 강조
       cells[index].classList.add('selected');
 
-      console.log('✅ 선택된 세운 셀:', cell.dataset.year); // ← 디버깅 로그
+      //console.log('✅ 선택된 세운 셀:', cell.dataset.year); // ← 디버깅 로그
 
 
       // 🔹 기존 로직: 인덱스는 보정해서 전달
@@ -415,10 +434,10 @@ export function attachSewoonClickListeners() {
       const branchKor = cell.dataset.branch;
       handleSewoonClick(year, stemKor, branchKor, correctedIndex);
 
-      console.log('1선택 세운 연도:', year);
-console.log('2선택 세운 천간:', stemKor);
-console.log('3선택 세운 지지:', branchKor);
-console.log('4correctedIndex:', correctedIndex);
+     // console.log('1선택 세운 연도:', year);
+//console.log('2선택 세운 천간:', stemKor);
+//console.log('3선택 세운 지지:', branchKor);
+//console.log('4correctedIndex:', correctedIndex);
     });
   });
 }
@@ -443,11 +462,11 @@ export function handleDaeyunClick(birthYear, birthMonth, birthDay, index) {
   // 🔍 클릭한 실제 대운 데이터
   const clickedPair = window.daeyunPairs[trueIndex];
   if (!clickedPair) {
-    console.warn(`대운 쌍이 존재하지 않습니다: trueIndex=${trueIndex}, 전체 개수=${window.daeyunPairs.length}`);
+    //console.warn(`대운 쌍이 존재하지 않습니다: trueIndex=${trueIndex}, 전체 개수=${window.daeyunPairs.length}`);
     return; // 또는 사용자에게 오류 메시지 표시
   }
   const { stem: clickedDaeyunStem, branch: clickedDaeyunBranch } = clickedPair;
-  console.log('🎯 클릭한 대운 간지:', clickedDaeyunStem, clickedDaeyunBranch);
+  //console.log('🎯 클릭한 대운 간지:', clickedDaeyunStem, clickedDaeyunBranch);
 
   const stemIndex = stemOrder.indexOf(clickedDaeyunStem);
   const branchIndex = branchOrder.indexOf(clickedDaeyunBranch);
@@ -649,10 +668,10 @@ export function arrangeByPosition(listOrMap) {
       }
     }
   }
-console.log("[DEBUG] 위치 1 아이템:", positionMap[0]);
-console.log("[DEBUG] 위치 4 아이템:", positionMap[3]);
+//console.log("[DEBUG] 위치 1 아이템:", positionMap[0]);
+//console.log("[DEBUG] 위치 4 아이템:", positionMap[3]);
 
-  console.log("[DEBUG] arrangeByPosition 결과:", positionMap);
+  //console.log("[DEBUG] arrangeByPosition 결과:", positionMap);
   return positionMap;
 }
 
@@ -682,7 +701,7 @@ export function renderDangryeongHeesinGisin(
   const cheonganHeesinByPos = arrangeByPosition(cheonganHeesinList);
   const jijiHeesinByPos = arrangeByPosition(jijiHeesinList);
   const jijiGisinByPos = arrangeByPosition(jijiGisinList);
-console.log("[DEBUG] jijiHeesinByPos at pos 4:", jijiHeesinByPos[3]);
+//console.log("[DEBUG] jijiHeesinByPos at pos 4:", jijiHeesinByPos[3]);
 
   const firstHeesinMap = {
     '癸': '甲', '甲': '癸', '乙': '丙', '丙': '乙',

@@ -114,6 +114,10 @@ const MONTH_TO_SOLAR_TERM = {
  * @param {Date} date - 년월일시 포함 Date 객체
  * @returns {Date} - 적용 절기의 절입일시 (Date 객체)
  */
+
+
+
+
 export function getJeolipDate(input1, input2, input3) {
   let year, month, day;
 

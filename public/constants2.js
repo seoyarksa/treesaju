@@ -4,6 +4,14 @@
 export const stemOrder = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
 export const branchOrder = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
 
+export const 충MAP = {
+  '子': '午', '午': '子',
+  '丑': '未', '未': '丑',
+  '寅': '申', '申': '寅',
+  '卯': '酉', '酉': '卯',
+  '辰': '戌', '戌': '辰',
+  '巳': '亥', '亥': '巳',
+};
 // (필요하면 다른 상수도 여기에 추가)
 export const elementMap = {
   甲: '木', 乙: '木',
@@ -527,6 +535,40 @@ export const  samhapGroups= [
   ['巳', '酉', '丑']
 ];
 
+export const johuBasis = ["丙","丁","戊","己","庚","辛","壬","癸","甲","乙","寅","卯","辰","巳","午","未","申","酉","戌","亥"];
+
+
+export const johuMap = {
+  "亥": "丙戊甲寅巳卯未",
+  "子": "丙戊甲寅午申辰",
+  "丑": "丙戊甲寅未巳酉",
+  "寅": "丁己辛酉申午戌",
+  "卯": "丁己辛酉酉亥未",
+  "辰": "丁己辛酉戌申子",
+  "巳": "壬戊庚申亥酉丑",
+  "午": "壬戊庚申子寅戌",
+  "未": "壬戊庚申丑亥卯",
+  "申": "癸己乙卯寅子辰",
+  "酉": "癸己乙卯卯巳丑",
+  "戌": "癸己乙卯辰寅午"
+};
+
+// 조후용신 자리별 의미
+export const johuMeaning = [
+  "환경제공",
+  "극복능력(자격,기술,지식)",
+  "방향성제공(인도,협력)",
+  "실물지원(먹거리,돈,자본)",
+  "장소이동(환경변화)",
+  "능력습득(삼합)",
+  "능력습득(삼합)"
+];
+
+
+
+
+
+
 
 export const GYEOKGUK_TYPES = {
   JEONGGWANG: '정관격',
@@ -872,6 +914,136 @@ export const 건록_암록_금여록MAP = {
     { target: '寅', tags: ['금여'] },
   ],
 };
+
+export const 문창_학당MAP = {
+  '甲': [
+    { target: '巳', tags: ['문창'] },
+    { target: '亥', tags: ['학당'] },
+    ],
+  '乙': [
+    { target: '午', tags: ['문창'] },
+    { target: '午', tags: ['학당'] },
+    ],
+  '丙': [
+    { target: '申', tags: ['문창'] },
+    { target: '寅', tags: ['학당'] },
+    ],
+  '丁': [
+    { target: '酉', tags: ['문창'] },
+    { target: '酉', tags: ['학당'] },
+    ],
+  '戊': [
+    { target: '申', tags: ['문창'] },
+    { target: '寅', tags: ['학당'] },
+    ],
+  '己': [
+    { target: '酉', tags: ['문창'] },
+    { target: '酉', tags: ['학당'] },
+    ],
+  '庚': [
+    { target: '亥', tags: ['문창'] },
+    { target: '巳', tags: ['학당'] },
+    ],
+  '辛': [
+    { target: '子', tags: ['문창'] },
+    { target: '子', tags: ['학당'] },
+    ],
+  '壬': [
+    { target: '寅', tags: ['문창'] },
+    { target: '申', tags: ['학당'] },
+    ],
+  '癸': [
+    { target: '卯', tags: ['문창'] },
+    { target: '卯', tags: ['학당'] },
+    ],
+};
+
+export const 양인_비인MAP = {
+  '甲': [
+    { target: '卯', tags: ['양인'] },
+    { target: '酉', tags: ['비인'] },
+    ],
+  '乙': [
+    { target: '辰', tags: ['양인'] },
+    { target: '戌', tags: ['비인'] },
+    ],
+  '丙': [
+    { target: '午', tags: ['양인'] },
+    { target: '子', tags: ['비인'] },
+    ],
+  '丁': [
+    { target: '未', tags: ['양인'] },
+    { target: '丑', tags: ['비인'] },
+    ],
+  '庚': [
+    { target: '酉', tags: ['양인'] },
+    { target: '卯', tags: ['비인'] },
+    ],
+  '辛': [
+    { target: '戌', tags: ['양인'] },
+    { target: '辰', tags: ['비인'] },
+    ],
+  '壬': [
+    { target: '子', tags: ['양인'] },
+    { target: '午', tags: ['비인'] },
+    ],
+  '癸': [
+    { target: '丑', tags: ['양인'] },
+    { target: '未', tags: ['비인'] },
+    ],
+};
+
+
+export const 태극귀인MAP = {
+  '甲': [
+    { target: '子', tags: ['태극'] },
+    { target: '午', tags: ['태극'] },
+    ],
+  '乙': [
+    { target: '子', tags: ['태극'] },
+    { target: '午', tags: ['태극'] },
+    ],
+  '丙': [
+    { target: '卯', tags: ['태극'] },
+    { target: '酉', tags: ['태극'] },
+    ],
+  '丁': [
+    { target: '卯', tags: ['태극'] },
+    { target: '酉', tags: ['태극'] },
+    ],
+  '戊': [
+    { target: '辰', tags: ['태극'] },
+    { target: '戌', tags: ['태극'] },
+    ],
+  '己': [
+    { target: '丑', tags: ['태극'] },
+    { target: '未', tags: ['태극'] },
+    ],
+  '庚': [
+    { target: '寅', tags: ['태극'] },
+    { target: '亥', tags: ['태극'] },
+    ],
+  '辛': [
+    { target: '寅', tags: ['태극'] },
+    { target: '亥', tags: ['태극'] },
+    ],
+  '壬': [
+    { target: '巳', tags: ['태극'] },
+    { target: '申', tags: ['태극'] },
+    ],
+  '癸': [
+    { target: '巳', tags: ['태극'] },
+    { target: '申', tags: ['태극'] },
+    ],
+};
+
+    export const HYUNCHIM_SAL_MAP = {
+      // 천간
+      '甲': true, '辛': true, '丁': true, '戊': true,
+      // 지지
+      '卯': true, '午': true, '未': true, '申': true, '酉': true, '子': true, '戌': true,
+    };
+
 
 //////지지신살/////////////////////////////////////////////////////////////////////
 export const 형충회합Map = {
@@ -1220,6 +1392,125 @@ export const 천덕_월덕MAP = {
    
 };
 
+export const 상문_조객MAP = {
+  '子': [
+    { target: '寅', tags: ['상문'] },
+    { target: '戌', tags: ['조객'] }],
+  '丑': [
+    { target: '卯', tags: ['상문'] },
+    { target: '亥', tags: ['조객'] }],
+  '寅': [
+    { target: '辰', tags: ['상문'] },
+    { target: '子', tags: ['조객'] }],
+  '卯': [
+    { target: '巳', tags: ['상문'] },
+    { target: '丑', tags: ['조객'] }],
+  '辰': [
+    { target: '午', tags: ['상문'] },
+    { target: '寅', tags: ['조객'] }],
+  '巳': [
+    { target: '未', tags: ['상문'] },
+    { target: '卯', tags: ['조객'] }],
+  '午': [
+    { target: '申', tags: ['상문'] },
+    { target: '辰', tags: ['조객'] }],
+  '未': [
+    { target: '酉', tags: ['상문'] },
+    { target: '巳', tags: ['조객'] }],
+  '申': [
+    { target: '戌', tags: ['상문'] },
+    { target: '午', tags: ['조객'] }],
+  '酉': [
+    { target: '亥', tags: ['상문'] },
+    { target: '未', tags: ['조객'] }],
+  '戌': [
+    { target: '子', tags: ['상문'] },
+    { target: '申', tags: ['조객'] }],
+  '亥': [
+    { target: '丑', tags: ['상문'] },
+    { target: '酉', tags: ['조객'] }],
+   
+};
+
+
+export const 급각살MAP = {
+  '子': [
+    { target: '辰', tags: ['급각'] },
+    { target: '丑', tags: ['급각'] }],
+  '丑': [
+    { target: '辰', tags: ['급각'] },
+    { target: '丑', tags: ['급각'] }],
+  '寅': [
+    { target: '亥', tags: ['급각'] },
+    { target: '子', tags: ['급각'] }],
+  '卯': [
+    { target: '亥', tags: ['급각'] },
+    { target: '子', tags: ['급각'] }],
+  '辰': [
+    { target: '亥', tags: ['급각'] },
+    { target: '子', tags: ['급각'] }],
+  '巳': [
+    { target: '卯', tags: ['급각'] },
+    { target: '未', tags: ['급각'] }],
+  '午': [
+    { target: '卯', tags: ['급각'] },
+    { target: '未', tags: ['급각'] }],
+  '未': [
+    { target: '卯', tags: ['급각'] },
+    { target: '未', tags: ['급각'] }],
+  '申': [
+    { target: '寅', tags: ['급각'] },
+    { target: '戌', tags: ['급각'] }],
+  '酉': [
+    { target: '寅', tags: ['급각'] },
+    { target: '戌', tags: ['급각'] }],
+  '戌': [
+    { target: '寅', tags: ['급각'] },
+    { target: '戌', tags: ['급각'] }],
+  '亥': [
+    { target: '辰', tags: ['급각'] },
+    { target: '丑', tags: ['급각'] }],
+   
+};
+
+
+export const 천의성MAP = {
+  '子': [{ target: '亥', tags: ['천의성'] }],
+  '丑': [{ target: '子', tags: ['천의성'] }],
+  '寅': [{ target: '丑', tags: ['천의성'] }],
+  '卯': [{ target: '寅', tags: ['천의성'] }],
+  '辰': [{ target: '卯', tags: ['천의성'] }],
+  '巳': [{ target: '辰', tags: ['천의성'] }],
+  '午': [{ target: '巳', tags: ['천의성'] }],
+  '未': [{ target: '午', tags: ['천의성'] }],
+  '申': [{ target: '未', tags: ['천의성'] }],
+  '酉': [{ target: '申', tags: ['천의성'] }],
+  '戌': [{ target: '酉', tags: ['천의성'] }],
+  '亥': [{ target: '戌', tags: ['천의성'] }],
+};
+
+export const 천라지망MAP = {
+  '辰': [{ target: '巳', tags: ['지망'] }],
+  '巳': [{ target: '辰', tags: ['지망'] }],
+  '戌': [{ target: '亥', tags: ['천라'] }],
+  '亥': [{ target: '戌', tags: ['천라'] }],
+   
+};
+
+export const 단교관살MAP = {
+  '子': [{ target: '亥', tags: ['단교관'] }],
+  '丑': [{ target: '子', tags: ['단교관'] }],
+  '寅': [{ target: '寅', tags: ['단교관'] }],
+  '卯': [{ target: '卯', tags: ['단교관'] }],
+  '辰': [{ target: '申', tags: ['단교관'] }],
+  '巳': [{ target: '丑', tags: ['단교관'] }],
+  '午': [{ target: '戌', tags: ['단교관'] }],
+  '未': [{ target: '酉', tags: ['단교관'] }],
+  '申': [{ target: '辰', tags: ['단교관'] }],
+  '酉': [{ target: '巳', tags: ['단교관'] }],
+  '戌': [{ target: '午', tags: ['단교관'] }],
+  '亥': [{ target: '未', tags: ['단교관'] }],
+};
 ////간지신살///////////////////////////////////////////////////////////////////////
 // 백호살 간지 (한자) - 객체(맵)
 export const BAEKHO_SAL_GANJI_MAP = {
@@ -1286,4 +1577,42 @@ export const 재고귀인Map = {
   '己丑': true, 
   '辛未': true, 
   '壬戌': true
+};
+
+export const 음양차착살Map = {
+  '辛卯': '음',
+  '辛酉': '음',
+  '丁未': '음',
+  '丁丑': '음',
+  '癸巳': '음',
+  '癸亥': '음',
+  '丙午': '양',
+  '丙子': '양',
+  '壬辰': '양',
+  '壬戌': '양',
+  '戊申': '양',
+  '戊寅': '양',
+};
+
+
+export const 고란살Map = {
+  '辛亥': '고란',
+  '戊申': '고란',
+  '丁巳': '고란',
+  '甲寅': '고란',
+  '乙巳': '고란',
+};
+
+// 십악대패살 상수맵
+export const 십악대패살MAP = {
+  '甲辰': true,
+  '乙巳': true,
+  '丙申': true,
+  '丁亥': true,
+  '戊戌': true,
+  '己丑': true,
+  '庚辰': true,
+  '辛巳': true,
+  '壬申': true,
+  '癸亥': true,
 };

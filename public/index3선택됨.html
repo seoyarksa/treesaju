@@ -145,6 +145,34 @@
   margin-right: auto;
 }
 
+#basic-section, #sinsal-section {
+  display: none;
+}
+
+
+.tooltip {
+  position: relative;
+  cursor: help;
+}
+
+.tooltip::after {
+  content: attr(data-desc);
+  position: absolute;
+  background: #333;
+  color: #fff;
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(-120%);
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+.tooltip:hover::after {
+  opacity: 1;
+}
 
 </style>
 
@@ -261,7 +289,10 @@
   <option value="58">58분</option>
   <option value="59">59분</option>
 </select><br />
-<button type="submit" class="btn-success">사주 출력</button>
+<button type="submit" class="btn-success">사주식 출력</button>
+<button type="button" id="sinsalBtn" class="btn-success">신살보기</button>
+
+
 
 
   </form>
@@ -269,9 +300,31 @@
 <div class="note-box">
   ※ 태어난 분대가 20~40분(30분 근처)에 있는 분은 정확한 시주가 산출되지 않을 수도 있으니 따로 확인해 주세요! 한국썸머타임은 적용된 상태입니다. 
 </div>
-  <div id="result" style="display: none;"></div>
+<div id="result" style="display:none;">
 
-  <div id="today-saju-container" style="margin-top:30px;display: none;"></div>
+  <!-- 공통 (항상 표시) -->
+  <div id="common-section">
+    <div id="birth-info"></div>
+    <div id="ganji-table"></div>
+    <div id="today-saju-container" style="margin-top:30px;"></div>
+    <div id="daeyun-table-container" class="daeyun-table-container"></div>
+    <div id="yearly-series"></div>
+  </div>
+
+  <!-- 기본 모드 -->
+  <div id="basic-section"  style="display:none;">
+  <div id="dangryeong-table"  class="dangryeong-table"></div>
+  </div>
+
+  <!-- 신살류 모드 -->
+  <div id="sinsal-section"  style="display:none;">
+    <div id="sinsal-box"></div>
+    <div id="etc-sinsal-box"></div>
+  </div>
+
+</div>
+
+
 
   <div id="question-box" style="margin-top: 40px; padding: 20px; border-top: 1px solid #ccc;">
     <h3>질문하기</h3>
@@ -285,6 +338,7 @@
 <!-- EmailJS SDK 추가 -->
 <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
 <script type="module" src="app.js"></script>
+
    <script>
     flatpickr("#birthdate", {
       dateFormat: "Y-m-d",
@@ -294,6 +348,27 @@
       defaultDate: "1969-08-23" //초기날짜값
     });
   </script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const btn = document.getElementById("sinsalBtn");
+    if (btn) {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+
+        const result = document.getElementById("result");
+        const basic = document.getElementById("basic-section");
+        const sinsal = document.getElementById("sinsal-section");
+
+        if (result && basic && sinsal) {
+          result.style.display = "block";
+          basic.style.display = "none";
+          sinsal.style.display = "block";
+        }
+      });
+    }
+  });
+</script>
+
 </body>
 </html>
 

@@ -19,7 +19,8 @@ import {
         GISIN_BY_DANGRYEONG_POSITION,
         tenGodMap,
         tenGodMapKor,
-        SARYEONGSHIK_MAP_WITH_ROLE
+        SARYEONGSHIK_MAP_WITH_ROLE,
+        johuBasis, johuMap, johuMeaning
         } from './constants.js';
 import { elementColors,arrangeByPosition} from './renderUtils.js';
 
@@ -35,7 +36,7 @@ export async function getJeolipDateFromAPI(year, month, day) {
     throw new Error(`API 요청 실패: ${res.status}`);
   }
   const data = await res.json();
-  console.log("getJeolipDateFromAPI response:", data);
+  //console.log("getJeolipDateFromAPI response:", data);
 
   // 로컬: data.date, 서버: data.jeolipDate 대응
   return new Date(data.jeolipDate || data.date);
@@ -396,7 +397,7 @@ export function getDangryeong(monthJi, daeyunAge, daYunDirection) {
 
 
 export function getSaryeong(monthJi, daeyunAge, direction) {
-  console.log('[getSaryeong] monthJi:', monthJi, 'daeyunAge:', daeyunAge, 'direction:', window.daYunDirection);
+  //console.log('[getSaryeong] monthJi:', monthJi, 'daeyunAge:', daeyunAge, 'direction:', window.daYunDirection);
   if (direction === undefined) {
     throw new Error("⚠️ 대운 방향(direction)이 정의되지 않았습니다.");
   }
@@ -406,7 +407,7 @@ export function getSaryeong(monthJi, daeyunAge, direction) {
 
   const [early, late] = saryeongMap[monthJi];
   const scaledValue = daeyunAge * 3;
-  console.log('[getSaryeong] scaledValue:', scaledValue);
+  //console.log('[getSaryeong] scaledValue:', scaledValue);
 
   if (direction === -1) {
     return scaledValue >= 15 ? late : early;
@@ -516,7 +517,7 @@ export function extractCheonganHeesinGisin(dangryeong, sajuCheonganList) {
 
 
 export function extractJijiSibgansWithMiddleInfo(sajuJijiArray) {
-  console.log('[DEBUG] extractJijiSibgansWithMiddleInfo 호출됨, 입력값:', sajuJijiArray);
+  //console.log('[DEBUG] extractJijiSibgansWithMiddleInfo 호출됨, 입력값:', sajuJijiArray);
   const sibganList = [];
 
   sajuJijiArray
@@ -534,7 +535,7 @@ export function extractJijiSibgansWithMiddleInfo(sajuJijiArray) {
       });
     });
 
-  console.log('[DEBUG] 지지희기신 추출전 지장간 리스트:', sibganList);
+  //console.log('[DEBUG] 지지희기신 추출전 지장간 리스트:', sibganList);
   return sibganList;
 }
 
@@ -550,7 +551,7 @@ export function extractJijiHeesinGisin(dangryeong, sajuJijiArray) {
   const gisinMap = GISIN_BY_DANGRYEONG_POSITION[dangryeong] || {};
 
   if (!Array.isArray(sajuJijiArray)) {
-    console.error('[ERROR] sajuJijiArray가 유효하지 않음:', sajuJijiArray);
+    //console.error('[ERROR] sajuJijiArray가 유효하지 않음:', sajuJijiArray);
     throw new Error('sajuJijiArray는 배열이어야 합니다.');
   }
 
@@ -596,5 +597,217 @@ export function extractJijiHeesinGisin(dangryeong, sajuJijiArray) {
     jijiHeesinList,
     jijiGisinList
   };
+}
+
+
+
+
+/////조후용신파트//////////////////////
+
+export function extractSajuGanList(saju) {
+  const { yearGan, monthGan, dayGan, hourGan, yearBranch, monthBranch, dayBranch, hourBranch } = saju;
+
+  console.log("🟢 extractSajuGanList called with saju:", saju);
+
+  // 1) 천간
+  const ganListFromCheongan = [yearGan, monthGan, dayGan, hourGan].map(g => ({
+    gan: g,
+    tag: "天",
+    isMiddle: false
+  }));
+  console.log("🔹 ganListFromCheongan:", ganListFromCheongan);
+
+  // 2) 지지 → 지장간
+  const ganListFromJiji = [yearBranch, monthBranch, dayBranch, hourBranch]
+    .flatMap(j => {
+      console.log("👉 처리중인 지지:", j, " → 매핑:", jijiToSibganMap[j]);
+      return (jijiToSibganMap[j] || [])
+        .filter(obj => obj.char)
+        .map(obj => ({
+          gan: obj.char,
+          tag: "地",
+          isMiddle: obj.isMiddle || false
+        }));
+    });
+  console.log("🔹 ganListFromJiji:", ganListFromJiji);
+
+  // 3) 합치기
+  const all = [...ganListFromCheongan, ...ganListFromJiji];
+  console.log("✅ combined before sort:", all);
+
+  // 4) 십간 순서 정렬
+  all.sort((a, b) => stemOrder.indexOf(a.gan) - stemOrder.indexOf(b.gan));
+  console.log("✅ final sorted:", all);
+
+  return all;
+}
+
+//중복 천간 *숫자형
+// 중복 천간 *숫자형
+//중복 천간 *숫자형
+function formatGanList(ganList, tag) {
+  const countMap = new Map();
+
+  ganList.filter(m => m.tag === tag).forEach(m => {
+    const mark = m.isMiddle ? "(中)" : "";
+    const key = `${m.gan}${mark}`;
+    countMap.set(key, (countMap.get(key) || 0) + 1);
+  });
+
+  return Array.from(countMap.entries())
+    .map(([key, count]) => {
+      return count > 1 
+        ? `${key}<span style="color:blue;">*${count}</span>` 
+        : key;
+    })
+    .join(", ");
+}
+
+
+
+///조후용신 나열
+export function renderJohuCell(saju) {
+  const ganList = extractSajuGanList(saju);
+  // ✅ 적용타입 계산:조화판단
+  const applyType = getJohuApplyType(saju);
+  console.log("조후용신 적용 타입:", applyType);
+// 1행: 천간 나열
+const rowTop = `<tr><td colspan="9" style="text-align:left; padding:4px;">` 
+  + `사주(천간): ` 
+  + formatGanList(ganList, "天")   // (中) 표시는 그대로 유지
+  + `</td></tr>`;
+
+// 2행: 지지 나열
+const rowMiddle = `<tr><td colspan="9" style="text-align:left; padding:4px;">`
+  + `사주(지지): `
+  + formatGanList(ganList, "地")   // (中) 표시는 그대로 유지
+  + `</td></tr>`;
+
+
+  // 3·4행: 조후용신 (9칸 구조)
+  const johuChars = (johuMap[saju.monthBranch] || "").split("");
+  const allGans = ganList.map(m => m.gan);
+
+// 원국 천간 + 지지 (지장간 제외)
+const baseGans = [
+  saju.yearGan, saju.monthGan, saju.dayGan, saju.hourGan,
+  saju.yearBranch, saju.monthBranch, saju.dayBranch, saju.hourBranch
+];
+
+
+// 기준 행
+const johuRow1 = `
+  <tr>
+    <td rowspan="2" style="background-color:#e6f0ff;">조후용신<br>[적용:<span style="color:red;">${applyType}</span>]</td>
+    <td style="background-color:#fff8dc;">기준</td>
+    ${johuChars.map((ch, i) => {
+      const desc = johuMeaning[i] || "";
+      console.log(`📌 기준 ${i}번째: ${ch}, 설명: ${desc}`);
+      return `<td style="background-color:#fff8dc;">${ch ? `<span class="tooltip" data-desc="${desc}">${ch}</span>` : ""}</td>`;
+    }).join("")}
+  </tr>
+`;
+
+// 보유 행
+const johuRow2 = `
+  <tr>
+    <td>보유</td>
+    ${johuChars.map((ch, i) => {
+      if (!ch) return `<td></td>`;
+      const isOwned = baseGans.includes(ch);   // 천간+지지에서만 검사
+      const desc = johuMeaning[i] || "";
+      return isOwned 
+        ? `<td><span class="tooltip" data-desc="${desc}" style="color:red">${ch}</span></td>`
+        : `<td></td>`;
+    }).join("")}
+  </tr>
+`;
+
+// 3행: 태과불급
+const johuRow3 = `
+  <tr>
+    <td colspan="9" style="text-align:left; padding:4px; color:purple;">
+      태과불급: ${calculateTaegwaBulgeup(saju)}
+    </td>
+  </tr>
+`;
+
+  return `
+    <table style="border-collapse:collapse;width:100%;text-align:center;" border="1">
+      ${rowTop}
+      ${rowMiddle}
+      ${johuRow1}
+      ${johuRow2}
+      ${johuRow3}
+    </table>
+  `;
+}
+
+
+
+///조화확인
+export function getJohuApplyType(saju) {
+  const { monthBranch, yearGan, monthGan, dayGan, hourGan,
+          yearBranch, dayBranch, hourBranch } = saju;
+
+  if (!monthBranch) return "無";
+
+  // 월지 그룹별 목표 천간
+  const targetMap = {
+    "亥子丑": "辛",
+    "寅卯辰": "癸",
+    "巳午未": "乙",
+    "申酉戌": "丁",
+  };
+
+  let target = null;
+  for (const group in targetMap) {
+    if (group.includes(monthBranch)) {
+      target = targetMap[group];
+      break;
+    }
+  }
+  if (!target) return "無";
+
+  // 1) 천간 확인 (년,월,일,시)
+  const cheongan = [yearGan, monthGan, dayGan, hourGan];
+  if (cheongan.includes(target)) return "양";
+
+  // 2) 지지(중기 제외) → 지장간 펼치기
+  const branches = [yearBranch, monthBranch, dayBranch, hourBranch];
+  for (const br of branches) {
+    const sibganList = jijiToSibganMap[br] || [];
+    const found = sibganList.find(obj => obj.char === target && !obj.isMiddle);
+    if (found) return "중";
+  }
+// 2-1) 삼합 보정 체크
+const SAMHAP_SUPPORT = {
+    "酉-丑": "辛", "丑-酉": "辛",
+    "子-辰": "癸", "辰-子": "癸",
+    "卯-未": "乙", "未-卯": "乙",
+    "午-戌": "丁", "戌-午": "丁",
+  };
+for (const br of branches) {
+  const key = `${monthBranch}-${br}`;
+  if (SAMHAP_SUPPORT[key]) {
+    const targetFromSamhap = SAMHAP_SUPPORT[key];
+    if (targetFromSamhap === target) {
+      console.log("🟢 삼합 보정으로 양 판정:", key, "=>", targetFromSamhap);
+      return "양";
+    }
+  }
+}
+  // 3) 없으면 음
+  return "음";
+}
+
+
+
+//태과불급 함수
+
+function calculateTaegwaBulgeup(saju) {
+  // 📌 임시: 아직 규칙 미정
+  // 나중에 구체적인 알고리즘 넣을 자리
+  return "계산중...";
 }
 

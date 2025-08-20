@@ -157,20 +157,6 @@ function getTimeIndexByHourMinute(hour, minute) {
 
 // 간지 계산
 
-const MONTH_TO_SOLAR_TERM = {
-  1: '소한',   // 1월 시작 절기 (소한) → 입춘 이전 절기
-  2: '입춘',   // 2월 시작 절기 (입춘)
-  3: '경칩',
-  4: '청명',
-  5: '입하',
-  6: '망종',
-  7: '소서',
-  8: '입추',
-  9: '백로',
-  10: '한로',
-  11: '입동',
-  12: '대설',
-};
 
 /**
  * 양력 기준 절기월 인덱스 구하기 (입춘을 1월 인덱스로)
@@ -178,37 +164,64 @@ const MONTH_TO_SOLAR_TERM = {
  * @returns {number} 0~11 (0=입춘(인월))
  */
 function getSolarTermMonthIndex(date) {
-  const year = date.getFullYear()
-  const solarTerms = getSolarTermDates(year);
-console.log(solarTerms.map(t => `${t.name}: ${dayjs(t.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss')}`));
+  const year = date.getFullYear();
+  const solarTerms = [
+    ...getSolarTermDates(year - 1),
+    ...getSolarTermDates(year),
+    ...getSolarTermDates(year + 1)
+  ];
 
-  // 입춘 기준 절기월 시작 절기명 배열 (12개)
-  const termNames = [
-    '입춘', '경칩', '청명', '입하', '망종', '소서',
-    '입추', '백로', '한로', '입동', '대설', '소한'
-  ]
-  const monthStartDates = termNames.map(name => {
-    const term = solarTerms.find(t => t.name === name)
-    if (!term) throw new Error(`${name} 절기 데이터 없음`)
-    return new Date(term.date)
-  })
+  const termToBranchIndex = {
+    '입춘': 0,  // 寅
+    '경칩': 1,  // 卯
+    '청명': 2,  // 辰
+    '입하': 3,  // 巳
+    '망종': 4,  // 午
+    '소서': 5,  // 未
+    '입추': 6,  // 申
+    '백로': 7,  // 酉
+    '한로': 8,  // 戌
+    '입동': 9,  // 亥
+    '대설': 10, // 子
+    '소한': 11  // 丑
+  };
 
-  const dateKST = dayjs(date).tz('Asia/Seoul')
-  for(let i=0; i<monthStartDates.length; i++){
-    const start = dayjs(monthStartDates[i]).tz('Asia/Seoul')
-    const end = dayjs(monthStartDates[(i+1) % monthStartDates.length]).tz('Asia/Seoul')
-    // console.log(`[절기 월 비교] 인덱스: ${i}, 절기명: ${termNames[i]}, 시작일: ${start.format('YYYY-MM-DD HH:mm:ss')}, 다음 절기 시작일: ${end.format('YYYY-MM-DD HH:mm:ss')}, 비교일: ${dateKST.format('YYYY-MM-DD HH:mm:ss')}`);
+  // 해당 시점 기준 ±1년치 절기들을 시간순으로 정렬
+  const monthStartDates = solarTerms
+    .filter(t => termToBranchIndex.hasOwnProperty(t.name))
+    .map(t => ({ name: t.name, date: new Date(t.date) }))
+    .sort((a, b) => a.date - b.date);
 
-    // 절기 월 범위 체크 (start 이상 end 미만)
-    if(dateKST.isAfter(start) || dateKST.isSame(start)){
-      if(dateKST.isBefore(end)){
-         console.log(`[절기 월 결정] 인덱스: ${i}, 절기명: ${termNames[i]}`);
-        return i // 0부터 시작, 입춘=0
-      }
+  const dateKST = dayjs(date).tz('Asia/Seoul');
+
+  for (let i = 0; i < monthStartDates.length; i++) {
+    const start = dayjs(monthStartDates[i].date).tz('Asia/Seoul');
+    let end;
+
+    if (i === monthStartDates.length - 1) {
+      // 마지막 → 다음 입춘까지
+      const nextIpchun = solarTerms.find(
+        t => t.name === '입춘' && new Date(t.date) > monthStartDates[i].date
+      );
+      if (!nextIpchun) throw new Error(`다음해 입춘 데이터 없음`);
+      end = dayjs(nextIpchun.date).tz('Asia/Seoul');
+    } else {
+      end = dayjs(monthStartDates[i+1].date).tz('Asia/Seoul');
+    }
+
+    if ((dateKST.isAfter(start) || dateKST.isSame(start)) && dateKST.isBefore(end)) {
+      const term = monthStartDates[i].name;
+      const idx = termToBranchIndex[term];
+      console.log(`[절기 월 결정] ${term} 시작 → 인덱스 ${idx}`);
+      return idx;
     }
   }
-  return 11 // 대한 이후면 대한월(11)
+
+  return 11; // fallback
 }
+
+
+
 
 /**
  * 월간 천간 계산
@@ -242,6 +255,57 @@ function getMonthGan(yearGanjiYear, solarTermMonthIndex) {
   return monthGan;
 }
 
+
+
+// 천간, 지지 배열
+
+/**
+ * 일주 계산 (solarlunar 사용하지 않고 직접 계산)
+ * 기준: 1900-02-02 (갑자일)
+ */
+function getDayGanji(year, month, day) {
+  const baseDate = new Date(1900, 1, 19); // 갑자일
+  const targetDate = new Date(year, month - 1, day);
+
+  const diffDays = Math.floor((targetDate - baseDate) / (1000 * 60 * 60 * 24));
+
+  if (isNaN(diffDays)) {
+    throw new Error("유효하지 않은 날짜입니다.");
+  }
+
+  const stemIndex = diffDays % 10;   // 천간은 10일 주기
+  const branchIndex = diffDays % 12; // 지지는 12일 주기
+
+  return heavenlyStems[(0 + stemIndex + 10) % 10] + earthlyBranches[(0 + branchIndex + 12) % 12];
+}
+
+
+
+
+/**
+ * 입춘 기준으로 년주 보정
+ */
+function getYearGanjiByJeolip(year, birthDate) {
+  const heavenlyStems = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
+  const earthlyBranches = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+
+  // ✅ 기준: 1864년 = 甲子년
+  const baseYear = 1864;
+  const baseStemIndex = 0;  // 甲
+  const baseBranchIndex = 0; // 子
+
+  // 출생 연도의 입춘 시각
+  const ipchun = getSolarTermDates(year).find(t => t.name === '입춘');
+  const ipchunDate = new Date(ipchun.date);
+
+  // 입춘 이전 출생 → 전년도
+  const targetYear = (birthDate < ipchunDate) ? year - 1 : year;
+
+  const diff = targetYear - baseYear;
+  const stem = heavenlyStems[(baseStemIndex + diff) % 10];
+  const branch = earthlyBranches[(baseBranchIndex + diff) % 12];
+  return stem + branch;
+}
 /**
  * 수정된 getGanji 함수
  * @param {number} year 양력 년
@@ -251,79 +315,61 @@ function getMonthGan(yearGanjiYear, solarTermMonthIndex) {
  * @param {number} minute 분 (0~59)
  * @returns {{year:string, month:string, day:string, time:string}} 간지 결과
  */
+
+
+
+
 export function getGanji(year, month, day, hour, minute) {
   console.log('[getGanji] 입력값:', { year, month, day, hour, minute });
 
-  const lunarDate = solarlunar.solar2lunar(year, month, day);
-  console.log('[getGanji] lunarDate:', lunarDate);
+  // 출생 시각 (KST 기준)
+  const birthDate = new Date(year, month - 1, day, hour, minute);
 
-  const dayGanji = lunarDate.gzDay;
+  // 1) 일주 계산 (기존 로직 그대로)
+  const dayGanji = getDayGanji(year, month, day);
   const dayGanHan = dayGanji.charAt(0);
-  const dayGanKor = hanToKor(dayGanHan);
-  console.log('[getGanji] 일간 한자:', dayGanHan, '→ 한글:', dayGanKor);
+  console.log('[getGanji] 일간지:', dayGanji);
 
-  const yearGanji = lunarDate.gzYear;
-  const yearGanHan = yearGanji.charAt(0);
-  console.log('[getGanji] 연간 한자:', yearGanHan);
+  // 2) 년주 계산 (solarlunar + 입춘 보정)
+  const lunarDate = solarlunar.solar2lunar(year, month, day);
+  let yearGanji = lunarDate.gzYear;
 
-  // 절기월 인덱스 계산 (입춘=0)
-  const solarTermMonthIndex = getSolarTermMonthIndex(new Date(year, month - 1, day, hour, minute));
-  console.log('[getGanji] 절기월 인덱스:', solarTermMonthIndex);
+  // ✅ 해당 연도의 "입춘 절입시각" 가져오기
+const ipchunDate = getJeolipDate(new Date(year, 2, 4)); // 반드시 당해 2월 기준으로 호출
+console.log('🌸 [getGanji] 당년 입춘 절입시각:', ipchunDate.toISOString(), 
+            'KST:', dayjs(ipchunDate).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss'));
 
-  // 월간 천간 계산 (절기월 기준)
-  const monthGanHan = getMonthGan(yearGanHan, solarTermMonthIndex);
-  console.log('[getGanji] 월간 천간 한자:', monthGanHan);
+  // 출생 시각이 입춘 시각 이전이면 전년도 간지 사용
+  if (birthDate.getTime() < ipchunDate.getTime()) {
+    const prev = solarlunar.solar2lunar(year - 1, 6, 1); // 전년도 아무 날
+    yearGanji = prev.gzYear;
+    console.log('[getGanji] 입춘 이전 → 전년도 간지로 보정:', yearGanji);
+  } else {
+    console.log('[getGanji] 입춘 이후 → 해당년도 간지 유지:', yearGanji);
+  }
 
-  // 절기 기준 월지 계산
-  const earthlyBranchesSolarTerm = [
-  '寅', // 0: 입춘
-  '卯', // 1: 경칩
-  '辰', // 2: 청명
-  '巳', // 3: 입하
-  '午', // 4: 망종
-  '未', // 5: 소서
-  '申', // 6: 입추
-  '酉', // 7: 백로
-  '戌', // 8: 한로
-  '亥', // 9: 입동 ← 여기!
-  '子', // 10: 대설
-  '丑', // 11: 소한
-];
-
-  const monthJiHan = earthlyBranchesSolarTerm[solarTermMonthIndex];
-  console.log('[getGanji] 월지 한자:', monthJiHan);
-
+  // 3) 월주 계산 (절기 기준, 기존 로직 유지)
+  const solarTermMonthIndex = getSolarTermMonthIndex(birthDate);
+  const monthGanHan = getMonthGan(yearGanji.charAt(0), solarTermMonthIndex);
+  const monthJiHan = ['寅','卯','辰','巳','午','未','申','酉','戌','亥','子','丑'][solarTermMonthIndex];
   const monthGanji = monthGanHan + monthJiHan;
-  console.log('[getGanji] 월간지:', monthGanji);
 
-  // --- 시간 간지 계산 추가 ---
-  // 천간 배열 (한자)
-  const heavenlyStems = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
-  // 지지 배열 (한자)
-  const earthlyBranches = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
-
-  // 시간 인덱스 계산 함수 getTimeIndexByHourMinute 그대로 사용한다고 가정
+  // 4) 시주 계산 (기존 로직 유지)
   const timeIndex = getTimeIndexByHourMinute(hour, minute);
-  console.log('[getGanji] 시간 인덱스:', timeIndex);
-
-  // 일간 천간 인덱스 구하기
   const dayStemIndex = heavenlyStems.indexOf(dayGanHan);
-  console.log('[getGanji] 일간 천간 인덱스:', dayStemIndex);
-
-  // 시간 천간 인덱스 계산 (일간 * 2 + 시간 인덱스) % 10
   const timeStemIndex = (dayStemIndex * 2 + timeIndex) % 10;
-  const timeStemHan = heavenlyStems[timeStemIndex];
-  const timeBranchHan = earthlyBranches[timeIndex];
-  const timeGanji = timeStemHan + timeBranchHan;
-  console.log('[getGanji] 시간 간지:', timeGanji);
+  const timeGanji = heavenlyStems[timeStemIndex] + earthlyBranches[timeIndex];
 
   return {
     year: yearGanji,
     month: monthGanji,
     day: dayGanji,
-    time: timeGanji,  // 여기에 시간 간지 추가
+    time: timeGanji,
   };
 }
+
+
+
 
 
 // API 요청 처리

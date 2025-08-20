@@ -159,7 +159,7 @@ export function getGyeokName(dayGanHanja, gyeokGanHanja) {
 
 export function hasSamhap(monthJi, otherJijiArr) {
   if (!Array.isArray(otherJijiArr)) {
-    console.error('otherJijiArr is not array:', otherJijiArr); // ← 임시로 찍어보기
+    //console.error('otherJijiArr is not array:', otherJijiArr); // ← 임시로 찍어보기
     return false;
   }
   const group = samhapGroups.find(group => group.includes(monthJi));
@@ -303,13 +303,7 @@ if (['辰', '戌', '丑', '未'].includes(monthJi)) {
 
     // 삼합격 후보 구함
     const samhapGyeokStem = junggiInCheongan || junggi;
-    console.log(
-      '[삼합] 후보:', samhapGyeokStem,
-      '오행:', elementMap[samhapGyeokStem],
-      '| 일간:', dayGan,
-      '오행:', elementMap[dayGan],
-      '| 같으면 SKIP(동오행)'
-    );
+    //console.log( '[삼합] 후보:', samhapGyeokStem,  '오행:', elementMap[samhapGyeokStem], '| 일간:', dayGan,  '오행:', elementMap[dayGan],  '| 같으면 SKIP(동오행)'     );
     if (elementMap[samhapGyeokStem] !== elementMap[dayGan]) {
       return { char: getGyeokName(dayGan, samhapGyeokStem), stem: samhapGyeokStem };
     }
@@ -490,7 +484,7 @@ if (['辰', '戌', '丑', '未'].includes(monthJi)) {
   if (hasSamhap(monthJi, otherJijiArr)) {
     if (primaryStem !== junggi) {
       const candidateChar = getGyeokName(dayGan, junggi);
-      console.log('보조격 후보-삼합:', candidateChar, 'stem:', junggi);
+      //console.log('보조격 후보-삼합:', candidateChar, 'stem:', junggi);
 
       // 보조격 후보가 4격이면 SKIP, 다음 단계로 진행
 if (
@@ -520,7 +514,7 @@ if (
   if (isFirstPeriod) {
     if (primaryStem !== yeogi) {
       const candidateChar = getGyeokName(dayGan, yeogi);
-      console.log('보조격 후보-전기:', candidateChar, 'stem:', yeogi);
+     //console.log('보조격 후보-전기:', candidateChar, 'stem:', yeogi);
 
 if (
   !['월비격', '월겁격', '건록격', '양인격'].some(type => candidateChar.startsWith(type))
@@ -535,7 +529,7 @@ if (
   if (isSecondPeriod) {
     if (primaryStem !== jeonggi) {
       const candidateChar = getGyeokName(dayGan, jeonggi);
-      console.log('보조격 후보-후기:', candidateChar, 'stem:', junggi);
+     // console.log('보조격 후보-후기:', candidateChar, 'stem:', junggi);
 if (
   !['월비격', '월겁격', '건록격', '양인격'].some(type => candidateChar.startsWith(type))
 ) {
@@ -589,7 +583,7 @@ export function getYukshinNameFromStems(dayGan, otherStem) {
 
 // 1. 천간과 지지에서 추출된 지장간을 태그를 붙여 저장
 export function extractTaggedStems(saju) {
-    console.log('🟢 extractTaggedStems called with saju:', saju);
+   // console.log('🟢 extractTaggedStems called with saju:', saju);
  const { yearGan, monthGan, hourGan, yearBranch, monthBranch, dayBranch, hourBranch } = saju;
 
  // ✅ 한글 → 한자로 변환
@@ -612,8 +606,8 @@ export function extractTaggedStems(saju) {
 
   const taggedStems = [];
 
-  console.log('🔹 천간 기반(天):', stemsFromSky);
-  console.log('🔹 지지 기반(地):', stemsFromEarth);
+  //console.log('🔹 천간 기반(天):', stemsFromSky);
+  //console.log('🔹 지지 기반(地):', stemsFromEarth);
 
   cheongans.forEach(stem => {
     taggedStems.push({ stem, tag: '天' });
@@ -625,7 +619,7 @@ export function extractTaggedStems(saju) {
     });
   });
 
-  console.log('🔹 태그된 간지:', taggedStems);
+ // console.log('🔹 태그된 간지:', taggedStems);
   return taggedStems;
 }
 
@@ -643,7 +637,7 @@ export function nameYukshinFromStems(taggedStems, dayGan) {
     };
   });
 
-  console.log('🔹 육신 이름 지정된 간지 목록:', namedStems);
+  //console.log('🔹 육신 이름 지정된 간지 목록:', namedStems);
   return namedStems;
 }
 
@@ -652,7 +646,7 @@ export function nameYukshinFromStems(taggedStems, dayGan) {
 function getYukshinItems(yukshinList, yukshinName) {
   if (!yukshinName) return [];
   const result = yukshinList.filter(item => item.yukshin === yukshinName);
-  console.log(`getYukshinItems: 찾는 육신명(${yukshinName}), 결과개수(${result.length})`);
+  //console.log(`getYukshinItems: 찾는 육신명(${yukshinName}), 결과개수(${result.length})`);
   return result;
 }
 
@@ -666,26 +660,26 @@ function getYukshinItems(yukshinList, yukshinName) {
 export function analyzeGyeokRelations(gyeok, dayGan, saju) {
   const gyeokNameRaw = gyeok.char || '';
   const gyeokName = gyeokNameRaw.replace(/\(.*\)/, '').trim();
-  console.log('🛠️ analyzeGyeokRelations called');
-  console.log('격 이름:', gyeokName);
+  //console.log('🛠️ analyzeGyeokRelations called');
+  //console.log('격 이름:', gyeokName);
   const isGoodGyeok = 길신격_목록.includes(gyeokName);
   const isBadGyeok = 흉신격_목록.includes(gyeokName);
 
   if (!isGoodGyeok && !isBadGyeok) {
-    console.warn('⚠️ 알 수 없는 격국:', gyeokName);
+    //console.warn('⚠️ 알 수 없는 격국:', gyeokName);
     return null;
   }
 
   const tagged = extractTaggedStems(saju);
-    console.log('추출된 tagged stems:', tagged);
+    //console.log('추출된 tagged stems:', tagged);
   const yukshinList = nameYukshinFromStems(tagged, dayGan);
-   console.log('전체 육신 목록 (label):', yukshinList.map(i => i.label));
+   //console.log('전체 육신 목록 (label):', yukshinList.map(i => i.label));
     // ✅ 여기에 추가
 
 
   const map = GYEOK_YUKSHIN_MAP[gyeokName];
   if (!map) {
-    console.warn('⚠️ GYEOK_YUKSHIN_MAP에 정의되지 않은 격국:', gyeokName);
+    //console.warn('⚠️ GYEOK_YUKSHIN_MAP에 정의되지 않은 격국:', gyeokName);
     return null;
   }
 
@@ -694,7 +688,7 @@ export function analyzeGyeokRelations(gyeok, dayGan, saju) {
   const gisin1Items = getYukshinItems(yukshinList, map.gisin1);
   const gisin2Items = getYukshinItems(yukshinList, map.gisin2);
   const gyeokStems = getYukshinItems(yukshinList, map.gyeokname2);
-  console.log('격 이름에 해당하는 stems:', gyeokStems);
+ // console.log('격 이름에 해당하는 stems:', gyeokStems);
 
 
 
@@ -748,7 +742,7 @@ function getStemsForYukshin(taggedStems, yukshinName) {
 export function renderGyeokFlowStyled(gyeok, saju, secondaryGyeok = null) {
 
   function _renderSingle(gyeokObj) {
-  console.log('[renderGyeokFlowStyled] 호출됨:', { gyeok, saju });
+ // console.log('[renderGyeokFlowStyled] 호출됨:', { gyeok, saju });
     if (!gyeokObj || !saju) return '정보 없음';
 
   function parseYukshinArray(arr) {
@@ -836,7 +830,7 @@ function formatParsedYukshinList(labelTitle, parsedArr, stemArr, labelColor) {
   if (!analysis) return '필수 정보 부족';
 
   const { sangsin, gusin, gisin1, gisin2, gyeokname2 } = analysis;
-  console.log('[🧩] 분석결과:', { sangsin, gusin, gisin1, gisin2, gyeokname2 });
+ // console.log('[🧩] 분석결과:', { sangsin, gusin, gisin1, gisin2, gyeokname2 });
 
   if (!sangsin) return '상신 정보 없음';
 
@@ -845,8 +839,8 @@ function formatParsedYukshinList(labelTitle, parsedArr, stemArr, labelColor) {
   const gusinParsedArr = parseYukshinArray(gusin);
   const sangsinParsedArr = parseYukshinArray(sangsin);
 const gyeokParsedArr = parseYukshinArray(gyeokname2); // '정인'
-  console.log('gyeokname2:', gyeokname2);
-console.log('✅ parseYukshinArray(gyeokname2):', gyeokParsedArr);
+ // console.log('gyeokname2:', gyeokname2);
+//console.log('✅ parseYukshinArray(gyeokname2):', gyeokParsedArr);
 
 
   const sangsinStems = sangsinParsedArr.map(resolveStemPosition);
@@ -855,13 +849,7 @@ console.log('✅ parseYukshinArray(gyeokname2):', gyeokParsedArr);
   const gisin2Stems = gisin2ParsedArr.map(resolveStemPosition);
   const gyeokname2Stems = gyeokParsedArr.map(resolveStemPosition);
 
-  console.log('[📌] Stem 위치 정보:', {
-    sangsinStems,
-    gusinStems,
-    gisin1Stems,
-    gisin2Stems,
-    gyeokname2Stems
-  });
+ // console.log('[📌] Stem 위치 정보:', {    sangsinStems,    gusinStems,    gisin1Stems,    gisin2Stems,    gyeokname2Stems  });
 
   const rel = GYEOK_RELATIONS[gyeokName];
   if (!rel) return '격국 관계 정보 없음';
