@@ -18,7 +18,8 @@ import {
   jijiToSibganMap2,
   HEESIN_GISIN_COMBINED, 
   HEESIN_BY_DANGRYEONG_POSITION, 
-  GISIN_BY_DANGRYEONG_POSITION
+  GISIN_BY_DANGRYEONG_POSITION, 
+  johuBasis, johuMap, johuMeaning
 } from './constants.js';
 
 
@@ -60,7 +61,8 @@ getCurrentDaeyunIndexFromStartAge,
   getdangryeongshik, 
  getDangryeongCheongans,
  extractJijiSibgansWithMiddleInfo,
-  extractCheonganHeesinGisin, extractJijiHeesinGisin, extractSajuGanList, renderJohuCell
+  extractCheonganHeesinGisin, extractJijiHeesinGisin,   
+  renderJohuCell, extractSajuGanList, getJohuApplyType, calculateTaegwaBulgeup
 } from './sajuUtils.js';
 //
 
@@ -1174,15 +1176,20 @@ window.handleDaeyunClick = handleDaeyunClick;
       <tr>
         <td style="border:1px solid #ccc; padding:4px;">${dangryeongHtml || "-"}</td>
         <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-display"></div></td>
-        <td style="border:1px solid #ccc; padding:4px;" id="johuyongsin-cell"></td>
+       
       </tr>
       <tr>
         <td style="border:1px solid #ccc; padding:4px;">
           <div id="dangryeongshik-container" style="margin-top: 0.5rem;"></div>
         </td>
         <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-flow"></div></td>
-        <td style="border:1px solid #ccc; padding:4px;">일간강약</td>
+       
       </tr>
+       <tr>
+       <td style="border:1px solid #ccc; padding:4px;" id="johuyongsin-cell"> ${renderJohuCell(saju)}</td>
+       <td style="border:1px solid #ccc; padding:4px;">일간강약</td>
+
+        </tr>
     </tbody>
   </table>
 </div>
@@ -1332,6 +1339,8 @@ document.getElementById('gyeok-secondary')?.addEventListener('click', () => {
     renderGyeokFlowStyled(secondaryGyeokResult, saju, gyeok);
   }
 });
+
+
 
 
 ///////////////////////// 12운성, 12신살  기타 신살류 출력부//////////////////////////////////////

@@ -805,7 +805,7 @@ for (const br of branches) {
 
 //태과불급 함수
 
-function calculateTaegwaBulgeup(saju) {
+export function calculateTaegwaBulgeup(saju) {
   // 📌 임시: 아직 규칙 미정
   // 나중에 구체적인 알고리즘 넣을 자리
   return "계산중...";
