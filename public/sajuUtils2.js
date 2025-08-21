@@ -20,7 +20,7 @@ import {
         tenGodMap,
         tenGodMapKor,
         SARYEONGSHIK_MAP_WITH_ROLE,
-        johuBasis, johuMap, johuMeaning
+        johuBasis, johuMap, johuMeaning,태과불급map
         } from './constants.js';
 import { elementColors,arrangeByPosition} from './renderUtils.js';
 
@@ -672,13 +672,13 @@ export function renderJohuCell(saju) {
   const applyType = getJohuApplyType(saju);
   console.log("조후용신 적용 타입:", applyType);
 // 1행: 천간 나열
-const rowTop = `<tr><td colspan="9" style="text-align:left; padding:4px;">` 
+const rowTop = `<tr><td colspan="9" style="text-align:left; padding:4px; background:#FFDDDD;">` 
   + `사주(천간): ` 
   + formatGanList(ganList, "天")   // (中) 표시는 그대로 유지
   + `</td></tr>`;
 
 // 2행: 지지 나열
-const rowMiddle = `<tr><td colspan="9" style="text-align:left; padding:4px;">`
+const rowMiddle = `<tr><td colspan="9" style="text-align:left; padding:4px; background:#FFDDDD;">`
   + `사주(지지): `
   + formatGanList(ganList, "地")   // (中) 표시는 그대로 유지
   + `</td></tr>`;
@@ -713,24 +713,37 @@ const johuRow2 = `
   <tr>
     <td>보유</td>
     ${johuChars.map((ch, i) => {
-      if (!ch) return `<td></td>`;
+      if (!ch) {
+        // 값이 없으면 X 출력
+        return `<td style="color:red">X</td>`;
+      }
       const isOwned = baseGans.includes(ch);   // 천간+지지에서만 검사
       const desc = johuMeaning[i] || "";
       return isOwned 
         ? `<td><span class="tooltip" data-desc="${desc}" style="color:red">${ch}</span></td>`
-        : `<td></td>`;
+        : `<td style="color:red">X</td>`;  // 값은 있으나 보유 X
     }).join("")}
   </tr>
 `;
 
+
 // 3행: 태과불급
-const johuRow3 = `
-  <tr>
-    <td colspan="9" style="text-align:left; padding:4px; color:purple;">
-      태과불급: ${calculateTaegwaBulgeup(saju)}
-    </td>
-  </tr>
-`;
+
+const tbList = calculateTaegwaBulgeup(saju, dangryeong);
+console.log("tbList 결과:", tbList);
+
+let johuRow3 = "";
+const tbHtml = renderTaegwaBulgeupList(tbList);
+if (tbHtml) {
+  johuRow3 = `
+    <tr>
+      <td colspan="9" style="text-align:left; padding:4px; color:purple;">
+        ${tbHtml}
+      </td>
+    </tr>
+  `;
+}
+
 
   return `
     <table style="border-collapse:collapse;width:100%;text-align:center;" border="1">
@@ -805,9 +818,261 @@ for (const br of branches) {
 
 //태과불급 함수
 
-function calculateTaegwaBulgeup(saju) {
-  // 📌 임시: 아직 규칙 미정
-  // 나중에 구체적인 알고리즘 넣을 자리
-  return "계산중...";
+
+export function calculateTaegwaBulgeup(saju) {
+  const monthGanji = { 
+    gan: saju.monthGan, 
+    ji: saju.monthBranch 
+  };
+  const dangryeong = getDangryeong(monthGanji.ji, daeyunAge, daYunDirection);
+
+  console.log("🔥 calculateTaegwaBulgeup 실행됨", saju, dangryeong);
+
+  if (!dangryeong) return ["해당사항 없음"];
+
+  const rules = 태과불급map[dangryeong];
+  if (!rules) return ["해당사항 없음"];
+
+  const ganList = extractSajuGanList(saju);
+
+  // 천간만 (순수 年月日時)
+  const cheongan = ganList.filter(g => g.tag === "天");
+
+  // 지지에서 나온 지장간 (본기+여러기, 중기 포함)
+  const jijiList = ganList.filter(g => g.tag !== "天");
+
+  const 판정결과 = [];
+
+  // 천간별 카운트
+  const countMap = {};
+  cheongan.forEach(m => {
+    countMap[m.gan] = (countMap[m.gan] || 0) + 1;
+  });
+
+  console.log("🟢 cheongan:", cheongan);
+  console.log("🟢 jijiList:", jijiList);
+  console.log("🟢 countMap:", countMap);
+  console.log("🟢 dangryeong:", dangryeong);
+
+  // 1) 태과 판정
+  for (const gan in countMap) {
+    const cnt = countMap[gan];
+    console.log(`▶ 검사중: ${gan}, cnt=${cnt}`);
+
+// 조건1: 천간에 2개 이상
+if (cnt >= 2) {
+  if (["甲", "乙", "庚", "辛"].includes(dangryeong)) {
+    // 당령이 甲/乙/庚/辛일 때
+    if (gan === dangryeong) {
+      // 자기 자신(당령)만 제외
+      console.log(`❌ 태과 제외 (조건1, 당령과 동일): ${gan}, 당령=${dangryeong}`);
+      continue;
+    }
+  }
+
+  // 그 외의 경우는 태과 판정
+  판정결과.push({ 구분: "태과", 원인: gan });
+  console.log(`✅ 태과 판정 (조건1): ${gan}, 당령=${dangryeong}`);
+  continue;
 }
+
+
+
+// 조건2: 천간 1개 + (당령 또는 삼합)일 때
+if (cnt === 1) {
+  const sameAsDangryeong = dangryeong === gan;
+  const sameAsSamhap = isValidSamhap(saju, gan);  // 월지 기준 삼합도 당령처럼 취급
+
+  if (sameAsDangryeong || sameAsSamhap) {
+    // 기본적으로는 태과 아님 → 하지만 아래 예외 케이스만 태과
+    if (
+      (["丙", "丁"].includes(dangryeong) || ["丙", "丁"].some(g => isValidSamhap(saju, g))) &&
+      ["丙", "丁"].includes(gan)
+    ) {
+      판정결과.push({ 구분: "태과", 원인: gan });
+      console.log(`🔥 태과 판정 (병정 조합): 당령=${dangryeong}, 원인=${gan}`);
+    }
+    else if (
+      (["壬", "癸"].includes(dangryeong) || ["壬", "癸"].some(g => isValidSamhap(saju, g))) &&
+      ["壬", "癸"].includes(gan)
+    ) {
+      판정결과.push({ 구분: "태과", 원인: gan });
+      console.log(`💧 태과 판정 (임계 조합): 당령=${dangryeong}, 원인=${gan}`);
+    }
+  }
+}
+  }
+
+// 2) 불급 판정
+
+// 3) 투간 판정
+
+
+
+  // 결과 없으면 문구 반환
+  if (판정결과.length === 0) {
+    return ["해당사항 없음"];
+  }
+
+  // 🔹 rules에서 상세 정보 붙이기
+  const tbList = [];
+  for (const r of 판정결과) {
+    const ruleList = rules[r.구분]; // 예: rules.태과
+    if (!ruleList) {
+      tbList.push(r);
+      continue;
+    }
+
+    const matched = ruleList.filter(rule => rule.원인 === r.원인);
+    if (matched.length > 0) {
+      matched.forEach(m => {
+        tbList.push({
+          구분: r.구분,
+          원인: m.원인,
+          tags: m.tags,
+          藥: m.藥,
+          설명: m.설명
+        });
+      });
+    } else {
+      tbList.push(r);
+    }
+  }
+
+  console.log("tbList 결과:", tbList);
+  return tbList.length > 0 ? tbList : ["해당사항 없음"];
+}
+
+
+// 2-1) 삼합 보정 체크
+const SAMHAP_SUPPORT = {
+  "酉-丑": "辛", "丑-酉": "辛",
+  "子-辰": "癸", "辰-子": "癸",
+  "卯-未": "乙", "未-卯": "乙",
+  "午-戌": "丁", "戌-午": "丁",
+};
+
+function isValidSamhap(saju, gan) {
+  const { monthBranch } = saju;  // 월지만 기준으로 사용
+
+  for (const key in SAMHAP_SUPPORT) {
+    const [a, b] = key.split("-");
+    const targetGan = SAMHAP_SUPPORT[key];
+
+    if (targetGan !== gan) continue;
+
+    // 월지가 a 또는 b 중 하나에 해당하면 성립
+    if (monthBranch === a || monthBranch === b) {
+      return true;
+    }
+  }
+  return false;
+}
+  
+
+
+
+// sajuUtils.js (혹은 별도 utils/taegwaBulgeupUtils.js)
+
+export function renderTaegwaBulgeupList(list) {
+  console.log("📌 renderTaegwaBulgeupList input:", list);
+
+  // ✅ 값이 없거나 빈 배열 → 문구만 출력
+  console.log("list 타입:", typeof list, Array.isArray(list), list);
+  console.log("👉 list 타입:", typeof list);
+console.log("👉 list instanceof Array:", list instanceof Array);
+console.log("👉 list 내용:", JSON.stringify(list));
+
+
+if (
+  !list ||
+  (Array.isArray(list) && (
+    list.length === 0 ||
+    (list.length === 1 && typeof list[0] === "string" && list[0].trim() === "해당사항 없음")
+  )) ||
+  (typeof list === "string" && list.trim() === "")
+) {
+  return `태과불급: 해당사항 없음`;
+}
+
+
+
+
+  // ✅ 문자열만 온 경우
+  if (typeof list === "string") {
+    console.log("📌 문자열 list:", list);
+    return `태과불급: ${list}`;
+  }
+
+  // ✅ 객체 하나만 온 경우 → 배열로 변환
+  if (!Array.isArray(list)) {
+    console.log("📌 단일 객체 list:", list);
+    list = [list];
+  }
+
+  // ✅ 데이터 행 생성
+  const rows = list.map((item, idx) => {
+    console.log("🔹 row item:", item);
+
+    const 구분 = item.구분 || item.type || "";
+    const 원인 = item.원인 || item.gan || "";
+    const tags = item.tags?.join(", ") || "";
+
+    let yakStr = "";
+    if (Array.isArray(item.藥)) {
+      yakStr = item.藥.map(
+        y => `<span class="tooltip" data-desc="${y.설명 || ''}">${y.글자}</span>`
+      ).join(", ");
+    } else if (item.藥) {
+      yakStr = `<span class="tooltip" data-desc="${item.설명 || ''}">${item.藥}</span>`;
+    }
+
+    // ✅ 첫 행
+    if (idx === 0) {
+      return `
+        <tr>
+          <td style="border:1px solid #ccc; padding:4px;">${구분}</td>
+          <td style="border:1px solid #ccc; padding:4px;"><span style="color:red;">${원인}</span></td>
+          <td style="border:1px solid #ccc; padding:4px;"><strong>${tags}</strong></td>
+          <td style="border:1px solid #ccc; padding:4px;"><span style="color:blue;">${yakStr}</span></td>
+        </tr>
+      `;
+    }
+
+    // ✅ 이후 행
+    return `
+      <tr>
+        <td style="border:1px solid #ccc; padding:4px;">${구분}</td>
+        <td style="border:1px solid #ccc; padding:4px;"><span style="color:red;">${원인}</span></td>
+        <td style="border:1px solid #ccc; padding:4px;"><strong>${tags}</strong></td>
+        <td style="border:1px solid #ccc; padding:4px;"><span style="color:blue;">${yakStr}</span></td>
+      </tr>
+    `;
+  }).join("");
+
+
+  if (!rows.trim()) {
+    return "";
+  }
+
+  // ✅ 최종 테이블
+  return `
+    <table style="border-collapse:collapse; width:100%; text-align:center;" border="1">
+      <tr style="background:#f2f2f2;">
+        <th rowspan="${list.length+1}" style="padding:4px; background:#e6f0ff;">태과불급</th>
+        <th style="padding:4px; background:#fff8dc;">구분</th>
+        <th style="padding:4px; background:#fff8dc;">원인</th>
+        <th style="padding:4px; background:#fff8dc;">명칭</th>
+        <th style="padding:4px; background:#fff8dc;">藥</th>
+      </tr>
+      ${rows}
+    </table>
+  `;
+}
+
+
+
+
+
+
 

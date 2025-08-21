@@ -62,7 +62,8 @@ getCurrentDaeyunIndexFromStartAge,
  getDangryeongCheongans,
  extractJijiSibgansWithMiddleInfo,
   extractCheonganHeesinGisin, extractJijiHeesinGisin,   
-  renderJohuCell, extractSajuGanList, getJohuApplyType, calculateTaegwaBulgeup
+  renderJohuCell, extractSajuGanList, getJohuApplyType, calculateTaegwaBulgeup,
+  renderTaegwaBulgeupList, 
 } from './sajuUtils.js';
 //
 
@@ -887,7 +888,7 @@ async function showBirthInfo(data) {
         return `${pad(d.getMonth() + 1)}월 ${pad(d.getDate())}일 ${pad(d.getHours())}:${pad(d.getMinutes())}`;
       };
 
-      solarTerm = `${data.thisTerm.name} (${fmt(data.thisTerm.date)}) ~ ${data.nextTerm.name} (${fmt(data.nextTerm.date)})`;
+      solarTerm = `<span style="color:red;">${data.thisTerm.name}</span> (${fmt(data.thisTerm.date)}) ~ ${data.nextTerm.name} (${fmt(data.nextTerm.date)})`;
 
     } else if (data.jeolipDate) {
       console.log("📭 서버 thisTerm/nextTerm 없음, jeolipDate 사용:", data.jeolipDate);
@@ -916,7 +917,8 @@ async function showBirthInfo(data) {
     ? `${lunar.lunarYear}년 ${pad(lunar.lunarMonth)}월 ${pad(lunar.lunarDay)}일 ${pad(lunar.hour)}시 ${pad(lunar.minute)}분`
     : "정보 없음";
 
-  const birthInfoText = `[양력] ${solarDate}  ||  [음력] ${lunarDate}  <br>  [절입시] ${solarTerm}`;
+  const birthInfoText = `[양력] <span style="color:blue;">${solarDate}</span>  ||  [음력] ${lunarDate}  <br>  [절입시] ${solarTerm}`;
+
 
   const birthInfoDiv = document.getElementById('birth-info');
   if (birthInfoDiv) {
@@ -925,7 +927,6 @@ async function showBirthInfo(data) {
     console.error("⚠️ birth-info 요소를 찾을 수 없습니다.");
   }
 }
-
 
 
 

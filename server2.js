@@ -15,7 +15,7 @@ dayjs.extend(timezone);
 
 // 수정된 유틸 import
 import { calculateDaeyunAge } from './utils/dateUtils.js';
-import { getSolarTermDates, getJeolipDate, getAccurateSolarLongitude } from './utils/solarTermCalculator.js';
+import { getSolarTermDates, getJeolipDate, getAccurateSolarLongitude, getSolarTermDate, MONTH_TO_SOLAR_TERM } from './utils/solarTermCalculator.js';
 import { stemOrder, branchOrder } from './public/constants.js';  // 사용 중이면 유지
 
 // server.js 또는 solarTermCalculator.js 파일 상단 어딘가에
@@ -95,6 +95,22 @@ const korToHanStem = {
 };
 const hanEarthlyBranches = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
 const hanToKor = (han) => hanToKorStem[han] || han;
+
+// 절기 → 다음 절기 매핑
+const SOLAR_TERM_NEXT = {
+  '입춘': '경칩',
+  '경칩': '청명',
+  '청명': '입하',
+  '입하': '망종',
+  '망종': '소서',
+  '소서': '입추',
+  '입추': '백로',
+  '백로': '한로',
+  '한로': '입동',
+  '입동': '대설',
+  '대설': '소한',
+  '소한': '입춘'
+};
 
 
 // 한국 DST 여부 판단 함수 (역사적 썸머타임 구간 모두 반영)
@@ -265,7 +281,8 @@ function getMonthGan(yearGanjiYear, solarTermMonthIndex) {
  */
 function getDayGanji(year, month, day) {
   const baseDate = new Date(1900, 1, 19); // 갑자일
-  const targetDate = new Date(year, month - 1, day);
+  const targetDate = new Date(`${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}T00:00:00+09:00`);
+
 
   const diffDays = Math.floor((targetDate - baseDate) / (1000 * 60 * 60 * 24));
 
@@ -432,9 +449,13 @@ if (isNaN(birthDate.getTime())) {
   console.error('❌ birthDate 생성 실패:', year, month, day, hour, minute);
   return res.status(500).json({ error: '유효하지 않은 생년월일입니다.' });
 }
+
+
 const jeolipDate = getJeolipDate(year, month, day);
-
-
+// ✅ thisTerm / nextTerm 추출
+const thisTerm = getSolarTermDate(year, MONTH_TO_SOLAR_TERM[month]);
+const nextTermName = SOLAR_TERM_NEXT[thisTerm.name];
+const nextTerm = getSolarTermDate(month === 12 ? year + 1 : year, nextTermName);
 console.log('✅ 최종 birthDate:', formatDateKST(birthDate));
 console.log('✅ 계산된 jeolipDate:', formatDateKST(jeolipDate));
 
@@ -484,7 +505,12 @@ console.log('yearStemKor:', hanToKor(ganji.year.charAt(0)));
      daeyunAge,
        yearStemKor, // 👉 이 줄 추가
     ganji,
- birthYear: birthDate.getFullYear()  // ✅ 여기서 숫자 연도로 추가
+ birthYear: birthDate.getFullYear(), // ✅ 여기서 숫자 연도로 추가
+
+   // 👉 여기 추가
+jeolipDate: jeolipDate,
+thisTerm: thisTerm ? { name: thisTerm.name, date: thisTerm.date } : null,
+nextTerm: nextTerm ? { name: nextTerm.name, date: nextTerm.date } : null
   });
 });
 
