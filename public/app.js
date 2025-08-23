@@ -2,7 +2,7 @@
 
 
 // git add .
-// git commit -m "신살적용중"   
+// git commit -m "일간왕쇠강약"   
 // git push origin main
 // git push
 

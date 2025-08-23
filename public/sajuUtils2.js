@@ -10,7 +10,7 @@
 
 
 import { 
-         saryeongMap,
+         saryeongMap, elementMap,
          DANGRYEONGSHIK_MAP,
          jijiToSibganMap,
          firstHeesinMap,
@@ -698,7 +698,7 @@ const baseGans = [
 // 기준 행
 const johuRow1 = `
   <tr>
-    <td rowspan="2" style="background-color:#e6f0ff;">조후용신<br>[적용:<span style="color:red;">${applyType}</span>]</td>
+    <td rowspan="2" style="background-color:#e6f0ff;">조후용신<br>[적용:<span style="color:blue;">${applyType}</span>]</td>
     <td style="background-color:#fff8dc;">기준</td>
     ${johuChars.map((ch, i) => {
       const desc = johuMeaning[i] || "";
@@ -839,112 +839,257 @@ export function calculateTaegwaBulgeup(saju) {
   const cheongan = ganList.filter(g => g.tag === "天");
 
   // 지지에서 나온 지장간 (본기+여러기, 중기 포함)
-  const jijiList = ganList.filter(g => g.tag !== "天");
+  // 지지에서 나온 지장간 (본기 + 여력기만, 중기는 제외)
+const jijiList = ganList.filter(g => g.tag !== "天" && !g.isMiddle);
+
 
   const 판정결과 = [];
 
   // 천간별 카운트
-  const countMap = {};
-  cheongan.forEach(m => {
-    countMap[m.gan] = (countMap[m.gan] || 0) + 1;
-  });
+// 천간만 갯수 세기
+const countMap = {};
+for (const g of cheongan) {
+  countMap[g.gan] = (countMap[g.gan] || 0) + 1;
+}
+
 
   console.log("🟢 cheongan:", cheongan);
   console.log("🟢 jijiList:", jijiList);
   console.log("🟢 countMap:", countMap);
   console.log("🟢 dangryeong:", dangryeong);
 
-  // 1) 태과 판정
-  for (const gan in countMap) {
-    const cnt = countMap[gan];
-    console.log(`▶ 검사중: ${gan}, cnt=${cnt}`);
+// 이후 태과 판정
+for (const gan in countMap) {
+  const cnt = countMap[gan];
+  console.log(`▶ 태과 검사중 (천간): ${gan}, cnt=${cnt}`);
+  // ... 태과 판정 로직 ...
 
-// 조건1: 천간에 2개 이상
-if (cnt >= 2) {
-  if (["甲", "乙", "庚", "辛"].includes(dangryeong)) {
-    // 당령이 甲/乙/庚/辛일 때
-    if (gan === dangryeong) {
-      // 자기 자신(당령)만 제외
-      console.log(`❌ 태과 제외 (조건1, 당령과 동일): ${gan}, 당령=${dangryeong}`);
-      continue;
+    // ✅ 조건0: 천간이 3개 이상이면 무조건 태과
+  if (cnt >= 3) {
+    판정결과.push({ 구분: "태과", 원인: gan });
+    console.log(`✅ 태과 판정 (천간 3개 이상 무조건): ${gan}, cnt=${cnt}`);
+    continue; // 추가 조건 안 보고 다음 글자로 넘어감
+  }
+// 조건1: 천간에 2개 이상 + (당령 또는 월지 삼합일 때)
+// 조건1: 천간에 2개 이상 + (당령/삼합과 같은 오행일 때)
+if (cnt === 2) {
+  const ganOhaeng = elementMap[gan];   // 현재 천간 → 오행
+  const supportedOhaeng = getSupportedOhaeng(saju, dangryeong); // 당령+삼합 오행 Set
+
+  // 📌 특수월 (寅·辰·申·戌): 반드시 글자가 당령과 같아야 태과
+  if (["寅", "辰", "申", "戌"].includes(saju.monthBranch)) {
+    if (gan === dangryeong) {  
+      판정결과.push({ 구분: "태과", 원인: gan });
+      console.log(`✅ 태과 (특수월 동일간): ${gan}, 월지=${saju.monthBranch}, 당령=${dangryeong}`);
+    } else {
+      console.log(`❌ 태과 아님 (특수월, 오행 같아도 글자 다름): ${gan}, 월지=${saju.monthBranch}, 당령=${dangryeong}`);
     }
   }
-
-  // 그 외의 경우는 태과 판정
-  판정결과.push({ 구분: "태과", 원인: gan });
-  console.log(`✅ 태과 판정 (조건1): ${gan}, 당령=${dangryeong}`);
-  continue;
+  // 📌 일반월: 천간 오행이 당령/삼합 오행과 일치해야 태과
+  else {
+    if (supportedOhaeng.has(ganOhaeng)) {
+      판정결과.push({ 구분: "태과", 원인: gan });
+      console.log(`✅ 태과 판정 (조건1+당령/삼합): ${gan}, 오행=${ganOhaeng}, 당령=${dangryeong}`);
+    } else {
+      console.log(`❌ 태과 아님 (조건1 불충족): ${gan}, 오행=${ganOhaeng}, 당령=${dangryeong}`);
+    }
+  }
 }
+
+
+
 
 
 
 // 조건2: 천간 1개 + (당령 또는 삼합)일 때
 if (cnt === 1) {
   const sameAsDangryeong = dangryeong === gan;
-  const sameAsSamhap = isValidSamhap(saju, gan);  // 월지 기준 삼합도 당령처럼 취급
+  const sameAsSamhap = isValidSamhap(saju, gan);
 
   if (sameAsDangryeong || sameAsSamhap) {
-    // 기본적으로는 태과 아님 → 하지만 아래 예외 케이스만 태과
-    if (
-      (["丙", "丁"].includes(dangryeong) || ["丙", "丁"].some(g => isValidSamhap(saju, g))) &&
-      ["丙", "丁"].includes(gan)
-    ) {
-      판정결과.push({ 구분: "태과", 원인: gan });
-      console.log(`🔥 태과 판정 (병정 조합): 당령=${dangryeong}, 원인=${gan}`);
+    // 🔥 당령이 丙일 때 → 丁 있으면 원인=丙
+    if (dangryeong === "丙" || isValidSamhap(saju, "丙")) {
+      if (countMap["丙"] && countMap["丁"]) {
+        판정결과.push({ 구분: "태과", 원인: "丙" });
+        console.log(`🔥 태과 판정: 당령=${dangryeong}, 원인=丙 (丙+丁 모두 존재)`);
+      }
     }
-    else if (
-      (["壬", "癸"].includes(dangryeong) || ["壬", "癸"].some(g => isValidSamhap(saju, g))) &&
-      ["壬", "癸"].includes(gan)
-    ) {
-      판정결과.push({ 구분: "태과", 원인: gan });
-      console.log(`💧 태과 판정 (임계 조합): 당령=${dangryeong}, 원인=${gan}`);
+
+    // 🔥 당령이 丁일 때 → 丙 있으면 원인=丁
+    if (dangryeong === "丁" || isValidSamhap(saju, "丁")) {
+      if (countMap["丙"] && countMap["丁"]) {
+        판정결과.push({ 구분: "태과", 원인: "丁" });
+        console.log(`🔥 태과 판정: 당령=${dangryeong}, 원인=丁 (丙+丁 모두 존재)`);
+      }
+    }
+
+    // 💧 당령이 壬일 때 → 癸 있으면 원인=壬
+    if (dangryeong === "壬" || isValidSamhap(saju, "壬")) {
+      if (countMap["壬"] && countMap["癸"]) {
+        판정결과.push({ 구분: "태과", 원인: "壬" });
+        console.log(`💧 태과 판정: 당령=${dangryeong}, 원인=壬 (壬+癸 모두 존재)`);
+      }
+    }
+
+    // 💧 당령이 癸일 때 → 壬 있으면 원인=癸
+    if (dangryeong === "癸" || isValidSamhap(saju, "癸")) {
+      if (countMap["壬"] && countMap["癸"]) {
+        판정결과.push({ 구분: "태과", 원인: "癸" });
+        console.log(`💧 태과 판정: 당령=${dangryeong}, 원인=癸 (癸+壬 모두 존재)`);
+      }
     }
   }
 }
+
+
+
   }
+
 
 // 2) 불급 판정
+// 2) 불급 판정 (조건1 + 조건2 통합)
+const ganListNoMiddle = ganList.filter(g => !g.isMiddle);
 
-// 3) 투간 판정
+const cheonganOnly = ganListNoMiddle.filter(g => g.tag === "天");
+const jijiOnly = ganListNoMiddle.filter(g => g.tag !== "天");
 
+stemOrder.forEach(gan => {
+  const cntInCheongan = cheonganOnly.filter(g => g.gan === gan).length;
+  const cntInJiji = jijiOnly.filter(g => g.gan === gan).length;
+  const totalCnt = cntInCheongan + cntInJiji;
 
-
-  // 결과 없으면 문구 반환
-  if (판정결과.length === 0) {
-    return ["해당사항 없음"];
+  // 조건1: 아예 없음
+  if (totalCnt === 0) {
+    판정결과.push({ 구분: "불급", 원인: gan, source: "basic" });
+    console.log(`⚠️ 불급 판정 (조건1): ${gan} 없음 (천간+지지 전체, 중기 제외)`);
   }
 
-  // 🔹 rules에서 상세 정보 붙이기
-  const tbList = [];
-  for (const r of 판정결과) {
-    const ruleList = rules[r.구분]; // 예: rules.태과
-    if (!ruleList) {
-      tbList.push(r);
-      continue;
-    }
+  // 조건2: 천간에만 1개 있고, 지지에는 없음 (단, 丙·壬·戊, 己는 제외)
+  else if (
+    cntInCheongan === 1 &&
+    cntInJiji === 0 &&
+    !["丙", "壬", "戊", "己"].includes(gan)
+  ) {
+    판정결과.push({ 구분: "불급", 원인: gan, source: "basic" });
+    console.log(`⚠️ 불급 판정 (조건2): ${gan} → 천간에만 1개, 지지에 없음`);
+  }
+});
 
-    const matched = ruleList.filter(rule => rule.원인 === r.원인);
-    if (matched.length > 0) {
-      matched.forEach(m => {
-        tbList.push({
-          구분: r.구분,
-          원인: m.원인,
-          tags: m.tags,
-          藥: m.藥,
-          설명: m.설명
-        });
-      });
-    } else {
-      tbList.push(r);
+
+
+// 3) 당령별 특수 보강[추가 태과불급과 투간적용]
+// 당령별 특수 규칙
+const specialRules = {
+  "癸": [
+    { 구분: "태과", 원인: "辛", condition: (multiInfo, countMap) => multiInfo.some(m => m.글자 === "辛") },
+    { 구분: "불급", 원인: "戊", condition: (multiInfo, countMap) => multiInfo.some(m => m.글자 === "戊") },
+    { 구분: "불급", 원인: "丙", condition: (multiInfo, countMap) => multiInfo.some(m => m.글자 === "丙") },
+    { 구분: "투간", 원인: "戊", condition: (multiInfo, countMap) => {
+    console.log("🌿 countMap戊:", countMap["戊"]);
+    return (countMap["戊"] || 0) >= 1;
+  } // 천간에 戊 있으면 무조건 투간
+        }], 
+      // 앞으로 계속 확장 가능
+  // "甲": [ ... ],
+  // "乙": [ ... ],
+};
+
+// 4) 당령별 특수 보강
+const multiInfo = extractMultiInfo(saju, ganList, countMap);
+
+if (specialRules[dangryeong]) {
+  for (const rule of specialRules[dangryeong]) {
+    if (rule.condition(multiInfo, countMap)) {
+      판정결과.push({ 구분: rule.구분, 원인: rule.원인 });
+      console.log(`✨ 특수 규칙 적용: 당령=${dangryeong}, ${rule.구분} → ${rule.원인}`);
+
     }
   }
-
-  console.log("tbList 결과:", tbList);
-  return tbList.length > 0 ? tbList : ["해당사항 없음"];
 }
 
 
-// 2-1) 삼합 보정 체크
+
+
+
+//////태과불급추출방식 끝/////////////////
+
+
+
+
+
+
+// 결과 없으면 문구 반환
+if (판정결과.length === 0) {
+  return ["해당사항 없음"];
+}
+
+// 🔹 rules에서 상세 정보 붙이기
+const tbList = [];
+for (const r of 판정결과) {
+  // 👉 기본 불급은 rules 매핑 건너뜀
+  if (r.구분 === "불급" && r.source === "basic") {
+    tbList.push(r);
+    continue;
+  }
+
+  const ruleList = rules[r.구분]; // 예: rules.태과
+  if (!ruleList) {
+    tbList.push(r);
+    continue;
+  }
+
+  const matched = ruleList.filter(rule => rule.원인 === r.원인);
+  if (matched.length > 0) {
+    matched.forEach(m => {
+      tbList.push({
+    구분: r.구분,
+    원인: m.원인,
+    tags: m.tags ?? null,
+    조건: m.조건 ?? null,   // 🔹 추가
+    藥: m.藥 ?? null,
+    설명: m.설명 ?? null
+      });
+    });
+  } else {
+    tbList.push(r);
+  }
+}
+
+console.log("🟢 원본 tbList:", tbList);
+
+// 🔹 상세 있는 줄 / 없는 줄 분리
+const detailList = tbList.filter(r => (r.藥 || r.tags || r.설명));
+console.log("📋 detailList (표로 출력):", detailList);
+
+// 🔹 나열식(藥/설명 없는 것만 모음)
+const simpleMap = tbList
+  .filter(r => !(r.藥 || r.tags || r.설명))
+  .reduce((acc, r) => {
+    if (!acc[r.구분]) acc[r.구분] = [];
+    acc[r.구분].push(r.원인);
+    return acc;
+  }, {});
+console.log("📋 simpleMap (나열식):", simpleMap);
+
+// 🔹 다한 천간(多) 추출
+const multiList = extractMultiInfo(saju, ganList, countMap);
+// 최종 반환
+const result = tbList.length > 0 ? tbList : ["해당사항 없음"];
+return { 
+  list: tbList,
+  detail: detailList, 
+  simple: simpleMap,
+  multi: multiList   // ← 여기 추가
+};
+}
+
+
+
+//////////////////////////////////////태과불급관련 보조함수들///////
+
+
+
+// 2-1) 삼합 보정 체크//////////
 const SAMHAP_SUPPORT = {
   "酉-丑": "辛", "丑-酉": "辛",
   "子-辰": "癸", "辰-子": "癸",
@@ -953,123 +1098,290 @@ const SAMHAP_SUPPORT = {
 };
 
 function isValidSamhap(saju, gan) {
-  const { monthBranch } = saju;  // 월지만 기준으로 사용
+  const { monthBranch } = saju;
+  const allBranches = [
+    saju.yearBranch,
+    saju.monthBranch,
+    saju.dayBranch,
+    saju.hourBranch
+  ];
 
   for (const key in SAMHAP_SUPPORT) {
-    const [a, b] = key.split("-");
+    const [month, other] = key.split("-");
     const targetGan = SAMHAP_SUPPORT[key];
 
     if (targetGan !== gan) continue;
 
-    // 월지가 a 또는 b 중 하나에 해당하면 성립
-    if (monthBranch === a || monthBranch === b) {
+    // 월지가 조건에 맞고, 다른 지지가 포함될 때 성립
+    if (monthBranch === month && allBranches.includes(other)) {
       return true;
     }
   }
   return false;
 }
-  
+/// 삼합성립시 삼합당령글자 소환//////
+function getSamhapDangryeong(saju) {
+  const { yearBranch, monthBranch, dayBranch, hourBranch } = saju;
+  const branches = [yearBranch, monthBranch, dayBranch, hourBranch];
+
+  // 모든 지지 조합 쌍 확인
+  for (let i = 0; i < branches.length; i++) {
+    for (let j = i + 1; j < branches.length; j++) {
+      const key = `${branches[i]}-${branches[j]}`;
+      if (SAMHAP_SUPPORT[key]) {
+        return SAMHAP_SUPPORT[key]; // 삼합당령 글자 반환
+      }
+    }
+  }
+  return null;
+}
+///////오행으로 비교하기/////////
+function getSupportedOhaeng(saju, dangryeong) {
+  const result = new Set();
+
+  // 1) 월지 당령 오행 무조건 추가
+  result.add(elementMap[dangryeong]);
+
+  // 2) 삼합당령 체크 → 있으면 오행 추가
+  const samhapGan = getSamhapDangryeong(saju);
+  // ⚡ isValidSamhap이 true/false만 반환한다면,
 
 
+  if (samhapGan) {
+    result.add(elementMap[samhapGan]);
+  }
 
-// sajuUtils.js (혹은 별도 utils/taegwaBulgeupUtils.js)
-
-export function renderTaegwaBulgeupList(list) {
-  console.log("📌 renderTaegwaBulgeupList input:", list);
-
-  // ✅ 값이 없거나 빈 배열 → 문구만 출력
-  console.log("list 타입:", typeof list, Array.isArray(list), list);
-  console.log("👉 list 타입:", typeof list);
-console.log("👉 list instanceof Array:", list instanceof Array);
-console.log("👉 list 내용:", JSON.stringify(list));
-
-
-if (
-  !list ||
-  (Array.isArray(list) && (
-    list.length === 0 ||
-    (list.length === 1 && typeof list[0] === "string" && list[0].trim() === "해당사항 없음")
-  )) ||
-  (typeof list === "string" && list.trim() === "")
-) {
-  return `태과불급: 해당사항 없음`;
+  return result;
 }
 
 
 
 
-  // ✅ 문자열만 온 경우
+///多한 천간 추출함수/////////////////////////////////////////////////////////////////////////////////////////////////////////
+function extractMultiInfo(saju, ganList, countMap) {
+  const cheongan = ganList.filter(g => g.tag === "天" && !g.isMiddle);
+  const jijiList = ganList.filter(g => g.tag !== "天" && !g.isMiddle);
+
+  const result = [];
+
+  // 0) 천간 3개 이상 → 무조건 多
+  for (const gan of stemOrder) {
+    const cntInCheongan = cheongan.filter(g => g.gan === gan).length;
+    if (cntInCheongan >= 3) {
+      result.push({ 글자: gan, type: "多" });
+    }
+  }
+
+  // 0-1) 무기토 특례: 천간 합쳐서 3개 이상 → 무조건 多
+  const cntMu = cheongan.filter(g => g.gan === "戊").length;
+  const cntGi = cheongan.filter(g => g.gan === "己").length;
+  if (cntMu + cntGi >= 3) {
+    if (cntMu > 0) result.push({ 글자: "戊", type: "多" });
+    if (cntGi > 0) result.push({ 글자: "己", type: "多" });
+  }
+
+  // 1) 일반 多: 천간 2개 이상 + 지지에 뿌리 존재
+  for (const gan of stemOrder) {
+    const cntInCheongan = cheongan.filter(g => g.gan === gan).length;
+    const existsInJiji = jijiList.some(g => g.gan === gan);
+
+    if (cntInCheongan >= 2 && existsInJiji) {
+      result.push({ 글자: gan, type: "多" });
+    }
+  }
+
+  // 1-1) 특례: 병·임·무 → 천간 2개 이상이면 바로 多
+  ["丙", "壬", "戊"].forEach(gan => {
+    if ((countMap[gan] || 0) >= 2) {
+      result.push({ 글자: gan, type: "多" });
+    }
+  });
+
+  // 2) 무기토 多 (무/기 2개 이상 + 辰戌丑未 존재)
+  const jijiSet = new Set([saju.yearBranch, saju.monthBranch, saju.dayBranch, saju.hourBranch]);
+  if ((countMap["戊"] >= 2 || countMap["己"] >= 2) &&
+      ["辰","戌","丑","未"].some(z => jijiSet.has(z))) {
+    if (countMap["戊"] >= 2) result.push({ 글자: "戊", type: "多" });
+    if (countMap["己"] >= 2) result.push({ 글자: "己", type: "多" });
+  }
+
+  // 2-1) 무기토 하나이면서 월지가 辰戌丑未 → 多
+if ((countMap["戊"] === 1 || countMap["己"] === 1) &&
+    ["辰","戌","丑","未"].includes(saju.monthBranch)) {
+  if (countMap["戊"] === 1) result.push({ 글자: "戊", type: "多" });
+  if (countMap["己"] === 1) result.push({ 글자: "己", type: "多" });
+}
+
+  // 3) 무기토 동주 多 (무진/무술/기미/기축 존재 + 무기토 동투)
+  const ganjiList = [
+    saju.yearGan + saju.yearBranch,
+    saju.monthGan + saju.monthBranch,
+    saju.dayGan + saju.dayBranch,
+    saju.hourGan + saju.hourBranch
+  ];
+  const 무기토동주패턴 = ["戊辰", "戊戌", "己未", "己丑"];
+  const has동주 = ganjiList.some(ganji => 무기토동주패턴.includes(ganji));
+  if (has동주 && countMap["戊"] && countMap["己"]) {
+    result.push({ 글자: "戊", type: "多" });
+    result.push({ 글자: "己", type: "多" });
+  }
+
+  return result;
+}
+
+
+//////////////////태과불급 추출함수 끝//////////////////////////////////////////////////
+
+
+export function renderTaegwaBulgeupList(result, saju, ganList, countMap) {
+  console.log("📌 renderTaegwaBulgeupList input:", result);
+
+  // ✅ 값이 없을 때
+  if (!result) return `태과불급: 해당사항 없음`;
+
+  let list = result;
+  let simpleMap = null;
+
+if (typeof result === "object" && !Array.isArray(result)) {
+  // calculateTaegwaBulgeup 결과: { list, detail, simple, multi }
+  list = result.detail && result.detail.length > 0 ? result.detail : result.list;
+  simpleMap = result.simple || null;
+
+  // ✅ 여기서 중복 제거
+  if (Array.isArray(list)) {
+    const seen = new Set();
+    list = list.filter(item => {
+      const key = `${item.구분}-${item.원인}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+}
+
+  // ✅ 완전히 빈 경우
+  if (
+    !list ||
+    (Array.isArray(list) && (
+      list.length === 0 ||
+      (list.length === 1 && typeof list[0] === "string" && list[0].trim() === "해당사항 없음")
+    )) ||
+    (typeof list === "string" && list.trim() === "")
+  ) {
+    return `태과불급: 해당사항 없음`;
+  }
+
   if (typeof list === "string") {
-    console.log("📌 문자열 list:", list);
     return `태과불급: ${list}`;
   }
 
-  // ✅ 객체 하나만 온 경우 → 배열로 변환
   if (!Array.isArray(list)) {
-    console.log("📌 단일 객체 list:", list);
     list = [list];
   }
 
-  // ✅ 데이터 행 생성
-  const rows = list.map((item, idx) => {
-    console.log("🔹 row item:", item);
+  // ✅ 메인 테이블은 '藥'이 있는 경우만 출력
+  const hasYak = list.some(item => item.藥);
+  let tableHTML = "";
 
-    const 구분 = item.구분 || item.type || "";
-    const 원인 = item.원인 || item.gan || "";
-    const tags = item.tags?.join(", ") || "";
+  if (hasYak) {
+    const rows = list.map(item => {
+      const 구분 = item.구분 || item.type || "";
+      const 원인 = item.원인 || item.gan || "";
+      const tags = item.tags?.join(", ") || "";
 
-    let yakStr = "";
-    if (Array.isArray(item.藥)) {
-      yakStr = item.藥.map(
-        y => `<span class="tooltip" data-desc="${y.설명 || ''}">${y.글자}</span>`
-      ).join(", ");
-    } else if (item.藥) {
-      yakStr = `<span class="tooltip" data-desc="${item.설명 || ''}">${item.藥}</span>`;
-    }
+      let yakStr = "";
+      if (Array.isArray(item.藥)) {
+        yakStr = item.藥.map(
+          y => `<span class="tooltip" data-desc="${y.설명 || ''}">${y.글자}</span>`
+        ).join(", ");
+      } else if (item.藥) {
+        yakStr = `<span class="tooltip" data-desc="${item.설명 || ''}">${item.藥}</span>`;
+      }
 
-    // ✅ 첫 행
-    if (idx === 0) {
+      const 조건 = item.조건
+        ? `<span class="tooltip" data-desc="${item.조건.설명2 || ''}">${item.조건.글자}</span>`
+        : "";
+
       return `
         <tr>
           <td style="border:1px solid #ccc; padding:4px;">${구분}</td>
           <td style="border:1px solid #ccc; padding:4px;"><span style="color:red;">${원인}</span></td>
           <td style="border:1px solid #ccc; padding:4px;"><strong>${tags}</strong></td>
+          <td style="border:1px solid #ccc; padding:4px;">${조건}</td>
           <td style="border:1px solid #ccc; padding:4px;"><span style="color:blue;">${yakStr}</span></td>
         </tr>
       `;
-    }
+    }).join("");
 
-    // ✅ 이후 행
-    return `
-      <tr>
-        <td style="border:1px solid #ccc; padding:4px;">${구분}</td>
-        <td style="border:1px solid #ccc; padding:4px;"><span style="color:red;">${원인}</span></td>
-        <td style="border:1px solid #ccc; padding:4px;"><strong>${tags}</strong></td>
-        <td style="border:1px solid #ccc; padding:4px;"><span style="color:blue;">${yakStr}</span></td>
-      </tr>
+    tableHTML = `
+      <table style="border-collapse:collapse; width:100%; text-align:center;" border="1">
+        <tr style="background:#f2f2f2;">
+          <th rowspan="${list.length + 1}" style="padding:4px; background:#e6f0ff;">태과불급</th>
+          <th style="padding:4px; background:#fff8dc;">구분</th>
+          <th style="padding:4px; background:#fff8dc;">원인</th>
+          <th style="padding:4px; background:#fff8dc;">명칭</th>
+          <th style="padding:4px; background:#fff8dc;">조건</th>
+          <th style="padding:4px; background:#fff8dc;">藥</th>
+        </tr>
+        ${rows}
+      </table>
     `;
-  }).join("");
-
-
-  if (!rows.trim()) {
-    return "";
+  } else {
+    // 👉藥이 전혀 없으면 해당사항 없음
+    tableHTML = `당령관련 태과불급: 해당사항 없음`;
   }
 
-  // ✅ 최종 테이블
-  return `
-    <table style="border-collapse:collapse; width:100%; text-align:center;" border="1">
-      <tr style="background:#f2f2f2;">
-        <th rowspan="${list.length+1}" style="padding:4px; background:#e6f0ff;">태과불급</th>
-        <th style="padding:4px; background:#fff8dc;">구분</th>
-        <th style="padding:4px; background:#fff8dc;">원인</th>
-        <th style="padding:4px; background:#fff8dc;">명칭</th>
-        <th style="padding:4px; background:#fff8dc;">藥</th>
-      </tr>
-      ${rows}
-    </table>
-  `;
-}
+  // ✅ simpleMap (나열식)
+let simpleHTML = "";
+if (simpleMap && Object.keys(simpleMap).length > 0) {
+  const taegwa = (simpleMap["태과"] || []);
+  const bulgeup = (simpleMap["불급"] || []);
+  const multi = (simpleMap["多"] || []);
 
+  // "多" 중에서 태과에 이미 들어간 원인 제외
+// 이미 추출된 목록들
+// 多 리스트
+const multiList = (result.multi || []).map(m => m.글자);
+
+// 태과 리스트
+const taegwaList = (result.simple && result.simple["태과"]) ? result.simple["태과"] : [];
+
+// "藥" 값이 있는 항목에서만 원인 글자 추출
+const originFromDetail = (result.detail || [])
+  .filter(r => r.藥)   // 약값 있는 것만
+  .map(r => r.원인);
+
+// 태과글자 + 원인글자 합치고 중복 제거
+const originList = [...new Set([...taegwaList, ...originFromDetail])];
+
+
+
+// 🔹 로그 확인
+console.log("🔍 result.detail:", result.detail);
+console.log("🔍 originFromDetail (藥 있는 원인):", originFromDetail);
+console.log("🔍 taegwaList (태과 글자):", taegwaList);
+console.log("🔍 originList (합쳐서 중복제거):", originList);
+
+
+simpleHTML = `
+  <table style="border-collapse:collapse; width:100%; text-align:center; margin-top:8px;" border="1">
+    <tr style="background:#f9f9f9;">
+      <th style="padding:4px; background:#e6f0ff;">多한 글자</th>
+      <th style="padding:4px; background:#e6f0ff;">부족한 글자</th>
+      <th style="padding:4px; background:#e6f0ff;">태과불급</th>
+    </tr>
+    <tr>
+      <td style="border:1px solid #ccc; padding:4px;">${multiList.join(", ") || "-"}</td>
+      <td style="border:1px solid #ccc; padding:4px;">${bulgeup || "-"}</td>
+      <td style="border:1px solid #ccc; padding:4px; background:#FFDFFF;">${originList.join(", ") || "-"}</td>
+    </tr>
+  </table>
+`;
+
+  }
+
+  return tableHTML + simpleHTML;
+}
 
 
 
