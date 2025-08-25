@@ -3,8 +3,4 @@
     "api/*.js": {
       "includeFiles": "utils/**"
     }
-  },
-  "env": {
-    "TZ": "Asia/Seoul"
-  }
-}
+  }}
