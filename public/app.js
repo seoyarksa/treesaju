@@ -749,12 +749,16 @@ window.daYunDirection = daYunDirection;
 
 const correctedStartAge = daeyunAge < 0 ? daeyunAge + 10 : daeyunAge;
 
-const ageLabels = ['0'];  // 첫 번째는 항상 0으로 시작
+const ageLabels = [];  
 
-for (let i = 1; i < daeyunPairs.length; i++) {
+for (let i = daeyunPairs.length - 1; i > 0; i--) {
   const ageValue = correctedStartAge + (i - 1) * 10;
   ageLabels.push(ageValue.toFixed(2));
 }
+
+// 마지막에 "월주" 추가
+ageLabels.push("월주");
+
 
 // 👉 정렬만 내림차순으로 적용
 ageLabels.sort((a, b) => parseFloat(b) - parseFloat(a));

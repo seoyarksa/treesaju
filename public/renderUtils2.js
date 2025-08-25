@@ -472,7 +472,7 @@ export function handleDaeyunClick(birthYear, birthMonth, birthDay, index) {
   const branchIndex = branchOrder.indexOf(clickedDaeyunBranch);
 
   // ⚠️ 세운 시작 기준 연도 계산 (direction 사용 X)
-  const baseYear = sewonYear + trueIndex * 10;
+  const baseYear = sewonYear-10 + trueIndex * 10;
 
   // 🔁 세운 생성
   const { yearlyStems, yearlyBranches } = generateYearlyGanjiSeries2(baseYear, stemIndex, branchIndex);

@@ -25,6 +25,7 @@ import {
 import { elementColors,arrangeByPosition} from './renderUtils.js';
 
 
+
 // sajuUtils.js
 const stemOrder = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
 const branchOrder = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
@@ -297,15 +298,39 @@ export function getStartMonthBySewoonStem(sewoonStem) {
   return map[sewoonStem] || { stem: '甲', branch: '子' }; // 기본값
 }
 
-export function calculateSewonYear(birthYear, birthMonth, birthDay, daeyunAge) {
-  const monthFraction = (birthMonth - 1) / 12;
-  const dayFraction = (birthDay / 30) / 12;
-  const decimalPart = monthFraction + dayFraction;
 
-  const sewonYear = (birthYear - 10) + daeyunAge + decimalPart;
+
+export function calculateSewonYear(birthYear, birthMonth, birthDay, daeyunAge) {
+  // ✅ 기본 Date 객체 사용
+  const birthDate = new Date(birthYear, birthMonth - 1, birthDay);
+
+  // 1) 정수부 = 년
+  const years = Math.floor(daeyunAge);
+
+  // 2) 소수부 → 월 환산 (12개월 중 10분율)
+  const decimal = daeyunAge - years;
+  const monthsFloat = (decimal * 12) / 10;
+  const months = Math.floor(monthsFloat);
+
+  // 3) 남은 소수 → 일 환산
+  const days = Math.round((monthsFloat - months) * 30);
+
+  // ✅ 실제 세운 시작 "날짜" → Date로 직접 더하기
+  const sewonDate = new Date(birthDate);
+  sewonDate.setFullYear(sewonDate.getFullYear() + years);
+  sewonDate.setMonth(sewonDate.getMonth() + months);
+  sewonDate.setDate(sewonDate.getDate() + days);
+
+  // ✅ 세운 년도를 소숫점(년.분수)으로 변환
+  const year = sewonDate.getFullYear();     // 숫자
+  const monthFraction = sewonDate.getMonth() / 12; 
+  const dayFraction = (sewonDate.getDate() / 30) / 12;
+
+  const sewonYear = year + monthFraction + dayFraction;
 
   return parseFloat(sewonYear.toFixed(2)); // 소숫점 2자리로 고정
 }
+
 
 export function findStartMonthIndex(stems, branches, targetStem, targetBranch) {
   for (let i = 0; i < 12; i++) {

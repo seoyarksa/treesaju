@@ -5,6 +5,7 @@
 // git commit -m "일간왕쇠강약"   
 // git push origin main
 // git push
+//강제실행   vercel --prod --force
 
 // 상수
 import { 
@@ -837,88 +838,48 @@ function updateResultRow({ type, gan, samhap }) {
 async function showBirthInfo(data) {
   console.log("👉 showBirthInfo 진입, data:", data);
 
-  // 월지 → 절입명 매핑 (한자 기준)
-  const BRANCH_TO_SOLAR_TERM = {
-    '寅': '입춘',
-    '卯': '경칩',
-    '辰': '청명',
-    '巳': '입하',
-    '午': '망종',
-    '未': '소서',
-    '申': '입추',
-    '酉': '백로',
-    '戌': '한로',
-    '亥': '입동',
-    '子': '대설',
-    '丑': '소한'
-  };
-
-  // 절기 → 다음 절기 매핑
-  const SOLAR_TERM_NEXT = {
-    '입춘': '경칩',
-    '경칩': '청명',
-    '청명': '입하',
-    '입하': '망종',
-    '망종': '소서',
-    '소서': '입추',
-    '입추': '백로',
-    '백로': '한로',
-    '한로': '입동',
-    '입동': '대설',
-    '대설': '소한',
-    '소한': '입춘'
-  };
-
   let solarTerm = "절입시 정보 없음";
 
-  if (data.monthBranch) {
-    const solarName = BRANCH_TO_SOLAR_TERM[data.monthBranch];
-    const nextSolarName = SOLAR_TERM_NEXT[solarName];
+  if (data.thisTerm && data.nextTerm) {
+    const pad = (n) => n.toString().padStart(2, '0');
+    const fmt = (val) => {
+      const d = (val instanceof Date) ? val : new Date(val);
+      if (isNaN(d)) return "날짜 오류";
+      return `${pad(d.getMonth() + 1)}월 ${pad(d.getDate())}일 ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
 
-    // ✅ 서버에서 절입시(thisTerm/nextTerm)를 함께 내려준 경우
-    if (data.thisTerm && data.nextTerm) {
-      console.log("📛 서버 절입 데이터 존재:", data.thisTerm, data.nextTerm);
+    // ✅ 현재절기 = thisTerm.name
+    solarTerm = `<span style="color:red;">${data.thisTerm.name}</span> 
+                 (${fmt(data.thisTerm.date)}) 
+                 ~ ${data.nextTerm.name} (${fmt(data.nextTerm.date)})`;
 
+  } else if (data.jeolipDate) {
+    console.log("📭 서버 thisTerm/nextTerm 없음, jeolipDate 사용:", data.jeolipDate);
+
+    const jeolipDateObj = new Date(data.jeolipDate);
+    if (!isNaN(jeolipDateObj)) {
       const pad = (n) => n.toString().padStart(2, '0');
-      const fmt = (val) => {
-        // date가 문자열이면 Date 객체로 변환
-        const d = (val instanceof Date) ? val : new Date(val);
-        console.log("🕒 변환 대상:", val, "→ Date 객체:", d);
-        if (isNaN(d)) return "날짜 오류";
-        return `${pad(d.getMonth() + 1)}월 ${pad(d.getDate())}일 ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-      };
-
-      solarTerm = `<span style="color:red;">${data.thisTerm.name}</span> (${fmt(data.thisTerm.date)}) ~ ${data.nextTerm.name} (${fmt(data.nextTerm.date)})`;
-
-    } else if (data.jeolipDate) {
-      console.log("📭 서버 thisTerm/nextTerm 없음, jeolipDate 사용:", data.jeolipDate);
-
-      const jeolipDateObj = new Date(data.jeolipDate);
-      if (!isNaN(jeolipDateObj)) {
-        const pad = (n) => n.toString().padStart(2, '0');
-        const jeolipStr = `${pad(jeolipDateObj.getMonth() + 1)}월 ${pad(jeolipDateObj.getDate())}일 ${pad(jeolipDateObj.getHours())}:${pad(jeolipDateObj.getMinutes())}`;
-        solarTerm = `${solarName} (${jeolipStr}) ~ ${nextSolarName}`;
-      } else {
-        console.log("⚠️ jeolipDate 파싱 실패:", data.jeolipDate);
-        solarTerm = `${solarName} ~ ${nextSolarName}`;
-      }
-
+      const jeolipStr = `${pad(jeolipDateObj.getMonth() + 1)}월 ${pad(jeolipDateObj.getDate())}일 ${pad(jeolipDateObj.getHours())}:${pad(jeolipDateObj.getMinutes())}`;
+      solarTerm = `절입 (${jeolipStr})`;
     } else {
-      console.log("❌ 서버 절입 데이터도 없고 jeolipDate도 없음");
-      solarTerm = `${solarName} ~ ${nextSolarName}`;
+      console.log("⚠️ jeolipDate 파싱 실패:", data.jeolipDate);
+      solarTerm = "절입시 정보 오류";
     }
+
+  } else {
+    console.log("❌ 서버 절입 데이터도 없고 jeolipDate도 없음");
   }
 
   const pad = (n) => n.toString().padStart(2, '0');
-  const solarDate = `${window.birthYear}-${pad(window.birthMonth)}-${pad(window.birthDay)} ${pad(window.birthHour)}:${pad(window.birthMinute)}`;
+  // ✅ window 변수 대신 서버에서 내려준 data.solar 사용
+  const solarDate = `${data.solar.year}-${pad(data.solar.month)}-${pad(data.solar.day)} ${pad(data.solar.hour)}:${pad(data.solar.minute)}`;
 
   const lunar = data.lunar;
   const lunarDate = lunar
-    ? `${lunar.lunarYear}년 ${pad(lunar.lunarMonth)}월 ${pad(lunar.lunarDay)}일 ${pad(lunar.hour)}시 ${pad(lunar.minute)}분`
+    ? `${lunar.lunarYear}년 ${pad(lunar.lunarMonth)}월 ${pad(lunar.lunarDay)}일 ${lunar.hour}시 ${lunar.minute}분`
     : "정보 없음";
 
   const birthInfoText = `[양력] <span style="color:blue;">${solarDate}</span>  ||  [음력] ${lunarDate}  <br>  [절입시] ${solarTerm}`;
-
 
   const birthInfoDiv = document.getElementById('birth-info');
   if (birthInfoDiv) {
@@ -927,6 +888,8 @@ async function showBirthInfo(data) {
     console.error("⚠️ birth-info 요소를 찾을 수 없습니다.");
   }
 }
+
+
 
 
 

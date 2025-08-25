@@ -10,6 +10,8 @@ import timezone from 'dayjs/plugin/timezone.js';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+// ✅ 서버/배포 환경에서도 항상 한국 시간으로 고정
+dayjs.tz.setDefault("Asia/Seoul");
 // 천간, 지지
 const heavenlyStems = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
 const earthlyBranches = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
@@ -123,7 +125,11 @@ function getMonthGan(yearGanjiYear, idx) {
 
 // ganji 전체 계산
 function getGanji(year, month, day, hour, minute, solarlunar) {
-  const birthDate = new Date(year, month - 1, day, hour, minute);
+  // ✅ 반드시 KST 고정
+  const birthDate = dayjs.tz(
+    `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}T${String(hour).padStart(2,"0")}:${String(minute).padStart(2,"0")}:00`,
+    "Asia/Seoul"
+  ).toDate();
 
   // 일주
   const dayGanji = getDayGanji(year, month, day);
@@ -152,9 +158,12 @@ function getGanji(year, month, day, hour, minute, solarlunar) {
   return { year: yearGanji, month: monthGanji, day: dayGanji, time: timeGanji };
 }
 
+
 // API handler
 export default async function handler(req, res) {
   try {
+    console.log("🕒 process.env.TZ:", process.env.TZ);
+console.log("🕒 Intl resolved timezone:", Intl.DateTimeFormat().resolvedOptions().timeZone);
     if (req.method !== 'POST') {
       return res.status(405).json({ error: 'Method Not Allowed' });
     }
@@ -180,14 +189,20 @@ export default async function handler(req, res) {
       }
     }
 
-    const birthDate = new Date(`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00+09:00`);
-    if (isNaN(birthDate.getTime())) throw new Error('유효하지 않은 날짜');
+  const birthDate = dayjs.tz(
+  `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00`,
+  "Asia/Seoul"
+).toDate();
 
+if (isNaN(birthDate.getTime())) {
+  throw new Error('유효하지 않은 날짜');
+}
     // 절기 관련
-    const jeolipDate = getJeolipDate(year, month, day);
-    const thisTerm = getSolarTermDate(year, MONTH_TO_SOLAR_TERM[month]);
-    const nextTermName = SOLAR_TERM_NEXT[thisTerm.name];
-    const nextTerm = getSolarTermDate(month === 12 ? year + 1 : year, nextTermName);
+  const jeolipDate = getJeolipDate(year, month, day, hour, minute);
+const thisTerm = jeolipDate.thisTerm;
+const nextTerm = jeolipDate.nextTerm;
+
+
 
     // 간지
     const ganji = getGanji(year, month, day, hour, minute, solarlunar);

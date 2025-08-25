@@ -345,7 +345,7 @@ export function getGanji(year, month, day, hour, minute) {
   // 1) 일주 계산 (기존 로직 그대로)
   const dayGanji = getDayGanji(year, month, day);
   const dayGanHan = dayGanji.charAt(0);
-  console.log('[getGanji] 일간지:', dayGanji);
+  //console.log('[getGanji] 일간지:', dayGanji);
 
   // 2) 년주 계산 (solarlunar + 입춘 보정)
   const lunarDate = solarlunar.solar2lunar(year, month, day);
@@ -353,16 +353,16 @@ export function getGanji(year, month, day, hour, minute) {
 
   // ✅ 해당 연도의 "입춘 절입시각" 가져오기
 const ipchunDate = getJeolipDate(new Date(year, 2, 4)); // 반드시 당해 2월 기준으로 호출
-console.log('🌸 [getGanji] 당년 입춘 절입시각:', ipchunDate.toISOString(), 
-            'KST:', dayjs(ipchunDate).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss'));
+//console.log('🌸 [getGanji] 당년 입춘 절입시각:', ipchunDate.toISOString(), 
+  //          'KST:', dayjs(ipchunDate).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss'));
 
   // 출생 시각이 입춘 시각 이전이면 전년도 간지 사용
   if (birthDate.getTime() < ipchunDate.getTime()) {
     const prev = solarlunar.solar2lunar(year - 1, 6, 1); // 전년도 아무 날
     yearGanji = prev.gzYear;
-    console.log('[getGanji] 입춘 이전 → 전년도 간지로 보정:', yearGanji);
+  ///////////  console.log('[getGanji] 입춘 이전 → 전년도 간지로 보정:', yearGanji);
   } else {
-    console.log('[getGanji] 입춘 이후 → 해당년도 간지 유지:', yearGanji);
+   /// console.log('[getGanji] 입춘 이후 → 해당년도 간지 유지:', yearGanji);
   }
 
   // 3) 월주 계산 (절기 기준, 기존 로직 유지)
@@ -407,7 +407,7 @@ app.post('/api/saju', (req, res) => {
 
 if (calendarType === 'lunar') {
   const converted = solarlunar.lunar2solar(year, month, day, false);
-  console.log('음력 → 양력 변환 결과:', converted);
+  //console.log('음력 → 양력 변환 결과:', converted);
   if (!converted || !converted.cYear) {
     return res.status(400).json({ error: '음력을 양력으로 변환하는 데 실패했습니다.' });
   }
@@ -416,11 +416,11 @@ if (calendarType === 'lunar') {
   day = converted.cDay;
 }
 
-  console.log(`최종 양력 생년월일: ${year}-${month}-${day}`);
+  //console.log(`최종 양력 생년월일: ${year}-${month}-${day}`);
 
 
 
-    console.log(`음력 → 양력 변환 결과: ${year}-${month}-${day}`);
+   // console.log(`음력 → 양력 변환 결과: ${year}-${month}-${day}`);
   if (isDSTKorea(year, month, day)) {
     hour -= 1;
     if (hour < 0) {
@@ -451,22 +451,24 @@ if (isNaN(birthDate.getTime())) {
 }
 
 
-const jeolipDate = getJeolipDate(year, month, day);
+const jeolipDate = getJeolipDate(year, month, day, hour, minute);
+
 // ✅ thisTerm / nextTerm 추출
-const thisTerm = getSolarTermDate(year, MONTH_TO_SOLAR_TERM[month]);
+// ✅ getJeolipDate가 이미 thisTerm/nextTerm을 포함해서 반환하도록 수정해놨다면
+const thisTerm = jeolipDate.thisTerm;
+const nextTerm = jeolipDate.nextTerm;
 const nextTermName = SOLAR_TERM_NEXT[thisTerm.name];
-const nextTerm = getSolarTermDate(month === 12 ? year + 1 : year, nextTermName);
 console.log('✅ 최종 birthDate:', formatDateKST(birthDate));
 console.log('✅ 계산된 jeolipDate:', formatDateKST(jeolipDate));
-
-
+//console.log('✅ 계산된 jeolipDate:', formatDateKST(jeolipDate))
 
 
 
 
 //const idx = getSolarTermMonthIndex(birthDate);
 //////////////////////////console.log('절기월 인덱스:', idx);
-const idx = getSolarTermMonthIndex(birthDate);
+const birthDateKST = dayjs(birthDate).tz('Asia/Seoul').toDate();
+const idx = getSolarTermMonthIndex(birthDateKST);
 console.log('절기월 인덱스:', idx);
 // ✅ 여기서 yearStemKor 변수 선언
 // 1. ganji 먼저 얻기
@@ -508,9 +510,9 @@ console.log('yearStemKor:', hanToKor(ganji.year.charAt(0)));
  birthYear: birthDate.getFullYear(), // ✅ 여기서 숫자 연도로 추가
 
    // 👉 여기 추가
-jeolipDate: jeolipDate,
-thisTerm: thisTerm ? { name: thisTerm.name, date: thisTerm.date } : null,
-nextTerm: nextTerm ? { name: nextTerm.name, date: nextTerm.date } : null
+    jeolipDate,
+      thisTerm: thisTerm ? { name: thisTerm.name, date: thisTerm.date } : null,
+      nextTerm: nextTerm ? { name: nextTerm.name, date: nextTerm.date } : null
   });
 });
 
