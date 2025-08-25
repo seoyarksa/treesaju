@@ -11,16 +11,17 @@ export default async function handler(req, res) {
       return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    const year = parseInt(req.query.year, 10);
-    const month = parseInt(req.query.month, 10);
-    const day = parseInt(req.query.day, 10);
+const year = parseInt(req.query.year, 10);
+const month = parseInt(req.query.month, 10);
+const day = parseInt(req.query.day, 10);
+const hour = req.query.hour ? parseInt(req.query.hour, 10) : 0;
+const minute = req.query.minute ? parseInt(req.query.minute, 10) : 0;
 
-   if (isNaN(year) || isNaN(month) || isNaN(day)) {
-     return res.status(400).json({ error: 'year, month, day 쿼리 파라미터가 필요합니다.' });
-    }
+if (isNaN(year) || isNaN(month) || isNaN(day)) {
+  return res.status(400).json({ error: 'year, month, day 쿼리 파라미터가 필요합니다.' });
+}
 
-
-    const jeolipDate = getJeolipDate(year, month, day);
+const jeolipDate = getJeolipDate(year, month, day, hour, minute);
 
     return res.status(200).json({
       year,

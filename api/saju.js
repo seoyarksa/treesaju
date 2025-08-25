@@ -184,10 +184,11 @@ export default async function handler(req, res) {
     if (isNaN(birthDate.getTime())) throw new Error('유효하지 않은 날짜');
 
     // 절기 관련
-    const jeolipDate = getJeolipDate(year, month, day, hour, minute);
-    const thisTerm = getSolarTermDate(year, MONTH_TO_SOLAR_TERM[month]);
-    const nextTermName = SOLAR_TERM_NEXT[thisTerm.name];
-    const nextTerm = getSolarTermDate(month === 12 ? year + 1 : year, nextTermName);
+  const jeolipDate = getJeolipDate(year, month, day, hour, minute);
+const thisTerm = jeolipDate.thisTerm;
+const nextTerm = jeolipDate.nextTerm;
+
+
 
     // 간지
     const ganji = getGanji(year, month, day, hour, minute, solarlunar);
