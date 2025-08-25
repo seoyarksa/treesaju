@@ -135,16 +135,30 @@ export function getJeolipDate(input1, input2, input3) {
 
   console.log('🔧 [getJeolipDate] 입력:', { year, month, day });
 
-  const thisTermName = MONTH_TO_SOLAR_TERM[month];
+  const thisMonthTermName = MONTH_TO_SOLAR_TERM[month];
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear = month === 1 ? year - 1 : year;
   const prevTermName = MONTH_TO_SOLAR_TERM[prevMonth];
 
-  console.log('📛 thisTermName:', thisTermName, 'prevTermName:', prevTermName);
+  console.log('📛 thisMonthTermName:', thisMonthTermName, 'prevTermName:', prevTermName);
 
-  const thisTerm = getSolarTermDate(year, thisTermName);
+  // ✅ 먼저 두 후보 절기 일자 가져오기
+  const thisMonthTerm = getSolarTermDate(year, thisMonthTermName);
   const prevTerm = getSolarTermDate(prevYear, prevTermName);
 
+  const current = dayjs(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00+09:00`).tz('Asia/Seoul');
+  const thisMonthTermKST = dayjs(thisMonthTerm.date).tz('Asia/Seoul');
+
+  // ✅ 실제 thisTermName 확정
+  const thisTermName = current.isBefore(thisMonthTermKST) ? prevTermName : thisMonthTermName;
+
+  const thisTerm = getSolarTermDate(year, thisTermName);
+// ✅ 로그 출력
+console.log('🎯 확정 thisTermName:', thisTermName);
+console.log('🎯 thisTerm:', {
+  name: thisTerm.name,
+  dateKST: dayjs(thisTerm.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss'),
+});
   if (!thisTerm || !thisTerm.date || !prevTerm || !prevTerm.date) {
     console.error('❌ [getJeolipDate] 절기 정보가 유효하지 않음', {
       year,
@@ -174,18 +188,18 @@ export function getJeolipDate(input1, input2, input3) {
   const nextTerm = getSolarTermDate(nextYear, nextTermName);
 
   // 기존 로직 그대로 둠
-  const current = dayjs(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00+09:00`).tz('Asia/Seoul');
   const thisTermKST = dayjs(thisTerm.date).tz('Asia/Seoul');
 
   console.log('⏱ current:', current.format(), 'thisTermKST:', thisTermKST.format());
 
-const result = current.isBefore(thisTermKST) ? new Date(prevTerm.date) : new Date(thisTerm.date);
+  const result = current.isBefore(thisTermKST) ? new Date(prevTerm.date) : new Date(thisTerm.date);
 
-// ✅ Date 객체 그대로 두고 속성만 추가
-result.thisTerm = thisTerm;
-result.nextTerm = nextTerm;
+  // ✅ Date 객체 그대로 두고 속성만 추가
+  result.thisTerm = thisTerm;
+  result.nextTerm = nextTerm;
 
-console.log('✅ 최종 반환:', result);
-return result;
+  console.log('✅ 최종 반환:', result);
+  return result;
 }
+
 

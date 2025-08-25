@@ -118,74 +118,96 @@ export const MONTH_TO_SOLAR_TERM = {
 
 
 
-export function getJeolipDate(input1, input2, input3) {
-  let year, month, day;
+export function getJeolipDate(yearOrDate, month, day, hour = 0, minute = 0) {
+  let year;
 
-  if (input1 instanceof Date) {
-    year = input1.getFullYear();
-    month = input1.getMonth() + 1;
-    day = input1.getDate();
-  } else if (typeof input1 === 'number' && typeof input2 === 'number' && typeof input3 === 'number') {
-    year = input1;
-    month = input2;
-    day = input3;
+  // Date 객체가 들어온 경우
+  if (yearOrDate instanceof Date) {
+    year = yearOrDate.getFullYear();
+    month = yearOrDate.getMonth() + 1;
+    day = yearOrDate.getDate();
+    hour = yearOrDate.getHours();
+    minute = yearOrDate.getMinutes();
+  } else if (
+    typeof yearOrDate === "number" &&
+    typeof month === "number" &&
+    typeof day === "number"
+  ) {
+    // 숫자(year, month, day[, hour, minute])가 들어온 경우
+    year = yearOrDate;
+    // month, day, hour, minute 그대로 사용
   } else {
-    throw new Error(`getJeolipDate: 잘못된 입력 형식입니다. Date 또는 (year:number, month:number, day:number) 형식을 사용하세요. 받은 값: ${input1}, ${input2}, ${input3}`);
+    throw new Error(
+      `getJeolipDate: 잘못된 입력 형식입니다. Date 또는 (year, month, day[, hour, minute]) 형식을 사용하세요.`
+    );
   }
 
-  console.log('🔧 [getJeolipDate] 입력:', { year, month, day });
+  console.log("🔧 [getJeolipDate] 입력:", {
+    year,
+    month,
+    day,
+    hour,
+    minute,
+  });
 
-  const thisTermName = MONTH_TO_SOLAR_TERM[month];
+  // 이하 로직은 그대로
+
+
+  const thisMonthTermName = MONTH_TO_SOLAR_TERM[month];
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear = month === 1 ? year - 1 : year;
   const prevTermName = MONTH_TO_SOLAR_TERM[prevMonth];
 
-  console.log('📛 thisTermName:', thisTermName, 'prevTermName:', prevTermName);
+  console.log('📛 thisMonthTermName:', thisMonthTermName, 'prevTermName:', prevTermName);
 
-  const thisTerm = getSolarTermDate(year, thisTermName);
+  // 두 후보 절기 가져오기
+  const thisMonthTerm = getSolarTermDate(year, thisMonthTermName);
   const prevTerm = getSolarTermDate(prevYear, prevTermName);
 
-  if (!thisTerm || !thisTerm.date || !prevTerm || !prevTerm.date) {
-    console.error('❌ [getJeolipDate] 절기 정보가 유효하지 않음', {
-      year,
-      month,
-      thisTermName,
-      prevTermName,
-      thisTerm,
-      prevTerm,
-    });
-    throw new Error('절기 데이터를 찾을 수 없습니다.');
-  }
+ const current = dayjs(
+  `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00+09:00`
+).tz('Asia/Seoul');  
+  const thisMonthTermKST = dayjs(thisMonthTerm.date).tz('Asia/Seoul');
 
-  console.log('☀️ thisTerm:', {
+
+// ✅ 출생시각 >= 절입시각이면 이번 절기, 아니면 이전 절기
+const thisTermName = current.isBefore(thisMonthTermKST)
+  ? prevTermName
+  : thisMonthTermName;
+
+const thisTermYear = current.isBefore(thisMonthTermKST) ? prevYear : year;
+const thisTerm = getSolarTermDate(thisTermYear, thisTermName);
+
+
+  console.log('🎯 확정 thisTermName:', thisTermName);
+  console.log('🎯 thisTerm:', {
     name: thisTerm.name,
     dateKST: dayjs(thisTerm.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss'),
   });
-  console.log('☀️ prevTerm:', {
-    name: prevTerm.name,
-    dateKST: dayjs(prevTerm.date).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss'),
-  });
 
-  // ✅ nextTerm만 추가
+  if (!thisTerm || !thisTerm.date || !prevTerm || !prevTerm.date) {
+    console.error('❌ [getJeolipDate] 절기 정보가 유효하지 않음');
+    throw new Error('절기 데이터를 찾을 수 없습니다.');
+  }
+
+  // nextTerm 추가
   const termNames = Object.values(MONTH_TO_SOLAR_TERM);
   const thisIndex = termNames.indexOf(thisTermName);
   const nextTermName = termNames[(thisIndex + 1) % termNames.length];
   const nextYear = month === 12 ? year + 1 : year;
   const nextTerm = getSolarTermDate(nextYear, nextTermName);
 
-  // 기존 로직 그대로 둠
-  const current = dayjs(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00+09:00`).tz('Asia/Seoul');
   const thisTermKST = dayjs(thisTerm.date).tz('Asia/Seoul');
-
   console.log('⏱ current:', current.format(), 'thisTermKST:', thisTermKST.format());
 
-const result = current.isBefore(thisTermKST) ? new Date(prevTerm.date) : new Date(thisTerm.date);
+// 항상 현재 절기의 절입시각을 반환
+const result = new Date(thisTerm.date);
+  // 속성 추가
+  result.thisTerm = thisTerm;
+  result.nextTerm = nextTerm;
 
-// ✅ Date 객체 그대로 두고 속성만 추가
-result.thisTerm = thisTerm;
-result.nextTerm = nextTerm;
-
-console.log('✅ 최종 반환:', result);
-return result;
+  console.log('✅ 최종 반환:', result);
+  return result;
 }
+
 
