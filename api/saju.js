@@ -125,7 +125,11 @@ function getMonthGan(yearGanjiYear, idx) {
 
 // ganji 전체 계산
 function getGanji(year, month, day, hour, minute, solarlunar) {
-  const birthDate = new Date(year, month - 1, day, hour, minute);
+  // ✅ 반드시 KST 고정
+  const birthDate = dayjs.tz(
+    `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}T${String(hour).padStart(2,"0")}:${String(minute).padStart(2,"0")}:00`,
+    "Asia/Seoul"
+  ).toDate();
 
   // 일주
   const dayGanji = getDayGanji(year, month, day);
@@ -153,6 +157,7 @@ function getGanji(year, month, day, hour, minute, solarlunar) {
 
   return { year: yearGanji, month: monthGanji, day: dayGanji, time: timeGanji };
 }
+
 
 // API handler
 export default async function handler(req, res) {

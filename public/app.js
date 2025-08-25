@@ -5,6 +5,7 @@
 // git commit -m "일간왕쇠강약"   
 // git push origin main
 // git push
+//강제실행   vercel --prod --force
 
 // 상수
 import { 
