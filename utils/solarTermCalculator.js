@@ -164,10 +164,12 @@ export function getJeolipDate(yearOrDate, month, day, hour = 0, minute = 0) {
   const thisMonthTerm = getSolarTermDate(year, thisMonthTermName);
   const prevTerm = getSolarTermDate(prevYear, prevTermName);
 
- const current = dayjs(
-  `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00+09:00`
-).tz('Asia/Seoul');  
-  const thisMonthTermKST = dayjs(thisMonthTerm.date).tz('Asia/Seoul');
+const current = dayjs.tz(
+  `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00`,
+  'Asia/Seoul'
+);
+
+const thisMonthTermKST = dayjs(thisMonthTerm.date).tz('Asia/Seoul');
 
 
 // ✅ 출생시각 >= 절입시각이면 이번 절기, 아니면 이전 절기
