@@ -9,8 +9,7 @@ import timezone from 'dayjs/plugin/timezone.js';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
-console.log("🕒 process.env.TZ:", process.env.TZ);
-console.log("🕒 Intl resolved timezone:", Intl.DateTimeFormat().resolvedOptions().timeZone);
+
 
 // 천간, 지지
 const heavenlyStems = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
@@ -157,6 +156,8 @@ function getGanji(year, month, day, hour, minute, solarlunar) {
 // API handler
 export default async function handler(req, res) {
   try {
+    console.log("🕒 process.env.TZ:", process.env.TZ);
+console.log("🕒 Intl resolved timezone:", Intl.DateTimeFormat().resolvedOptions().timeZone);
     if (req.method !== 'POST') {
       return res.status(405).json({ error: 'Method Not Allowed' });
     }
