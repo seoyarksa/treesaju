@@ -183,9 +183,14 @@ console.log("🕒 Intl resolved timezone:", Intl.DateTimeFormat().resolvedOption
       }
     }
 
-    const birthDate = new Date(`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00+09:00`);
-    if (isNaN(birthDate.getTime())) throw new Error('유효하지 않은 날짜');
+  const birthDate = dayjs.tz(
+  `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00`,
+  "Asia/Seoul"
+).toDate();
 
+if (isNaN(birthDate.getTime())) {
+  throw new Error('유효하지 않은 날짜');
+}
     // 절기 관련
   const jeolipDate = getJeolipDate(year, month, day, hour, minute);
 const thisTerm = jeolipDate.thisTerm;
