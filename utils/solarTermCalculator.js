@@ -7,7 +7,8 @@ import timezone from 'dayjs/plugin/timezone.js'
 dayjs.extend(utc)
 dayjs.extend(timezone)
 
-
+// ✅ 서버/배포 환경에서도 항상 한국 시간으로 고정
+dayjs.tz.setDefault("Asia/Seoul");
 
 export function getAccurateSolarLongitude(T) {
   // T: J2000 세기 단위 (Julian Century)
