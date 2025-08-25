@@ -467,7 +467,8 @@ console.log('✅ 계산된 jeolipDate:', formatDateKST(jeolipDate));
 
 //const idx = getSolarTermMonthIndex(birthDate);
 //////////////////////////console.log('절기월 인덱스:', idx);
-const idx = getSolarTermMonthIndex(birthDate);
+const birthDateKST = dayjs(birthDate).tz('Asia/Seoul').toDate();
+const idx = getSolarTermMonthIndex(birthDateKST);
 console.log('절기월 인덱스:', idx);
 // ✅ 여기서 yearStemKor 변수 선언
 // 1. ganji 먼저 얻기
