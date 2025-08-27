@@ -14,13 +14,15 @@ import {
   yukshinToKey,  
   tenGodMap,
   tenGodMapKor,
+  YANG_GAN, YIN_GAN,
   jijiToSibganMap, 
+  SAMHAP_SUPPORT,
   GYEOKGUK_TYPES,
   jijiToSibganMap2,
   HEESIN_GISIN_COMBINED, 
   HEESIN_BY_DANGRYEONG_POSITION, 
   GISIN_BY_DANGRYEONG_POSITION, 
-  johuBasis, johuMap, johuMeaning
+  johuBasis, johuMap, johuMeaning, SANGSAENG_MAP, SANGGEUK_MAP
 } from './constants.js';
 
 
@@ -749,12 +751,16 @@ window.daYunDirection = daYunDirection;
 
 const correctedStartAge = daeyunAge < 0 ? daeyunAge + 10 : daeyunAge;
 
-const ageLabels = ['0'];  // 첫 번째는 항상 0으로 시작
+const ageLabels = [];  
 
-for (let i = 1; i < daeyunPairs.length; i++) {
+for (let i = daeyunPairs.length - 1; i > 0; i--) {
   const ageValue = correctedStartAge + (i - 1) * 10;
   ageLabels.push(ageValue.toFixed(2));
 }
+
+// 마지막에 "월주" 추가
+ageLabels.push("월주");
+
 
 // 👉 정렬만 내림차순으로 적용
 ageLabels.sort((a, b) => parseFloat(b) - parseFloat(a));
@@ -1186,6 +1192,12 @@ window.handleDaeyunClick = handleDaeyunClick;
        <td style="border:1px solid #ccc; padding:4px;">일간강약</td>
 
         </tr>
+        <!-- 태과불급 전용 한 칸 -->
+<tr>
+  <td colspan="2" style="border:1px solid #ccc; padding:4px; color:purple;" id="taegwa-bulgeup-cell">
+    ${renderTaegwaBulgeupList(calculateTaegwaBulgeup(saju, dangryeong))}
+  </td>
+</tr>
     </tbody>
   </table>
 </div>

@@ -706,8 +706,7 @@ if (sinsalName === '음양차착살') {
 
 
 //////////////////////////////////////////////////////////////////////////////////끝//////////
-
-    // 모두 X면 생략
+  // 모두 X면 생략
 const type = getSinsalType(sinsalName);
 
 // 타입과 다른 구역은 전부 빈칸으로 마스킹 (X도 숨김)
@@ -718,37 +717,52 @@ const maskedGanji = (type === 'ganji' || (type === 'mixed' && sinsalName !== '�
                     : ganjiResults.map(() => '');
 
 // 모두 비거나 X면 행 생략 (빈칸도 생략 판정에 포함)
-// 모두 비거나 X면 행 생략
-const allX = [...maskedGan, ...maskedJiji, ...maskedGanji].every(v => {
+const allXGanJiji = [...maskedGan, ...maskedJiji].every(v => {
   const txt = (v || '').replace(/<[^>]+>/g, '').trim(); // 태그 제거
-  return !txt || txt === 'X' || txt === '기준'; // 기준도 X 취급
+  return !txt || txt === 'X' || txt === '기준';
 });
-if (allX) return '';
+const allXGanji = maskedGanji.every(v => {
+  const txt = (v || '').replace(/<[^>]+>/g, '').trim();
+  return !txt || txt === 'X' || txt === '기준';
+});
 
-
-    // ▼ 데이터 행도 6칸씩 맞춰 출력 (천간/지지/간지 블록)
-return `
+// ▼ 데이터 행 (천간+지지, 간지 따로 관리)
+// ✅ 각 표별로 독립적으로 줄 삭제
+const rowGanJiji = allXGanJiji ? '' : `
   <tr>
     <td style="text-align:center;">${sinsalName}</td>
     ${maskedGan.map(v   => `<td>${v || ''}</td>`).join('')}
     ${maskedJiji.map(v  => `<td>${v || ''}</td>`).join('')}
+  </tr>
+`;
+
+const rowGanji = allXGanji ? '' : `
+  <tr>
+    <td style="text-align:center;">${sinsalName}</td>
     ${maskedGanji.map(v => `<td>${v || ''}</td>`).join('')}
   </tr>
 `;
-  }).filter(Boolean).join('');
 
-  if (!sinsalRows) {
+// ✅ 둘 다 없으면 아예 삭제
+if (!rowGanJiji && !rowGanji) return null;
+
+return { rowGanJiji, rowGanji };
+}).filter(Boolean);   // null 걸러짐
+
+
+  const sinsalRowsGanJiji = sinsalRows.map(r => r.rowGanJiji).join('');
+  const sinsalRowsGanji   = sinsalRows.map(r => r.rowGanji).join('');
+
+  if (!sinsalRowsGanJiji && !sinsalRowsGanji) {
     return `<table style="margin:auto; margin-top:10px;"><tr><td>해당 기타 신살 없음</td></tr></table>`;
   }
-
-  // ▼ 표 렌더링: 헤더/제목/기준간지도 6칸에 맞춰 출력 (사주 4 + 대운 + 세운)
-  return `
+// ▼ 표 A: 천간 + 지지
+const tableA = `
 <table border="1" style="text-align:center; border-collapse:collapse; margin:auto; margin-top:16px; font-size:14px; min-width:600px;">
 <tr>
   <th style="background:#efefef;" rowspan="2">신살류</th>
-  <th colspan="6" style="background:#cfebfd;">천간</th>
-  <th colspan="6" style="background:#efcffd;">지지</th>
-  <th colspan="6" style="background:#fdebcf;">간지(동주)</th>
+  <th colspan="6" style="background:#cfebfd;">천간[사주+운]</th>
+  <th colspan="6" style="background:#efcffd;">지지[사주+운]</th>
 </tr>
 <tr>
   <!-- 사주천간(6칸) -->
@@ -766,8 +780,37 @@ return `
   <td style="background:#efcffd;">년</td>
   <td style="background:#efcffd;">대운</td>
   <td style="background:#efcffd;">세운</td>
+</tr>
 
-  <!-- 사주간지(동주)(6칸) -->
+<tr>
+<td style="background:#efefef; color:red;">기준간지<br>(빨강색)</td>
+
+  <!-- 천간칸: 천간만 빨강 -->
+  ${extGanjiArr.map(gj => {
+    if (!gj) return `<td style="background:#cfebfd;">-</td>`;
+    return `<td style="background:#cfebfd;"><span style="color:red;">${gj[0]}</span><br>${gj[1]}</td>`;
+  }).join('')}
+
+  <!-- 지지칸: 지지만 빨강 -->
+  ${extGanjiArr.map(gj => {
+    if (!gj) return `<td style="background:#efcffd;">-</td>`;
+    return `<td style="background:#efcffd;">${gj[0]}<br><span style="color:red;">${gj[1]}</span></td>`;
+  }).join('')}
+</tr>
+
+${sinsalRowsGanJiji}
+</table>
+`;
+
+
+// ▼ 표 B: 간지(동주)
+const tableB = `
+<table border="1" style="text-align:center; border-collapse:collapse; margin:auto; margin-top:16px; font-size:14px; min-width:400px;">
+<tr>
+  <th style="background:#efefef;" rowspan="2">신살류</th>
+  <th colspan="6" style="background:#fdebcf;">간지(동주)[사주+운]</th>
+</tr>
+<tr>
   <td style="background:#fdebcf;">시주</td>
   <td style="background:#fdebcf;">일주</td>
   <td style="background:#fdebcf;">월주</td>
@@ -777,54 +820,27 @@ return `
 </tr>
 
 <tr>
-<td style="background:#efefef; color:red;">기준간지</td>
+<td style="background:#efefef; color:red;">기준간지<br>(빨강색)</td>
 
-  ${extGanArr.map(g  => `<td style="color:red; background:#cfebfd;">${g  || '-'}</td>`).join('')}
-  ${extJijiArr.map(j  => `<td style="color:red; background:#efcffd;">${j  || '-'}</td>`).join('')}
-  ${extGanjiArr.map(gj => `<td style="color:red; background:#fdebcf;">${gj || '-'}</td>`).join('')}
+  <!-- 간지칸: 천간+지지 모두 빨강 -->
+  ${extGanjiArr.map(gj =>
+    gj
+      ? `<td style="background:#fdebcf;"><span style="color:red;">${gj[0]}</span><br><span style="color:red;">${gj[1]}</span></td>`
+      : `<td style="background:#fdebcf;">-</td>`
+  ).join('')}
 </tr>
 
-
-${sinsalRows
-  .split('</tr>')
-  .filter(row => row.trim())
-  .map(row => {
-    let tdIdx = -1;
-    return row.replace(/<td(\s*[^>]*)?>/g, (m, attrs='') => {
-      tdIdx++;
-
-      // 기존 style 추출 & attrs에서 제거(중복 방지)
-      let baseStyle = '';
-      const mStyle = attrs.match(/\sstyle="([^"]*)"/i);
-      if (mStyle) {
-        baseStyle = (mStyle[1] || '').trim();
-        attrs = attrs.replace(/\sstyle="[^"]*"/i, '');
-      }
-
-      // 블록 기준 색상: 월(노랑), 세운(파랑)
-      const YELLOW = [2, 8, 14];
-      const BLUE   = [4, 10, 16];
-
-      // ✅ 대운·세운(연두/녹색)
-      const GREEN  = [5, 6, 11, 12, 17, 18];
-
-      // 순서 주의: 마지막에 설정한 background가 우선됨
-      if (YELLOW.includes(tdIdx)) baseStyle += 'background:#fff59d;';
-      if (BLUE.includes(tdIdx))   baseStyle += 'background:#90caf9;';
-      if (GREEN.includes(tdIdx))  baseStyle += 'background:#c8e6c9;'; // 연녹(#c8e6c9) 톤
-  // ✅ 글자 크기 줄이기
-  baseStyle += 'font-size:12px;';
-
-      return `<td${attrs} style="${baseStyle}">`;
-    }) + '</tr>';
-  }).join('')}
-
-  
+${sinsalRowsGanji}
 </table>
+`;
+
+  return tableA + tableB + `
 <div class="note-box" style="text-align:center">
   ※ 일간,일지,일주 / 년간,년지,년주 / 대운,세운 칸들은 각각 노랑, 파랑, 초록 색깔로 구분함. <br>일반적으로 기준간지[<span style="color:red;">빨강</span>]를 기준으로 신살적용됨. 특정 간,지가 기준[<span style="color:red;">빨강</span>]인 경우 해당칸에 기준을 표기하였음.
 </div>
 `;
+
+
 
 }
 

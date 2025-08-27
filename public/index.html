@@ -150,9 +150,11 @@
 }
 
 
+
+
 .tooltip {
   position: relative;
-  cursor: help;
+  cursor: pointer;
 }
 
 .tooltip::after {
@@ -160,12 +162,25 @@
   position: absolute;
   background: #333;
   color: #fff;
-  font-size: 12px;
-  padding: 4px 6px;
+  padding: 6px 10px;
   border-radius: 4px;
-  white-space: nowrap;
+  font-size: 13px;
+  z-index: 9999;
+
+  /* 여러 줄 출력 가능 */
+  white-space: normal;
+  word-break: keep-all;   /* 단어 단위 줄바꿈 (띄어쓰기 기준) */
+  max-width: 600px;       /* 줄바꿈 발생할 최대 폭 */
+  line-height: 1.5;
+  text-align: left;
+
+  /* 위치: 요소 위쪽 중앙 */
+  bottom: 120%;
+  left: 50%;
+  transform: translateX(-50%);
+
+  display: block;         /* ✅ 세로 한줄 문제 방지 */
   opacity: 0;
-  transform: translateY(-120%);
   pointer-events: none;
   transition: opacity 0.2s;
 }
@@ -173,6 +188,11 @@
 .tooltip:hover::after {
   opacity: 1;
 }
+
+
+
+
+
 
 </style>
 
@@ -201,15 +221,15 @@
     
     <select id="calendar-type" name="calendar-type">
       <option value="선택" ></option>
-      <option value="solar"  >양력</option>
+      <option value="solar" selected="" >양력</option>
       <option value="lunar">음력</option>
     </select><br />
     <label>성별:</label>
     <label><input type="radio" name="gender" value="male" > 남자</label>
-    <label><input type="radio" name="gender" value="female"> 여자</label><br />
+    <label><input type="radio" name="gender" value="female"checked> 여자</label><br />
     <label>출생 시간:</label>
     <label><input type="radio" name="ampm" value="AM" > 오전</label>
-    <label><input type="radio" name="ampm" value="PM"> 오후</label>
+    <label><input type="radio" name="ampm" value="PM"checked> 오후</label>
     <label>+</label>
     <select id="hour-select">
       <option value="선택"></option>
@@ -218,7 +238,7 @@
       <option value="2">2시</option>
       <option value="3">3시</option>
       <option value="4">4시</option>
-      <option value="5">5시</option>
+      <option value="5"selected>5시</option>
       <option value="6">6시</option>
       <option value="7">7시</option>
       <option value="8" >8시</option>
@@ -228,7 +248,7 @@
     </select>
 <select id="minute-select">
   <option value="선택"></option>
-  <option value="0">0분</option>
+  <option value="0"selected>0분</option>
   <option value="1">1분</option>
   <option value="2">2분</option>
   <option value="3">3분</option>
@@ -368,6 +388,7 @@
     }
   });
 </script>
+
 
 </body>
 </html>

@@ -150,9 +150,10 @@
 }
 
 
+
 .tooltip {
   position: relative;
-  cursor: help;
+  cursor: pointer;
 }
 
 .tooltip::after {
@@ -160,12 +161,25 @@
   position: absolute;
   background: #333;
   color: #fff;
-  font-size: 12px;
-  padding: 4px 6px;
+  padding: 6px 10px;
   border-radius: 4px;
-  white-space: nowrap;
+  font-size: 13px;
+  z-index: 9999;
+
+  /* 여러 줄 출력 가능 */
+  white-space: normal;
+  word-break: keep-all;   /* 단어 단위 줄바꿈 (띄어쓰기 기준) */
+  max-width: 600px;       /* 줄바꿈 발생할 최대 폭 */
+  line-height: 1.5;
+  text-align: left;
+
+  /* 위치: 요소 위쪽 중앙 */
+  bottom: 120%;
+  left: 50%;
+  transform: translateX(-50%);
+
+  display: block;         /* ✅ 세로 한줄 문제 방지 */
   opacity: 0;
-  transform: translateY(-120%);
   pointer-events: none;
   transition: opacity 0.2s;
 }
@@ -173,6 +187,9 @@
 .tooltip:hover::after {
   opacity: 1;
 }
+
+
+
 
 </style>
 
