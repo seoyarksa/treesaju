@@ -15,7 +15,8 @@ import {
   tenGodMap,
   tenGodMapKor,
   YANG_GAN, YIN_GAN,
-  jijiToSibganMap, 
+  jijiToSibganMap,
+  간합MAP, 
   SAMHAP_SUPPORT,
   GYEOKGUK_TYPES,
   jijiToSibganMap2,
@@ -91,7 +92,7 @@ import {
   getYukshin,
   getUseGuByGyeok,
   renderGyeokFlowStyled,
-  getSecondaryGyeok
+  getSecondaryGyeok, renderhapshinTable
 } from './gyeokUtils.js';
 
 import { renderSinsalTable, 
@@ -931,44 +932,115 @@ window.handleDaeyunClick = handleDaeyunClick;
     line-height: 1.0;
     vertical-align: middle;
   }
-    .daeyun-table {
-  font-size: 1.2rem;
+
+.daeyun-table {
+  font-size: 0.85rem;        /* 전체 글자 크기 ↓ */
   text-align: center;
-  margin: 10px 0 0 20px;
+  min-width: 450px;  /* ✅ 최소 크기 지정 */
+  margin: 10px auto;      /* 위아래 여백 ↓ */
   border-collapse: collapse;
 }
-  .daeyun-table th,
-    .daeyun-table td {
-      width: 50px;
-      padding: 2px;
-    }
+.daeyun-table th,
+.daeyun-table td {
+  width: 35px;               /* 칸 너비 ↓ */
+  padding: 2px;          /* 여백 ↓ */
+}
 
-    .daeyun-cell {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      gap: 2px;
-      font-size: 1.1rem;
-    }  
+.daeyun-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1px;                  /* 줄 간격 ↓ */
+  font-size: 0.85rem;        /* 셀 글자 크기 ↓ */
+  line-height: 1.1;          /* 행 높이 촘촘하게 */
+}
 
-/* td는 그대로 두고 */
-.daeyun-table tbody tr:nth-child(2) td.daeyun-selected { background: transparent !important; outline: 0 !important; }
+ .daeyun-table,
+.sinsal-table {
+  table-layout: fixed;  /* 자동 확장 막기 */
+  width: 100%;          /* 부모 폭에 맞춤 */
+  word-wrap: break-word;
+  white-space: nowrap;  /* 줄바꿈 비허용 허용시 nowrap대신 normal */
+}
 
-/* 내부 div만 칠하기 */
-.daeyun-table tbody tr:nth-child(2) td.daeyun-selected .daeyun-cell {
+
+/* ✅ td 자체에 하이라이트 적용 */
+.daeyun-table tbody tr:nth-child(2) td.daeyun-selected {
   background: rgba(255, 235, 59, 0.45) !important;
   box-shadow: inset 0 0 0 2px #f1c40f !important;
   border-radius: 6px;
 }
 
+/* ❌ 내부 div만 칠하는 부분은 제거 (더 이상 필요 없음) */
+/* .daeyun-table tbody tr:nth-child(2) td.daeyun-selected .daeyun-cell { ... } */
+
+/* ✅ 선택된 .daeyun-cell 추가 효과 (테두리만 남김, 원하면 유지 가능) */
+.daeyun-cell.selected {
+  border: 2px solid rgb(225, 231, 167);
+  border-radius: 6px;
+}
+
+#yearly-series td,
+#yearly-ganji-container td {
+  width: 20px;             /* 원하는 만큼 좁게 */
+  padding: 2px;
+  font-size: 0.7rem;       /* 글자 크기 축소 */
+  white-space: normal;     /* 줄바꿈 허용 */
+  word-break: break-word;  /* 글자 강제 줄바꿈 */
+  text-align: center;
+  vertical-align: middle;
+}
+/* 세운 셀 크기 줄이기 */
+.sewoon-cell {
+  width: 30px;            /* 원하는 고정 폭 (예: 40px → 필요시 더 줄여도 됨) */
+  padding: 2px !important;/* 안쪽 여백 최소화 */
+  font-size: 0.7rem;      /* 글자 크기 축소 */
+  line-height: 1.1;       /* 줄 간격 조절 */
+  text-align: center;
+  vertical-align: top;
+  word-wrap: break-word;  /* 긴 글자도 셀 안에서 줄바꿈 */
+}
 
 
-      /* style 영역에 추가 */
-    .daeyun-cell.selected {
-      border: 2px solidrgb(225, 231, 167);
-      border-radius: 6px;
-  } 
+/* 세운/월운 테이블 전용 */
+.sewoon-table td, 
+.wolwoon-table td {
+  width: 35px !important;   /* 셀 가로폭 줄이기 */
+  padding: 1px !important;  /* 안쪽 여백 최소화 */
+  font-size: 0.75rem;       /* 글자 크기 줄이기 */
+  line-height: 1.1;         /* 줄 간격 압축 */
+}
+
+.dangryeong-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 1rem;
+  text-align: center;
+  table-layout: fixed;
+  border: none; /* 전체 테두리 제거 */
+}
+.dangryeong-table td {
+  border: none; /* 기본선 제거 */
+}
+.dangryeong-table td + td {
+  border-left: 1px solid #ccc; /* 두 칸 사이 세로선만 표시 */
+}
+
+
+.sinsal-table {
+  table-layout: fixed;
+  width: 100%;
+  word-wrap: break-word;
+  white-space: normal;   /* 줄바꿈 허용 */
+}
+
+.sinsal-table td, 
+.sinsal-table th {
+  max-width: 80px;       /* 셀 최대 폭 제한 */
+  overflow: hidden;      /* 넘치면 숨김 */
+  text-overflow: ellipsis; /* ... 처리 */
+}
 
 
 .sewoon-cell.selected {
@@ -982,8 +1054,21 @@ window.handleDaeyunClick = handleDaeyunClick;
   border: 2px solid #fdcb6e !important;
   border-radius: 6px;
 }
+ .sinsal-highlight {
+    background: #ffe97a !important;
+    color: #b85c00 !important;
+    font-weight: bold;
+    border: 2px solid #ffba22 !important;
+    border-radius: 8px;
+    transition: background 0.1s;
+  }
+      .saju-blue {
+    color: #1976d2 !important;
+    font-weight: bold;
+    text-shadow: 0 1px 0 #e6f3ff;
+  }
 
-
+ 
   .note-box {
     font-size: 0.75rem;
     color: #555;
@@ -1014,19 +1099,7 @@ window.handleDaeyunClick = handleDaeyunClick;
           white-space: pre-line;
         }
 
-  .sinsal-highlight {
-    background: #ffe97a !important;
-    color: #b85c00 !important;
-    font-weight: bold;
-    border: 2px solid #ffba22 !important;
-    border-radius: 8px;
-    transition: background 0.1s;
-  }
-      .saju-blue {
-    color: #1976d2 !important;
-    font-weight: bold;
-    text-shadow: 0 1px 0 #e6f3ff;
-  }
+ 
           
 </style>
 
@@ -1177,7 +1250,9 @@ window.handleDaeyunClick = handleDaeyunClick;
     <tbody>
       <tr>
         <td style="border:1px solid #ccc; padding:4px;">${dangryeongHtml || "-"}</td>
-        <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-display"></div></td>
+        <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-display"></div>
+                                                        <div id="hapshin-box"></div>
+</div></td>
        
       </tr>
       <tr>
@@ -1205,15 +1280,6 @@ window.handleDaeyunClick = handleDaeyunClick;
 
 
 
- <!-- ✅ 대운 테이블 -->
-<div class="daeyun-table-container"></div>
-
-
-
-
-<div id="yearly-series" style="margin-top: 1rem;"></div>
-<!-- 세운 표시 영역 -->
-<div id="yearly-ganji-container" style="margin-top: 20px;"></div>
 
 
 `;
@@ -1225,18 +1291,28 @@ window.handleDaeyunClick = handleDaeyunClick;
 document.getElementById('sinsal-section').innerHTML = `
 
 
- <!-- ✅ 대운 테이블 -->
-<div class="daeyun-table-container"></div>
+<table style="border-collapse:collapse; width:100%; border:none; text-align:center;">
+  <tr>
+    <!-- 왼쪽 칸: 대운/세운/월운 -->
+    <td style="vertical-align:top; padding:8px; width:70%; border:none;">
+      <div class="daeyun-table-container"></div>
+      <div id="yearly-series" style="margin-top: 1rem;"></div>
+      <div id="yearly-ganji-container" style="margin-top: 20px;"></div>
+    </td>
 
+    <!-- 오른쪽 칸: 기본신살 -->
+    <td style="vertical-align:top; padding:8px; width:30%; border:none;">
+      <div id="sinsal-box"></div>
+    </td>
+  </tr>
+  <tr>
+    <!-- 두 번째 줄: 기타신살 -->
+    <td colspan="2" style="padding:8px; border:none;">
+      <div id="etc-sinsal-box"></div>
+    </td>
+  </tr>
+</table>
 
-<div id="yearly-series" style="margin-top: 1rem;"></div>
-<!-- 세운 표시 영역 -->
-<div id="yearly-ganji-container" style="margin-top: 20px;"></div>
-
-<!-- ✅신살테이블 -->
-<div style="height:16px;"></div>
-<div id="sinsal-box"></div>       <!-- 기본 신살표 -->
-<div id="etc-sinsal-box"></div>   <!-- 기타 신살표 -->
 
 `;
 
@@ -1326,27 +1402,101 @@ if (secondaryGyeokResult?.primary && secondaryGyeokResult?.secondary) {
   `;
 }
 
+
 // 격국 표시
+// 격국 이름 계산
+const gyeokResult = getGyeokForMonth({ 
+  monthJi, saryeong, chunganList, dayGan, daeyunAge, daYunDirection, saju, otherJijiArr 
+});
+
+// 격 이름 (예: "건록격")
+const gyeokName = gyeokResult.char;
+
+// 격 기준이 된 천간 (예: "庚")
+const gyeokGanHanja = gyeokResult.stem;
+
+// 최종 격국 이름 만들기 (예: "건록격(庚)")
+const gyeokDisplayText2 = getGyeokName(dayGan, gyeokGanHanja); // 단일 격 이름 + 천간
 const gyeokDisplayEl = document.getElementById("gyeok-display");
+
 if (gyeokDisplayEl) {
-  gyeokDisplayEl.innerHTML = `격국: ${gyeokDisplayText}`;
+  // 정규화: 공백/괄호 제거
+  const normalizedName = (gyeokDisplayText2 || "")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/\(.*?\)/g, "");
+
+  console.log("▶ 격국이름 원본:", gyeokDisplayText2, "정규화:", normalizedName);
+
+  // 합신 테이블 HTML 생성 (normalizedName 사용)
+  const hapshinTableHtml = renderhapshinTable(
+    normalizedName,
+    saju,
+    dayGan,
+    gyeokGanHanja
+  );
+
+  // 출력은 기존의 주격+보조격 로직(gyeokDisplayText)을 유지
+  gyeokDisplayEl.innerHTML = ` 격국: ${gyeokDisplayText} `;
+
+   // 3) 합신표 별도 박스에 출력
+  document.getElementById("hapshin-box").innerHTML = hapshinTableHtml;
 }
+
+
+
+
 
 if (gyeok && saju) {
   renderGyeokFlowStyled(gyeok, saju, secondaryGyeokResult);
 }
 
 // ▶ 클릭 이벤트 연결!
+// ▶ 클릭 이벤트 연결!
 document.getElementById('gyeok-primary')?.addEventListener('click', () => {
   renderGyeokFlowStyled(gyeok, saju, secondaryGyeokResult);
+
+  // ⚡ 격 이름 정리 (괄호 제거)
+  const pureName = (gyeok.char || "").replace(/\(.*?\)/g, "");
+
+  // 합신표만 교체
+  const hapshinHtml = renderhapshinTable(
+    pureName,    // ← 정리된 격 이름
+    saju,
+    dayGan,
+    gyeok.stem
+  );
+  document.getElementById("hapshin-box").innerHTML = hapshinHtml;
 });
+
 document.getElementById('gyeok-secondary')?.addEventListener('click', () => {
+  let selectedGyeok, otherGyeok;
+
   if (secondaryGyeokResult?.primary && secondaryGyeokResult?.secondary) {
-    renderGyeokFlowStyled(secondaryGyeokResult.secondary, saju, secondaryGyeokResult.primary);
+    selectedGyeok = secondaryGyeokResult.secondary;
+    otherGyeok = secondaryGyeokResult.primary;
   } else {
-    renderGyeokFlowStyled(secondaryGyeokResult, saju, gyeok);
+    selectedGyeok = secondaryGyeokResult;
+    otherGyeok = gyeok;
   }
+
+  renderGyeokFlowStyled(selectedGyeok, saju, otherGyeok);
+
+  // ⚡ 격 이름 정리 (괄호 제거)
+  const pureName = (selectedGyeok.char || "").replace(/\(.*?\)/g, "");
+
+  // 합신표만 교체
+  const hapshinHtml = renderhapshinTable(
+    pureName,    // ← 정리된 격 이름
+    saju,
+    dayGan,
+    selectedGyeok.stem
+  );
+  document.getElementById("hapshin-box").innerHTML = hapshinHtml;
 });
+
+
+
 
 
 

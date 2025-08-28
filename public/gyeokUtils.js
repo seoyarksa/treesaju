@@ -9,7 +9,7 @@ import {
          jijiToSibganMap2,
          gyeokjijiToSibganMap,
          firstHeesinMap, 
-         tenGodMap,
+         tenGodMap, 간합MAP,
          GYEOKGUK_TYPES,
          samhapGroups,
          isYangStem,
@@ -18,7 +18,7 @@ import {
          길신격_목록,
          흉신격_목록,
          YUKSHIN_COUNTERS,
-         GYEOK_YUKSHIN_MAP
+         GYEOK_YUKSHIN_MAP, jijiToSibganMap
         } from './constants.js';
 
 import { hanToKorStem,
@@ -984,6 +984,142 @@ let html = _renderSingle(gyeok);
 document.getElementById('gyeok-flow').innerHTML = html;
 
 }
+
+
+
+
+//// 합신 테이블/////////////////////////////////////////////////////////////////////////////////
+// 상신의 천간으로 합신을 구하는 함수
+
+// 특정 육신의 합신을 구하는 일반 함수
+function getGanForYukshin(dayGan, yukshinName) {
+  const table = tenGodMap[dayGan];
+  console.log("[getGanForYukshin] dayGan=", dayGan, "yukshinName=", yukshinName, "table=", table);
+
+  if (!table) return null;
+
+  for (const gan in table) {
+    if (table[gan] === yukshinName) {
+      console.log("[getGanForYukshin] FOUND:", yukshinName, "=>", gan);
+      return gan;
+    }
+  }
+  console.log("[getGanForYukshin] NOT FOUND:", yukshinName);
+  return null;
+}
+
+// 합신 구하기 (천간 + 육신명 출력, 중복 제거)
+function getHapshinByGan(dayGan, baseGan, saju) {
+  if (!baseGan) return "X";
+
+  const hapGan = 간합MAP[baseGan];
+  if (!hapGan) return "X";
+
+  const hapYukshin = tenGodMap[dayGan]?.[hapGan] || "?";
+
+  const sources = [];
+
+  // --- 1. 천간 검사 (⚡ 일간 제외) ---
+  const cheonganList = [saju.yearGan, saju.monthGan, saju.hourGan].filter(Boolean);
+  if (cheonganList.includes(hapGan)) {
+    sources.push(`${hapGan}(天)`);
+  }
+
+  // --- 2. 지지 지장간 검사 (중기 제외) ---
+  const jijiList = [saju.yearBranch, saju.monthBranch, saju.dayBranch, saju.hourBranch].filter(Boolean);
+  for (const branch of jijiList) {
+    const sibgans = jijiToSibganMap[branch] || [];
+    const filtered = sibgans.filter(s => s && s.char && !s.isMiddle);
+
+    if (filtered.some(s => s.char === hapGan)) {
+      sources.push(`${hapGan}(地)`);
+      break; // 한 지지만 잡으면 충분
+    }
+  }
+
+  // --- 3. 중복 제거 ---
+  const unique = [...new Set(sources)];
+
+  return unique.length > 0 ? `${hapYukshin}[${unique.join(", ")}]` : "X";
+}
+
+
+
+
+
+
+  const ROLE_COLOR_MAP = {
+  격: "black",
+  상신: "blue",
+  구신: "green",
+  기신1: "red",
+  기신2: "red",
+};
+
+export function renderhapshinTable(gyeokName, saju, dayGan, gyeokStem) {
+  const normalizedName = (gyeokName || "")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/\(.*?\)/g, "");
+
+  const map = GYEOK_YUKSHIN_MAP[normalizedName];
+  if (!map) {
+    return `<div>⚠ '${normalizedName}'에 대한 육신 매핑 없음</div>`;
+  }
+
+  // 육신(천간) 붙이기
+  const withGan = (yukshin) => {
+    if (!yukshin) return `${yukshin}(?)`;
+    const baseGan = getGanForYukshin(dayGan, yukshin);
+    return `${yukshin}(${baseGan || "?"})`;
+  };
+
+  // 윗줄 (각 항목에 색 적용)
+  const headers = [
+    `<span style="color:${ROLE_COLOR_MAP["상신"]}">상신[${withGan(map.sangsin)}]</span>`,
+    `<span style="color:${ROLE_COLOR_MAP["구신"]}">구신[${withGan(map.gusin)}]</span>`,
+    `<span style="color:${ROLE_COLOR_MAP["기신1"]}">기신1[${withGan(map.gisin1)}]</span>`,
+    `<span style="color:${ROLE_COLOR_MAP["기신2"]}">기신2[${withGan(map.gisin2)}]</span>`
+  ];
+
+  // 합신 (격 포함 5개)
+  const hapshinVals = [
+    getHapshinByGan(dayGan, gyeokStem, saju),
+    getHapshinByGan(dayGan, getGanForYukshin(dayGan, map.sangsin), saju),
+    getHapshinByGan(dayGan, getGanForYukshin(dayGan, map.gusin), saju),
+    getHapshinByGan(dayGan, getGanForYukshin(dayGan, map.gisin1), saju),
+    getHapshinByGan(dayGan, getGanForYukshin(dayGan, map.gisin2), saju),
+  ];
+
+  return `
+    <table style="border-collapse: collapse; width:100%; margin-top:4px; font-size:0.75rem; text-align:center;">
+      <tr>
+        <td style="border:1px solid #ccc; padding:2px; width:6%;"></td>
+        <td style="border:1px solid #ccc; padding:2px; width:14%; color:${ROLE_COLOR_MAP["격"]};font-weight:bold;">${gyeokName}[${gyeokStem}]</td>
+        ${headers.map(h => `<td style="border:1px solid #ccc; padding:2px;">${h}</td>`).join("")}
+      </tr>
+      <tr>
+        <td style="border:1px solid #ccc; padding:2px;">합신</td>
+        ${hapshinVals.map((h, i) => {
+          const role = ["격","상신","구신","기신1","기신2"][i];
+          const color = ROLE_COLOR_MAP[role] || "black";
+          return `<td style="border:1px solid #ccc; padding:2px; color:${color};">${h}</td>`;
+        }).join("")}
+      </tr>
+    </table>
+     <div style="text-align:center; margin-top:6px; font-size:0.7rem; font-family:monospace;">
+    * 아래 격도식의 
+    <span style="color:red; font-weight:">빨강색 화살표(→)</span>는 극의 관계, 
+    <span style="color:blue; font-weight:">파랑색 화살표(→)</span>는 생의 관계
+  </div>
+  `;
+}
+
+
+
+
+
+
 
 
 

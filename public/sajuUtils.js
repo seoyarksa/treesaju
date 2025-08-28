@@ -19,7 +19,7 @@ import {
         HEESIN_BY_DANGRYEONG_POSITION, 
         GISIN_BY_DANGRYEONG_POSITION,
         tenGodMap,
-        tenGodMapKor,
+        tenGodMapKor, 간합MAP,
         SARYEONGSHIK_MAP_WITH_ROLE, SAMHAP_SUPPORT,
         johuBasis, johuMap, johuMeaning,태과불급map, 특수태과불급map, SANGSAENG_MAP, SANGGEUK_MAP
         } from './constants.js';

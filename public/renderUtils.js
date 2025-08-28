@@ -79,12 +79,27 @@ export function renderDaeyunTable({ daeyunAge, ageLabels, pairsToRender, birthYe
   let html = `
     <table class="daeyun-table">
       <thead>
-        <tr><th colspan="10">대운수: ${daeyunAge.toFixed(2)}</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          ${ageLabels.map(age => `<td style="font-size:0.85rem; color:#999;">${age}</td>`).join('')}
-        </tr>
+ <thead>
+  <tr><th colspan="10">대운수: ${daeyunAge.toFixed(2)}</th></tr>
+</thead>
+<tbody>
+<tr>
+  ${ageLabels.map(age => {
+    // 문자열(월주)이면 그대로 출력
+    if (isNaN(Number(age))) {
+      return `<td style="font-size:0.85rem; color:#666;">${age}</td>`;
+    }
+    // 숫자 문자열이든 숫자든 무조건 정수로
+    const intAge = Math.floor(Number(age));
+    return `<td style="font-size:0.85rem; color:#999;">${intAge}</td>`;
+  }).join('')}
+</tr>
+
+
+
+
+
+
         <tr>
           ${pairsToRender.slice().reverse().map((pair, i) => {
 
@@ -299,16 +314,19 @@ const tenGodBranch = targetStemHan ? getTenGod(dayStemHan, targetStemHan) : '';
 
 
     // 🎯 출력 HTML 구성
-    const year = baseYear + i;
-// 🎯 renderYearlyGanjiSeries 내부 세운 셀 코드
+const year = (baseYear + i);
+const yearDisplay = Math.floor(year);  // 정수 부분만
+const yearFull = year.toFixed(2);      // 전체값 (툴팁)
+
 dataRow.innerHTML += `
-  <td class="sewoon-cell" data-index="${i}" data-year="${year.toFixed(2)}" data-stem="${stemKor}" data-branch="${branchKor}">
-    <div style="font-size:0.85rem; color:#999;">${year.toFixed(2)}</div>
-    <div style="font-size:0.85rem;">${colorize(stemHan)}</div>
-    <div style="font-size:0.75rem; color:#999;">(${tenGodStem})</div>
-    <div style="font-size:0.85rem;">${colorize(branchHan)}</div>
-    ${tenGodBranch ? `<div style="font-size:0.75rem; color:#999;">(${tenGodBranch})</div>` : ''}
+  <td class="sewoon-cell" data-index="${i}" data-year="${yearFull}" data-stem="${stemKor}" data-branch="${branchKor}">
+    <div style="font-size:0.75rem; color:#999;" title="${yearFull}">${yearDisplay}</div>
+    <div style="font-size:0.75rem;">${colorize(stemHan)}</div>
+    <div style="font-size:0.65rem; color:#999;">(${tenGodStem})</div>
+    <div style="font-size:0.75rem;">${colorize(branchHan)}</div>
+    ${tenGodBranch ? `<div style="font-size:0.65rem; color:#999;">(${tenGodBranch})</div>` : ''}
   </td>`;
+
 
   }
 
@@ -383,14 +401,13 @@ export function renderMonthlyGanjiSeries(baseYear, sewoonStem) {
     // ✅ 월 번호(표가 12→1 역순이라 12-i)
     const monthNum = 12 - i;
 
-    html += `
-      <td class="wolwoon-cell" data-month="${monthNum}" style="text-align:center;">
-        <div style="font-size:0.85rem;">${colorize(stemHan)}</div>
-        <div style="font-size:0.75rem; color:#999;">(${tenGodStem})</div>
-        <div style="font-size:0.85rem;">${colorize(branchHan)}</div>
-        ${tenGodBranch ? `<div style="font-size:0.75rem; color:#999;">(${tenGodBranch})</div>` : ''}
-      </td>`;
-  }
+html += `
+  <td class="wolwoon-cell" data-month="${monthNum}" style="text-align:center;">
+    <div style="font-size:0.85rem;">${colorize(stemHan)}</div>
+    <div style="font-size:0.85rem;">${colorize(branchHan)}</div>
+  </td>`;
+}
+
 
   html += '</tr></tbody></table>';
   container.innerHTML = html;

@@ -191,6 +191,7 @@
 
 
 
+
 </style>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -222,20 +223,20 @@
       <option value="lunar">음력</option>
     </select><br />
     <label>성별:</label>
-    <label><input type="radio" name="gender" value="male" > 남자</label>
-    <label><input type="radio" name="gender" value="female"checked> 여자</label><br />
+    <label><input type="radio" name="gender" value="male" checked> 남자</label>
+    <label><input type="radio" name="gender" value="female"> 여자</label><br />
     <label>출생 시간:</label>
-    <label><input type="radio" name="ampm" value="AM" > 오전</label>
-    <label><input type="radio" name="ampm" value="PM"checked> 오후</label>
+    <label><input type="radio" name="ampm" value="AM" checked> 오전</label>
+    <label><input type="radio" name="ampm" value="PM"> 오후</label>
     <label>+</label>
     <select id="hour-select">
       <option value="선택"></option>
        <option value="0">0시</option>
       <option value="1">1시</option>
       <option value="2">2시</option>
-      <option value="3">3시</option>
+      <option value="3"selected>3시</option>
       <option value="4">4시</option>
-      <option value="5"selected>5시</option>
+      <option value="5">5시</option>
       <option value="6">6시</option>
       <option value="7">7시</option>
       <option value="8" >8시</option>
@@ -245,7 +246,7 @@
     </select>
 <select id="minute-select">
   <option value="선택"></option>
-  <option value="0"selected>0분</option>
+  <option value="0">0분</option>
   <option value="1">1분</option>
   <option value="2">2분</option>
   <option value="3">3분</option>
@@ -255,7 +256,7 @@
   <option value="7">7분</option>
   <option value="8">8분</option>
   <option value="9">9분</option>
-  <option value="10">10분</option>
+  <option value="10"selected>10분</option>
   <option value="11">11분</option>
   <option value="12">12분</option>
   <option value="13">13분</option>
@@ -319,27 +320,32 @@
 </div>
 <div id="result" style="display:none;">
 
-  <!-- 공통 (항상 표시) -->
-  <div id="common-section">
-    <div id="birth-info"></div>
-    <div id="ganji-table"></div>
-    <div id="today-saju-container" style="margin-top:30px;"></div>
-    <div id="daeyun-table-container" class="daeyun-table-container"></div>
-    <div id="yearly-series"></div>
-  </div>
-
-  <!-- 기본 모드 -->
-  <div id="basic-section"  style="display:none;">
-  <div id="dangryeong-table"  class="dangryeong-table"></div>
-  </div>
-
-  <!-- 신살류 모드 -->
-  <div id="sinsal-section"  style="display:none;">
-    <div id="sinsal-box"></div>
-    <div id="etc-sinsal-box"></div>
-  </div>
-
+<!-- 공통 (항상 표시) -->
+<div id="common-section">
+  <div id="birth-info"></div>
+  <div id="ganji-table"></div>
+  <div id="today-saju-container" style="margin-top:30px;"></div>
 </div>
+
+<!-- 기본 모드 -->
+<div id="basic-section" style="display:none;">
+  <div id="dangryeong-table" class="dangryeong-table"></div>
+
+  <!-- ✅ basic 전용 대운/세운 -->
+  <div id="basic-daeyun-table" class="daeyun-table-container"></div>
+  <div id="basic-yearly-series"></div>
+</div>
+
+<!-- 신살류 모드 -->
+<div id="sinsal-section" style="display:none;">
+  <!-- ✅ sinsal 전용 대운/세운 -->
+  <div id="sinsal-daeyun-table" class="daeyun-table-container"></div>
+  <div id="sinsal-yearly-series"></div>
+
+  <div id="sinsal-box"></div>
+  <div id="etc-sinsal-box"></div>
+</div>
+
 
 
 

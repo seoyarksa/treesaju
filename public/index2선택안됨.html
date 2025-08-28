@@ -219,7 +219,7 @@
     
     <select id="calendar-type" name="calendar-type">
       <option value="선택" ></option>
-      <option value="solar"  >양력</option>
+      <option value="solar" >양력</option>
       <option value="lunar">음력</option>
     </select><br />
     <label>성별:</label>
@@ -320,27 +320,32 @@
 </div>
 <div id="result" style="display:none;">
 
-  <!-- 공통 (항상 표시) -->
-  <div id="common-section">
-    <div id="birth-info"></div>
-    <div id="ganji-table"></div>
-    <div id="today-saju-container" style="margin-top:30px;"></div>
-    <div id="daeyun-table-container" class="daeyun-table-container"></div>
-    <div id="yearly-series"></div>
-  </div>
-
-  <!-- 기본 모드 -->
-  <div id="basic-section"  style="display:none;">
-  <div id="dangryeong-table"  class="dangryeong-table"></div>
-  </div>
-
-  <!-- 신살류 모드 -->
-  <div id="sinsal-section"  style="display:none;">
-    <div id="sinsal-box"></div>
-    <div id="etc-sinsal-box"></div>
-  </div>
-
+<!-- 공통 (항상 표시) -->
+<div id="common-section">
+  <div id="birth-info"></div>
+  <div id="ganji-table"></div>
+  <div id="today-saju-container" style="margin-top:30px;"></div>
 </div>
+
+<!-- 기본 모드 -->
+<div id="basic-section" style="display:none;">
+  <div id="dangryeong-table" class="dangryeong-table"></div>
+
+  <!-- ✅ basic 전용 대운/세운 -->
+  <div id="basic-daeyun-table" class="daeyun-table-container"></div>
+  <div id="basic-yearly-series"></div>
+</div>
+
+<!-- 신살류 모드 -->
+<div id="sinsal-section" style="display:none;">
+  <!-- ✅ sinsal 전용 대운/세운 -->
+  <div id="sinsal-daeyun-table" class="daeyun-table-container"></div>
+  <div id="sinsal-yearly-series"></div>
+
+  <div id="sinsal-box"></div>
+  <div id="etc-sinsal-box"></div>
+</div>
+
 
 
 
