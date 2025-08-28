@@ -1250,7 +1250,7 @@ window.handleDaeyunClick = handleDaeyunClick;
     <tbody>
       <tr>
         <td style="border:1px solid #ccc; padding:4px;">${dangryeongHtml || "-"}</td>
-        <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-display"></div>
+        <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-display"></div><br>
                                                         <div id="hapshin-box"></div>
 </div></td>
        

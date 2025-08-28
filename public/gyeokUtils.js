@@ -1108,9 +1108,9 @@ export function renderhapshinTable(gyeokName, saju, dayGan, gyeokStem) {
       </tr>
     </table>
      <div style="text-align:center; margin-top:6px; font-size:0.7rem; font-family:monospace;">
-    * 아래 격도식의 
-    <span style="color:red; font-weight:">빨강색 화살표(→)</span>는 극의 관계, 
-    <span style="color:blue; font-weight:">파랑색 화살표(→)</span>는 생의 관계
+    * 아래 격도식에서  
+    <span style="color:red; font-weight:">⮕</span>는 극의 관계, 
+    <span style="color:blue; font-weight:">⮕</span>는 생의 관계
   </div>
   `;
 }
