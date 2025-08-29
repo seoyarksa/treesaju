@@ -754,7 +754,14 @@ const johuRow2 = `
 
 
   return `
-    <table style="border-collapse:collapse;width:100%;text-align:center;" border="1">
+    <table 
+  style="border-collapse:collapse;
+         width:100%;
+         text-align:center;
+         table-layout:fixed;
+         word-wrap:break-word;
+         word-break:break-all;"
+  border="1">
       ${rowTop}
       ${rowMiddle}
       ${johuRow1}
