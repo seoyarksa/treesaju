@@ -92,7 +92,8 @@ import {
   getYukshin,
   getUseGuByGyeok,
   renderGyeokFlowStyled,
-  getSecondaryGyeok, renderhapshinTable
+  getSecondaryGyeok, renderhapshinTable,
+  renderIlganGyeokTable, getGyeokGrade
 } from './gyeokUtils.js';
 
 import { renderSinsalTable, 
@@ -565,6 +566,14 @@ const gyeok = getGyeokForMonth({
 
 const jijiSibgans = jijiToSibganMap2[monthJi] || [];
 // 2. 보조격 결정 (주격과 동일한 사주 정보 사용!)
+console.log("▶ saju:", saju);
+const gyeokResult = getGyeokForMonth({ 
+  monthJi, saryeong, chunganList, dayGan, daeyunAge, daYunDirection, saju, otherJijiArr 
+});
+console.log("▶ gyeokResult:", gyeokResult);
+// 격 이름 (예: "건록격")
+const gyeokName = gyeokResult?.char || "미판정";
+console.log("▶ gyeokName:", gyeokName);
 const secondaryGyeokResult = getSecondaryGyeok({
   monthJi,
   saryeong,
@@ -577,6 +586,18 @@ const secondaryGyeokResult = getSecondaryGyeok({
   primaryChar: gyeok?.char,     // 이 위치에서 값 세팅!,
   otherJijiArr  
 });
+console.log("▶ secondaryGyeokResult:", secondaryGyeokResult);
+// 격 기준이 된 천간 (예: "庚")
+const gyeokGanHanja = gyeokResult.stem;
+
+// 격 데이터 패키징 (여기서 바로 묶음)
+const gyeokData = {
+  primaryName: gyeokName || "미판정",                 
+  primaryStem: gyeokGanHanja || "-",                  
+  secondaryName: secondaryGyeokResult?.char || "X",   
+  secondaryStem: secondaryGyeokResult?.stem || null   
+};
+
 
 
 //console.log("격국:", gyeok);
@@ -1264,7 +1285,7 @@ window.handleDaeyunClick = handleDaeyunClick;
       </tr>
        <tr>
        <td style="border:1px solid #ccc; padding:4px;" id="johuyongsin-cell"> ${renderJohuCell(saju)}</td>
-       <td style="border:1px solid #ccc; padding:4px;">일간강약</td>
+       <td style="border:1px solid #ccc; padding:4px;">   ${renderIlganGyeokTable(saju, {gyeokName, secondaryGyeokResult})}</td>
 
         </tr>
         <!-- 태과불급 전용 한 칸 -->
@@ -1405,15 +1426,6 @@ if (secondaryGyeokResult?.primary && secondaryGyeokResult?.secondary) {
 
 // 격국 표시
 // 격국 이름 계산
-const gyeokResult = getGyeokForMonth({ 
-  monthJi, saryeong, chunganList, dayGan, daeyunAge, daYunDirection, saju, otherJijiArr 
-});
-
-// 격 이름 (예: "건록격")
-const gyeokName = gyeokResult.char;
-
-// 격 기준이 된 천간 (예: "庚")
-const gyeokGanHanja = gyeokResult.stem;
 
 // 최종 격국 이름 만들기 (예: "건록격(庚)")
 const gyeokDisplayText2 = getGyeokName(dayGan, gyeokGanHanja); // 단일 격 이름 + 천간

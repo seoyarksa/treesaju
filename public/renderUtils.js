@@ -607,26 +607,28 @@ return `
 }
 
   </style>
-  <div style="display: flex; justify-content: center; margin-top: 1rem;">
-    <table class="dangryeong-table" style="border-collapse: collapse; font-size: 1rem; text-align: center; width: 100%; max-width: 600px; border: 1px solid #ccc;">
+  <div style="display: flex; justify-content: center; margin-top: 0;">
+    <table class="dangryeong-table" style="border-collapse: collapse; font-size: 1rem; text-align: center; width: 100%; max-width: 600px; border: 1px solid #ccc;table-layout:fixed;">
       <tbody>
         <tr>
 <td style="border:1px solid #ccc; padding:4px;">
   <span style="background-color:#f0f0f0; padding:2px 4px;">당령:</span>
   <span style="color: red; font-weight: bold;">${dangryeong || '-'}</span>
 </td>
-<td style="border:1px solid #ccc; padding:4px;">
+<td style="border:1px solid #ccc; padding:4px;max-width:150px;">
   <span style="background-color:#f0f0f0; padding:2px 4px;">사령:</span>
   <span style="color: blue;">${saryeong || '-'}</span>
 </td>
 
 
-          <td style="border:1px solid #ccc; padding:4px;">당령식: ${dangryeongshikHtml || '-'}</td>
+          <td style="border:1px solid #ccc; padding:4px;min-width:250px;">${styledSaryeongshik}</td>
         </tr>
         <tr> 
-          <td style="border:1px solid #ccc; padding:4px;" colspan="2">${styledSaryeongshik}</td>
-          <td style="border:1px solid #ccc; padding:4px; font-size:12px;">
-            *당령[빨강], 제1희신[녹색], 사령[파랑], 사령보좌[녹색], 기신[오렌지색]
+          <td style="border:1px solid #ccc; padding:4px;font-size:20px;" colspan="3">당령식: ${dangryeongshikHtml || '-'}
+          <br>
+            <div style="font-size:12px;margin-top:6px;">*당령[<span style="color:red;">빨강</span>], 제1희신[<span style="color:green;">녹색</span>], 사령[<span style="color:blue;">파랑</span>], 사령보좌[<span style="color:green;">녹색</span>], 기신[<span style="color:orange;">오렌지색</span>]으로 구분하였음.
+            <br> 아래글자중 괄호()로 묶은 글자는 중기에 해당하는 글자을 의미함
+            </div>
           </td>
         </tr>
       </tbody>
