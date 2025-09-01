@@ -15,16 +15,18 @@
   }
 
   /* 덩굴 테두리 컨테이너 전체 감싸기 */
-  .vine-border-container {
-    position: relative;
-    padding: 40px;
-    max-width: 1200px;
-    margin: 40px auto 80px auto;
-    background-color: transparent;
-    border: none;
-    border-radius: 0;
-    overflow: visible; /* 넝쿨 이미지가 영역 밖에 있을 수 있게 */
-  }
+.vine-border-container {
+  position: relative;
+  display: inline-block;   /* ✅ 내용 크기만큼만 박스 크기 */
+  padding: 40px;
+  max-width: 100%;       /* ✅ 화면 전체 폭까지 가능 */
+  width: auto;           /* ✅ 내용 크기에 맞게 기본은 auto */
+  margin: 40px auto 80px auto;
+  background-color: transparent;
+  border: none;
+  border-radius: 0;
+  overflow: visible;     /* 넝쿨 이미지가 영역 밖에 있을 수 있게 */
+}
 
   /* 흐릿한 배경 (내용 전체 배경 역할) */
   .text-bg {
@@ -36,39 +38,41 @@
     pointer-events: none;
   }
 
-  /* 덩굴 이미지 4모서리 */
-  .vine-deco {
-    position: absolute;
-    width: 100px; height: 100px;
-    background-image: url('https://www.pngkey.com/png/detail/187-1870678_-vine-border-paper-background-printable-flower-leaves.png');
-    background-size: contain;
-    background-repeat: no-repeat;
-    opacity: 0.85;
-    pointer-events: none;
-    z-index: 2;
-  }
-  .vine-top-left {
-    top: 0; left: 0;
-    transform: rotate(180deg);
-  }
-  .vine-top-right {
-    top: 0; right: 0;
-    transform: scaleX(-1) rotate(180deg);
-  }
-  .vine-bottom-left {
-    bottom: 0; left: 0;
-    transform: scaleY(-1) rotate(180deg);
-  }
-  .vine-bottom-right {
-    bottom: 0; right: 0;
-    transform: scaleX(-1) scaleY(-1) rotate(180deg);
-  }
+/* 덩굴 이미지 4모서리 */
+.vine-deco {
+  position: absolute;
+  width: 150px; 
+  height: 150px;
+  background-image: url('/images/vine.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 1;
+  pointer-events: none;   /* 입력 가리지 않음 */
+  z-index: 9999;          /* ✅ 덩굴을 항상 맨 위로 */
+}
 
-  /* 내부 콘텐츠 영역 - 덩굴보다 위에 표시 */
-  .vine-border-container > *:not(.text-bg):not(.vine-deco) {
-    position: relative;
-    z-index: 3;
-  }
+.vine-top-left {
+  top: 0; left: 0;
+  transform: rotate(180deg);
+}
+.vine-top-right {
+  top: 0; right: 0;
+  transform: scaleX(-1) rotate(180deg);
+}
+.vine-bottom-left {
+  bottom: 0; left: 0;
+  transform: scaleY(-1) rotate(180deg);
+}
+.vine-bottom-right {
+  bottom: 0; right: 0;
+  transform: scaleX(-1) scaleY(-1) rotate(180deg);
+}
+
+/* 내부 콘텐츠 영역 - 덩굴보다 뒤에 위치 */
+.vine-border-container > *:not(.text-bg):not(.vine-deco) {
+  position: relative;
+  z-index: 1;   /* ✅ 덩굴보다 낮게 */
+}
 
   /* 제목, 폼 스타일 */
   h1 {
@@ -188,10 +192,29 @@
   opacity: 1;
 }
 
+.nackhwa-table {
+  border-collapse: collapse !important;   /* ✅ 상위 테이블 속성 무시 */
+  width: 100%;
+}
 
+.nackhwa-table td,
+.nackhwa-table th {
+  border: 1px solid #999 !important;      /* ✅ 내부 칸 선 강제 표시 */
+  padding: 2px;
+}
 
+      .parent #nackhwaPopup .nackhwa-table td,
+.parent #nackhwaPopup .nackhwa-table th {
+  border: 1px solid #999 !important;
+}
 
-
+#nackhwaPopup {
+  width: auto !important;      /* ✅ 자동 크기 */
+  min-width: unset !important; /* ✅ 기본 제한 해제 */
+  max-width: none !important;  /* ✅ 최대폭 제한 해제 */
+  height: auto !important;     /* ✅ 높이도 자동 */
+  white-space: nowrap;         /* ✅ 줄바꿈 방지 */
+}
 </style>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -316,7 +339,7 @@
   </form>
 
 <div class="note-box">
-  ※ 태어난 분대가 20~40분(30분 근처)에 있는 분은 정확한 시주가 산출되지 않을 수도 있으니 따로 확인해 주세요! 한국썸머타임은 적용된 상태입니다. 
+  ※ 태어난 분대가 20~40분(30분 근처)에 있는 분은 정확한 시주가 <br>산출되지 않을 수도 있으니 따로 확인해 주세요! <br>한국썸머타임은 적용된 상태입니다. 
 </div>
 <div id="result" style="display:none;">
 

@@ -932,7 +932,7 @@ window.handleDaeyunClick = handleDaeyunClick;
     document.getElementById('common-section').innerHTML = `
 <div id="birth-info" style="max-width: 600px; margin-left: 20px; font-family: 'Nanum Gothic', sans-serif; font-size: 0.85rem; color: #333; margin-bottom: 8px;"></div>
 
-    <div style="max-width: 750px; margin-left: 20px;">
+    <div style="width:100%; max-width:100%; margin-left: 0;">
       <style>
   .ganji-table {
     border-collapse: collapse;
@@ -1132,10 +1132,18 @@ window.handleDaeyunClick = handleDaeyunClick;
       <th>일주</th>
       <th>월주</th>
       <th>년주</th>
+       <!-- 오늘의 사주 -->
+<th rowspan="4" style="
+  border:none; 
+  font-size:0.85rem; 
+  text-align:left; 
+  padding:6px;
+">
+  <div id="today-saju-container" style="margin-top:5px; display:none;"></div>
+</th>
     </tr>
   </thead>
   <tbody>
-  <div id="birth-info"></div>
     <!-- 천간 -->
     <tr>
       <td>
@@ -1165,15 +1173,7 @@ window.handleDaeyunClick = handleDaeyunClick;
 
 
 
-<!-- 오늘 & 절입시 칸 -->
-<td rowspan="3" style="
-  border:none; 
-  font-size:0.85rem; 
-  text-align:left; 
-  padding:6px;
-">
-  <div id="today-saju-container" style="margin-top:30px; display:none;"></div>
-</td>
+
     </tr>
 
 
@@ -1239,6 +1239,7 @@ window.handleDaeyunClick = handleDaeyunClick;
 
   </tbody>
 </table>
+
 </div>
 
 

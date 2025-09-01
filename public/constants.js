@@ -4,6 +4,8 @@
 export const stemOrder = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
 export const branchOrder = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
 
+export const branchOrder2 = [ '亥', '戌', '酉', '申', '未', '午', '巳', '辰', '卯', '寅', '丑', '子'];
+
 // 충관계
 export const 충MAP = {
   '子': '午', '午': '子',
@@ -1232,18 +1234,18 @@ export const GYEOK_YUKSHIN_MAP = {
 
 //격의 성패에서 격의 요구조건
 export const GYEOK_SEONGPAE_MAP  = Object.freeze({
-  "정관격": { required: "정인왕" },
-  "편관격": { required: "근왕,비왕" },
-  "정인격": { required: "겁왕" },
-  "편인격": { required: "근왕,비왕" },
-  "정재격": { required: "정인왕" },
-  "편재격": { required: "근왕,비왕" },
-  "식신격": { required: "근왕,비왕" },
-  "상관격": { required: "정인왕" },
-  "건록격": { required: "정인왕" },
-  "양인격": { required: "편인왕" },
-  "월비격": { required: "정인왕" },
-  "월겁격": { required: "편인왕" },
+  "정관격": { required: "정인旺" },
+  "편관격": { required: "근旺,비旺" },
+  "정인격": { required: "겁旺" },
+  "편인격": { required: "근旺,비旺" },
+  "정재격": { required: "정인旺" },
+  "편재격": { required: "근旺,비旺" },
+  "식신격": { required: "근旺,비旺" },
+  "상관격": { required: "정인旺" },
+  "건록격": { required: "정인旺" },
+  "양인격": { required: "편인旺" },
+  "월비격": { required: "정인旺" },
+  "월겁격": { required: "편인旺" },
   //인왕하면 근왕해서는 안됨, 상관격은 인왕해야하는데 근왕하면 다른 길로 나아감, 관과 일간의 비중으로 따져 일간비중이 크면 파격이 됨.
 });
 

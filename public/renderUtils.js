@@ -15,7 +15,7 @@ import {
          HEESIN_BY_DANGRYEONG_POSITION, 
          GISIN_BY_DANGRYEONG_POSITION,
          tenGodMap,
-         tenGodMapKor
+         tenGodMapKor,branchOrder2
       } from './constants.js';
 
 import {
@@ -529,43 +529,128 @@ export function handleSewoonClick(year, stemKor, branchKor, index) {
 export function renderTodaySajuBox({ yearGanji, monthGanji, dayGanji, timeGanji, dayGanKorGan, todayStr }) {
   const container = document.getElementById('today-saju-container');
   if (!container) return;
-  // ✅ 오늘의 사주 생성
 
+  // 🔹 일지 기준으로 6개 지지 뽑기
+  function getNackhwaBranches(dayBranch) {
+    const idx = branchOrder2.indexOf(dayBranch);
+    if (idx === -1) return [];
+    const result = [];
+    for (let i = 4; i > -2; i--) {
+      const newIndex = (idx - i + branchOrder2.length) % branchOrder2.length;
+      result.push(branchOrder2[newIndex]);
+    }
+    return result;
+  }
 
+  // 🔹 낙화래정법 표 생성
+  function generateNackhwaTable() {
+    const branches = getNackhwaBranches(dayGanji.ji);
 
+    return `
+      <style>
+        .nackhwa-table { border-collapse: collapse; width:100%; font-size:0.75rem; text-align:center; }
+        .nackhwa-table td, .nackhwa-table th { border:1px solid #000; padding:2px; }
+      </style>
+      <div style="text-align:center; margin-bottom:5px; font-weight:bold;">📋 낙화래정법</div>
+      <table class="nackhwa-table">
+        <tr>
+          <td>단계</td>
+          <td>묘(苗)</td>
+          <td>근(根)/실(實)</td>
+          <td>화(花)</td>
+          <td>묘(苗)</td>
+          <td>근(根)/실(實)</td>
+          <td>화(花)</td>
+        </tr>
+        <tr>
+          <td>형상</td>
+          <td colspan="4">유형(有形)</td>
+          <td colspan="2">무형(無形)</td>
+        </tr>
+        <tr>
+          <td>내용</td>
+          <td>이탈자</td>
+          <td>이유/목적</td>
+          <td>낙화(落花)</td>
+          <td>고민/음욕</td>
+          <td>장벽</td>
+          <td>증오/암시(暗矢)</td>
+        </tr>
+        <tr>
+          <td>기준천간</td>
+          ${Array(6).fill("<td></td>").join("")}
+        </tr>
+        <tr>
+          <td>해당지지</td>
+          ${branches.map(b => `<td>${colorize(b)}</td>`).join("")}
+        </tr>
+        <tr>
+          <td>해결자</td>
+          ${Array(6).fill("<td></td>").join("")}
+        </tr>
+      </table>
+    `;
+  }
+
+  // 🔹 오늘의 사주 표
+  const sajuHTML = `
+    <div style="max-width: 400px; margin-left: 5px;">
+      <h3 style="font-size:0.75rem; margin-left:5px;">📆 오늘의 사주<br> (${todayStr})</h3>
+      <table class="ganji-table" style="font-size: 0.8rem; margin-left:5px;">
+        <thead>
+          <tr>
+            <th style="padding:2px; font-size: 0.75rem;">시</th>
+            <th style="padding:2px; font-size: 0.75rem;">일</th>
+            <th style="padding:2px; font-size: 0.75rem;">월</th>
+            <th style="padding:2px; font-size: 0.75rem;">년</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>${colorize(timeGanji.gan)}</td>
+            <td>${colorize(dayGanji.gan)}</td>
+            <td>${colorize(monthGanji.gan)}</td>
+            <td>${colorize(yearGanji.gan)}</td>
+          </tr>
+          <tr>
+            <td>${colorize(timeGanji.ji)}</td>
+            <td>${colorize(dayGanji.ji)}</td>
+            <td>${colorize(monthGanji.ji)}</td>
+            <td>${colorize(yearGanji.ji)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  // 🔹 컨테이너 렌더링
   container.innerHTML = `
-<div style="max-width: 400px; margin-left: 20px;">
-    <h3 style="font-size:1rem; margin-left:20px;">📆 오늘의 사주 (${todayStr})</h3>
-    <table class="ganji-table" style="font-size: 0.8rem; margin-left:20px;">
-               <thead>
-    <tr>
-      <th style="padding:2px; font-size: 0.75rem;">시</th>
-      <th style="padding:2px; font-size: 0.75rem;">일</th>
-      <th style="padding:2px; font-size: 0.75rem;">월</th>
-      <th style="padding:2px; font-size: 0.75rem;">년</th>
-    </tr>
-</thead>
+    ${sajuHTML}
+    <div style="margin-top:8px; text-align:center; position:relative;">
+      <div id="nackhwaPopup"
+           style="display:none; position:absolute; bottom:40px; left:50%; transform:translateX(-50%);
+                  background:#fffbe6; border:1px solid #fbc02d; border-radius:8px;
+                  box-shadow:0 2px 6px rgba(0,0,0,0.2); font-size:0.8rem; z-index:1000;">
+      </div>
+      <button id="popupNackhwaBtn"
+              style="font-size:0.75rem; padding:5px 12px; background-color:#ffeb3b;
+                     color:#333; border:1px solid #fbc02d; border-radius:6px; cursor:pointer;">
+        낙화래정법
+      </button>
+    </div>
+  `;
 
+  // 🔹 버튼 이벤트
+  const btn = document.getElementById("popupNackhwaBtn");
+  const popup = document.getElementById("nackhwaPopup");
 
-      <tbody>
-        <!-- 천간 -->
-        <tr>
-          <td>${colorize(timeGanji.gan)}</td>
-          <td>${colorize(dayGanji.gan)}</td>
-          <td>${colorize(monthGanji.gan)}</td>
-          <td>${colorize(yearGanji.gan)}</td>
-        </tr>
-        <!-- 지지 -->
-        <tr>
-          <td>${colorize(timeGanji.ji)}</td>
-          <td>${colorize(dayGanji.ji)}</td>
-          <td>${colorize(monthGanji.ji)}</td>
-          <td>${colorize(yearGanji.ji)}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>`;
+  btn.addEventListener("click", () => {
+    popup.innerHTML = generateNackhwaTable();
+    popup.style.display = (popup.style.display === "none") ? "block" : "none";
+  });
 }
+
+
 
 
 // renderUtils.js
