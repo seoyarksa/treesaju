@@ -1909,7 +1909,13 @@ renderTodaySajuBox({
   dayGanji: dayGanji2,
   timeGanji: timeGanji2,
   dayGanKorGan: dayGanKorGan2,
-  todayStr
+  todayStr,
+    birthSaju: {
+    yearGanji,
+    monthGanji,
+    dayGanji,
+    timeGanji
+  }
 });
 
 

@@ -808,12 +808,7 @@ export function getJohuApplyType(saju) {
     if (found) return "중";
   }
 // 2-1) 삼합 보정 체크
-const SAMHAP_SUPPORT = {
-    "酉-丑": "辛", "丑-酉": "辛",
-    "子-辰": "癸", "辰-子": "癸",
-    "卯-未": "乙", "未-卯": "乙",
-    "午-戌": "丁", "戌-午": "丁",
-  };
+
 for (const br of branches) {
   const key = `${monthBranch}-${br}`;
   if (SAMHAP_SUPPORT[key]) {

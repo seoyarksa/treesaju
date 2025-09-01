@@ -930,29 +930,55 @@ window.handleDaeyunClick = handleDaeyunClick;
 
 
     document.getElementById('common-section').innerHTML = `
-<div id="birth-info" style="max-width: 600px; margin-left: 20px; font-family: 'Nanum Gothic', sans-serif; font-size: 0.85rem; color: #333; margin-bottom: 8px;"></div>
 
     <div style="width:100%; max-width:100%; margin-left: 0;">
       <style>
-  .ganji-table {
-    border-collapse: collapse;
-    margin: 20px 0 10px 20px;
-    font-family: 'Nanum Gothic', sans-serif;
-    font-size: 3rem;
-    text-align: center;
-  }
 
-  .ganji-table th {
-    background-color: #ddd;
-    padding: 10px;
-    font-size: 1.1rem;
-  }
 
-  .ganji-table td {
-    padding: 2px 6px;
-    line-height: 1.0;
-    vertical-align: middle;
-  }
+
+#result .parent {
+  border-collapse: collapse;
+  border: none !important;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  table-layout: fixed;
+}
+
+#result .parent td,
+#result .parent th {
+  border: none !important;
+  margin: 0;
+  padding: 0;
+}
+
+.ganji-table {
+  border-collapse: collapse;
+  margin: 0;                  /* 바깥 여백 제거 */
+  padding: 0;                 /* 안쪽 여백 제거 */
+  width: 100%;                /* 부모셀 폭에 맞춰 자동 조정 */
+  font-family: 'Nanum Gothic', sans-serif;
+  font-size: 3rem;
+  text-align: center;
+  table-layout: fixed;        /* 화면 줄면 셀도 줄어듦 */
+  border: none;               /* ✅ 외곽 큰 테두리 제거 */
+}
+
+.ganji-table th {
+  background-color: #ddd;
+  padding: 10px;
+  font-size: 1.1rem;
+  border: 1px solid #000;     /* ✅ 각 헤더 칸에만 테두리 */
+}
+
+.ganji-table td {
+  padding: 2px 6px;
+  line-height: 1.0;
+  vertical-align: middle;
+  border: 1px solid #000;     /* ✅ 각 데이터 칸에만 테두리 */
+}
+
+
 
 .daeyun-table {
   font-size: 0.85rem;        /* 전체 글자 크기 ↓ */
@@ -1090,13 +1116,15 @@ window.handleDaeyunClick = handleDaeyunClick;
   }
 
  
-  .note-box {
-    font-size: 0.75rem;
-    color: #555;
-    line-height: 1.2;
-    margin-left: 20px;
-    white-space: pre-line;
-  }
+.note-box {
+  font-size: 0.75rem;
+  color: #555;
+  line-height: 1.2;
+  margin-left: 20px;
+  white-space: pre-line;   /* 개행문자는 살림 */
+  overflow-wrap: break-word; /* 화면 줄어들면 자동 줄바꿈 */
+}
+
      /* 지장간 전용 스타일 */
         .hidden-stem-wrapper {
           display: flex;
@@ -1120,11 +1148,24 @@ window.handleDaeyunClick = handleDaeyunClick;
           white-space: pre-line;
         }
 
- 
+ #today-saju-container {
+  margin: 0;              /* 부모셀에 딱 붙게 */
+  padding: 0;             /* 내부 패딩 제거 */
+  width: 100%;            /* 부모 td에 맞게 꽉 차도록 */
+  max-width: 50%;        /* 부모보다 커지지 않게 */
+  box-sizing: border-box; /* 패딩 포함 크기 계산 */
+}
+
+#today-saju-container table {
+  width: 100%;            /* 안의 표도 td 크기에 맞춰서 */
+  border-collapse: collapse;
+}
+
           
 </style>
 
-
+<table class="parent">
+<tr><td>
 <table class="ganji-table">
   <thead>
     <tr>
@@ -1132,15 +1173,7 @@ window.handleDaeyunClick = handleDaeyunClick;
       <th>일주</th>
       <th>월주</th>
       <th>년주</th>
-       <!-- 오늘의 사주 -->
-<th rowspan="4" style="
-  border:none; 
-  font-size:0.85rem; 
-  text-align:left; 
-  padding:6px;
-">
-  <div id="today-saju-container" style="margin-top:5px; display:none;"></div>
-</th>
+      
     </tr>
   </thead>
   <tbody>
@@ -1239,19 +1272,22 @@ window.handleDaeyunClick = handleDaeyunClick;
 
   </tbody>
 </table>
+</td>
+ <!-- 오늘의 사주 -->
+<td style="
+  border:none; 
+  font-size:0.85rem; 
+  text-align:left; 
+  padding:6px;
+">
+<div id="birth-info" style="max-width: 600px; margin-left: 20px; font-family: 'Nanum Gothic', sans-serif; font-size: 0.85rem; color: #333; margin-bottom: 8px;"></div>
+
+  <div id="today-saju-container" style="margin-top:5px; display:none;"></div>
+</td>
+</tr>
+</table>
 
 </div>
-
-
-
-
-
-
-
-
-
-
-
 
 `;
 
@@ -1831,6 +1867,7 @@ if (sortedIndex < 0) {
 }
 
 // -------------------------------
+//오늘의 사주표 부분
 // ✅ 오늘 날짜 기준 사주 요청 및 렌더
 // -------------------------------
 const today = new Date();
@@ -1872,7 +1909,13 @@ renderTodaySajuBox({
   dayGanji: dayGanji2,
   timeGanji: timeGanji2,
   dayGanKorGan: dayGanKorGan2,
-  todayStr
+  todayStr,
+    birthSaju: {
+    yearGanji,
+    monthGanji,
+    dayGanji,
+    timeGanji
+  }
 });
 
 

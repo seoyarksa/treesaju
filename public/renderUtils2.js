@@ -15,7 +15,7 @@ import {
          HEESIN_BY_DANGRYEONG_POSITION, 
          GISIN_BY_DANGRYEONG_POSITION,
          tenGodMap,
-         tenGodMapKor
+         tenGodMapKor,branchOrder2, 충MAP, 지지십간MAP
       } from './constants.js';
 
 import {
@@ -526,46 +526,301 @@ export function handleSewoonClick(year, stemKor, branchKor, index) {
 
 // renderUtils.js 또는 app.js에 추가 (추천: renderUtils.js에 UI만 담당)
 //오늘의 사주팔자
-export function renderTodaySajuBox({ yearGanji, monthGanji, dayGanji, timeGanji, dayGanKorGan, todayStr }) {
+export function renderTodaySajuBox({ yearGanji, monthGanji, dayGanji, timeGanji, dayGanKorGan, todayStr, birthSaju })
+ {
   const container = document.getElementById('today-saju-container');
   if (!container) return;
-  // ✅ 오늘의 사주 생성
 
+  // 🔹 일지 기준으로 6개 지지 뽑기
+  function getNackhwaBranches(dayBranch) {
 
+    const idx = branchOrder2.indexOf(dayBranch);
+    if (idx === -1) return [];
+    const result = [];
+    for (let i = 4; i > -2; i--) {
+      const newIndex = (idx - i + branchOrder2.length) % branchOrder2.length;
+      result.push(branchOrder2[newIndex]);
+    }
+    return result;
+  }
 
-  container.innerHTML = `
-<div style="max-width: 400px; margin-left: 20px;">
-    <h3 style="font-size:1rem; margin-left:20px;">📆 오늘의 사주 (${todayStr})</h3>
-    <table class="ganji-table" style="font-size: 0.8rem; margin-left:20px;">
-               <thead>
-    <tr>
-      <th style="padding:2px; font-size: 0.75rem;">시</th>
-      <th style="padding:2px; font-size: 0.75rem;">일</th>
-      <th style="padding:2px; font-size: 0.75rem;">월</th>
-      <th style="padding:2px; font-size: 0.75rem;">년</th>
-    </tr>
-</thead>
+  // 🔹 낙화래정법 표 생성
+  const 천간한글 = { '갑':'甲','을':'乙','병':'丙','정':'丁','무':'戊','기':'己','경':'庚','신':'辛','임':'壬','계':'癸' };
+const dayMaster = 천간한글[birthSaju.dayGanji.gan] || birthSaju.dayGanji.gan;
 
+function getSipsin(dayGan, targetJi) {
+  const targetGan = 지지십간MAP[targetJi]; // 지지 본기
+  console.log("👉 getSipsin", { dayGan, targetJi, targetGan });
 
-      <tbody>
-        <!-- 천간 -->
-        <tr>
-          <td>${colorize(timeGanji.gan)}</td>
-          <td>${colorize(dayGanji.gan)}</td>
-          <td>${colorize(monthGanji.gan)}</td>
-          <td>${colorize(yearGanji.gan)}</td>
-        </tr>
-        <!-- 지지 -->
-        <tr>
-          <td>${colorize(timeGanji.ji)}</td>
-          <td>${colorize(dayGanji.ji)}</td>
-          <td>${colorize(monthGanji.ji)}</td>
-          <td>${colorize(yearGanji.ji)}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>`;
+  if (!targetGan) return "";
+  const result = tenGodMap[dayGan]?.[targetGan] || "";
+  console.log("👉 조회 결과:", result);
+  return result;
 }
+
+
+
+  // HTML 태그 제거 → 순수 텍스트만 남김
+  // 출생 사주의 일간
+
+function stripTags(html) {
+  if (!html) return "";
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return div.textContent || div.innerText || "";
+}
+
+function generateNackhwaTable({ birthSaju, dayGanji }) {
+  const branches = getNackhwaBranches(dayGanji.ji);
+
+  const birthBranches = [
+    birthSaju.yearGanji.ji,
+    birthSaju.monthGanji.ji,
+    birthSaju.dayGanji.ji,
+    birthSaju.timeGanji.ji
+  ].map(b => stripTags(colorize(b)));
+
+  return `
+    <style>
+      .nackhwa-table { border-collapse: collapse; width:100%; font-size:0.75rem; text-align:center; }
+      .nackhwa-table td, .nackhwa-table th { border:1px solid #000; padding:2px; }
+      .highlight-cell { background-color: #ffeb99 !important; }
+    </style>
+    <div style="text-align:center; margin-bottom:5px; font-weight:bold;">📋 낙화래정법</div>
+    <table class="nackhwa-table">
+      <tr>
+        <td>단계</td>
+        <td>묘(苗)</td>
+        <td>근(根)/실(實)</td>
+        <td>화(花)</td>
+        <td>묘(苗)</td>
+        <td>근(根)/실(實)</td>
+        <td>화(花)</td>
+      </tr>
+      <tr>
+        <td>형상</td>
+        <tr>
+  <td>형상</td>
+  <td colspan="4" style="background-color:#ffe0f0;">유형(有形)</td> <!-- 연분홍 -->
+  <td colspan="2" style="background-color:#d6eaff;">무형(無形)</td> <!-- 연파랑 -->
+</tr>
+
+      </tr>
+      <tr>
+        <td>내용</td>
+        <td>이탈자/비부살</td>
+          <td style="color:blue; font-weight:">이유/목적<br>(오늘문제)</td>
+          <td style="color:red; font-weight:">낙화(落花)</td>
+        <td>고민/음욕살</td>
+        <td>장벽살<br>(문제씨앗)</td>
+        <td>증오/암시(暗矢)</td>
+      </tr>
+      <tr>
+        <td>기준천간</td>
+          <td></td>
+ <td style="color:red; font-weight:">일간:${colorize(birthSaju.dayGanji.gan)}</td>
+  <td></td>
+  <td></td>
+  <td>오늘천간:${colorize(dayGanji.gan)}</td>
+  <td></td>
+      </tr>
+<tr>
+  <td>해당지지</td>
+  ${branches.map(b => {
+    const val = stripTags(colorize(b));
+    const highlight = birthBranches.includes(val) ? ' class="highlight-cell"' : '';
+    const sipsin = getSipsin(dayMaster, b);
+    return `<td${highlight}>${colorize(b)}<br><span style="font-size:0.7em;">${sipsin}</span></td>`;
+  }).join("")}
+</tr>
+<tr>
+  <td>해결자</td>
+  ${branches.map(b => {
+    const chong = 충MAP[b] || '';
+    const val = stripTags(colorize(chong));
+    const highlight = birthBranches.includes(val) ? ' class="highlight-cell"' : '';
+    const sipsin = chong ? getSipsin(dayMaster, chong) : '';
+    return `<td${highlight}>${colorize(chong)}<br><span style="font-size:0.7em;">${sipsin}</span></td>`;
+  }).join("")}
+</tr>
+
+<tr>
+  <td colspan="7">*노란색 강조된 칸의 글자는 생일사주에 있는 글자를 표시한 것입니다</td>
+</tr>
+
+    </table>
+  `;
+}
+
+
+
+  // 🔹 오늘의 사주 표
+  const sajuHTML = `
+    <div style="max-width: 400px; margin-left: 5px;">
+      <h3 style="font-size:0.75rem; margin-left:5px;">📆 오늘의 사주<br> (${todayStr})</h3>
+      <table class="ganji-table" style="font-size: 0.8rem; margin-left:5px;">
+        <thead>
+          <tr>
+            <th style="padding:2px; font-size: 0.75rem;">시</th>
+            <th style="padding:2px; font-size: 0.75rem;">일</th>
+            <th style="padding:2px; font-size: 0.75rem;">월</th>
+            <th style="padding:2px; font-size: 0.75rem;">년</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>${colorize(timeGanji.gan)}</td>
+            <td>${colorize(dayGanji.gan)}</td>
+            <td>${colorize(monthGanji.gan)}</td>
+            <td>${colorize(yearGanji.gan)}</td>
+          </tr>
+          <tr>
+            <td>${colorize(timeGanji.ji)}</td>
+            <td>${colorize(dayGanji.ji)}</td>
+            <td>${colorize(monthGanji.ji)}</td>
+            <td>${colorize(yearGanji.ji)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  // 🔹 컨테이너 렌더링
+  container.innerHTML = `
+    ${sajuHTML}
+    <div style="margin-top:8px; text-align:center; position:relative;">
+      <div id="nackhwaPopup"
+           style="display:none; position:absolute; bottom:40px; left:50%; transform:translateX(-50%);
+                  background:#fffbe6; border:1px solid #fbc02d; border-radius:8px;
+                  box-shadow:0 2px 6px rgba(0,0,0,0.2); font-size:0.8rem; z-index:1000;">
+      </div>
+      <button id="popupNackhwaBtn"
+              style="font-size:0.75rem; padding:5px 12px; background-color:#ffeb3b;
+                     color:#333; border:1px solid #fbc02d; border-radius:6px; cursor:pointer;">
+        낙화래정법
+      </button>
+    </div>
+  `;
+
+  // 🔹 버튼 이벤트
+  const btn = document.getElementById("popupNackhwaBtn");
+  const popup = document.getElementById("nackhwaPopup");
+
+btn.addEventListener("click", (e) => {
+  e.stopPropagation();
+
+  // 오늘 날짜/시간 구하기
+  const now = new Date();
+  const todayStr = now.toISOString().split("T")[0];  // YYYY-MM-DD
+  const timeStr = now.toTimeString().slice(0, 5);    // HH:MM
+
+  popup.innerHTML = `
+    <div>
+      <label for="nackhwaDate">날짜 선택: </label>
+      <input type="date" id="nackhwaDate" value="${todayStr}">
+      <label for="nackhwaTime">시간 선택: </label>
+      <input type="time" id="nackhwaTime" step="3600" value="${timeStr}">
+      <button id="nackhwaGenerateBtn">조회</button>
+      <hr>
+      <div id="nackhwaTableArea">
+        ${generateNackhwaTable({ birthSaju, dayGanji })} 
+      </div>
+    </div>
+  `;
+
+  popup.style.display = (popup.style.display === "none" || popup.style.display === "") 
+    ? "block" 
+    : "none";
+
+
+
+    // 내부 조회 버튼 이벤트
+    const dateInput = document.getElementById("nackhwaDate");
+    const timeInput = document.getElementById("nackhwaTime");
+    const genBtn = document.getElementById("nackhwaGenerateBtn");
+    const tableArea = document.getElementById("nackhwaTableArea");
+
+genBtn.addEventListener("click", async () => {
+  console.log("📌 조회 버튼 클릭됨");
+  console.log("📌 dateInput.value:", dateInput.value);
+  console.log("📌 timeInput.value:", timeInput.value);
+
+  if (dateInput.value) {
+    const date = new Date(dateInput.value);
+
+    if (timeInput.value) {
+      const [hours, minutes] = timeInput.value.split(":").map(Number);
+      date.setHours(hours);
+      date.setMinutes(minutes || 0);
+    }
+
+    console.log("📌 최종 Date 객체:", date);
+
+    // ✅ API가 요구하는 payload 형식 맞추기
+    const payload = {
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      day: date.getDate(),
+      hour: date.getHours(),
+      minute: date.getMinutes(),
+      calendarType: "solar",                // 필수
+      gender: window.gender || "male",      // 필수
+    };
+
+    console.log("📌 보낼 payload:", payload);
+
+    try {
+      const response = await fetch("/api/saju", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+const saju = await response.json();
+
+if (saju.error) {
+  tableArea.innerHTML = `<div style="color:red;">❌ ${saju.error}</div>`;
+  return;
+}
+
+// ✅ 새로 조회한 날짜의 일주만 분해
+const dayGanji3 = splitGanji(saju.ganji.day);
+
+console.log("📌 조회일 일주:", dayGanji3);
+
+// ✅ generateNackhwaTable 호출 (year/month/time은 필요 없음)
+tableArea.innerHTML = generateNackhwaTable({
+  birthSaju,
+  dayGanji: dayGanji3
+});
+
+
+
+
+
+
+
+
+    } catch (err) {
+      console.error("❌ 사주 API 호출 실패:", err);
+      tableArea.innerHTML = `<div style="color:red;">❌ 서버 호출 실패</div>`;
+    }
+  }
+});
+
+
+
+  });
+
+  // 🔹 문서 클릭 시 팝업 닫기
+  document.addEventListener("click", (e) => {
+    if (popup.style.display === "block" && !popup.contains(e.target) && e.target !== btn) {
+      popup.style.display = "none";
+    }
+  });
+}
+
+
 
 
 // renderUtils.js
