@@ -13,6 +13,8 @@ import {
          SAMHAP_SUPPORT,
          GYEOKGUK_TYPES,
          samhapGroups,
+         SANGSAENG_MAP,
+         SANGGEUK_MAP,
          isYangStem,
          GYEOK_USE_GU_MAP,
          GYEOK_RELATIONS,
@@ -1250,11 +1252,37 @@ if (rootCount > 0) {
 }
 
 
-  // 4) 당령 보정
-  if (dangryeong && targetGan === dangryeong) {
+// 4) 당령 보정
+if (dangryeong) {
+  const targetElement = elementMap[targetGan];      // 대상 천간의 오행
+  const dangElement = elementMap[dangryeong];       // 당령의 오행
+
+  if (targetElement === dangElement) {
     score += 100;
-    console.log(`당령 보정: ${targetGan} → +100`);
+    console.log(`당령 보정: ${targetGan}(${targetElement}) 동일 → +100`);
+  } 
+  // 당령이 target을 생 (예: 목(당령) → 화(target))
+  else if (SANGSAENG_MAP[dangElement] === targetElement) {
+    score += 80;
+    console.log(`당령 보정: ${dangElement} → ${targetElement} (당령이 생) → +80`);
+  } 
+  // target이 당령을 생 (예: 화(target) → 토(당령))
+  else if (SANGSAENG_MAP[targetElement] === dangElement) {
+    score += 60;
+    console.log(`당령 보정: ${targetElement} → ${dangElement} (target이 생) → +60`);
+  } 
+  // target이 당령을 극 (예: 화(target) → 금(당령))
+  else if (SANGGEUK_MAP[targetElement] === dangElement) {
+    score += 30;
+    console.log(`당령 보정: ${targetElement} → ${dangElement} (target이 극) → +30`);
+  } 
+  // 당령이 target을 극 (예: 화(당령) → 금(target))
+  else if (SANGGEUK_MAP[dangElement] === targetElement) {
+    score += 10;
+    console.log(`당령 보정: ${dangElement} → ${targetElement} (당령이 극) → +10`);
   }
+}
+
 
   const finalScore = score / 2;
   console.log(`▶ [${targetGan}] 최종 점수 = ${finalScore}`);
@@ -1320,13 +1348,13 @@ for (let gan of extendedChunganList) {
 // 가상의 편관, 정관도 계산
 
 // 가상의 편관/정관 강약 점수 계산
-// 가상의 편관/정관 강약 점수 계산
+// === 편관 점수 계산 ===
 if (gwanCandidates.편관) {
   console.log(`\n=== [편관(${gwanCandidates.편관})] 강약 점수 계산 시작 ===`);
 
   let baseScore = getGanStrengthScore(
     gwanCandidates.편관,
-    relationChunganList,  // ✅ 삼합 포함 리스트
+    relationChunganList,
     jijiGanlists,
     tenGodMap,
     ganRootMap,
@@ -1336,22 +1364,38 @@ if (gwanCandidates.편관) {
 
   console.log(`▶ [편관(${gwanCandidates.편관})] 기본 점수 = ${baseScore}`);
 
-  // ✅ 실제 사주 천간에 편관이 존재하면 +50
+  // 원국 천간에 편관이 실제 존재하면 +50
   if (cheongans.includes(gwanCandidates.편관)) {
     baseScore += 50;
-    console.log(`⚡ [편관(${gwanCandidates.편관})] 원국에 존재 → +50 보정 → ${baseScore}`);
+    console.log(`⚡ 원국 천간에 편관 존재 → +50 → ${baseScore}`);
+  }
+
+  // 전체 원국(천간+지장간+삼합 대표간)
+  const allExistGans = [...cheongans, ...extraGans, ...jijiGanlists.flat()];
+
+  // 편재 있으면 +50
+  if (allExistGans.some(gan => tenGodMap[saju.dayGan][gan] === "편재")) {
+    baseScore += 50;
+    console.log(`💰 편재 존재 보정 → +50 → ${baseScore}`);
+  }
+
+  // 정재 있으면 +25
+  if (allExistGans.some(gan => tenGodMap[saju.dayGan][gan] === "정재")) {
+    baseScore += 25;
+    console.log(`💎 정재 존재 보정 → +25 → ${baseScore}`);
   }
 
   ganStrengthResults[`편관(${gwanCandidates.편관})`] = baseScore;
   console.log(`✅ [편관(${gwanCandidates.편관})] 최종 저장 점수 = ${baseScore}`);
 }
 
+// === 정관 점수 계산 ===
 if (gwanCandidates.정관) {
   console.log(`\n=== [정관(${gwanCandidates.정관})] 강약 점수 계산 시작 ===`);
 
   let baseScore = getGanStrengthScore(
     gwanCandidates.정관,
-    relationChunganList,  // ✅ 삼합 포함 리스트rkddir
+    relationChunganList,
     jijiGanlists,
     tenGodMap,
     ganRootMap,
@@ -1361,15 +1405,30 @@ if (gwanCandidates.정관) {
 
   console.log(`▶ [정관(${gwanCandidates.정관})] 기본 점수 = ${baseScore}`);
 
-  // ✅ 실제 사주 천간에 정관이 존재하면 +50
+  // 원국 천간에 정관이 실제 존재하면 +50
   if (cheongans.includes(gwanCandidates.정관)) {
     baseScore += 50;
-    console.log(`⚡ [정관(${gwanCandidates.정관})] 원국에 존재 → +50 보정 → ${baseScore}`);
+    console.log(`⚡ 원국 천간에 정관 존재 → +50 → ${baseScore}`);
+  }
+
+  const allExistGans = [...cheongans, ...extraGans, ...jijiGanlists.flat()];
+
+  // 정재 있으면 +50
+  if (allExistGans.some(gan => tenGodMap[saju.dayGan][gan] === "정재")) {
+    baseScore += 50;
+    console.log(`💰 정재 존재 보정 → +50 → ${baseScore}`);
+  }
+
+  // 편재 있으면 +25
+  if (allExistGans.some(gan => tenGodMap[saju.dayGan][gan] === "편재")) {
+    baseScore += 25;
+    console.log(`💎 편재 존재 보정 → +25 → ${baseScore}`);
   }
 
   ganStrengthResults[`정관(${gwanCandidates.정관})`] = baseScore;
   console.log(`✅ [정관(${gwanCandidates.정관})] 최종 저장 점수 = ${baseScore}`);
 }
+
 
 
 
@@ -1428,19 +1487,97 @@ function normalizeKey(name) {
 const normalizedMainName = normalizeKey(rawMainName);
 const normalizedSecondaryName = normalizeKey(rawSecondaryName);
 
+
+
+//격에 따른 격 강도 계산
+// 주격 천간 찾기 (사주에 있든 없든 무조건 찾음)
+// === 주격 강도 계산 ===
+if (normalizedMainName && normalizedMainName !== "X") {
+  const targetYuksin = GYEOK_YUKSHIN_MAP[normalizedMainName]?.gyeokname2;
+  if (targetYuksin) {
+    const mapping = tenGodMap[dayGanHan];
+    const mainGan = Object.keys(mapping).find(gan => mapping[gan] === targetYuksin);
+
+    if (mainGan) {
+      console.log(`\n📌 주격천간 ${normalizedMainName} → 육신(${targetYuksin}) → 천간(${mainGan})`);
+
+      let score = getGanStrengthScore(
+        mainGan,
+        relationChunganList,
+        jijiGanlists,
+        tenGodMap,
+        ganRootMap,
+        jijiList,
+        dangryeong
+      );
+
+      ganStrengthResults[normalizedMainName] = score;
+      console.log(`✅ 주격 normalizedMainName 강도 점수 = ${score}`);
+    }
+  }
+}
+
+// === 보조격 강도 계산 ===
+if (normalizedSecondaryName && normalizedSecondaryName !== "X") {
+  const targetYuksin = GYEOK_YUKSHIN_MAP[normalizedSecondaryName]?.gyeokname2;
+  if (targetYuksin) {
+    const mapping = tenGodMap[dayGanHan];
+    const secondaryGan = Object.keys(mapping).find(gan => mapping[gan] === targetYuksin);
+
+    if (secondaryGan) {
+      console.log(`\n📌 보조격천간 ${normalizedSecondaryName} → 육신(${targetYuksin}) → 천간(${secondaryGan})`);
+
+      let score = getGanStrengthScore(
+        secondaryGan,
+        relationChunganList,
+        jijiGanlists,
+        tenGodMap,
+        ganRootMap,
+        jijiList,
+        dangryeong
+      );
+
+      ganStrengthResults[normalizedSecondaryName] = score;
+      console.log(`✅ 보조격 normalizedSecondaryName 강도 점수 = ${score}`);
+    }
+  }
+}
+
+
+
+// ▶ 주격 등급
 console.log("▶ 주격 원본:", rawMainName, "정규화:", normalizedMainName);
-const mainGrade = getGyeokGrade(saju, normalizedMainName, tenGodMap);
+const mainGrade = getGyeokGrade(
+  saju,
+  normalizedMainName,
+  tenGodMap,
+  ganStrengthResults,
+  gwanCandidates,
+  normalizedSecondaryName,
+  secondaryGyeokResult
+);
 console.log("▶ 주격 등급 결과:", mainGrade);
 
-// 보조격 등급
+// ▶ 보조격 등급
 let secondaryGrade = null;
 if (normalizedSecondaryName && GYEOK_YUKSHIN_MAP[normalizedSecondaryName]) {
   console.log("▶ 보조격 원본:", rawSecondaryName, "정규화:", normalizedSecondaryName);
-  secondaryGrade = getGyeokGrade(saju, normalizedSecondaryName, tenGodMap);
+  secondaryGrade = getGyeokGrade(
+    saju,
+    normalizedSecondaryName,
+    tenGodMap,
+    ganStrengthResults,     // ✅ 강도 결과 전달
+    gwanCandidates,
+    normalizedSecondaryName,
+    secondaryGyeokResult
+  );
   console.log("▶ 보조격 등급 결과:", secondaryGrade);
 } else {
   console.log("▶ 보조격 없음:", rawSecondaryName);
 }
+
+
+
 
 
 //격의 성패조건 삽입
@@ -1460,8 +1597,9 @@ console.log("▶ mainRequired:", mainRequired);
       <th style="padding:3px;">구분</th>
       <th style="padding:3px;">격이름</th>
       <th style="padding:3px;">격등급</th>
-      <th style="padding:3px;">격의 성패조건</th>
+      <th style="padding:3px;">격의 요구조건</th>
       <th style="padding:3px;">일간의 환경</th>
+      <th style="padding:3px;">勢비교</th>
       <th style="padding:3px;">성패[최종]</th>
     </tr>
   </thead>
@@ -1471,8 +1609,9 @@ console.log("▶ mainRequired:", mainRequired);
       <td style="padding:3px;">${gyeokName || '-'}</td>
       <td style="padding:3px;">${mainGrade ? mainGrade.final : '-'}</td>
       <td style="padding:3px;">${mainRequired}</td>
-      <td style="padding:3px;"></td>
-      <td style="padding:3px;"></td>
+      <td style="padding:3px;">정인,비,근旺</td>
+      <td style="padding:3px;">身<官</td>
+      <td style="padding:3px;">成</td>
     </tr>
     <tr>
       <td style="padding:3px;background:#e6f0ff;">보조격</td>
@@ -1481,9 +1620,10 @@ console.log("▶ mainRequired:", mainRequired);
       <td style="padding:3px;">${secondaryRequired}</td>
       <td style="padding:3px;"></td>
       <td style="padding:3px;"></td>
+      <td style="padding:3px;"></td>
     </tr>
     <tr>
-      <td colspan="6" style="padding:3px; text-align:center;font-size:12px;">
+      <td colspan="7" style="padding:3px; text-align:center;font-size:12px;">
         * 격등급은 "총점<span style="color:blue;">100점</span>"중의 환산점수임. <span style="color:red;">破</span>는 격이 성립되지 못함을 의미 
       </td>
     </tr>
@@ -1545,6 +1685,11 @@ console.log("▶ mainRequired:", mainRequired);
 }
 
 
+
+
+
+
+
 ////격등급구하기///////////
 /**
  * 격 등급 계산 함수 (1차+2차+3차)
@@ -1558,11 +1703,18 @@ console.log("▶ mainRequired:", mainRequired);
  * @param {string}  options.gishinPos   기신 위치 ("천간"|"삼합"|"지지"|null)
  * @returns {Object} { grade1, grade2, grade3, final }
  */
-export function getGyeokGrade(saju, gyeokName, tenGodMap) {
 
 
-// 정규화된 이름 (판정용)
- const normalizedName = (gyeokName || "").replace(/\(.*?\)/g, "");
+
+export function getGyeokGrade(
+  saju,
+  gyeokName,
+  tenGodMap,
+  ganStrengthResults,
+  gwanCandidates,
+  secondaryGyeokName = "",
+  secondaryGyeokResult = null   // ✅ 보조격 결과 객체도 추가
+) {
 
   // ---------------------
   // 0. 사주 기본 데이터 추출
@@ -1570,11 +1722,10 @@ export function getGyeokGrade(saju, gyeokName, tenGodMap) {
   const { yearGan, monthGan, dayGan, hourGan,
           yearBranch, monthBranch, dayBranch, hourBranch } = saju;
 
-  // 1) 천간 리스트
+  // 1) 천간 리스트 (일간 제외)
   const chunganList = [
     convertKorToHanStem(yearGan),
     convertKorToHanStem(monthGan),
-    
     convertKorToHanStem(hourGan),
   ];
 
@@ -1588,18 +1739,11 @@ export function getGyeokGrade(saju, gyeokName, tenGodMap) {
     convertKorToHanBranch(dayBranch),
     convertKorToHanBranch(hourBranch),
   ];
-console.log("branches:", branches);
-for (let branch of branches) {
-  console.log("branch:", branch, "→", jijiToSibganMap3[branch]);
-}
-  // 3) 지지 속 천간 (중기 제거한 버전 사용)
- const jijiGanlists = branches.flatMap(branch =>
-  (jijiToSibganMap3[branch] || []).filter(Boolean)
-);
 
-  console.log("천간:", chunganList);
-  console.log("일간:", ilgan);
-  console.log("지장간:", jijiGanlists);
+  // 3) 지지 속 천간 (중기 제거한 버전 사용)
+  const jijiGanlists = branches.flatMap(branch =>
+    (jijiToSibganMap3[branch] || []).filter(Boolean)
+  );
 
   // ---------------------
   // 1. 육신 판별 함수
@@ -1625,344 +1769,172 @@ for (let branch of branches) {
   // ---------------------
   // 2. 격별 상신~기신 로딩
   // ---------------------
-  const { sangsin, gusin, gisin1, gisin2 } = GYEOK_YUKSHIN_MAP[gyeokName] || {};
+  const { sangsin, gusin, gisin1, gisin2, gyeokname2: baseYukshin } = GYEOK_YUKSHIN_MAP[gyeokName] || {};
+
 
   const sangsinPos = findYukshinPosition(sangsin);
   const gusinPos   = findYukshinPosition(gusin);
   const gisin1Pos  = findYukshinPosition(gisin1);
   const gisin2Pos  = findYukshinPosition(gisin2);
 
-  const hasSangsin  = !!sangsinPos;
-  const hasGusin    = !!gusinPos;
-  const hasGishin1  = !!gisin1Pos;
-  const hasGishin2  = !!gisin2Pos;
-
-// 2) 격의 기준 천간 (예: "정관격(壬)" → "壬")
+  // ---------------------
+  // 합신 보조함수
+  // ---------------------
+  function checkHapshinForGan(chunganList, targetGan) {
+    if (!targetGan) return false;
+    const pair = 간합MAP[targetGan];
+    return pair && chunganList.includes(pair);
+  }
 
   // ---------------------
-  // 3. 등급 판정 (기존 로직 그대로)
+  // 1. 격 점수
   // ---------------------
-  // ✅ 점수 계산
-  const GILSIN_GYEOKS = ["식신격","편재격","정재격","정관격","정인격","편인격"];
-  const HYUNGSIN_GYEOKS = ["상관격","편관격","건록격","양인격","월비격","월겁격"];
+let gyeokScore = 0;
 
-
-  let total = 0;
-
-if (!sangsinPos) {
-  console.log("❌ 상신 없음 → 파격");
-  return { final: "破", score: 0 };
-}
-
-// ---------------------
 // 상신 점수
-// ---------------------
 if (sangsinPos === "천간") {
-  total += 50;
-  console.log("▶ 상신(천간) +50");
-}
-if (sangsinPos === "지지") {
-  total += 15;
-  console.log("▶ 상신(지지) +15");
+  gyeokScore += 50;
+  console.log(`💡 상신(${sangsin}) 천간 위치 → +50`);
+} else {
+  console.log(`💡 상신(${sangsin}) 위치 = ${sangsinPos || "없음"} → 점수 없음`);
 }
 
-// ---------------------
 // 구신 점수
-// ---------------------
 if (gusinPos === "천간") {
-  total += 30;
-  console.log("▶ 구신(천간) +30");
-}
-if (gusinPos === "지지") {
-  total += 9;
-  console.log("▶ 구신(지지) +9");
+  gyeokScore += 30;
+  console.log(`💡 구신(${gusin}) 천간 위치 → +30`);
+} else {
+  console.log(`💡 구신(${gusin}) 위치 = ${gusinPos || "없음"} → 점수 없음`);
 }
 
-// ---------------------
-// 기신1 점수
-// ---------------------
+// 격의 기본 육신
+if (baseYukshin && chunganList.some(gan => getYukshin(ilgan, gan) === baseYukshin)) {
+  gyeokScore += 50;
+  console.log(`💡 격 기본 육신(${baseYukshin}) 천간에 존재 → +50`);
+} else {
+  console.log(`💡 격 기본 육신(${baseYukshin}) → 점수 없음`);
+}
+
+// 합신
+let hapApplied = false;
+for (let gan of [sangsin, gusin, baseYukshin]) {
+  if (!gan || hapApplied) continue;
+  if (checkHapshinForGan(chunganList, gan)) {
+    gyeokScore += 20;
+    hapApplied = true;
+    console.log(`💡 합신 성립 (${gan}) → +20`);
+  }
+}
+
+// 상신 + 기신1
 if (gisin1Pos === "천간") {
-  total += 15;
-  console.log("▶ 기신1(천간) +15");
-}
-if (gisin1Pos === "지지") {
-  total += 5;
-  console.log("▶ 기신1(지지) +5");
+  if (sangsinPos === "천간") {
+    gyeokScore += 20;
+    console.log(`💡 상신+기신1(${gisin1}) 함께 천간 → +20`);
+    if (checkHapshinForGan(chunganList, gisin1)) {
+      gyeokScore += 10;
+      console.log(`💡 기신1(${gisin1}) 합신 → +10`);
+    }
+  } else {
+    gyeokScore -= 20;
+    console.log(`⚠️ 기신1(${gisin1}) 천간 but 상신 없음 → -20`);
+    if (checkHapshinForGan(chunganList, gisin1)) {
+      gyeokScore -= 10;
+      console.log(`⚠️ 기신1(${gisin1}) 합신 but 상신 없음 → -10`);
+    }
+  }
 }
 
-// ---------------------
-// 기신2 점수
-// ---------------------
+// 구신 + 기신2
 if (gisin2Pos === "천간") {
-  total += 15;
-  console.log("▶ 기신2(천간) +15");
-}
-if (gisin2Pos === "지지") {
-  total += 5;
-  console.log("▶ 기신2(지지) +5");
-}
-
-// ---------------------
-// 감점 규칙
-// ---------------------
-if (GILSIN_GYEOKS.includes(normalizedName)) {
-  if (!gusinPos && gisin2Pos) {
-    if (gisin2Pos === "천간") {
-      total -= 15;
-      console.log("⚠️ 길신격 감점: 구신 없음 + 기신2(천간) -15");
+  if (gusinPos === "천간") {
+    gyeokScore += 20;
+    console.log(`💡 구신+기신2(${gisin2}) 함께 천간 → +20`);
+    if (checkHapshinForGan(chunganList, gisin2)) {
+      gyeokScore += 10;
+      console.log(`💡 기신2(${gisin2}) 합신 → +10`);
     }
-    if (gisin2Pos === "지지") {
-      total -= 5;
-      console.log("⚠️ 길신격 감점: 구신 없음 + 기신2(지지) -5");
-    }
-  }
-}
-if (HYUNGSIN_GYEOKS.includes(normalizedName)) {
-  if (!gusinPos && gisin1Pos) {
-    if (gisin1Pos === "천간") {
-      total -= 15;
-      console.log("⚠️ 흉신격 감점: 구신 없음 + 기신1(천간) -15");
-    }
-    if (gisin1Pos === "지지") {
-      total -= 5;
-      console.log("⚠️ 흉신격 감점: 구신 없음 + 기신1(지지) -5");
+  } else {
+    gyeokScore -= 20;
+    console.log(`⚠️ 기신2(${gisin2}) 천간 but 구신 없음 → -20`);
+    if (checkHapshinForGan(chunganList, gisin2)) {
+      gyeokScore -= 10;
+      console.log(`⚠️ 기신2(${gisin2}) 합신 but 구신 없음 → -10`);
     }
   }
 }
 
-// ---------------------
-// 격이 천간에 있으면 +10
-// ---------------------
-// 격이름에서 괄호 안의 천간 추출
-// 격 기준 육신 (예: 정인격 → "정인")
-// 기준 육신 (예: 정관격 → 정관, 건록격 → 비견, 양인격 → 겁재)
-const baseYukshin = GYEOK_YUKSHIN_MAP[normalizedName]?.gyeokname2;
-
-let hasBaseYukshinInCheongan = false;
-if (baseYukshin) {
-  for (let gan of chunganList) {
-    const yukshin = getYukshin(ilgan, gan);
-    if (yukshin === baseYukshin) {
-      hasBaseYukshinInCheongan = true;
-      console.log(`▶ 격(${normalizedName}) 기준육신 ${baseYukshin} 천간 투출 (${gan})`);
-      break;
-    }
-  }
+// 상신 + 구신 같이 있으면
+if (sangsinPos === "천간" && gusinPos === "천간") {
+  gyeokScore += 20;
+  console.log(`💡 상신+구신 동시 천간 존재 → +20`);
 }
 
-if (hasBaseYukshinInCheongan) {
-  total += 10;
-  console.log(`▶ 기준육신(${baseYukshin}) 천간 존재 +10`);
-}
+console.log("▶ 격 점수 최종 합계:", gyeokScore);
 
 
+
+
+
+
+
+  // ---------------------
+// 2. 강약 점수 (격의 강도)
 // ---------------------
-// 삼합 보정
-// ---------------------
-const wolji = convertKorToHanBranch(monthBranch);
-let samhapBonus = 0;
-
-for (let branch of branches) {
-  const key = `${wolji}-${branch}`;
-  const supportGan = SAMHAP_SUPPORT[key];
-
-  if (supportGan) {
-    const yukshin = getYukshin(ilgan, supportGan);
-    console.log(`▶ 삼합 성립: 월지=${wolji}, 지지=${branch}, 대표간=${supportGan}, 십신=${yukshin}`);
-
-    if (yukshin === sangsin) {
-      samhapBonus += 10;
-      console.log(`   ✅ 삼합 상신 +10 (${supportGan})`);
-    }
-    if (yukshin === gusin) {
-      samhapBonus += 5;
-      console.log(`   ✅ 삼합 구신 +5 (${supportGan})`);
-    }
-    if (yukshin === gisin1 || yukshin === gisin2) {
-      samhapBonus += 2;
-    } else if (yukshin === baseYukshin) {  
-      // ⚡ 기준 육신(격)과 같을 경우
-      samhapBonus += 4;
-      console.log(`   ✅ 삼합 격(${baseYukshin}) +4 (${supportGan})`);
-    }
-  }
+const rawMainName = gyeokName;                           // 예: "정관격(壬)"
+const rawSecondaryName = secondaryGyeokResult?.char || "X"; // 예: "정인격(癸)"
+// 2) 판정용 정규화 이름
+function normalizeKey(name) {
+  return (name || "")
+    .replace(/\(.*?\)/g, "")  // 괄호 제거
+    .trim()                   // 앞뒤 공백 제거
+    .normalize("NFC");        // 유니코드 정규화
 }
 
-total += samhapBonus;
-console.log("▶ 삼합 보정 합계:", samhapBonus);
+const normalizedMainName = normalizeKey(rawMainName);
+const normalizedSecondaryName = normalizeKey(rawSecondaryName);
+
+// ✅ 디버깅 로그 추가
+console.log("📌 rawMainName:", rawMainName, "➡ normalizedMainName:", normalizedMainName);
+console.log("📌 rawSecondaryName:", rawSecondaryName, "➡ normalizedSecondaryName:", normalizedSecondaryName);
 
 
-// ---------------------
-// 합신 보정
-// ---------------------
-let hapshinBonus = 0;
+let strengthScore = 0;
+console.log("📌 ganStrengthResults keys:", Object.keys(ganStrengthResults || {}));
+console.log("📌 찾으려는 key:", normalizedMainName, normalizedSecondaryName);
 
-// (1) 천간끼리 합
-const checked = new Set();
-
-for (let gan of chunganList) {
-  const pair = 간합MAP[gan];
-  if (pair && chunganList.includes(pair)) {
-    const key = [gan, pair].sort().join("-");
-    if (checked.has(key)) continue; // 중복 방지
-    checked.add(key);
-
-    const hapList = [gan, pair];
-    console.log(`▶ 합신(천간) 성립: ${hapList.join("+")}`);
-
-    const hapYukshins = hapList.map(g => getYukshin(ilgan, g));
-    console.log("   ▶ 합신 육신:", hapYukshins);
-
-    if (hapYukshins.includes(sangsin)) {
-      hapshinBonus += 15;
-      console.log("   ✅ 합신에 상신 포함 +15");
-    }
-    if (hapYukshins.includes(gusin)) {
-      hapshinBonus += 7;
-      console.log("   ✅ 합신에 구신 포함 +7");
-    }
-    if (hapYukshins.includes(gisin1) || hapYukshins.includes(gisin2)) {
-      hapshinBonus -= 10;
-      console.log("   ⚠️ 합신에 기신 포함 -10");
-    }
-
-    // ⚡ 격 육신 포함 보정
-    if (baseYukshin && hapYukshins.includes(baseYukshin)) {
-      hapshinBonus += 10;
-      console.log(`   ⭐ 합신(천간) 격(${baseYukshin}) 포함 +10`);
-    }
-  }
+// 주격 강도 불러오기
+if (ganStrengthResults[normalizedMainName] !== undefined) {
+  strengthScore = ganStrengthResults[normalizedMainName];
+  console.log(`💪 ${normalizedMainName} 강도 점수 = ${strengthScore}`);
+}
+// 보조격 강도 불러오기 (옵션)
+else if (
+  normalizedSecondaryName &&
+  ganStrengthResults[normalizedSecondaryName] !== undefined
+) {
+  strengthScore = ganStrengthResults[normalizedSecondaryName];
+  console.log(`💪 ${normalizedSecondaryName} 강도 점수 = ${strengthScore}`);
 }
 
+console.log("📌 강도 저장:", normalizedMainName, strengthScore);
+console.log("📌 현재 ganStrengthResults:", ganStrengthResults);
 
-// (2) 지지끼리 합 (지장간 기준)
-const checkedJiji = new Set();
+  // ---------------------
+  // 3. 최종 합계
+  // ---------------------
+// 격 점수 → 백분율 환산
+const normalizedGyeok = (gyeokScore / 110) * 100;
+console.log(`📌 원본 격 점수: ${gyeokScore}, 정규화 후: ${normalizedGyeok.toFixed(2)}`);
 
-for (let branch of branches) {
-  const ganList = jijiToSibganMap3[branch] || [];
-  for (let gan of ganList) {
-    const pair = 간합MAP[gan];
-    if (pair && jijiGanlists.includes(pair)) {
-      const key = [gan, pair].sort().join("-");
-      if (checkedJiji.has(key)) continue;
-      checkedJiji.add(key);
+// 강도 점수 그대로
+const normalizedStrength = strengthScore;
+console.log(`📌 강도 점수: ${normalizedStrength}`);
 
-      const hapList = [gan, pair];
-      console.log(`▶ 합신(지지) 성립: ${hapList.join("+")}`);
+// 두 값 평균
+const finalScore = Math.round((normalizedGyeok + normalizedStrength) / 2);
+console.log(`📌 최종 점수 계산식: ( ${normalizedGyeok.toFixed(2)} + ${normalizedStrength} ) / 2 = ${finalScore}`);
 
-      const hapYukshins = hapList.map(g => getYukshin(ilgan, g));
-      console.log("   ▶ 합신(지지) 육신:", hapYukshins);
-
-      if (hapYukshins.includes(sangsin)) {
-        hapshinBonus += 5;
-        console.log("   ✅ 합신(지지) 상신 +5");
-      }
-      if (hapYukshins.includes(gusin)) {
-        hapshinBonus += 2;
-        console.log("   ✅ 합신(지지) 구신 +2");
-      }
-      if (hapYukshins.includes(gisin1) || hapYukshins.includes(gisin2)) {
-        hapshinBonus -= 3;
-        console.log("   ⚠️ 합신(지지) 기신 -3");
-      }
-
-      // ⚡ 격 육신 포함 보정
-      if (baseYukshin && hapYukshins.includes(baseYukshin)) {
-        hapshinBonus += 4;
-        console.log(`   ⭐ 합신(지지) 격(${baseYukshin}) 포함 +4`);
-      }
-    }
-  }
-}
-
-
-// (3) 천간–지지 합 (교차 합)
-const checkedPairs = new Set();
-
-// (1) 천간→지지 합신
-for (let gan of chunganList) {
-  const pair = 간합MAP[gan];
-  if (pair && jijiGanlists.includes(pair)) {
-    const key = [gan, pair].sort().join("-");
-    if (checkedPairs.has(key)) continue;
-    checkedPairs.add(key);
-
-    const hapList = [gan, pair];
-    const hapYukshins = hapList.map(g => getYukshin(ilgan, g));
-    console.log(`▶ 합신(천간-지지) 성립: ${hapList.join("+")} → 육신=${hapYukshins}`);
-
-    if (hapYukshins.includes(sangsin)) {
-      hapshinBonus += 10;
-      console.log("   ✅ 상신(천간 기준) +10");
-    }
-    if (hapYukshins.includes(gusin)) {
-      hapshinBonus += 5;
-      console.log("   ✅ 구신(천간 기준) +5");
-    }
-    if (hapYukshins.includes(gisin1) || hapYukshins.includes(gisin2)) {
-      hapshinBonus -= 5;
-      console.log("   ⚠️ 기신(천간 기준) -5");
-    }
-
-    // ⚡ 격 육신 포함 보정
-    if (baseYukshin && hapYukshins.includes(baseYukshin)) {
-      hapshinBonus += 8;
-      console.log(`   ⭐ 합신(천간-지지, 천간격) 격(${baseYukshin}) 포함 +8`);
-    }
-  }
-}
-
-// (2) 지지→천간 합신
-for (let gan of jijiGanlists) {
-  const pair = 간합MAP[gan];
-  if (pair && chunganList.includes(pair)) {
-    const key = [gan, pair].sort().join("-");
-    if (checkedPairs.has(key)) {
-      console.log(`⚠️ 합신(지지-천간) ${gan}+${pair} → 천간기준으로 이미 반영, 무시`);
-      continue;
-    }
-    checkedPairs.add(key);
-
-    const hapList = [gan, pair];
-    const hapYukshins = hapList.map(g => getYukshin(ilgan, g));
-    console.log(`▶ 합신(지지-천간) 성립: ${hapList.join("+")} → 육신=${hapYukshins}`);
-
-    if (hapYukshins.includes(sangsin)) {
-      hapshinBonus += 7;
-      console.log("   ✅ 상신(지지 기준) +7");
-    }
-    if (hapYukshins.includes(gusin)) {
-      hapshinBonus += 3;
-      console.log("   ✅ 구신(지지 기준) +3");
-    }
-    if (hapYukshins.includes(gisin1) || hapYukshins.includes(gisin2)) {
-      hapshinBonus -= 3;
-      console.log("   ⚠️ 기신(지지 기준) -3");
-    }
-
-    // ⚡ 격 육신 포함 보정
-    if (baseYukshin && hapYukshins.includes(baseYukshin)) {
-      hapshinBonus += 6;
-      console.log(`   ⭐ 합신(지지-천간, 지지격) 격(${baseYukshin}) 포함 +6`);
-    }
-  }
-}
-
-total += hapshinBonus;
-console.log("▶ 합신 보정 합계:", hapshinBonus);
-
-
-// ---------------------
-// 최종 점수
-// ---------------------
-const percentage = Math.floor(((total / 169) * 100)+20);
-console.log(`✅ 최종 점수: ${total}/169 → ${percentage}+20점`);
-
-return { final: `${percentage}점`, score: percentage };
+return { final: `${finalScore}점`, score: finalScore };
 
 }
-
-////천간의 강약구분.//////////
-///보조 천간의 뿌리 유무확인
-//1.각 천간의 통근
-//2.천간과 지지별 생극에 따른 강약

@@ -7,6 +7,12 @@
 // git push
 //강제실행   vercel --prod --force
 
+
+//로그 다시 실행
+//console.clear();  console.log("🔥 전체 다시 실행됨");  console.log("👉 현재 saju:", JSON.stringify(saju));
+
+
+
 // 상수
 import { 
   elementMap, 
@@ -67,7 +73,7 @@ getCurrentDaeyunIndexFromStartAge,
  extractJijiSibgansWithMiddleInfo,
   extractCheonganHeesinGisin, extractJijiHeesinGisin,   
   renderJohuCell, extractSajuGanList, getJohuApplyType, calculateTaegwaBulgeup,
-  renderTaegwaBulgeupList, 
+  renderTaegwaBulgeupList, buildCountMap, 
 } from './sajuUtils.js';
 //
 
@@ -102,6 +108,8 @@ import { renderSinsalTable,
          getSamhapKeyByJiji, 
          renderEtcSinsalTable
       } from './sinsalUtils.js';
+
+
 
 
 const MONTH_TO_SOLAR_TERM = {
@@ -547,7 +555,42 @@ const saju = {
   monthBranch: monthGanji.ji,
   dayBranch: dayGanji.ji,
   hourBranch: timeGanji.ji,
+  dangryeong,
+    // ✅ 태과불급 태그 저장용
+  johuTags: []
 };
+// 2. 천간/지지 리스트 뽑기
+const ganList = extractSajuGanList(saju);
+
+// 3. 글자 개수 맵 만들기
+const countMap = buildCountMap(ganList);
+
+// 4. 태과불급 + 조후 출력
+console.log("호출 직전 saju:", saju);
+
+// 여기서 renderTaegwaBulgeupList 호출
+// ✅ 원본을 먼저 계산해서 넘겨라
+const taegwaResult = calculateTaegwaBulgeup(saju, dangryeong);
+
+// sanity check
+console.log("📦 taegwaResult type:", typeof taegwaResult, Array.isArray(taegwaResult) ? "Array" : "");
+if (taegwaResult && typeof taegwaResult === "object") {
+  console.log("📦 taegwaResult keys:", Object.keys(taegwaResult));
+  console.log("📦 taegwaResult.detail len:", Array.isArray(taegwaResult.detail) ? taegwaResult.detail.length : "no detail");
+  console.log("📦 taegwaResult.list len:", Array.isArray(taegwaResult.list) ? taegwaResult.list.length : "no list");
+}
+
+const { html: tb, johuTags } = renderTaegwaBulgeupList(taegwaResult, saju, ganList, countMap);
+saju.johuTags = johuTags || [];
+
+let combinedHTML = tb;
+try {
+  const johu = renderJohuCell(saju);
+  combinedHTML += johu;
+} catch (e) {
+  console.error("❌ renderJohuCell 실행 중 에러:", e);
+}
+  
 
 const sajuCheonganList = [timeGanji.gan, dayGanji.gan, monthGanji.gan, yearGanji.gan];
 const sajuJijiList = [timeGanji.ji, dayGanji.ji, monthGanji.ji, yearGanji.ji];
@@ -1328,8 +1371,9 @@ window.handleDaeyunClick = handleDaeyunClick;
         <!-- 태과불급 전용 한 칸 -->
 <tr>
   <td colspan="2" style="border:1px solid #ccc; padding:4px; color:purple;" id="taegwa-bulgeup-cell">
-    ${renderTaegwaBulgeupList(calculateTaegwaBulgeup(saju, dangryeong))}
-  </td>
+ ${tb}
+</td>
+
 </tr>
     </tbody>
   </table>
