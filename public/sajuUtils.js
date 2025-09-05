@@ -20,7 +20,7 @@ import {
         GISIN_BY_DANGRYEONG_POSITION,
         tenGodMap, elementToStems,
         tenGodMapKor, 간합MAP, ganRootMap,
-        SARYEONGSHIK_MAP_WITH_ROLE, SAMHAP_SUPPORT,jijiToSibganMap3,
+        SARYEONGSHIK_MAP_WITH_ROLE, SAMHAP_SUPPORT,jijiToSibganMap3,형충회합Map,
         johuBasis, johuMap, johuAdjustMap2,johuMeaning,태과불급map, 특수태과불급map, SANGSAENG_MAP, SANGGEUK_MAP, SANGSAENG_REVERSE, 방합Map
         } from './constants.js';
 import { elementColors,arrangeByPosition} from './renderUtils.js';
@@ -1136,6 +1136,9 @@ if (cnt === 1) {
 }
 
 
+//조건4 태과 천간,지지 합쳐서 같은 오행4 [화,수]만 해당
+
+
 // ✅ 태과 전체 결과 로그 (중복 제거)
 const taegwaResults = 판정결과.filter(r => r.구분 === "태과");
 
@@ -1257,23 +1260,24 @@ function checkTuchulOrBultu(dangryeong, cheongan) {
   // 1. 사주 천간 리스트 (문자만 추출)
   const cheonList = cheongan.map(c => c.gan);
 
-  // 2. 추가 리스트 (기본 + 조합)
+  // 2. 추가 리스트 (기본 + 모든 2글자 조합)
   let addList = [...cheonList];
-  if (cheonList.includes("辛") && cheonList.includes("癸")) {
-    addList.push("辛癸");
-  }
-  if (cheonList.includes("乙") && cheonList.includes("丁")) {
-    addList.push("乙丁");
+
+  for (let i = 0; i < cheonList.length; i++) {
+    for (let j = i + 1; j < cheonList.length; j++) {
+      const pair1 = cheonList[i] + cheonList[j]; // 순방향
+      const pair2 = cheonList[j] + cheonList[i]; // 역방향
+      addList.push(pair1, pair2);
+    }
   }
 
   console.log("🟡 사주 천간 리스트:", cheonList, "→ 추가리스트:", addList);
 
-  // 3. 當令 규칙만 불러오기
+  // 3. 當令 규칙 가져오기
   const rules = 특수태과불급map[dangryeong] || [];
 
-  // 4. 판정 결과 만들기
+  // 4. 판정 결과
   const results = rules.map(rule => {
-    // 원인 리스트 통일
     let compareList = [];
     if (Array.isArray(rule.원인)) {
       compareList = rule.원인;
@@ -1281,7 +1285,7 @@ function checkTuchulOrBultu(dangryeong, cheongan) {
       compareList = [rule.원인];
     }
 
-    // 교집합 검사
+    // 모든 원인이 addList 안에 있어야 매칭됨
     const isMatch = compareList.every(g => addList.includes(g));
     const result = isMatch ? "투간" : "불투";
 
@@ -1295,6 +1299,7 @@ function checkTuchulOrBultu(dangryeong, cheongan) {
 
   return results;
 }
+
 
 
 
@@ -1812,6 +1817,71 @@ if (cntMu2 >= 1 && (condA || condB)) {
 }
 
 
+// 1) 천간 4개
+const ganList4 = [
+  saju.yearGan,
+  saju.monthGan,
+  saju.dayGan,
+  saju.hourGan
+];
+const ganElements = ganList4.map(gan => elementMap[gan] || "?");
+
+// 2) 지지 4개
+const jijiList4 = [
+  saju.yearBranch,
+  saju.monthBranch,
+  saju.dayBranch,
+  saju.hourBranch
+];
+const jijiElements4 = jijiList4.map(ji => jijielementMap[ji] || "?");
+
+// 3) 합산
+const combinedElements = [...ganElements, ...jijiElements4];
+
+// 4) 오행 카운트
+const combinedCount = combinedElements.reduce((acc, el) => {
+  acc[el] = (acc[el] || 0) + 1;
+  return acc;
+}, {});
+console.log("📊 합산 오행 카운트:", combinedCount);
+
+// 5) 火·水 多 판정
+["火", "水"].forEach(el => {
+  const cnt = combinedCount[el] || 0;
+
+  if (cnt >= 4) {
+    const stems = elementToStems[el] || [el];
+    const existingStems = stems.filter(stem => ganList4.includes(stem));
+
+    const ganCount = ganList4.reduce((acc, g) => {
+      acc[g] = (acc[g] || 0) + 1;
+      return acc;
+    }, {});
+
+    const duGan = existingStems.find(stem => ganCount[stem] >= 2);
+
+if (duGan) {
+  // 투간된 글자 하나만
+  result.push({ 글자: duGan, type: "多", source: "조건4-투간" });
+  console.log(`💡 조건4) ${el} ${cnt}개 → 多 (투간: ${duGan})`);
+} else if (existingStems.length > 0) {
+  // 기존: "丙丁" 하나로 → 수정: ["丙","丁"] 개별로
+  existingStems.forEach(stem => {
+    result.push({ 글자: stem, type: "多", source: "조건4-천간존재" });
+    console.log(`💡 조건4) ${el} ${cnt}개 → 多 (천간 존재: ${stem})`);
+  });
+} else {
+  // 지지 우위일 때도 문자열 전체 대신 분리
+  stems.forEach(stem => {
+    result.push({ 글자: stem, type: "多", source: "조건4-지지우위" });
+  });
+  console.log(`⚠ 조건4) ${el} ${cnt}개 (천간 없음) → 多 (${stems.join(",")})`);
+}
+  }
+
+});
+
+
 
   console.log("✅ 최종 多 판정:", result);
   return result;
@@ -1950,7 +2020,7 @@ export function renderTaegwaBulgeupList(result, saju, ganList, countMap) {
     tableHTML = `
       <table style="border-collapse:collapse; width:100%; text-align:center;" border="1">
         <tr style="background:#f2f2f2;">
-          <th rowspan="${list.length + 1}" style="padding:4px; background:#e6f0ff;">태과불급</th>
+          <th rowspan="${list.length + 1}" style="padding:4px; background:#e6f0ff;">태과불급+?</th>
           <th style="padding:4px; background:#fff8dc;">구분</th>
           <th style="padding:4px; background:#fff8dc;">원인</th>
           <th style="padding:4px; background:#fff8dc;">명칭</th>
@@ -1977,16 +2047,24 @@ export function renderTaegwaBulgeupList(result, saju, ganList, countMap) {
 
     const taegwaList = (result.simple && result.simple["태과"]) ? result.simple["태과"] : [];
 
-    const originFromDetail = (result.detail || [])
-      .filter(r => r.藥)
-      .map(r => r.원인);
+// 1) detail 중 "藥" 있는 것만
+// 2) 그 중 판정이 "투간/불투"가 아닌 것만
+const originFromDetail = (result.detail || [])
+  .filter(r => r.藥 && r.구분 !== "투간" && r.구분 !== "불투")
+  .map(r => r.원인);
+
+
 
     const originList = [...new Set([...taegwaList, ...originFromDetail])];
 
-    console.log("🔍 result.detail:", result.detail);
-    console.log("🔍 originFromDetail (藥 있는 원인):", originFromDetail);
-    console.log("🔍 taegwaList (태과 글자):", taegwaList);
-    console.log("🔍 originList (합쳐서 중복제거):", originList);
+console.log("📌 detail 전체:", result.detail);
+console.log("📌 필터링 전:",
+  (result.detail || []).map(r => `${r.원인}(${r.구분})`)
+);
+console.log("📌 필터링 후:", originFromDetail);
+
+
+
 
     simpleHTML = `
       <table style="border-collapse:collapse; width:100%; text-align:center; margin-top:8px;" border="1">
@@ -2011,5 +2089,160 @@ export function renderTaegwaBulgeupList(result, saju, ganList, countMap) {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//사주정보류////////
+
+
+export function makeSajuInfoTable(jijiList, ganList2) {
+  if (!Array.isArray(jijiList) || jijiList.length < 4) {
+    return "<tr><td colspan='7'>⚠ 지지/천간 정보 없음</td></tr>";
+  }
+
+  const monthBranch = jijiList[1]; // 월지
+  const result = extractSajuRelations(monthBranch, jijiList);
+
+  // 월지 + 값 같이 출력
+  // 월지 + 값 같이 출력 (없으면 X만 출력)
+const withMonth = (val) => {
+  return val ? `${monthBranch}(${val})` : "<span style='color:red;'>X</span>";
+};
+
+// 🔹 천간합 계산
+let ganhapResult = [];
+if (Array.isArray(ganList2) && ganList2.length > 0) {
+
+  for (let i = 0; i < ganList2.length; i++) {
+    for (let j = i + 1; j < ganList2.length; j++) {
+      const a = ganList2[i];
+      const b = ganList2[j];
+
+      console.log(`🔎 비교: ${a}+${b}`);
+
+      if (간합MAP[a] === b) {
+        console.log(`✅ ${a}+${b} → 합`);
+        ganhapResult.push(`${a}${b}`);   // ← 글자만
+      } else if (간합MAP[b] === a) {
+        console.log(`✅ ${b}+${a} → 합`);
+        ganhapResult.push(`${b}${a}`);   // ← 글자만
+      }
+    }
+  }
+} else {
+  console.warn("⚠ ganList2비어있음:", ganList2);
+}
+
+const ganhapStr = ganhapResult.length 
+  ? ganhapResult.join(", ") 
+  : "<span style='color:red;'>X</span>";
+
+
+
+console.log("👉 jijiList:", jijiList);
+console.log("👉 ganList2:", ganList2);
+console.log("👉 월지:", monthBranch);
+console.log("👉 지지 관계 결과:", result);
+console.log("👉 천간합 결과:", ganhapStr);
+
+
+  return `
+    <table 
+      style="border-collapse:collapse; 
+             width:100%; 
+             text-align:center; 
+             font-size:12px;"
+      border="1">
+      <tbody>
+          <tr style="background-color:#e6f7ff;">
+          <td style="border:1px solid #ccc; padding:2px; line-height:1.2;">육합</td>
+          <td style="border:1px solid #ccc; padding:2px; line-height:1.2;">삼합</td>
+          <td style="border:1px solid #ccc; padding:2px; line-height:1.2;">방합</td>
+          <td style="border:1px solid #ccc; padding:2px; line-height:1.2;">배열</td>
+          <td style="border:1px solid #ccc; padding:2px; line-height:1.2;">충</td>
+          <td style="border:1px solid #ccc; padding:2px; line-height:1.2;">형</td>
+          <td style="border:1px solid #ccc; padding:2px; line-height:1.2;">간합</td>
+        </tr>
+
+        <tr>
+          <td style="padding:2px;"><span style='color:blue;'>${withMonth(result.육합)}</span></td>
+          <td style="padding:2px;"><span style='color:blue;'>${withMonth(result.삼합)}</span></td>
+          <td style="padding:2px;"><span style='color:blue;'>${withMonth(result.방합)}</span></td>
+          <td style="padding:2px;"><span style='color:blue;'>${withMonth(result.배열)}</span></td>
+          <td style="padding:2px;"><span style='color:blue;'>${withMonth(result.충)}</span></td>
+          <td style="padding:2px;"><span style='color:blue;'>${withMonth(result.형)}</span></td>
+          <td style="padding:2px;"><span style='color:blue;'>${ganhapStr}</span></td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+}
+
+
+function extractSajuRelations(monthBranch, jijiList, ganList2) {
+
+  const relations = 형충회합Map[monthBranch] || [];
+
+  // 결과 틀
+  const result = {
+    육합: [],
+    삼합: [],
+    방합: [],
+    배열: [],
+    충: [],
+    형: [],
+    간합: []
+  };
+
+for (const { target, tags } of relations) {
+  if (!jijiList.includes(target)) continue;
+
+  // tags가 배열인지 문자열인지에 따라 나눔
+  let tagList = [];
+  if (Array.isArray(tags)) {
+    // ["육합/방합/배열"] 또는 ["육합","방합"] 가능
+    tags.forEach(t => {
+      tagList.push(...t.split('/')); 
+    });
+  } else if (typeof tags === "string") {
+    tagList = tags.split('/');
+  }
+
+  for (const tag of tagList) {
+    if (result[tag] !== undefined) {
+      result[tag].push(target);
+    }
+  }
+}
+
+
+  // 값들을 문자열로 정리 (없으면 빈칸)
+  Object.keys(result).forEach(key => {
+    result[key] = result[key].length ? result[key].join(' ') : '';
+  });
+
+  return result;
+}
 
 

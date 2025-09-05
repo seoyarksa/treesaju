@@ -15,7 +15,7 @@ import {
          HEESIN_BY_DANGRYEONG_POSITION, 
          GISIN_BY_DANGRYEONG_POSITION,
          tenGodMap,
-         tenGodMapKor,branchOrder2, 충MAP, 지지십간MAP
+         tenGodMapKor,branchOrder2, 충MAP, 지지십간MAP, 형충회합Map
       } from './constants.js';
 
 import {
@@ -44,7 +44,7 @@ getDangryeong,
   getdangryeongshik,
   getSaryeongshikHtml,
   getDangryeongCheongans,
-  extractCheonganHeesinGisin, extractJijiHeesinGisin
+  extractCheonganHeesinGisin, extractJijiHeesinGisin, makeSajuInfoTable
 } from './sajuUtils.js';
 
 const stemOrder = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
@@ -618,10 +618,10 @@ function generateNackhwaTable({ birthSaju, dayGanji }) {
       <tr>
         <td>기준천간</td>
           <td></td>
- <td style="color:red; font-weight:">일간:${colorize(birthSaju.dayGanji.gan)}</td>
+ <td >일간:<span style="font-size:1.2em;">${colorize(birthSaju.dayGanji.gan)}</span></td>
   <td></td>
   <td></td>
-  <td>오늘천간:${colorize(dayGanji.gan)}</td>
+  <td >오늘천간:<span style="font-size:1.2em;">${colorize(dayGanji.gan)}</span></td>
   <td></td>
       </tr>
 <tr>
@@ -630,7 +630,7 @@ function generateNackhwaTable({ birthSaju, dayGanji }) {
     const val = stripTags(colorize(b));
     const highlight = birthBranches.includes(val) ? ' class="highlight-cell"' : '';
     const sipsin = getSipsin(dayMaster, b);
-    return `<td${highlight}>${colorize(b)}<br><span style="font-size:0.7em;">${sipsin}</span></td>`;
+    return `<td${highlight}><span style="font-size:1.5em;">${colorize(b)}</span><br><span style="font-size:0.9em;">${sipsin}</span></td>`;
   }).join("")}
 </tr>
 <tr>
@@ -640,7 +640,7 @@ function generateNackhwaTable({ birthSaju, dayGanji }) {
     const val = stripTags(colorize(chong));
     const highlight = birthBranches.includes(val) ? ' class="highlight-cell"' : '';
     const sipsin = chong ? getSipsin(dayMaster, chong) : '';
-    return `<td${highlight}>${colorize(chong)}<br><span style="font-size:0.7em;">${sipsin}</span></td>`;
+    return `<td${highlight}><span style="font-size:1.5em;">${colorize(chong)}</span><br><span style="font-size:0.9em;">${sipsin}</span></td>`;
   }).join("")}
 </tr>
 
@@ -823,12 +823,23 @@ tableArea.innerHTML = generateNackhwaTable({
 
 
 
-// renderUtils.js
 
-export function createDangryeongTableHtml(dangryeong, saryeong, dangryeongShikArray, monthJi) {
+export function createDangryeongTableHtml(
+  dangryeong,
+  saryeong,
+  dangryeongShikArray,
+  monthJi,
+  jijiList,
+  ganList2   // ← 여기가 추가됨
+) {
+  console.log("💡 createDangryeongTableHtml 받은 ganList2:", ganList2);
+
+
   if (!dangryeongShikArray || dangryeongShikArray.length === 0) {
     return `<div>당령식 데이터가 없습니다.</div>`;
   }
+
+
 const firstHeesin = firstHeesinMap[dangryeong];
 const dangryeongshikHtml = dangryeongShikArray.map((char, i) => {
   if (char === dangryeong) {
@@ -842,6 +853,7 @@ const dangryeongshikHtml = dangryeongShikArray.map((char, i) => {
 
   // 여기서 사령식 HTML 문자열 생성
   const styledSaryeongshik = getSaryeongshikHtml(monthJi, saryeong);
+   const sajuInfoHtml = makeSajuInfoTable(jijiList, ganList2)
 return `
   <style>
 .saryeong-char {
@@ -863,10 +875,10 @@ return `
 
   </style>
   <div style="display: flex; justify-content: center; margin-top: 0;">
-    <table class="dangryeong-table" style="border-collapse: collapse; font-size: 1rem; text-align: center; width: 100%; max-width: 600px; border: 1px solid #ccc;table-layout:fixed;">
+    <table class="dangryeong-table" style="border-collapse: collapse; width:100%; margin-top:0; font-size:0.75rem; text-align:center;">
       <tbody>
        <tr> 
-          <td style="border:1px solid #ccc; padding:4px;font-size:12px;" colspan="3">사주정보[간합,배열...]</td>
+          <td style="border:1px solid #ccc; padding:4px;font-size:12px;" colspan="4" id="saju-relations">${sajuInfoHtml}</td>
         </tr>
         <tr>
 <td style="border:1px solid #ccc; padding:4px;">
@@ -876,14 +888,15 @@ return `
 <td style="border:1px solid #ccc; padding:4px;max-width:150px;">
   <span style="background-color:#f0f0f0; padding:2px 4px;">사령:</span>
   <span style="color: blue;">${saryeong || '-'}</span>
-</td>
 
 
-          <td style="border:1px solid #ccc; padding:4px;min-width:250px;">${styledSaryeongshik}</td>
+          <td style="border:1px solid #ccc; padding:4px;min-width:250px;"colspan="2">${styledSaryeongshik}</td>
+          
         </tr>
         <tr> 
-          <td style="border:1px solid #ccc; padding:4px;font-size:20px;" colspan="2">당령식: ${dangryeongshikHtml || '-'}
-          </td><td><div style="font-size:12px;margin-top:6px;">[*색깔별 <span style="color:red;">당령</span>, <span style="color:green;">제1희신,사령보좌</span>, <span style="color:blue;">사령</span>, <span style="color:orange;">기신</span>.] </div>
+          <td style="border:1px solid #ccc; padding:4px;font-size:14px;" colspan="2">당령식: ${dangryeongshikHtml || '-'}
+          </td>
+          <td style=style="border:1px solid #ccc; padding:4px;" colspan="2"><div style="font-size:12px;margin-top:6px;">*색: <span style="color:red;">당령</span>, <span style="color:green;">제1희신,사령보좌</span>, <span style="color:blue;">사령</span>, <span style="color:orange;">기신</span> </div>
           </td>
         </tr>
       </tbody>
@@ -1082,3 +1095,7 @@ html += createSectionLineHTML("지지기신", jijiGisinByPos); // ✅ sourceList
 
   container.innerHTML = html;
 }
+
+
+
+

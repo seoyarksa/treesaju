@@ -472,11 +472,15 @@ if (sinsalName === '태극귀인') {
     return hit ? `${jiji}(${hit.tags?.[0] || ''})` : 'X';
   }
 
-  if (sinsalName === '격각살') {
-    const rels = 격각살MAP[jiji] || [];
-    const hit = rels.find(r => extJijiArr.includes(r.target));
-    return hit ? `${hit.target}` : 'X';
-  }
+if (sinsalName === '격각살') {
+  const rels = 격각살MAP[jiji] || [];
+  const hits = rels.filter(r => extJijiArr.includes(r.target));
+  return hits.length
+    ? hits.map(h => `${jiji}${h.target}`).join(", ")  // "子寅, 子戌"
+    : 'X';
+}
+
+
 
   if (sinsalName === '합방/공방살') {
     const dayJiji = sajuJijiArr[1]; // 기준: 일지
@@ -979,10 +983,24 @@ export function getSinsalForJiji(
     if (sinsalName === '귀문살') {
     return 귀문살Map[jiji] ? [`${jiji}(${귀문살Map[jiji]})`] : [];
   }
-      //격각살
-    if (sinsalName === '격각살') {
-    return 격각살Map[jiji] ? [`${jiji}(${격각살Map[jiji]})`] : [];
-  }
+// 격각살
+if (sinsalName === '격각살') {
+  console.log(">>> [격각살 조건문 진입]", jiji, sinsalName);
+
+  const rels = 격각살MAP[jiji] || [];
+  console.log("rels:", rels.map(r => r.target));
+  console.log("extJijiArr:", extJijiArr);
+
+  const hits = rels.filter(r => extJijiArr.includes(r.target));
+  console.log("hits:", hits.map(h => h.target));
+
+  return hits.length 
+    ? [`${jiji}(${hits.map(h => h.target).join("")})`] 
+    : [];
+}
+
+
+
 if (sinsalName === '합방/공방살') {
   const gender = context?.gender; // context에서 성별 받기
   const rels = 합방_공방살MAP[jiji] || [];

@@ -73,7 +73,7 @@ getCurrentDaeyunIndexFromStartAge,
  extractJijiSibgansWithMiddleInfo,
   extractCheonganHeesinGisin, extractJijiHeesinGisin,   
   renderJohuCell, extractSajuGanList, getJohuApplyType, calculateTaegwaBulgeup,
-  renderTaegwaBulgeupList, buildCountMap, 
+  renderTaegwaBulgeupList, buildCountMap, makeSajuInfoTable
 } from './sajuUtils.js';
 //
 
@@ -460,8 +460,37 @@ console.log("▶ 생년월일시 (KST):", birthDate.toLocaleString('ko-KR', { ti
 // ✅ 올바른 방식으로 호출
 //const jeolipDate = new Date(await getJeolipDateFromAPI(window.birthYear, window.birthMonth, window.birthDay));
 
+let html = "";   // ✅ 반드시 선언
+
+// ⚡ 먼저 분해 (이미 app.js 안에서 하고 있음)
+const yearGanji  = splitGanji(data.ganji.year);
+const monthGanji = splitGanji(data.ganji.month);
+const dayGanji   = splitGanji(data.ganji.day);
+const timeGanji  = splitGanji(data.ganji.time);
+
+const ganList2 = [
+  yearGanji.gan,  // 예: "己"
+  monthGanji.gan, // 예: "壬"
+  dayGanji.gan,   // 예: "庚"
+  timeGanji.gan   // 예: "丁"
+];
+const jijiList = [
+  data.ganji.year.slice(1),   // 酉
+  data.ganji.month.slice(1),  // 申
+  data.ganji.day.slice(1),    // 午
+  data.ganji.time.slice(1)    // 丑
+];
 
 
+
+
+console.log("👉 jijiList:", jijiList);
+console.log("👉 ganList2:", ganList2);
+
+const target = document.querySelector("#saju-relations");
+if (target) {
+  target.innerHTML = makeSajuInfoTable(jijiList, ganList2);
+}
 
 // 원본 값 (소수점 유지)
 const daeyunAgeRaw = data.daeyunAge;
@@ -478,10 +507,6 @@ window.daeyunAge = daeyunAge;
     if (!response.ok) throw new Error('서버 오류 발생');
 
 
-    const yearGanji = splitGanji(data.ganji.year);
-    const monthGanji = splitGanji(data.ganji.month);
-    const dayGanji = splitGanji(data.ganji.day);
-    const timeGanji = splitGanji(data.ganji.time);
 
 
 
@@ -680,7 +705,14 @@ function renderAllDangryeong(dangryeong, saryeong, sajuChungan, sajuJiji) {
    // console.log('dangryeongShikArray:', dangryeongShikArray);
   //console.log('Array.isArray:', Array.isArray(dangryeongShikArray));
 
-  const dangryeongHtml = createDangryeongTableHtml(dangryeong, saryeong, dangryeongShikArray, monthJi);
+ const dangryeongHtml = createDangryeongTableHtml(
+  dangryeong,
+  saryeong,
+  dangryeongShikArray,
+  monthJi,
+  jijiList,
+  ganList2
+);
  // console.log(dangryeongHtml);
 }
 
@@ -778,7 +810,7 @@ if (document.readyState === "loading") {
 const dangryeongShikArray = getdangryeongshik(dangryeong);
 
 // 2. HTML을 생성해서 HTML에 직접 삽입하거나 템플릿에 사용
-const dangryeongHtml = createDangryeongTableHtml(dangryeong, saryeong, dangryeongShikArray, monthJi);
+const dangryeongHtml = createDangryeongTableHtml(dangryeong, saryeong, dangryeongShikArray, monthJi, jijiList, ganList2);
 
 
 const startStemKor = convertHanToKorStem(monthGanji.gan);
