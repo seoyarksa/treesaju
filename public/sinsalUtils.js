@@ -1,6 +1,6 @@
 // sinsalUtils.js
 
-import { branchOrder,samhapGroups, UNSEONG_LIST, unseongMap12, sinsal_LIST, sinsalMap12, 충MAP,
+import { branchOrder,samhapGroups, tenGodMap, UNSEONG_LIST, unseongMap12, sinsal_LIST, sinsalMap12, 충MAP,
          cheonEulMap, BAEKHO_SAL_GANJI_MAP,형충회합Map,원진육해Map,간여지동Map,효신살Map,소실살Map,재고귀인Map,
          홍염Map, 도화살MAP,귀문살MAP, 낙정관살Map,격각살MAP,합방_공방살MAP,
          GWAIGANG_SAL_GANJI, 건록_암록_금여록MAP,천덕_월덕MAP,문창_학당MAP,상문_조객MAP, 양인_비인MAP, 급각살MAP, 
@@ -38,6 +38,16 @@ function getSinsalType(name) {
  
 }
 
+export function getSipsin(dayGan, targetGan) {
+  if (!dayGan || !targetGan) return "";
+
+  // targetGan은 천간 10글자 중 하나
+  const result = tenGodMap[dayGan]?.[targetGan] || "";
+  console.log("👉 십신 조회:", dayGan, "vs", targetGan, "=>", result);
+
+  return result;
+}
+
 // saju: { dayGan, yearBranch, monthBranch, dayBranch, hourBranch }
 // samhapKey: getSamhapKeyByJiji(saju.yearBranch) 등에서 추출
 
@@ -47,6 +57,7 @@ export function renderSinsalTable({ sajuGanArr, samhapKey, sajuJijiArr }) {
   const jijiArr = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
   const sajuGanjiArr = sajuGanArr.map((gan, idx) => gan + sajuJijiArr[idx]);
 
+const dayGan = sajuGanArr[1];  
   // ✅ 추가: 같은 지지 '열' 인덱스 계산(첫 칸이 <th>라서 +2 사용)
   const norm = v => (v ?? '').toString().trim();
   const highlightIdx = new Set(
@@ -73,9 +84,17 @@ const colCss = [...highlightIdx].map(i => `
       <th colspan="4">12신살</th>
     </tr>
     <tr>
-      ${ganList.map(gan =>
-        `<td class="clickable${sajuGanArr.includes(gan) ? ' saju-blue' : ''}" data-type="unseong" data-gan="${gan}" style="cursor:pointer;">${gan}</td>`
-      ).join('')}
+      ${ganList.map(gan => {
+  const sipsin = getSipsin(dayGan, gan);  // 천간에 대한 십신명
+  return `<td class="clickable${sajuGanArr.includes(gan) ? ' saju-blue' : ''}" 
+              data-type="unseong" 
+              data-gan="${gan}" 
+              style="cursor:pointer; text-align:center;">
+              <div>${gan}</div>
+              <div style="font-size:0.8em; color:#555;">${sipsin}</div>
+          </td>`;
+}).join("")}
+
       ${samhapNames.map(key =>
         `<td class="clickable${key === samhapKey ? ' saju-blue' : ''}" data-type="sinsal" data-samhap="${key}" style="cursor:pointer;">${key}</td>`
       ).join('')}
@@ -546,7 +565,7 @@ if (sinsalName === '병부살') {
     const baseIdx = branchOrder.indexOf(yearBase);
     const prev = branchOrder[(baseIdx - 1 + 12) % 12];
     if (jiji === prev) {
-      results.push(`${jiji}(병부)<span style="color:red;">[년지]</span>`);
+      results.push(`${jiji}(병부)<span style="color:red;">[년지기준]</span>`);
     }
   }
 
@@ -556,7 +575,7 @@ if (sinsalName === '병부살') {
     const baseIdx = branchOrder.indexOf(extJijiArr[daeyunIdx]);
     const prev = branchOrder[(baseIdx - 1 + 12) % 12];
     if (jiji === prev) {
-      results.push(`${jiji}(병부)<span style="color:red;">[대운]</span>`);
+      results.push(`${jiji}(병부)<span style="color:red;">[대운기준]</span>`);
     }
   }
 
@@ -566,7 +585,7 @@ if (sinsalName === '병부살') {
     const baseIdx = branchOrder.indexOf(extJijiArr[seunIdx]);
     const prev = branchOrder[(baseIdx - 1 + 12) % 12];
     if (jiji === prev) {
-      results.push(`${jiji}(병부)<span style="color:red;">[세운]</span>`);
+      results.push(`${jiji}(병부)<span style="color:red;">[세운기준]</span>`);
     }
   }
 
@@ -587,7 +606,7 @@ if (sinsalName === '사부살') {
     const prev = branchOrder[(baseIdx - 1 + 12) % 12];
     const 충자 = 충MAP[prev];
     if (jiji === 충자) {
-      results.push(`${jiji}(사부)<span style="color:red;">[년지]</span>`);
+      results.push(`${jiji}(사부)<span style="color:red;">[년지기준]</span>`);
     }
   }
 
@@ -598,7 +617,7 @@ if (sinsalName === '사부살') {
     const prev = branchOrder[(baseIdx - 1 + 12) % 12];
     const 충자 = 충MAP[prev];
     if (jiji === 충자) {
-      results.push(`${jiji}(사부)<span style="color:red;">[대운]</span>`);
+      results.push(`${jiji}(사부)<span style="color:red;">[대운기준]</span>`);
     }
   }
 
@@ -609,7 +628,7 @@ if (sinsalName === '사부살') {
     const prev = branchOrder[(baseIdx - 1 + 12) % 12];
     const 충자 = 충MAP[prev];
     if (jiji === 충자) {
-      results.push(`${jiji}(사부)<span style="color:red;">[세운]</span>`);
+      results.push(`${jiji}(사부)<span style="color:red;">[세운기준]</span>`);
     }
   }
 

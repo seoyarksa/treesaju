@@ -548,7 +548,7 @@ export function renderTodaySajuBox({ yearGanji, monthGanji, dayGanji, timeGanji,
   const 천간한글 = { '갑':'甲','을':'乙','병':'丙','정':'丁','무':'戊','기':'己','경':'庚','신':'辛','임':'壬','계':'癸' };
 const dayMaster = 천간한글[birthSaju.dayGanji.gan] || birthSaju.dayGanji.gan;
 
-function getSipsin(dayGan, targetJi) {
+ function getSipsin(dayGan, targetJi) {
   const targetGan = 지지십간MAP[targetJi]; // 지지 본기
   console.log("👉 getSipsin", { dayGan, targetJi, targetGan });
 

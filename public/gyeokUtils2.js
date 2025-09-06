@@ -1153,10 +1153,7 @@ const ganStrengthResults = {};
   const ilgan = cheongans[2]; // 일간
   const wolji = jijiList[1];  // 월지
   // 시간 천간을 일간 기준으로 해석
-const gwanCandidates = getGwanCandidates(ilgan, tenGodMap);
 
-console.log("편관:", gwanCandidates.편관); // 예: 丁
-console.log("정관:", gwanCandidates.정관); // 예: 丙
 
  //천간의 뿌리찾기 
 const uncertainRoots = {
@@ -1198,18 +1195,6 @@ function getSamhapSupportGans(jijiList) {
 
 
 
-function getGwanCandidates(ilgan, tenGodMap) {
-  const result = { 편관: null, 정관: null };
-
-  // tenGodMap[일간] 은 {천간: 십신명} 형태
-  for (const [gan, yukshin] of Object.entries(tenGodMap[ilgan] || {})) {
-    if (yukshin === "편관") result.편관 = gan;
-    if (yukshin === "정관") result.정관 = gan;
-  }
-
-  return result;
-}
-
 function getGanStrengthScore(
   targetGan,
   chunganList,   // 원국 + 삼합 대표간
@@ -1241,58 +1226,50 @@ function getGanStrengthScore(
     }
   }
 
-  // 3) 뿌리 여부 판정
-// 3) 뿌리 여부 판정 (개수만큼 점수)
-const roots = (ganRootMap[targetGan] || "").split(",");
-let rootCount = roots.filter(root => jijiList.includes(root.replace("(?)",""))).length;
+  // 3) 뿌리 여부 판정 (개수만큼 점수)
+  const roots = (ganRootMap[targetGan] || "").split(",");
+  let rootCount = roots.filter(root => jijiList.includes(root.replace("(?)",""))).length;
 
-if (rootCount > 0) {
-  score += rootCount * 12.5;
-  console.log(`뿌리 존재: ${targetGan} → ${rootCount}개 → +${rootCount * 12.5}`);
-}
-
-
-// 4) 당령 보정
-if (dangryeong) {
-  const targetElement = elementMap[targetGan];      // 대상 천간의 오행
-  const dangElement = elementMap[dangryeong];       // 당령의 오행
-
-  if (targetElement === dangElement) {
-    score += 100;
-    console.log(`당령 보정: ${targetGan}(${targetElement}) 동일 → +100`);
-  } 
-  // 당령이 target을 생 (예: 목(당령) → 화(target))
-  else if (SANGSAENG_MAP[dangElement] === targetElement) {
-    score += 80;
-    console.log(`당령 보정: ${dangElement} → ${targetElement} (당령이 생) → +80`);
-  } 
-  // target이 당령을 생 (예: 화(target) → 토(당령))
-  else if (SANGSAENG_MAP[targetElement] === dangElement) {
-    score += 60;
-    console.log(`당령 보정: ${targetElement} → ${dangElement} (target이 생) → +60`);
-  } 
-  // target이 당령을 극 (예: 화(target) → 금(당령))
-  else if (SANGGEUK_MAP[targetElement] === dangElement) {
-    score += 30;
-    console.log(`당령 보정: ${targetElement} → ${dangElement} (target이 극) → +30`);
-  } 
-  // 당령이 target을 극 (예: 화(당령) → 금(target))
-  else if (SANGGEUK_MAP[dangElement] === targetElement) {
-    score += 10;
-    console.log(`당령 보정: ${dangElement} → ${targetElement} (당령이 극) → +10`);
+  if (rootCount > 0) {
+    score += rootCount * 12.5;
+    console.log(`뿌리 존재: ${targetGan} → ${rootCount}개 → +${rootCount * 12.5}`);
   }
-}
 
+  // 4) 당령 보정
+  if (dangryeong) {
+    const targetElement = elementMap[targetGan];
+    const dangElement = elementMap[dangryeong];
+
+    if (targetElement === dangElement) {
+      score += 100;
+      console.log(`당령 보정: ${targetGan}(${targetElement}) 동일 → +100`);
+    } 
+    else if (SANGSAENG_MAP[dangElement] === targetElement) {
+      score += 80;
+      console.log(`당령 보정: ${dangElement} → ${targetElement} (당령이 생) → +80`);
+    } 
+    else if (SANGSAENG_MAP[targetElement] === dangElement) {
+      score += 60;
+      console.log(`당령 보정: ${targetElement} → ${dangElement} (target이 생) → +60`);
+    } 
+    else if (SANGGEUK_MAP[targetElement] === dangElement) {
+      score += 30;
+      console.log(`당령 보정: ${targetElement} → ${dangElement} (target이 극) → +30`);
+    } 
+    else if (SANGGEUK_MAP[dangElement] === targetElement) {
+      score += 10;
+      console.log(`당령 보정: ${dangElement} → ${targetElement} (당령이 극) → +10`);
+    }
+  }
 
   const finalScore = score / 2;
-  console.log(`▶ [${targetGan}] 최종 점수 = ${finalScore}`);
-  return finalScore;
+  const yukshin = tenGodMap[ilganHan]?.[targetGan] || null;  // 일간 기준 십신
+  console.log(`▶ [${targetGan}] 최종 점수 = ${finalScore}, 십신=${yukshin}`);
+
+  return { score: finalScore, yukshin };
 }
 
-
-
-
-// 사주 데이터
+// ================== 사주 데이터 준비 ==================
 const chunganList = [
   convertKorToHanStem(saju.yearGan),
   convertKorToHanStem(saju.monthGan),
@@ -1307,16 +1284,10 @@ const jijiList2 = [
 ];
 const jijiGanlists = jijiList2.flatMap(branch => jijiToSibganMap3[branch] || []);
 
-  // ✅ 당령 구하기 (외부 함수 활용)
-  const dangryeong = getDangryeong(wolji, daeyunAge, daYunDirection);
-  const extraGans = getSamhapSupportGans(jijiList);
-
-// ✅ 천간 리스트에 삼합 대표간 추가
-const extendedChunganList = [
-  ...cheongans,
-  ...(gwanCandidates.편관 ? [gwanCandidates.편관] : []),
-  ...(gwanCandidates.정관 ? [gwanCandidates.정관] : [])
-];
+// ✅ 당령 구하기
+const dangryeong = getDangryeong(wolji, daeyunAge, daYunDirection);
+// ✅ 삼합 대표간 구하기
+const extraGans = getSamhapSupportGans(jijiList);
 
 // 십신 관계용 = 원국 천간 + 삼합 대표간
 const relationChunganList = [
@@ -1324,112 +1295,140 @@ const relationChunganList = [
   ...extraGans
 ];
 console.log("▶ jijiGanlists (지지 속 천간들):", jijiGanlists);
-console.log("▶ extendedChunganList (점수 대상: 원국 + 가상 관성):", extendedChunganList);
 console.log("▶ relationChunganList (십신 관계용: 원국 + 삼합대표간):", relationChunganList);
 
 
+// ================== 전체 10천간 강약 점수 계산 ==================
+const ilganHan = convertKorToHanStem(saju.dayGan);
+const allTenGans = ["甲","乙","丙","丁","戊","己","庚","辛","壬","癸"];
 
-// 4개 천간 각각 강약 점수 계산
-// 점수 계산
-for (let gan of extendedChunganList) {
-  const score = getGanStrengthScore(
+for (let gan of allTenGans) {
+  const result = getGanStrengthScore(
     gan,
     relationChunganList,
     jijiGanlists,
     tenGodMap,
     ganRootMap,
     jijiList,
-    dangryeong
+    dangryeong,
+    ilganHan
   );
-  ganStrengthResults[gan] = score;
-  console.log(`=== ${gan} 최종 점수 저장: ${score} ===`);
+  ganStrengthResults[gan] = result;  // {score, yukshin
+
+ }
+// ✅ 여기서 합산 검사
+for (let [gan, info] of Object.entries(ganStrengthResults)) {
+  if (!info) continue;
+  console.log(`합산 검사: ${gan}, 점수=${info.score}, 십신=${info.yukshin}`);
 }
 
-// 가상의 편관, 정관도 계산
+//일간, 관성 총점구하기////////////////
+// ================== 합산 점수 계산 함수 ==================
 
-// 가상의 편관/정관 강약 점수 계산
-// === 편관 점수 계산 ===
-if (gwanCandidates.편관) {
-  console.log(`\n=== [편관(${gwanCandidates.편관})] 강약 점수 계산 시작 ===`);
+// ================== 일간총점 ==================
+function calculateIlganTotal(ilganHan, ganStrengthResults, cheongans, jijiGanlists) {
+  let total = 0;
+  console.log("\n=== ▶ 일간 총합 계산 시작 ===");
 
-  let baseScore = getGanStrengthScore(
-    gwanCandidates.편관,
-    relationChunganList,
-    jijiGanlists,
-    tenGodMap,
-    ganRootMap,
-    jijiList,
-    dangryeong
-  );
+  // 1) 일간 점수
+  const ilganScore = ganStrengthResults[ilganHan]?.score || 0;
+  console.log(`일간값: ${ilganHan} = ${ilganScore}`);
+  total += ilganScore;
 
-  console.log(`▶ [편관(${gwanCandidates.편관})] 기본 점수 = ${baseScore}`);
+  // 2) 비견, 겁재, 식신, 상관
+  for (let type of ["비견", "겁재", "식신", "상관"]) {
+    let ganSubtotal = 0;
+    let jijiSubtotal = 0;
 
-  // 원국 천간에 편관이 실제 존재하면 +50
-  if (cheongans.includes(gwanCandidates.편관)) {
-    baseScore += 50;
-    console.log(`⚡ 원국 천간에 편관 존재 → +50 → ${baseScore}`);
+    for (let [gan, info] of Object.entries(ganStrengthResults)) {
+      if (!info || info.yukshin !== type) continue;
+
+      // 천간 점수
+      if (cheongans.includes(gan)) {
+        ganSubtotal += info.score;
+      }
+
+      // 지지 점수 (1/10)
+      const countInJiji = jijiGanlists.filter(g => g === gan).length;
+      if (countInJiji > 0) {
+        jijiSubtotal += (info.score * 0.1) * countInJiji;
+      }
+    }
+
+    console.log(`${type}천간 = ${ganSubtotal}`);
+    console.log(`${type}지지 = ${jijiSubtotal}`);
+
+    total += ganSubtotal + jijiSubtotal;
   }
 
-  // 전체 원국(천간+지장간+삼합 대표간)
-  const allExistGans = [...cheongans, ...extraGans, ...jijiGanlists.flat()];
-
-  // 편재 있으면 +50
-  if (allExistGans.some(gan => tenGodMap[saju.dayGan][gan] === "편재")) {
-    baseScore += 50;
-    console.log(`💰 편재 존재 보정 → +50 → ${baseScore}`);
-  }
-
-  // 정재 있으면 +25
-  if (allExistGans.some(gan => tenGodMap[saju.dayGan][gan] === "정재")) {
-    baseScore += 25;
-    console.log(`💎 정재 존재 보정 → +25 → ${baseScore}`);
-  }
-
-  ganStrengthResults[`편관(${gwanCandidates.편관})`] = baseScore;
-  console.log(`✅ [편관(${gwanCandidates.편관})] 최종 저장 점수 = ${baseScore}`);
-}
-
-// === 정관 점수 계산 ===
-if (gwanCandidates.정관) {
-  console.log(`\n=== [정관(${gwanCandidates.정관})] 강약 점수 계산 시작 ===`);
-
-  let baseScore = getGanStrengthScore(
-    gwanCandidates.정관,
-    relationChunganList,
-    jijiGanlists,
-    tenGodMap,
-    ganRootMap,
-    jijiList,
-    dangryeong
-  );
-
-  console.log(`▶ [정관(${gwanCandidates.정관})] 기본 점수 = ${baseScore}`);
-
-  // 원국 천간에 정관이 실제 존재하면 +50
-  if (cheongans.includes(gwanCandidates.정관)) {
-    baseScore += 50;
-    console.log(`⚡ 원국 천간에 정관 존재 → +50 → ${baseScore}`);
-  }
-
-  const allExistGans = [...cheongans, ...extraGans, ...jijiGanlists.flat()];
-
-  // 정재 있으면 +50
-  if (allExistGans.some(gan => tenGodMap[saju.dayGan][gan] === "정재")) {
-    baseScore += 50;
-    console.log(`💰 정재 존재 보정 → +50 → ${baseScore}`);
-  }
-
-  // 편재 있으면 +25
-  if (allExistGans.some(gan => tenGodMap[saju.dayGan][gan] === "편재")) {
-    baseScore += 25;
-    console.log(`💎 편재 존재 보정 → +25 → ${baseScore}`);
-  }
-
-  ganStrengthResults[`정관(${gwanCandidates.정관})`] = baseScore;
-  console.log(`✅ [정관(${gwanCandidates.정관})] 최종 저장 점수 = ${baseScore}`);
+  console.log(`▶ 일간총합 = ${total}`);
+  return total;
 }
 
 
+
+// ================== 관성총점 ==================
+function calculateGwanTotal(ganStrengthResults, cheongans, jijiGanlists) {
+  let total = 0;
+  console.log("\n=== ▶ 관성 총합 계산 시작 ===");
+
+  for (let type of ["편관", "정관", "편재", "정재"]) {
+    let ganSubtotal = 0;
+    let jijiSubtotal = 0;
+
+    for (let [gan, info] of Object.entries(ganStrengthResults)) {
+      if (!info || info.yukshin !== type) continue;
+
+      // 천간 점수
+      if (cheongans.includes(gan)) {
+        ganSubtotal += info.score;
+      }
+
+      // 지지 점수 (1/10)
+      const countInJiji = jijiGanlists.filter(g => g === gan).length;
+      if (countInJiji > 0) {
+        jijiSubtotal += (info.score * 0.1) * countInJiji;
+      }
+    }
+
+    console.log(`${type}천간 = ${ganSubtotal}`);
+    console.log(`${type}지지 = ${jijiSubtotal}`);
+
+    total += ganSubtotal + jijiSubtotal;
+  }
+
+  // 보정값 (아직 규칙 없음)
+  const bojeong = 0;
+  console.log(`보정값 = ${bojeong}`);
+  total += bojeong;
+
+  console.log(`▶ 관성총합 = ${total}`);
+  return total;
+}
+
+
+
+// ================== 실제 계산 ==================
+
+
+// 일간총점 (일간 + 비견, 겁재, 식신, 상관)
+// 일간총점
+const ilganTotal = calculateIlganTotal(
+  ilganHan,           // ✅ 일간(한자)만 넘겨야 함
+  ganStrengthResults,
+  chunganList,
+  jijiGanlists
+);
+
+// 관성총점
+const gwanTotal = calculateGwanTotal(
+  ganStrengthResults,
+  chunganList,
+  jijiGanlists
+);
+
+console.log(`▶ 일간 총점 = ${ilganTotal}`);
+console.log(`▶ 관성 총점 = ${gwanTotal}`);
 
 
 // 뿌리 찾기 + 실제 사주 존재 여부
@@ -1552,7 +1551,6 @@ const mainGrade = getGyeokGrade(
   normalizedMainName,
   tenGodMap,
   ganStrengthResults,
-  gwanCandidates,
   normalizedSecondaryName,
   secondaryGyeokResult
 );
@@ -1567,7 +1565,6 @@ if (normalizedSecondaryName && GYEOK_YUKSHIN_MAP[normalizedSecondaryName]) {
     normalizedSecondaryName,
     tenGodMap,
     ganStrengthResults,     // ✅ 강도 결과 전달
-    gwanCandidates,
     normalizedSecondaryName,
     secondaryGyeokResult
   );
@@ -1635,11 +1632,25 @@ console.log("▶ mainRequired:", mainRequired);
   <thead>
     <tr style="background:#fff8dc;">
   <th style="padding:3px; width:100px;">천간</th>
-  <th style="padding:3px;">${convertKorToHanStem(saju.hourGan)} (시)</th>
-  <th style="padding:3px;"><span style="color:red;">${convertKorToHanStem(saju.dayGan)} (일간)</span></th>
-  <th style="padding:3px;">${convertKorToHanStem(saju.monthGan)} (월)</th>
-  <th style="padding:3px;">${convertKorToHanStem(saju.yearGan)} (년)</th>
-   <th colspan="2" style="padding:3px; width:100px;">관성</th>
+<th style="padding:3px;">
+  ${convertKorToHanStem(saju.hourGan)} 
+  (${tenGodMap[convertKorToHanStem(saju.dayGan)][convertKorToHanStem(saju.hourGan)]})
+</th>
+<th style="padding:3px;">
+  <span style="color:red;">
+    ${convertKorToHanStem(saju.dayGan)} (일간)
+  </span>
+</th>
+<th style="padding:3px;">
+  ${convertKorToHanStem(saju.monthGan)} 
+  (${tenGodMap[convertKorToHanStem(saju.dayGan)][convertKorToHanStem(saju.monthGan)]})
+</th>
+<th style="padding:3px;">
+  ${convertKorToHanStem(saju.yearGan)} 
+  (${tenGodMap[convertKorToHanStem(saju.dayGan)][convertKorToHanStem(saju.yearGan)]})
+</th>
+
+   <th colspan="2" style="padding:3px; width:100px;">일간&관성</th>
 
 </tr>
     </tr>
@@ -1652,29 +1663,36 @@ console.log("▶ mainRequired:", mainRequired);
         <td style="padding:3px;">${monthRoots}</td>
         <td style="padding:3px;">${yearRoots}</td>
       
-  <td style="padding:3px;background:#fff8dc;">편관(${gwanCandidates.편관 || '-'})</td>
-  <td style="padding:3px;background:#fff8dc;">정관(${gwanCandidates.정관 || '-'})</td>
+// 일간
+<td style="padding:3px;background:#fff8dc;">
+  일간[${convertKorToHanStem(saju.dayGan)}]
+</td>
+
+// 관성 (편관, 정관 순서대로)
+<td style="padding:3px;background:#fff8dc;">
+  관[
+    ${
+      Object.entries(tenGodMap[convertKorToHanStem(saju.dayGan)] || {})
+        .filter(([gan, yukshin]) => yukshin === "편관" || yukshin === "정관")
+        .map(([gan]) => gan)
+        .join(" ")
+    }
+  ]
+</td>
+
 
 
       </tr>
   <tr>
   <td style="padding:3px;background:#e6f0ff;">왕쇠강약</td>
-  <td style="padding:3px;">${ganStrengthResults[hourGanHan] || "-"}</td>
-  <td style="padding:3px;"><span style="color:blue;">${ganStrengthResults[dayGanHan] || "-"}</span></td>
-  <td style="padding:3px;">${ganStrengthResults[monthGanHan] || "-"}</td>
-  <td style="padding:3px;">${ganStrengthResults[yearGanHan] || "-"}</td>
-    <!-- ✅ 편관 강약 -->
-<td style="padding:3px;">
-  ${ganStrengthResults[`편관(${gwanCandidates.편관})`] 
-    ? `<span style="color:red;">${ganStrengthResults[`편관(${gwanCandidates.편관})`]}</span>` 
-    : "-"}
-</td>
-<td style="padding:3px;">
-  ${ganStrengthResults[`정관(${gwanCandidates.정관})`] 
-    ? `<span style="color:red;">${ganStrengthResults[`정관(${gwanCandidates.정관})`]}</span>` 
-    : "-"}
-</td>
+<td style="padding:3px;">${ganStrengthResults[hourGanHan]?.score.toFixed(1) || "-"}</td>
+<td style="padding:3px;"><span style="color:blue;">${ganStrengthResults[dayGanHan]?.score.toFixed(1) || "-"}</span></td>
+<td style="padding:3px;">${ganStrengthResults[monthGanHan]?.score.toFixed(1) || "-"}</td>
+<td style="padding:3px;">${ganStrengthResults[yearGanHan]?.score.toFixed(1) || "-"}</td>
 
+    <!-- ✅ 편관 강약 -->
+<td style="padding:3px;">${ilganTotal.toFixed(1)}</td>
+<td style="padding:3px;">${gwanTotal.toFixed(1)}</td>
 
 </tr>
   </tbody>
@@ -1711,7 +1729,6 @@ export function getGyeokGrade(
   gyeokName,
   tenGodMap,
   ganStrengthResults,
-  gwanCandidates,
   secondaryGyeokName = "",
   secondaryGyeokResult = null   // ✅ 보조격 결과 객체도 추가
 ) {
