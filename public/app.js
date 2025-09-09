@@ -1246,9 +1246,10 @@ window.handleDaeyunClick = handleDaeyunClick;
 
 
 .basic-daeyun-table {
-  width: 100%;
+  width: 80%;
   border-collapse: collapse;
   table-layout: fixed;
+  margin-top: 8px;   /* ✅ 위쪽 여백 추가 */
 }
 
 .basic-daeyun-table th,

@@ -270,11 +270,12 @@ sewoonReversed.forEach(({ stem, branch, year }, i) => {
   td.style.textAlign = "center";
   td.style.verticalAlign = "middle";
 
-  td.innerHTML = `
-    <span>${colorize(stem)}</span>
-    ${tenGod ? `<span style="font-size:0.75rem; color:#999;">(${tenGod})</span>` : ""}
-    <span>${colorize(branch)}</span>
-  `;
+td.innerHTML = `
+  <div>${colorize(stem)}</div>
+  ${tenGod ? `<div style="font-size:0.75rem; color:#999;">(${tenGod})</div>` : ""}
+  <div>${colorize(branch)}</div>
+`;
+
 
   // ✅ 클릭 시 하이라이트 처리
   td.addEventListener("click", () => {
