@@ -232,6 +232,22 @@ export function getGanjiByYear(year) {
 }
 
 
+//사주쪽 세운넣기
+export function generateYearlyGanjiSeriesFixed(startYear) {
+  startYear = Math.floor(startYear);
+  const result = [];
+
+  for (let i = 0; i < 10; i++) {
+    const year = startYear + i;
+    const { stem, branch } = getGanjiByYear(year);
+    result.push({ year, stem, branch });
+  }
+
+  return result; // ✅ 반드시 배열 반환
+}
+
+
+
 
 export function generateYearlyGanjiSeries2(startYear) {
   startYear = Math.floor(startYear); // 소숫점 버림

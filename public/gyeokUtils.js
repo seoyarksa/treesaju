@@ -1335,8 +1335,8 @@ function calculateIlganTotal(ilganHan, ganStrengthResults, cheongans, jijiGanlis
   console.log(`일간값: ${ilganHan} = ${ilganScore}`);
   total += ilganScore;
 
-  // 2) 비견, 겁재, 식신, 상관
-  for (let type of ["비견", "겁재", "식신", "상관"]) {
+  // 2) 비견, 겁재, 식신, 상관, 편인, 정인
+  for (let type of ["비견", "겁재", "식신", "상관", "편인", "정인"]) {
     let ganSubtotal = 0;
     let jijiSubtotal = 0;
 
@@ -1361,18 +1361,40 @@ function calculateIlganTotal(ilganHan, ganStrengthResults, cheongans, jijiGanlis
     total += ganSubtotal + jijiSubtotal;
   }
 
-  console.log(`▶ 일간총합 = ${total}`);
-  return total;
+  // ✅ 보정값: 식신·상관 투간 → 개수만큼 100점씩 추가
+  let bojeong = 0;
+  for (let type of ["식신", "상관"]) {
+    // 천간에 해당 십신이 몇 개 있는지 카운트
+    const count = Object.entries(ganStrengthResults).filter(
+      ([gan, info]) => info.yukshin === type && cheongans.includes(gan)
+    ).length;
+
+    if (count > 0) {
+      bojeong += count * 100;
+      console.log(`보정: ${type} 투간 ${count}개 → +${count * 100}`);
+    } else {
+      console.log(`보정: ${type} 투간 없음 → +0`);
+    }
+  }
+
+  total += bojeong;
+
+  console.log(`보정값 = ${bojeong}`);
+  console.log(`▶ 일간총합 (raw) = ${total}`);
+
+  // ✅ 700으로 나누고 최종값은 백분율
+  const normalized = (total / 700) * 100;
+  console.log(`▶ 일간총합 (백분율) = ${normalized.toFixed(1)}%`);
+  return normalized;
 }
-
-
 
 // ================== 관성총점 ==================
 function calculateGwanTotal(ganStrengthResults, cheongans, jijiGanlists) {
   let total = 0;
   console.log("\n=== ▶ 관성 총합 계산 시작 ===");
 
-  for (let type of ["편관", "정관", "편재", "정재"]) {
+  // 편관, 정관, 편재, 정재, 편인, 정인
+  for (let type of ["편관", "정관", "편재", "정재", "편인", "정인"]) {
     let ganSubtotal = 0;
     let jijiSubtotal = 0;
 
@@ -1397,14 +1419,32 @@ function calculateGwanTotal(ganStrengthResults, cheongans, jijiGanlists) {
     total += ganSubtotal + jijiSubtotal;
   }
 
-  // 보정값 (아직 규칙 없음)
-  const bojeong = 0;
-  console.log(`보정값 = ${bojeong}`);
+  // ✅ 보정값: 편관·정관·편인·정인 투간 개수 × 100
+  let bojeong = 0;
+  for (let type of ["편관", "정관", "편인", "정인"]) {
+    const count = Object.entries(ganStrengthResults).filter(
+      ([gan, info]) => info.yukshin === type && cheongans.includes(gan)
+    ).length;
+
+    if (count > 0) {
+      bojeong += count * 100;
+      console.log(`보정: ${type} 투간 ${count}개 → +${count * 100}`);
+    } else {
+      console.log(`보정: ${type} 투간 없음 → +0`);
+    }
+  }
+
   total += bojeong;
 
-  console.log(`▶ 관성총합 = ${total}`);
-  return total;
+  console.log(`보정값 = ${bojeong}`);
+  console.log(`▶ 관성총합 (raw) = ${total}`);
+
+  // ✅ 600으로 나누고 최종값은 백분율
+  const normalized = (total / 600) * 100;
+  console.log(`▶ 관성총합 (백분율) = ${normalized.toFixed(1)}%`);
+  return normalized;
 }
+
 
 
 
@@ -1510,8 +1550,10 @@ if (normalizedMainName && normalizedMainName !== "X") {
         dangryeong
       );
 
-      ganStrengthResults[normalizedMainName] = score;
-      console.log(`✅ 주격 normalizedMainName 강도 점수 = ${score}`);
+      // ✅ 객체 형태로 저장
+      ganStrengthResults[normalizedMainName] = { score, yukshin: targetYuksin };
+
+      console.log(`✅ 주격 ${normalizedMainName} 강도 점수 = ${score}`);
     }
   }
 }
@@ -1536,13 +1578,19 @@ if (normalizedSecondaryName && normalizedSecondaryName !== "X") {
         dangryeong
       );
 
-      ganStrengthResults[normalizedSecondaryName] = score;
-      console.log(`✅ 보조격 normalizedSecondaryName 강도 점수 = ${score}`);
+      // ✅ 객체 형태로 저장
+      ganStrengthResults[normalizedSecondaryName] = { score, yukshin: targetYuksin };
+
+      console.log(`✅ 보조격 ${normalizedSecondaryName} 강도 점수 = ${score}`);
     }
   }
 }
 
-
+// ✅ 점수만 추출해서 별도 맵 생성
+const ganStrengthScores = {};
+for (let [key, value] of Object.entries(ganStrengthResults)) {
+  ganStrengthScores[key] = (typeof value === "object") ? value.score : value;
+}
 
 // ▶ 주격 등급
 console.log("▶ 주격 원본:", rawMainName, "정규화:", normalizedMainName);
@@ -1550,7 +1598,7 @@ const mainGrade = getGyeokGrade(
   saju,
   normalizedMainName,
   tenGodMap,
-  ganStrengthResults,
+  ganStrengthScores,   // ✅ 점수만 넘김
   normalizedSecondaryName,
   secondaryGyeokResult
 );
@@ -1564,7 +1612,7 @@ if (normalizedSecondaryName && GYEOK_YUKSHIN_MAP[normalizedSecondaryName]) {
     saju,
     normalizedSecondaryName,
     tenGodMap,
-    ganStrengthResults,     // ✅ 강도 결과 전달
+    ganStrengthScores,   // ✅ 점수만 넘김
     normalizedSecondaryName,
     secondaryGyeokResult
   );
@@ -1921,18 +1969,20 @@ console.log("📌 ganStrengthResults keys:", Object.keys(ganStrengthResults || {
 console.log("📌 찾으려는 key:", normalizedMainName, normalizedSecondaryName);
 
 // 주격 강도 불러오기
-if (ganStrengthResults[normalizedMainName] !== undefined) {
-  strengthScore = ganStrengthResults[normalizedMainName];
+// 주격 강도 불러오기
+
+
+// 주격 강도 점수 가져오기
+if (ganStrengthResults[normalizedMainName]) {
+  strengthScore = ganStrengthResults[normalizedMainName].score || 0;  // ✅ score만
   console.log(`💪 ${normalizedMainName} 강도 점수 = ${strengthScore}`);
 }
-// 보조격 강도 불러오기 (옵션)
-else if (
-  normalizedSecondaryName &&
-  ganStrengthResults[normalizedSecondaryName] !== undefined
-) {
-  strengthScore = ganStrengthResults[normalizedSecondaryName];
+// 보조격 강도 점수 가져오기
+else if (ganStrengthResults[normalizedSecondaryName]) {
+  strengthScore = ganStrengthResults[normalizedSecondaryName].score || 0;  // ✅ score만
   console.log(`💪 ${normalizedSecondaryName} 강도 점수 = ${strengthScore}`);
 }
+
 
 console.log("📌 강도 저장:", normalizedMainName, strengthScore);
 console.log("📌 현재 ganStrengthResults:", ganStrengthResults);

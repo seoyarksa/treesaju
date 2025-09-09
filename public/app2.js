@@ -88,7 +88,8 @@ import {
   renderTodaySajuBox,
   createDangryeongTableHtml,
   renderDangryeongHeesinGisin,
-  arrangeByPosition
+  arrangeByPosition, renderBasicDaeyunTable, handleBasicDaeyunClick,
+  highlightInitialDaeyun, highlightInitialSewoon
 } from './renderUtils.js';
 
 import {
@@ -135,6 +136,9 @@ let outputMode = "basic"; // 기본값: 사주출력
 //
 window.handleDaeyunClick = handleDaeyunClick;
 window.handleSewoonClick = handleSewoonClick;
+// ✅ 전역에 노출
+window.handleBasicDaeyunClick = handleBasicDaeyunClick;
+
 // 기존 할당 보존
 const _origDaeyunClick = handleDaeyunClick;
 const _origSewoonClick = handleSewoonClick;
@@ -584,6 +588,10 @@ const saju = {
     // ✅ 태과불급 태그 저장용
   johuTags: []
 };
+
+// 전역에서도 쓸 수 있게 등록
+window.saju = saju;
+
 // 2. 천간/지지 리스트 뽑기
 const ganList = extractSajuGanList(saju);
 
@@ -1236,6 +1244,57 @@ window.handleDaeyunClick = handleDaeyunClick;
   border-collapse: collapse;
 }
 
+
+.basic-daeyun-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.basic-daeyun-table th,
+.basic-daeyun-table td {
+  border: 1px solid #ccc;
+  padding: 4px;
+  text-align: center;
+  vertical-align: middle;
+  word-wrap: break-word;
+  font-size: 0.7rem;
+  display: table-cell; /* ✅ 강제로 table-cell 지정 */
+}
+
+
+.basic-daeyun-table th {
+  background: #f5f5f5;
+}
+
+@media (max-width: 600px) {
+  .basic-daeyun-table th,
+  .basic-daeyun-table td {
+    font-size: 0.7rem;
+    padding: 2px;
+  }
+}
+
+.basic-daeyun-table td.selected {
+  background-color: #ffe08a !important;  /* 노란색 강조 */
+  font-weight: bold;
+}
+
+td.classList.add("sewoon-cell");
+td.onclick = () => {
+  document.querySelectorAll('#basic-daeyun-table .sewoon-cell').forEach(x => x.classList.remove('selected'));
+  td.classList.add("selected");
+};
+.basic-daeyun-table .sewoon-cell.selected {
+  background-color: #c2e0ff !important; /* 파란빛 강조 */
+  font-weight: bold;
+}
+const td = document.createElement("td");
+td.classList.add("sewoon-cell");   // ✅ 세운은 반드시 sewoon-cell
+
+td.classList.add("sewoon-cell");
+td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
+
           
 </style>
 
@@ -1370,7 +1429,10 @@ window.handleDaeyunClick = handleDaeyunClick;
     document.getElementById('basic-section').innerHTML = `
 
 <!-- 당령 표시용 영역 -->
+  <div id="basic-daeyun-table" class="basic-daeyun-container"></div>
+  <div id="basic-yearly-ganji-container"></div>
 <div style="margin-top: 1rem; margin-left: 20px;">
+
   <table class="dangryeong-table" style="
     border-collapse: collapse;
     font-size: 1rem;
@@ -1902,6 +1964,25 @@ renderDaeyunTable({
   birthDay: window.birthDay,
   sewonYear: window.sewonYear  // ✅ 유지
 });
+
+renderBasicDaeyunTable({
+  daeyunAge,
+  birthYear: window.birthYear,
+  birthMonth: window.birthMonth,
+  birthDay: window.birthDay,
+  wolju: {
+    stem: saju.monthGan,    // 월간
+    branch: saju.monthBranch // 월지
+  },
+   direction: daYunDirection,
+});
+
+// ✅ 첫 로딩 시 현재 대운/세운 자동 선택
+setTimeout(() => {
+  highlightInitialDaeyun();
+  setTimeout(highlightInitialSewoon, 200); // 세운 렌더 후 실행
+}, 200);
+
 
 // 🔥 자동 출력 시작!
 
