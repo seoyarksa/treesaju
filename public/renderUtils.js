@@ -42,10 +42,17 @@ getDangryeong,
   findStartMonthIndex,
   generateMonthlyGanjiSeriesByGanji,
   getdangryeongshik,
-  getSaryeongshikHtml,
+  getSaryeongshikHtml,renderJohuCell,
   getDangryeongCheongans,
-  extractCheonganHeesinGisin, extractJijiHeesinGisin, makeSajuInfoTable
+  extractCheonganHeesinGisin, extractJijiHeesinGisin, makeSajuInfoTable, 
 } from './sajuUtils.js';
+
+
+import { renderhapshinTable
+        
+      } from './gyeokUtils.js';
+
+
 
 const stemOrder = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
 const branchOrder = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
@@ -204,6 +211,8 @@ function generateDaeyunGanjiSeries(wolju, count, isForward) {
 
 
 // 대운 클릭 → 세운 갱신
+// ✅ 대운 클릭 시 실행
+// ✅ 대운 클릭 시 실행
 export function handleBasicDaeyunClick(idx, stem, branch) {
   const startAge = Math.floor(window.daeyunAge);
   const birthYear = window.birthYear;
@@ -217,7 +226,9 @@ export function handleBasicDaeyunClick(idx, stem, branch) {
   // === 세운 시작년도 갱신 ===
   const sewonStart = window.sewonYear + (trueIndex * 10) - 10;
   const displayDate2 = convertYearFractionToDate(sewonStart);
-console.log("displayDate2 =", displayDate2);
+  console.log("displayDate2 =", displayDate2);
+
+  // 헤더 제목 갱신
   const headerTitleRow = document.querySelector("#basic-daeyun-table thead tr:first-child");
   if (headerTitleRow) {
     const ths = headerTitleRow.querySelectorAll("th");
@@ -227,8 +238,9 @@ console.log("displayDate2 =", displayDate2);
   // ✅ 세운 10년치 (역순으로 뒤집음)
   const sewoonReversed = generateYearlyGanjiSeriesFixed(sewonStart).slice().reverse();
   console.log("📌 세운 시작년도:", sewonStart);
-console.log("📌 세운 배열:", sewoonReversed.map(x => x.year).join(","));
-  // === 헤더(년도) 갱신 ===
+  console.log("📌 세운 배열:", sewoonReversed.map(x => x.year).join(","));
+
+  // 헤더(년도) 갱신
   const headerRow = document.querySelector("#basic-daeyun-table thead tr:nth-child(2)");
   if (headerRow) {
     const ths = headerRow.querySelectorAll("th");
@@ -237,62 +249,115 @@ console.log("📌 세운 배열:", sewoonReversed.map(x => x.year).join(","));
     });
   }
 
-  // === 데이터 줄(세운 간지) 갱신 ===
-  const daeyunRow = document.querySelector("#basic-daeyun-table .daeyun-row");
-  if (!daeyunRow) return;
-
   // === 모든 대운 셀에서 selected 제거 ===
   document.querySelectorAll('#basic-daeyun-table .daeyun-cell')
     .forEach(td => td.classList.remove('selected'));
 
   // === 클릭한 대운 셀만 selected 추가 ===
   const daeyunCells = document.querySelectorAll('#basic-daeyun-table .daeyun-cell');
-  console.log("📌 daeyunCells 개수:", daeyunCells.length);
   if (daeyunCells[idx]) {
     daeyunCells[idx].classList.add("selected");
-    console.log("✅ selected 추가됨:", daeyunCells[idx]);
   }
 
-  // === 기존 세운 셀 삭제 ===
+  // === 대운 선택 전역 저장 ===
+  window.selectedDaewoon = { stem, branch };
+  console.log("▶ 선택된 대운:", window.selectedDaewoon);
+
+  // === 기존 세운값 리셋 ===
+  window.selectedSewoon = null;
+  console.log("⏹ 세운 리셋 완료");
+
+  // 리스트 갱신
+  const lists = getAllCompareLists(window.saju);
+  console.log("▶ 대운 선택 후 리스트:", lists);
+
+  // === 세운 셀 갱신 ===
+  updateBasicSewoonCells(sewoonReversed);
+
+
+}
+
+
+
+// ✅ 세운 셀 생성 및 클릭 이벤트 바인딩
+// ✅ 세운 셀 생성 및 클릭 이벤트 바인딩
+function updateBasicSewoonCells(sewoonReversed) {
+  const daeyunRow = document.querySelector("#basic-daeyun-table .daeyun-row");
+  if (!daeyunRow) return;
+
+  // 기존 세운 셀 삭제
   while (daeyunRow.children.length > 10) {
     daeyunRow.removeChild(daeyunRow.lastChild);
   }
 
-// === 새로운 세운 셀 추가 ===
-sewoonReversed.forEach(({ stem, branch, year }, i) => {
-  const tenGod = (window.saju && window.saju.monthGan)
-    ? getTenGod(window.saju.monthGan, stem)
-    : '';
+  // 새로운 세운 셀 추가
+  sewoonReversed.forEach(({ stem, branch, year }) => {
+    const tenGod = (window.saju && window.saju.monthGan)
+      ? getTenGod(window.saju.monthGan, stem)
+      : '';
 
-  const td = document.createElement("td");
-  td.classList.add("sewoon-cell");
-  td.setAttribute("data-year", year);  // ✅ 소숫점 포함 그대로 저장
-  td.style.textAlign = "center";
-  td.style.verticalAlign = "middle";
+    const td = document.createElement("td");
+    td.classList.add("sewoon-cell");
+    td.setAttribute("data-year", year);
+    td.style.textAlign = "center";
+    td.style.verticalAlign = "middle";
 
-td.innerHTML = `
-  <div>${colorize(stem)}</div>
-  ${tenGod ? `<div style="font-size:0.75rem; color:#999;">(${tenGod})</div>` : ""}
-  <div>${colorize(branch)}</div>
-`;
+    td.innerHTML = `
+      <div>${colorize(stem)}</div>
+      ${tenGod ? `<div style="font-size:0.75rem; color:#999;">(${tenGod})</div>` : ""}
+      <div>${colorize(branch)}</div>
+    `;
 
+    // ✅ 세운 클릭 처리
+    td.addEventListener("click", () => basicSewoonClick(td, stem, branch, year));
 
-  // ✅ 클릭 시 하이라이트 처리
-  td.addEventListener("click", () => {
-    console.log("✅ 세운 클릭:", { index: i, year, stem, branch });
-
-    // 기존 세운 강조 제거
-    document.querySelectorAll('#basic-daeyun-table .sewoon-cell')
-      .forEach(x => x.classList.remove("selected"));
-
-    // 현재 클릭한 세운 강조
-    td.classList.add("selected");
+    daeyunRow.appendChild(td);
   });
 
-  daeyunRow.appendChild(td);
-});
+document.querySelector("#dangryeong-cell").innerHTML =
+  makeSajuInfoTable();
+renderDangryeongHeesinGisin();
+
+document.querySelector("#johuyongsin-cell").innerHTML = renderJohuCell();
+
+document.querySelector("#hapshin-box").innerHTML = renderhapshinTable();
 
 }
+
+
+
+
+
+// ✅ 세운 클릭 시 실행
+// ✅ 세운 클릭 시 실행
+export function basicSewoonClick(td, stem, branch, year) {
+  console.log("✅ 세운 클릭:", { stem, branch, year });
+
+  // 세운 선택 전역 저장
+  window.selectedSewoon = { type: "sewoon", stem, branch, year };
+  console.log("▶ 선택된 세운:", window.selectedSewoon);
+
+  // 리스트 갱신
+  const lists = getAllCompareLists(window.saju);
+  console.log("▶ 세운 선택 후 리스트:", lists);
+
+  // 기존 세운 강조 제거
+  document.querySelectorAll('#basic-daeyun-table .sewoon-cell')
+    .forEach(x => x.classList.remove("selected"));
+
+  // 현재 클릭한 세운 강조
+  td.classList.add("selected");
+
+document.querySelector("#dangryeong-cell").innerHTML =
+  makeSajuInfoTable();
+renderDangryeongHeesinGisin();
+
+document.querySelector("#johuyongsin-cell").innerHTML = renderJohuCell();
+
+document.querySelector("#hapshin-box").innerHTML = renderhapshinTable();
+
+}
+
 
 
 // 날짜 → 소숫점 연도로 변환
@@ -305,67 +370,88 @@ function toDecimalYear(year, month, day) {
   return year + (dayOfYear / yearLength);
 }
 
+
+
 export function highlightInitialDaeyun() {
   const startAge = Math.floor(window.daeyunAge);
 
-  // 출생일 소숫점 연도
   const birthDecimal = toDecimalYear(window.birthYear, window.birthMonth, window.birthDay);
-
-  // 오늘 날짜 소숫점 연도
   const now = new Date();
   const todayDecimal = toDecimalYear(now.getFullYear(), now.getMonth() + 1, now.getDate());
-
-  // 현재 나이 (소숫점 포함)
   const currentDecimalAge = todayDecimal - birthDecimal;
 
-  // 대운 Index
   let daeyunIndex = Math.ceil((currentDecimalAge - startAge) / 10);
   if (daeyunIndex < 0) daeyunIndex = 0;
   if (daeyunIndex > 9) daeyunIndex = 9;
 
-  // 역순 보정
   const displayIndex = 9 - daeyunIndex;
 
-  console.log("▶ highlightInitialDaeyun 계산:", {
-    birthDecimal,
-    todayDecimal,
-    currentDecimalAge,
-    startAge,
-    daeyunIndex,
-    displayIndex
-  });
-
-  // 하이라이트 적용
   const daeyunCells = document.querySelectorAll('#basic-daeyun-table .daeyun-cell');
+  console.log("📌 대운 셀 개수:", daeyunCells.length, "선택 index:", displayIndex);
+
   if (daeyunCells[displayIndex]) {
-    daeyunCells[displayIndex].click();
-    console.log("▶ 자동 클릭 대운셀:", daeyunCells[displayIndex].innerText);
+    const cell = daeyunCells[displayIndex];
+    const ganjiText = cell.innerText.trim().split("\n");
+    console.log("📌 선택된 대운 셀 내용:", ganjiText);
+
+    window.selectedDaewoon = {
+      type: "daewoon",
+      stem: ganjiText[0] || cell.getAttribute("data-stem") || "",
+      sibshin: (ganjiText[1] || "").replace(/[()]/g, ""),
+      branch: ganjiText[2] || cell.getAttribute("data-branch") || ""
+    };
+
+    console.log("▶ 자동 선택된 대운:", window.selectedDaewoon);
+
+    cell.click(); // UI 반영
+  } else {
+    console.warn("⚠️ highlightInitialDaeyun: 표시할 셀 없음", displayIndex);
   }
 }
 
 
-export function highlightInitialSewoon() {
-  const currentYear = new Date().getFullYear();  // 예: 2025
-  const sewoonCells = document.querySelectorAll('#basic-daeyun-table .sewoon-cell');
-  console.log("sewoonCells 개수:", sewoonCells.length);
 
+export function highlightInitialSewoon() {
+  const currentYear = new Date().getFullYear();
+  const sewoonCells = document.querySelectorAll('#basic-daeyun-table .sewoon-cell');
   let foundCell = null;
+
   sewoonCells.forEach(cell => {
     const yearAttr = parseFloat(cell.getAttribute("data-year"));
-    const yearInt = Math.floor(yearAttr);   // ✅ 여기서만 정수로 변환
-    console.log("세운셀 확인:", yearInt, "vs 현재년도", currentYear);
+    const yearInt = Math.floor(yearAttr);
     if (yearInt === currentYear) {
       foundCell = cell;
     }
   });
 
   if (foundCell) {
+    // 1) 하이라이트 처리
     sewoonCells.forEach(x => x.classList.remove("selected"));
     foundCell.classList.add("selected");
-    console.log("▶ 자동 선택된 세운셀:", {
-      year: foundCell.getAttribute("data-year"),
-      text: foundCell.innerText
-    });
+
+    // 2) window.selectedSewoon 설정
+    const ganjiText = foundCell.innerText.trim().split("\n");
+    window.selectedSewoon = {
+      type: "sewoon",
+      year: foundCell.getAttribute("data-year") || "",
+      stem: ganjiText[0] || "",
+      sibshin: (ganjiText[1] || "").replace(/[()]/g, ""),
+      branch: ganjiText[2] || ""
+    };
+    console.log("▶ 자동 선택된 세운:", window.selectedSewoon);
+
+    // 3) 전역 saju가 있으면 리스트 생성 + 전역 등록
+    if (window.saju) {
+      const lists = getAllCompareLists(window.saju);
+      console.log("▶ highlightInitialSewoon 이후 리스트:", lists);
+
+      // 4) 테이블 갱신
+      document.querySelector("#dangryeong-cell").innerHTML = makeSajuInfoTable();
+
+      return lists; // 필요하면 반환도 해줌
+    } else {
+      console.warn("⚠️ window.saju가 아직 없습니다. 리스트를 만들 수 없습니다.");
+    }
   } else {
     console.warn("⚠️ 현재 연도 세운셀을 찾지 못했습니다.");
   }
@@ -1196,7 +1282,7 @@ const dangryeongshikHtml = dangryeongShikArray.map((char, i) => {
 
   // 여기서 사령식 HTML 문자열 생성
   const styledSaryeongshik = getSaryeongshikHtml(monthJi, saryeong);
-   const sajuInfoHtml = makeSajuInfoTable(jijiList, ganList2)
+  
 return `
   <style>
 .saryeong-char {
@@ -1220,9 +1306,7 @@ return `
   <div style="display: flex; justify-content: center; margin-top: 0;">
     <table class="dangryeong-table" style="border-collapse: collapse; width:100%; margin-top:0; font-size:0.75rem; text-align:center;">
       <tbody>
-       <tr> 
-          <td style="border:1px solid #ccc; padding:4px;font-size:12px;" colspan="4" id="saju-relations">${sajuInfoHtml}</td>
-        </tr>
+
         <tr>
 <td style="border:1px solid #ccc; padding:4px;">
   <span style="background-color:#f0f0f0; padding:2px 4px;">당령:</span>
@@ -1316,14 +1400,15 @@ export function arrangeByPosition(listOrMap) {
 
 
 ////////////////////////////////////////////출력부분
-export function renderDangryeongHeesinGisin(
-  cheonganGisinList,
-  cheonganHeesinList,
-  dangryeongList,
-  jijiHeesinList,
-  jijiGisinList,
-  trueDangryeongChar
-) {
+export function renderDangryeongHeesinGisin() {
+  console.log("전역 확인:", {
+    cheonganGisinList: window.cheonganGisinList,
+    cheonganHeesinList: window.cheonganHeesinList,
+    dangryeongList: window.dangryeongList,
+    jijiHeesinList: window.jijiHeesinList,
+    jijiGisinList: window.jijiGisinList,
+    trueDangryeongChar: window.trueDangryeongChar
+  });
   const container = document.getElementById("dangryeongshik-container");
   if (!container) return;
 
@@ -1341,6 +1426,109 @@ export function renderDangryeongHeesinGisin(
   const firstHeesinChar = firstHeesinMap[trueDangryeongChar] || "";
 
   const commonStyle = "font-family:Consolas, 'Courier New', monospace; font-size:16px; line-height:1.8;";
+
+  // ------------------------------
+  // ✅ 내부 함수: 대운/세운 희·기신 분류
+  // ------------------------------
+function makeHeeGiSinList() {
+  const daewoon = window.selectedDaewoon;
+  const sewoon  = window.selectedSewoon;
+
+  // 둘 다 없을 때만 리턴
+  if (!daewoon && !sewoon) {
+    console.warn("대운/세운 선택값 없음");
+    return {
+      daewoon: { cheonganHeesin: "", cheonganGisin: "", jijiHeesin: "", jijiGisin: "" },
+      sewoon:  { cheonganHeesin: "", cheonganGisin: "", jijiHeesin: "", jijiGisin: "" }
+    };
+  }
+
+  const { heesin, gisin } = HEESIN_GISIN_COMBINED[trueDangryeongChar] || { heesin: [], gisin: [] };
+
+  const extractChars = (stem, branch, label) => {
+    let list = [];
+    if (stem) {
+      list.push({ char: stem, isMiddle: false, source: label, from: "stem" });
+    }
+    if (branch && jijiToSibganMap[branch]) {
+      jijiToSibganMap[branch].forEach(s => {
+        if (s && s.char) {
+          list.push({
+            char: s.char,
+            isMiddle: !!s.isMiddle,
+            source: label,
+            from: "branch"
+          });
+        }
+      });
+    }
+    return list;
+  };
+
+  const daewoonList = daewoon ? extractChars(daewoon.stem, daewoon.branch, "大") : [];
+  const sewoonList  = sewoon  ? extractChars(sewoon.stem,  sewoon.branch,  "世") : [];
+
+  const classify = (list) => {
+    return {
+      cheonganHeesin: list.find(x => heesin.includes(x.char) && !x.isMiddle) || null,
+      cheonganGisin:  list.find(x => gisin.includes(x.char) && !x.isMiddle) || null,
+      jijiHeesin:     list.find(x => heesin.includes(x.char) && x.isMiddle) || null,
+      jijiGisin:      list.find(x => gisin.includes(x.char) && x.isMiddle) || null,
+    };
+  };
+
+  return {
+    daewoon: classify(daewoonList),
+    sewoon:  classify(sewoonList),
+  };
+}
+
+
+
+function formatHeeGiSinItem(item) {
+  if (!item) return "";
+
+  // 중기면 괄호 처리
+  let char = item.isMiddle ? `(${item.char})` : item.char;
+
+  // 출처 태그 (대운/세운)
+
+
+  // 천간/지지 태그
+  const loc = item.from === "stem" ? "[天]" : "[地]";
+
+  // --- 색상 강조 (기존 highlightIfNeeded 규칙과 동일) ---
+  const plainChar = char.replace(/[()]/g, ""); // 괄호 제거 후 비교
+
+  const isDangryeong = (plainChar === trueDangryeongChar);
+  const isFirstHeesin = (plainChar === firstHeesinChar);
+
+  const { heesin, gisin } = HEESIN_GISIN_COMBINED[trueDangryeongChar] || { heesin: [], gisin: [] };
+  const isGisin = gisin.includes(plainChar);
+  const isHeesin = heesin.includes(plainChar);
+
+  let styledChar = char;
+  if (isDangryeong) {
+    styledChar = `<span style="color:red; font-weight:bold;">${char}</span>`;
+  } else if (isFirstHeesin) {
+    styledChar = `<span style="color:green; font-weight:bold;">${char}</span>`;
+  } else if (isGisin) {
+    styledChar = `<span style="color:orange; font-weight:bold;">${char}</span>`;
+  } else if (isHeesin) {
+    // 희신은 별도 색 없음 → 그냥 char
+    styledChar = char;
+  }
+
+  return `${styledChar}${loc}`;
+}
+
+
+
+
+  const result = makeHeeGiSinList();
+
+  // ------------------------------
+  // highlightIfNeeded / createSectionLineHTML 등 기존 그대로 유지
 
 const highlightIfNeeded = (charObj) => {
   if (!charObj) return "";
@@ -1429,14 +1617,77 @@ const createDangryeongLineHTML = (title, list) => {
   return `<div style="${commonStyle}"><strong style="display:inline-block; width:${titleWidth}px;">${title}</strong>${cells}</div>`;
 };
 
-  let html = "";
-html += createSectionLineHTML("천간기신", cheonganGisinByPos);
-html += createSectionLineHTML("천간희신", cheonganHeesinByPos);
-html += createDangryeongLineHTML("당령식", dangryeongList);
-html += createSectionLineHTML("지지희신", jijiHeesinByPos); // ✅ sourceList 전달 제거
-html += createSectionLineHTML("지지기신", jijiGisinByPos); // ✅ sourceList 전달 제거
+let leftCell = "";
+leftCell += createSectionLineHTML("천간기신", cheonganGisinByPos);
+leftCell += createSectionLineHTML("천간희신", cheonganHeesinByPos);
+leftCell += createDangryeongLineHTML("당령식", dangryeongList);
+leftCell += createSectionLineHTML("지지희신", jijiHeesinByPos);
+leftCell += createSectionLineHTML("지지기신", jijiGisinByPos);
 
-  container.innerHTML = html;
+// 오른쪽 표 (대운/세운 희기신)
+let rightCell = `
+<table style="border-collapse:collapse; width:100%; text-align:center; font-size:12px; line-height:1.2;">
+  <tr style="background-color:#fff8dc;">
+    <th style="border:1px solid #ccc; padding:2px 4px;">구분</th>
+    <th style="border:1px solid #ccc; padding:2px 4px;">대운</th>
+    <th style="border:1px solid #ccc; padding:2px 4px;">세운</th>
+  </tr>
+  <tr>
+    <td rowspan="2" style="border:1px solid #ccc; padding:2px 4px; background-color:#e6f0ff;">희신</td>
+    <td style="border:1px solid #ccc; padding:2px 4px;">
+      ${result.daewoon.cheonganHeesin ? formatHeeGiSinItem(result.daewoon.cheonganHeesin) : "X"}
+    </td>
+    <td style="border:1px solid #ccc; padding:2px 4px;">
+      ${result.sewoon.cheonganHeesin ? formatHeeGiSinItem(result.sewoon.cheonganHeesin) : "X"}
+    </td>
+  </tr>
+  <tr>
+    <td style="border:1px solid #ccc; padding:2px 4px;">
+      ${result.daewoon.jijiHeesin ? formatHeeGiSinItem(result.daewoon.jijiHeesin) : "X"}
+    </td>
+    <td style="border:1px solid #ccc; padding:2px 4px;">
+      ${result.sewoon.jijiHeesin ? formatHeeGiSinItem(result.sewoon.jijiHeesin) : "X"}
+    </td>
+  </tr>
+  <tr>
+    <td rowspan="2" style="border:1px solid #ccc; padding:2px 4px; background-color:#e6f0ff;">기신</td>
+    <td style="border:1px solid #ccc; padding:2px 4px;">
+      ${result.daewoon.cheonganGisin ? formatHeeGiSinItem(result.daewoon.cheonganGisin) : "X"}
+    </td>
+    <td style="border:1px solid #ccc; padding:2px 4px;">
+      ${result.sewoon.cheonganGisin ? formatHeeGiSinItem(result.sewoon.cheonganGisin) : "X"}
+    </td>
+  </tr>
+  <tr>
+    <td style="border:1px solid #ccc; padding:2px 4px;">
+      ${result.daewoon.jijiGisin ? formatHeeGiSinItem(result.daewoon.jijiGisin) : "X"}
+    </td>
+    <td style="border:1px solid #ccc; padding:2px 4px;">
+      ${result.sewoon.jijiGisin ? formatHeeGiSinItem(result.sewoon.jijiGisin) : "X"}
+    </td>
+  </tr>
+</table>
+`;
+
+
+// 전체 1행 2칸짜리 큰 표
+let html = `
+ <table style="border-collapse:collapse; width:100%; border:none;">
+    <tr>
+      <td style="vertical-align:top; padding:8px; border:none;">
+        ${leftCell}   <!-- 기존 천간/지지/당령식 -->
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align:top; padding:8px; border:none;">
+        ${rightCell}  <!-- 대운/세운 희기신 -->
+      </td>
+    </tr>
+  </table>
+`;
+
+container.innerHTML = html;
+
 }
 
 

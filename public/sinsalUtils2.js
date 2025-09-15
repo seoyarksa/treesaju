@@ -23,7 +23,7 @@ const etcSinsalList = ['천을귀인','홍염살', '낙정관살', '건록/암�
 // ////////////////////////////////////////////////////////////////////////////////////////
 // 신살 표시 구역 타입 분류
 const GAN_SINSAL   = new Set(['천을귀인', '홍염살', '낙정관살', '건록/암록/금여록','문창/학당','양인/비인',
-                              '태극귀인']);    // 필요 시 추가
+                              '태극귀인','천덕/월덕',]);    // 필요 시 추가
 const JIJI_SINSAL  = new Set(['형충회합', '원진/육해', '도화살', '귀문살', '격각살','합방/공방살','천덕/월덕',
                               '상문/조객','급각살', '천의성', '천라지망','병부살', '사부살','단교관살' ]); // 필요 시 추가
 const GANJI_SINSAL = new Set(['간여지동', '백호살', '괴강살', '효신살', '소실살', '재고귀인','공망살','음양차착살',
@@ -510,13 +510,21 @@ if (sinsalName === '격각살') {
     return hits.length ? `${jiji}[${hits[0].tags?.[0] || ''}]` : 'X';
   }
 
-  if (sinsalName === '천덕/월덕') {
-    if (!monthJiji) return 'X';
-    const rels = 천덕_월덕MAP[monthJiji] || [];
-    const hit = rels.find(r => r.target === jiji);
-    if (idx === 2 && jiji === monthJiji) return `<span style="color:red;">기준</span>`;
-    return hit ? `${hit.target}[${hit.tags?.[0] || ''}]` : 'X';
+if (sinsalName === '천덕/월덕') {
+  if (!monthJiji) return 'X';
+  const rels = 천덕_월덕MAP[monthJiji] || [];
+  const hit = rels.find(r => r.target === jiji);
+
+  // 기준 위치일 경우 → 매칭이 있으면 기준+값, 없으면 'X'
+  if (idx === 2 && jiji === monthJiji) {
+    return hit 
+      ? `<span style="color:red;">기준</span> ${hit.target}[${hit.tags?.[0] || ''}]`
+      : 'X';
   }
+
+  return hit ? `${hit.target}[${hit.tags?.[0] || ''}]` : 'X';
+}
+
 
   // 상문/조객살 (년지 기준)
   if (sinsalName === '상문/조객') {
@@ -733,13 +741,28 @@ if (sinsalName === '음양차착살') {
 const type = getSinsalType(sinsalName);
 
 // 타입과 다른 구역은 전부 빈칸으로 마스킹 (X도 숨김)
-const maskedGan   = (type === 'gan'   || type === 'mixed') ? ganResults   : ganResults.map(() => '');
-const maskedJiji  = (type === 'jiji'  || type === 'mixed') ? jijiResults  : jijiResults.map(() => '');
+const maskedGan   = (type === 'gan'   || type === 'mixed' || sinsalName === '천덕/월덕')
+                    ? ganResults
+                    : ganResults.map(() => '');
+
+const maskedJiji  = (type === 'jiji'  || type === 'mixed' || sinsalName === '천덕/월덕')
+                    ? jijiResults
+                    : jijiResults.map(() => '');
+
+
 const maskedGanji = (type === 'ganji' || (type === 'mixed' && sinsalName !== '천덕/월덕'))
                     ? ganjiResults
                     : ganjiResults.map(() => '');
 
+
 // 모두 비거나 X면 행 생략 (빈칸도 생략 판정에 포함)
+function shouldDeleteRow(cells) {
+  const texts = cells.map(v => (v || '').replace(/<[^>]+>/g, '').trim());
+  const allX = texts.every(txt => !txt || txt === 'X' || txt === '기준');
+  const hasReal = texts.some(txt => txt && txt !== 'X' && txt !== '기준');
+  return allX && !hasReal;
+}
+
 const allXGanJiji = [...maskedGan, ...maskedJiji].every(v => {
   const txt = (v || '').replace(/<[^>]+>/g, '').trim(); // 태그 제거
   return !txt || txt === 'X' || txt === '기준';
@@ -751,22 +774,21 @@ const allXGanji = maskedGanji.every(v => {
 
 // ▼ 데이터 행 (천간+지지, 간지 따로 관리)
 // ✅ 각 표별로 독립적으로 줄 삭제
-const rowGan = maskedGan.every(v => !v || v === 'X' || v === '기준') ? '' : `
+const rowGan = shouldDeleteRow(maskedGan) ? '' : `
   <tr>
     <td>${sinsalName}</td>
     ${maskedGan.map(v => `<td>${v || ''}</td>`).join('')}
   </tr>
 `;
 
-const rowJiji = maskedJiji.every(v => !v || v === 'X' || v === '기준') ? '' : `
+const rowJiji = shouldDeleteRow(maskedJiji) ? '' : `
   <tr>
     <td>${sinsalName}</td>
     ${maskedJiji.map(v => `<td>${v || ''}</td>`).join('')}
   </tr>
 `;
 
-
-const rowGanji = allXGanji ? '' : `
+const rowGanji = shouldDeleteRow(maskedGanji) ? '' : `
   <tr>
     <td style="text-align:center;">${sinsalName}</td>
     ${maskedGanji.map(v => `<td>${v || ''}</td>`).join('')}

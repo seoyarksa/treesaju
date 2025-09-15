@@ -508,7 +508,7 @@ console.log('yearStemKor:', hanToKor(ganji.year.charAt(0)));
        yearStemKor, // 👉 이 줄 추가
     ganji,
  birthYear: birthDate.getFullYear(), // ✅ 여기서 숫자 연도로 추가
-
+gender,   // ← 반드시 추가!
    // 👉 여기 추가
     jeolipDate,
       thisTerm: thisTerm ? { name: thisTerm.name, date: thisTerm.date } : null,

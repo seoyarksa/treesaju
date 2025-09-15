@@ -229,7 +229,8 @@ const nextTerm = jeolipDate.nextTerm;
       birthYear: birthDate.getFullYear(),
       jeolipDate,
       thisTerm: thisTerm ? { name: thisTerm.name, date: thisTerm.date } : null,
-      nextTerm: nextTerm ? { name: nextTerm.name, date: nextTerm.date } : null
+      nextTerm: nextTerm ? { name: nextTerm.name, date: nextTerm.date } : null,
+      gender,
     });
   } catch (e) {
     console.error('API 처리 오류:', e);

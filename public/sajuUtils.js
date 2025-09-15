@@ -84,6 +84,108 @@ export function convertHanToKorStem(han) {
   return hanToKorStem[han] || han;
 }
 
+//태과불급 2차조건들 정리////////////////////////////////////////////////////////////////
+export function checkTuchulOrBultu(dangryeong, cheongan) {
+  // 1. 사주 천간 리스트 (문자만 추출)
+  const cheonList = cheongan.map(c => c.gan);
+
+  // 2. 추가 리스트 (기본 + 모든 2글자 조합)
+  let addList = [...cheonList];
+
+  for (let i = 0; i < cheonList.length; i++) {
+    for (let j = i + 1; j < cheonList.length; j++) {
+      const pair1 = cheonList[i] + cheonList[j]; // 순방향
+      const pair2 = cheonList[j] + cheonList[i]; // 역방향
+      addList.push(pair1, pair2);
+    }
+  }
+
+  console.log("🟡 사주 천간 리스트:", cheonList, "→ 추가리스트:", addList);
+
+  // 3. 當令 규칙 가져오기
+  const rules = 특수태과불급map[dangryeong] || [];
+
+  // 4. 판정 결과
+  const results = rules.map(rule => {
+    let compareList = [];
+    if (Array.isArray(rule.원인)) {
+      compareList = rule.원인;
+    } else if (typeof rule.원인 === "string") {
+      compareList = [rule.원인];
+    }
+
+    // 모든 원인이 addList 안에 있어야 매칭됨
+    const isMatch = compareList.every(g => addList.includes(g));
+    const result = isMatch ? "투간" : "불투";
+
+    console.log(`🔍 당령=${dangryeong}, 원인=${JSON.stringify(rule.원인)} → ${result}`);
+
+    return {
+      ...rule,
+      판정: result
+    };
+  });
+
+  return results;
+}
+// 🔹 태과/불급 조건2 규칙
+//구분: 불급, 투간, 불투, 多
+//태그 기준으로 메인은 원인글자, 엑스트라는 기타 조건에 해당
+
+const conditionRules = [
+  {
+    tag: "금한수냉",
+    main: { 원인: "辛" },     // 기본 조건
+    extra: { 글자: "癸", 조건2: "투간" },     // 추가 조건
+    note: "金多水濁은 辛이 태과 + 癸가 불급일 때"
+  }
+
+
+
+  // … 필요시 계속 추가
+];
+
+// 🔹 조건 검사 함수
+function checkConditions(item, list, multiList, bulgeup, tuchulResults) {
+  for (const rule of conditionRules) {
+    if (item.tags?.includes(rule.tag)) {
+      // ① main 조건 (자기 자신)
+      if (rule.main) {
+        if (item.원인 !== rule.main.글자 || item.구분 !== rule.main.구분) {
+          return false;
+        }
+      }
+
+      // ② extra 조건 (조건2에 따라 다른 소스 확인)
+      if (rule.extra) {
+        const { 글자, 조건2 } = rule.extra;
+
+        if (조건2 === "불급" && !bulgeup.includes(글자)) {
+          console.log(`⛔ ${rule.tag}: ${글자} 불급 없음`);
+          return false;
+        }
+
+        if (조건2 === "多" && !multiList.includes(글자)) {
+          console.log(`⛔ ${rule.tag}: ${글자} 多 없음`);
+          return false;
+        }
+
+        if ((조건2 === "투간" || 조건2 === "불투") &&
+            !tuchulResults.some(r => r.글자 === 글자 && r.구분 === 조건2)) {
+          console.log(`⛔ ${rule.tag}: ${글자} ${조건2} 없음`);
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+
+
+
+
+//태과불급 2차조건들 정리 끝////////////////////////////////////////////////////////////////
 
 
 export function getCurrentDaeyunIndexFromStartAge(correctedStartAge, inputBirthDate, inputDecimalYear) {
@@ -408,7 +510,11 @@ export function isBefore(month, day, term) {
 
 // 2) 당령 구하는 함수도 추가
 
-export function getDangryeong(monthJi, daeyunAge, daYunDirection) {
+export function getDangryeong() {
+  const monthJi = window.monthJi;
+  const daeyunAge = window.daeyunAge;
+  const daYunDirection = window.daYunDirection;
+
   const d = dangryeongMap[monthJi];
   if (!d) {
     console.warn('당령을 찾을 수 없는 월지:', monthJi);
@@ -513,18 +619,28 @@ export function getDangryeongCheongans(dangryeong) {
 
 //3.희기신추출리스트
 // 1) 천간 희기신 추출 함수
-export function extractCheonganHeesinGisin(dangryeong, sajuCheonganList) {
-  const heesinMap = HEESIN_BY_DANGRYEONG_POSITION[dangryeong];
-  const gisinMap = GISIN_BY_DANGRYEONG_POSITION[dangryeong];
+export function extractCheonganHeesinGisin() {
+  const dangryeong = window.trueDangryeongChar;
+  console.group("▶ extractCheonganHeesinGisin 실행");
+  console.log("입력 dangryeong:", dangryeong);
+  console.log("전역 sajuStemList:", window.sajuStemList);
 
-  // 희신 후보: 문자별 위치 배열 저장
+  if (!dangryeong) {
+    console.warn("⚠️ 전역 trueDangryeongChar 없음");
+    return { cheonganHeesinList: [], cheonganGisinList: [] };
+  }
+
+  const heesinMap = HEESIN_BY_DANGRYEONG_POSITION[dangryeong] || {};
+  const gisinMap  = GISIN_BY_DANGRYEONG_POSITION[dangryeong] || {};
+
+  // 희신 후보
   const heesinCharPosMap = {};
   Object.entries(heesinMap).forEach(([pos, char]) => {
     if (!heesinCharPosMap[char]) heesinCharPosMap[char] = [];
     heesinCharPosMap[char].push(Number(pos));
   });
 
-  // 기신 후보: 문자별 위치 배열 저장
+  // 기신 후보
   const gisinCharPosMap = {};
   Object.entries(gisinMap).forEach(([pos, chars]) => {
     chars.forEach(char => {
@@ -533,21 +649,27 @@ export function extractCheonganHeesinGisin(dangryeong, sajuCheonganList) {
     });
   });
 
-  // 사주 천간에 포함된 희신만 추출
+  // 사주 천간에 포함된 희신
   const cheonganHeesinList = Object.entries(heesinCharPosMap)
-    .filter(([char]) => sajuCheonganList.includes(char))
+    .filter(([char]) => window.sajuStemList.some(x => x.value === char))
     .map(([char, posArr]) => ({ char, pos: posArr }));
 
-  // 사주 천간에 포함된 기신만 추출
+  // 사주 천간에 포함된 기신
   const rawGisinList = Object.entries(gisinCharPosMap)
-    .filter(([char]) => sajuCheonganList.includes(char))
+    .filter(([char]) => window.sajuStemList.some(x => x.value === char))
     .map(([char, posArr]) => ({ char, pos: posArr }));
 
-  // 희신 문자 집합
+  // 희신 문자 제거
   const heesinChars = new Set(cheonganHeesinList.map(h => h.char));
-
-  // 기신 리스트에서 희신 문자 제거
   const cheonganGisinList = rawGisinList.filter(({ char }) => !heesinChars.has(char));
+
+  console.log("최종 cheonganHeesinList:", cheonganHeesinList);
+  console.log("최종 cheonganGisinList:", cheonganGisinList);
+  console.groupEnd();
+
+  // ✅ 전역에 등록
+  window.cheonganHeesinList = cheonganHeesinList;
+  window.cheonganGisinList = cheonganGisinList;
 
   return {
     cheonganHeesinList,
@@ -558,7 +680,13 @@ export function extractCheonganHeesinGisin(dangryeong, sajuCheonganList) {
 
 
 
-export function extractJijiSibgansWithMiddleInfo(sajuJijiArray) {
+
+
+export function extractJijiSibgansWithMiddleInfo() {
+  const sajuJijiArray = window.sajuJijiArray;
+  if (!Array.isArray(sajuJijiArray)) {
+    throw new Error("sajuJijiArray는 배열이어야 합니다.");
+  }
   //console.log('[DEBUG] extractJijiSibgansWithMiddleInfo 호출됨, 입력값:', sajuJijiArray);
   const sibganList = [];
 
@@ -588,14 +716,14 @@ export function extractJijiSibgansWithMiddleInfo(sajuJijiArray) {
 
 
 //사주지지천간리스트 뽑기
-export function extractJijiHeesinGisin(dangryeong, sajuJijiArray) {
-  const heesinMap = HEESIN_BY_DANGRYEONG_POSITION[dangryeong] || {};
-  const gisinMap = GISIN_BY_DANGRYEONG_POSITION[dangryeong] || {};
-
+export function extractJijiHeesinGisin(dangryeong) {
+  const sajuJijiArray = window.sajuJijiArray;
   if (!Array.isArray(sajuJijiArray)) {
-    //console.error('[ERROR] sajuJijiArray가 유효하지 않음:', sajuJijiArray);
-    throw new Error('sajuJijiArray는 배열이어야 합니다.');
+    throw new Error("sajuJijiArray는 배열이어야 합니다.");
   }
+
+  const heesinMap = HEESIN_BY_DANGRYEONG_POSITION[dangryeong] || {};
+  const gisinMap  = GISIN_BY_DANGRYEONG_POSITION[dangryeong] || {};
 
   const flatSibganList = extractJijiSibgansWithMiddleInfo(sajuJijiArray);
 
@@ -635,6 +763,10 @@ export function extractJijiHeesinGisin(dangryeong, sajuJijiArray) {
     });
   });
 
+  // ✅ 전역 등록
+  window.jijiHeesinList = jijiHeesinList;
+  window.jijiGisinList  = jijiGisinList;
+
   return {
     jijiHeesinList,
     jijiGisinList
@@ -646,7 +778,14 @@ export function extractJijiHeesinGisin(dangryeong, sajuJijiArray) {
 
 /////조후용신파트//////////////////////
 
-export function extractSajuGanList(saju) {
+export function extractSajuGanList() {
+  const saju = window.saju;
+
+  if (!saju) {
+    console.warn("⚠️ window.saju 가 아직 준비되지 않았습니다.");
+    return null;
+  }
+
   const { yearGan, monthGan, dayGan, hourGan, yearBranch, monthBranch, dayBranch, hourBranch } = saju;
 
   console.log("🟢 extractSajuGanList called with saju:", saju);
@@ -715,14 +854,24 @@ const dangryeongToMonth = {
 };
 
 // ✅ 최종 후보군 구하는 함수
-function getJohuList(monthBranch, tags = [], dangryeong = null) {
-  let tagList = Array.isArray(tags) ? tags : [tags];
+// ✅ 최종 후보군 구하는 함수 (전역 기반)
+function getJohuList() {
+  const saju = window.saju;
+  if (!saju) {
+    console.warn("⚠️ window.saju 가 아직 준비되지 않았습니다.");
+    return "";
+  }
+
+  const monthBranch = saju.monthBranch;
+  let tagList = Array.isArray(saju.johuTags) ? saju.johuTags : [saju.johuTags];
+  const dangryeong = saju.dangryeong;
 
   // 四孟月 → 당령과 월지가 일치하면 당령 태그도 추가
   if (dangryeong && dangryeongToMonth[dangryeong] === monthBranch) {
     tagList = [...new Set([...tagList, dangryeong])];
   }
 
+  // 보정맵 우선 적용
   if (johuAdjustMap2[monthBranch]) {
     for (const tag of tagList) {
       if (johuAdjustMap2[monthBranch][tag]) {
@@ -730,104 +879,108 @@ function getJohuList(monthBranch, tags = [], dangryeong = null) {
       }
     }
   }
+
+  // 기본 맵 적용
   return johuMap[monthBranch] || "";
 }
 
 
-/// 조후용신 나열
-export function renderJohuCell(saju) {
-  console.log("✅ renderJohuCell 함수 로드됨");
 
-  console.log("🟢 renderJohuCell 시작 시점 saju:", saju);
-  console.log("🟢 renderJohuCell johuTags:", saju.johuTags);
-    // 🔍 추가 디버깅 로그
-  console.log("🟢 renderJohuCell saju.johuTags (직접접근):", saju.johuTags);
-  console.log("🟢 renderJohuCell typeof:", typeof saju.johuTags, "isArray?", Array.isArray(saju.johuTags));
-  console.log("🟢 renderJohuCell JSON:", JSON.stringify(saju.johuTags));
+
+
+
+/// 조후용신 나열
+export function renderJohuCell() {
+  console.group("🟢 renderJohuCell 실행");
+
+  const saju = window.saju;
+  const daewoonSewoonStemList    = window.daewoonSewoonStemList || [];
+  const daewoonSewoonBranchList1 = window.daewoonSewoonBranchList1 || [];
+
+  console.log("▶ saju:", saju);
+  console.log("▶ 선택된 대운:", window.selectedDaewoon);
+  console.log("▶ 선택된 세운:", window.selectedSewoon);
+  console.log("▶ daewoonSewoonStemList:", daewoonSewoonStemList);
+  console.log("▶ daewoonSewoonBranchList1:", daewoonSewoonBranchList1);
 
   const ganList = extractSajuGanList(saju);
+  console.log("▶ 추출된 ganList:", ganList);
+
   // ✅ 적용타입 계산:조화판단
   const applyType = getJohuApplyType(saju);
-  console.log("조후용신 적용 타입:", applyType);
-// 1행: 천간 나열
-const rowTop = `<tr><td colspan="9" style="text-align:left; padding:4px; background:#FFDDDD;">` 
-  + `사주(천간): ` 
-  + formatGanList(ganList, "天")   // (中) 표시는 그대로 유지
-  + `</td></tr>`;
+  console.log("▶ 조후용신 적용 타입:", applyType);
 
-// 2행: 지지 나열
-const rowMiddle = `<tr><td colspan="9" style="text-align:left; padding:4px; background:#FFDDDD;">`
-  + `사주(지지): `
-  + formatGanList(ganList, "地")   // (中) 표시는 그대로 유지
-  + `</td></tr>`;
+  // 1행: 천간 나열
+  const rowTop = `<tr><td colspan="9" style="text-align:left; padding:4px; background:#FFDDDD;">` 
+    + `사주(천간): ` 
+    + formatGanList(ganList, "天")
+    + `</td></tr>`;
 
-// ✅ 조후 후보군 구하기 (특수월 보정 반영)
-let johuStr = "";
+  // 2행: 지지 나열
+  const rowMiddle = `<tr><td colspan="9" style="text-align:left; padding:4px; background:#FFDDDD;">`
+    + `사주(지지): `
+    + formatGanList(ganList, "地")
+    + `</td></tr>`;
 
-// 태그 준비 (필요시 당령 병합)
-let tagList = Array.isArray(saju.johuTags) ? [...saju.johuTags] : [];
-const dangryeongToMonth = { "甲": "寅", "庚": "申", "丙": "巳", "壬": "亥" };
-if (saju.dangryeong && dangryeongToMonth[saju.dangryeong] === saju.monthBranch) {
-  tagList = [...new Set([...tagList, saju.dangryeong])];
-}
+  // ✅ 조후 후보군 구하기 (특수월 보정 반영)
+  let johuStr = "";
+  let tagList = Array.isArray(saju.johuTags) ? [...saju.johuTags] : [];
+  const dangryeongToMonth = { "甲": "寅", "庚": "申", "丙": "巳", "壬": "亥" };
+  if (saju.dangryeong && dangryeongToMonth[saju.dangryeong] === saju.monthBranch) {
+    tagList = [...new Set([...tagList, saju.dangryeong])];
+  }
 
-// 🔎 기본 로그
-console.log("📌 조후태그 감지됨:", tagList);
-console.log("📌 월지:", saju.monthBranch, "보정맵:", johuAdjustMap2[saju.monthBranch]);
+  console.log("📌 조후태그 감지됨:", tagList);
+  console.log("📌 월지:", saju.monthBranch, "보정맵:", johuAdjustMap2[saju.monthBranch]);
 
-// ✅ 사/해월 예외: 태그 2개 이상이고, (금한수냉 | 목다화치) 포함 시 → 기본맵 강제
-const conflictTags = ["금한수냉(金寒水冷)", "목다화치(木多火熾)"];
-const isSaHae = (saju.monthBranch === "巳" || saju.monthBranch === "亥");
-const multiTags = tagList.length >= 2;
-const hasConflict = tagList.some(t => conflictTags.includes(t));
+  const conflictTags = ["금한수냉(金寒水冷)", "목다화치(木多火熾)"];
+  const isSaHae = (saju.monthBranch === "巳" || saju.monthBranch === "亥");
+  const multiTags = tagList.length >= 2;
+  const hasConflict = tagList.some(t => conflictTags.includes(t));
 
-if (isSaHae && multiTags && hasConflict) {
-  console.log("🟡 사/해월 + 다중 태그 + (금한수냉|목다화치) → 기본 조후맵 예외 적용");
-  johuStr = johuMap[saju.monthBranch] || "";
-} else {
-  // ✅ 조후태그가 있으면 보정맵 우선 적용
-  if (tagList.length > 0) {
-    const adjustMap = johuAdjustMap2[saju.monthBranch];
-    console.log("📌 보정맵 keys:", adjustMap ? Object.keys(adjustMap) : []);
-    if (adjustMap) {
-      for (const tag of tagList) {
-        console.log("🔍 보정 태그 검사:", tag);
-        if (adjustMap[tag]) {
-          johuStr = adjustMap[tag];
-          console.log("✅ 보정 적용됨:", tag, "→", johuStr);
-          break;
+  if (isSaHae && multiTags && hasConflict) {
+    console.log("🟡 사/해월 + 다중 태그 + (금한수냉|목다화치) → 기본 조후맵 예외 적용");
+    johuStr = johuMap[saju.monthBranch] || "";
+  } else {
+    if (tagList.length > 0) {
+      const adjustMap = johuAdjustMap2[saju.monthBranch];
+      console.log("📌 보정맵 keys:", adjustMap ? Object.keys(adjustMap) : []);
+      if (adjustMap) {
+        for (const tag of tagList) {
+          console.log("🔍 보정 태그 검사:", tag);
+          if (adjustMap[tag]) {
+            johuStr = adjustMap[tag];
+            console.log("✅ 보정 적용됨:", tag, "→", johuStr);
+            break;
+          }
         }
       }
     }
+    if (!johuStr) {
+      johuStr = johuMap[saju.monthBranch] || "";
+      console.log("⚠️ 보정 없음, 기본 맵 적용:", johuStr);
+    }
   }
 
-  // ✅ 태그 없거나 매칭 실패 → 기본 맵 사용
-  if (!johuStr) {
-    johuStr = johuMap[saju.monthBranch] || "";
-    console.log("⚠️ 보정 없음, 기본 맵 적용:", johuStr);
-  }
-}
-
-  // 3·4행: 조후용신 (9칸 구조)
   const johuChars = johuStr.split("");
   const allGans = ganList.map(m => m.gan);
-
-  // 원국 천간 + 지지 (지장간 제외)
   const baseGans = [
     saju.yearGan, saju.monthGan, saju.dayGan, saju.hourGan,
     saju.yearBranch, saju.monthBranch, saju.dayBranch, saju.hourBranch
   ];
+  console.log("🟢 baseGans 초기(원국):", baseGans);
+
+  // --- 이하 행(row) 구성은 원본 그대로 ---
 
 // 기준 행
 const johuRow1 = `
   <tr>
-    <td rowspan="2" 
+    <td rowspan="3" 
     style="background-color:#e6f0ff;
-           width:80px;   /* 가로폭 늘리기 */
-           min-width:80px;
            text-align:center;
-           vertical-align:middle;">
-             조후용신<br>[적용:<span style="color:blue;">${applyType}</span>]</td>
+           vertical-align:middle;
+           white-space:nowrap;">
+             조후<br>용신<br>[<span style="color:blue;">${applyType}</span>]</td>
     <td style="background-color:#fff8dc;">기준</td>
     ${johuChars.map((ch, i) => {
       const desc = johuMeaning[i] || "";
@@ -838,57 +991,97 @@ const johuRow1 = `
 `;
 
 // 보유 행
+// 2행: 보유(원국)
 const johuRow2 = `
   <tr>
-    <td>보유</td>
+    <td>원국</td>
     ${johuChars.map((ch, i) => {
-      if (!ch) {
-        // 값이 없으면 X 출력
+      if (!ch) return `<td style="color:red">X</td>`;
+      const desc = johuMeaning[i] || "";
+      const isOwned = baseGans.includes(ch); // 원국만 검사
+      return isOwned
+        ? `<td><span class="tooltip" data-desc="${desc}" style="color:blue">${ch}</span></td>`
+        : `<td style="color:red">X</td>`;
+    }).join("")}
+  </tr>
+`;
+
+// 3행: 보유(대운·세운)
+const johuRow3 = `
+  <tr>
+    <td>運</td>
+    ${johuChars.map((ch, i) => {
+      if (!ch) return `<td style="color:red">X</td>`;
+      const desc = johuMeaning[i] || "";
+
+      const daewoon = window.selectedDaewoon;
+      const sewoon  = window.selectedSewoon;
+
+      const lists = [];
+      if (daewoon?.stem)   lists.push({ type: "daewoon", value: daewoon.stem });
+      if (daewoon?.branch) lists.push({ type: "daewoon", value: daewoon.branch });
+      if (sewoon?.stem)    lists.push({ type: "sewoon", value: sewoon.stem });
+      if (sewoon?.branch)  lists.push({ type: "sewoon", value: sewoon.branch });
+
+      const matches = lists.filter(item => item.value === ch);
+      if (matches.length > 0) {
+        const marker = matches.map(m =>
+          m.type === "daewoon" ? "(大)" :
+          m.type === "sewoon"  ? "(世)" : ""
+        ).join("");
+        return `<td><span class="tooltip" data-desc="${desc}" style="color:blue">${ch}${marker}</span></td>`;
+      } else {
         return `<td style="color:red">X</td>`;
       }
-      const isOwned = baseGans.includes(ch);   // 천간+지지에서만 검사
-      const desc = johuMeaning[i] || "";
-      return isOwned 
-        ? `<td><span class="tooltip" data-desc="${desc}" style="color:red">${ch}</span></td>`
-        : `<td style="color:red">X</td>`;  // 값은 있으나 보유 X
     }).join("")}
   </tr>
 `;
 
 
-  return `
-    <table 
-  style="border-collapse:collapse;
-         width:100%;
-         text-align:center;
-         table-layout:fixed;
-         word-wrap:break-word;
-         word-break:break-all;"
-  border="1">
-  <colgroup>
-    <col style="width:100px;">   <!-- 첫 번째 열 고정 -->
-    <col style="width:60px;">    <!-- 2열: 150px 고정 -->
-    <col style="width:auto;">    <!-- 나머지는 자동 -->
-  </colgroup>
+
+  const html = `
+    <table style="...">
+      <colgroup>
+        <col style="width:50px;">
+        <col style="width:60px;">
+        <col style="width:auto;">
+      </colgroup>
       ${rowTop}
       ${rowMiddle}
       ${johuRow1}
       ${johuRow2}
+      ${johuRow3}
     </table>
-    <div style="font-size:14px;margin-top:6px;">* 표의 조후글자(간지)를 마우스 오버(또는 클릭시) 간단한 설명을 볼 수 있습니다. </div>
+    <div style="font-size:14px;margin-top:6px;">
+      * 표의 조후글자(간지)를 마우스 오버(또는 클릭시) 간단한 설명을 볼 수 있습니다.
+    </div>
   `;
+
+  console.log("▶ renderJohuCell 최종 HTML 길이:", html.length);
+  console.groupEnd();
+  return html;
 }
 
+/// 조화확인
+export function getJohuApplyType() {
+  console.group("🟢 getJohuApplyType 실행");
 
+  const saju = window.saju;
+  if (!saju) {
+    console.warn("⚠️ window.saju 가 아직 준비되지 않았습니다.");
+    console.groupEnd();
+    return "無";
+  }
 
-///조화확인
-export function getJohuApplyType(saju) {
   const { monthBranch, yearGan, monthGan, dayGan, hourGan,
           yearBranch, dayBranch, hourBranch } = saju;
+  console.log("▶ monthBranch:", monthBranch);
 
-  if (!monthBranch) return "無";
+  if (!monthBranch) {
+    console.groupEnd();
+    return "無";
+  }
 
-  // 월지 그룹별 목표 천간
   const targetMap = {
     "亥子丑": "辛",
     "寅卯辰": "癸",
@@ -903,34 +1096,47 @@ export function getJohuApplyType(saju) {
       break;
     }
   }
-  if (!target) return "無";
+  console.log("▶ 목표 천간 target:", target);
+  if (!target) {
+    console.groupEnd();
+    return "無";
+  }
 
-  // 1) 천간 확인 (년,월,일,시)
   const cheongan = [yearGan, monthGan, dayGan, hourGan];
-  if (cheongan.includes(target)) return "양";
+  if (cheongan.includes(target)) {
+    console.log("✅ 천간에서 발견됨:", target);
+    console.groupEnd();
+    return "+";
+  }
 
-  // 2) 지지(중기 제외) → 지장간 펼치기
   const branches = [yearBranch, monthBranch, dayBranch, hourBranch];
   for (const br of branches) {
     const sibganList = jijiToSibganMap[br] || [];
     const found = sibganList.find(obj => obj.char === target && !obj.isMiddle);
-    if (found) return "중";
-  }
-// 2-1) 삼합 보정 체크
-
-for (const br of branches) {
-  const key = `${monthBranch}-${br}`;
-  if (SAMHAP_SUPPORT[key]) {
-    const targetFromSamhap = SAMHAP_SUPPORT[key];
-    if (targetFromSamhap === target) {
-      console.log("🟢 삼합 보정으로 양 판정:", key, "=>", targetFromSamhap);
-      return "양";
+    if (found) {
+      console.log("✅ 지지(지장간)에서 발견됨:", br, found);
+      console.groupEnd();
+      return "중";
     }
   }
+
+  for (const br of branches) {
+    const key = `${monthBranch}-${br}`;
+    if (SAMHAP_SUPPORT[key]) {
+      const targetFromSamhap = SAMHAP_SUPPORT[key];
+      if (targetFromSamhap === target) {
+        console.log("🟢 삼합 보정으로 양 판정:", key, "=>", targetFromSamhap);
+        console.groupEnd();
+        return "양";
+      }
+    }
+  }
+
+  console.log("❌ 발견 안 됨 → 음");
+  console.groupEnd();
+  return "-";
 }
-  // 3) 없으면 음
-  return "음";
-}
+
 
 
 
@@ -1272,49 +1478,7 @@ const multiListCheck = multiInfo.map(m => m.글자);   // ← 이름 변경
 //   .map(r => r.원인);
 
 // 투간/불투 판정 함수 (當令 기준)
-function checkTuchulOrBultu(dangryeong, cheongan) {
-  // 1. 사주 천간 리스트 (문자만 추출)
-  const cheonList = cheongan.map(c => c.gan);
 
-  // 2. 추가 리스트 (기본 + 모든 2글자 조합)
-  let addList = [...cheonList];
-
-  for (let i = 0; i < cheonList.length; i++) {
-    for (let j = i + 1; j < cheonList.length; j++) {
-      const pair1 = cheonList[i] + cheonList[j]; // 순방향
-      const pair2 = cheonList[j] + cheonList[i]; // 역방향
-      addList.push(pair1, pair2);
-    }
-  }
-
-  console.log("🟡 사주 천간 리스트:", cheonList, "→ 추가리스트:", addList);
-
-  // 3. 當令 규칙 가져오기
-  const rules = 특수태과불급map[dangryeong] || [];
-
-  // 4. 판정 결과
-  const results = rules.map(rule => {
-    let compareList = [];
-    if (Array.isArray(rule.원인)) {
-      compareList = rule.원인;
-    } else if (typeof rule.원인 === "string") {
-      compareList = [rule.원인];
-    }
-
-    // 모든 원인이 addList 안에 있어야 매칭됨
-    const isMatch = compareList.every(g => addList.includes(g));
-    const result = isMatch ? "투간" : "불투";
-
-    console.log(`🔍 당령=${dangryeong}, 원인=${JSON.stringify(rule.원인)} → ${result}`);
-
-    return {
-      ...rule,
-      판정: result
-    };
-  });
-
-  return results;
-}
 
 
 
@@ -1862,7 +2026,7 @@ const combinedCount = combinedElements.reduce((acc, el) => {
 console.log("📊 합산 오행 카운트:", combinedCount);
 
 // 5) 火·水 多 판정
-["火", "水"].forEach(el => {
+["火", "水", "金", "木"].forEach(el =>  {
   const cnt = combinedCount[el] || 0;
 
   if (cnt >= 4) {
@@ -1945,7 +2109,28 @@ export function renderTaegwaBulgeupList(result, saju, ganList, countMap) {
   }
 
   // 3) ✅ 여기서부터는 list가 배열이라고 가정하고 공통 처리
-  if (!Array.isArray(list)) list = [list];
+if (!Array.isArray(list)) list = [list];
+
+// 🔹 multiList / bulgeup 준비, 추가 조건2 리스트 준비
+const multiList = Array.from(
+  new Set([...(result.multi ? result.multi.map(m => m.글자) : [])])
+);
+const bulgeup = result.simple?.불급 || [];
+
+// 🔹 투간/불투 결과 계산 (여기서 checkTuchulOrBultu 사용)
+const tuchulResults = [];
+for (const gan of ganList) {
+  const status = checkTuchulOrBultu(saju.dangryeong, [gan]); // ← 배열로 감싸기
+  if (status) {
+    tuchulResults.push({ 글자: gan, 구분: status });
+  }
+}
+
+// 🔹 조건 필터링
+list = list.filter(item =>
+  checkConditions(item, list, multiList, bulgeup, tuchulResults)
+);
+
 
   // 중복 제거
   const seen = new Set();
@@ -2050,6 +2235,10 @@ export function renderTaegwaBulgeupList(result, saju, ganList, countMap) {
     tableHTML = `당령관련 태과불급: 해당사항 없음`;
   }
 
+
+
+
+
   // simpleMap 나열식 (있을 때만)
   let simpleHTML = "";
   if (simpleMap && Object.keys(simpleMap).length > 0) {
@@ -2132,83 +2321,82 @@ console.log("📌 필터링 후:", originFromDetail);
 //사주정보류////////
 
 
-export function makeSajuInfoTable(jijiList, ganList2) {
-  if (!Array.isArray(jijiList) || jijiList.length < 4) {
+// --- 사주 정보 테이블 생성 ---
+export function makeSajuInfoTable() {
+  if (!Array.isArray(window.allBranchList1) || window.allBranchList1.length < 4) {
     return "<tr><td colspan='7'>⚠ 지지/천간 정보 없음</td></tr>";
   }
 
-  const monthBranch = jijiList[1]; // 월지
-  const result = extractSajuRelations(monthBranch, jijiList);
+  console.group("▶ makeSajuInfoTable 실행");
+  console.log("초기 allBranchList1:", window.allBranchList1);
+  console.log("초기 allStemList:", window.allStemList);
 
-  // 월지 + 값 같이 출력
-  // 월지 + 값 같이 출력 (없으면 X만 출력)
-const withMonth = (val) => {
-  return val ? `${monthBranch}(${val})` : "<span style='color:red;'>X</span>";
-};
+  const monthBranch = window.allBranchList1[1]?.value; // 월지 (value 사용)
 
-// 🔹 천간합 계산
+  // --- 🔹 지지 관계 계산 ---
+  const result = extractSajuRelations(monthBranch, window.allBranchList1, {
+    daewoon: window.selectedDaewoon,
+    sewoon: window.selectedSewoon
+  });
+
+  // --- 🔹 천간합 계산 ---
+// --- 🔹 천간합 계산 ---
 let ganhapResult = [];
-if (Array.isArray(ganList2) && ganList2.length > 0) {
+for (let i = 0; i < window.allStemList.length; i++) {
+  for (let j = i + 1; j < window.allStemList.length; j++) {
+    const aObj = window.allStemList[i];
+    const bObj = window.allStemList[j];
+    const a = aObj?.value || "";
+    const b = bObj?.value || "";
 
-  for (let i = 0; i < ganList2.length; i++) {
-    for (let j = i + 1; j < ganList2.length; j++) {
-      const a = ganList2[i];
-      const b = ganList2[j];
+    if (!a || !b) continue;
 
-      console.log(`🔎 비교: ${a}+${b}`);
+    let aLabel = a;
+    let bLabel = b;
 
-      if (간합MAP[a] === b) {
-        console.log(`✅ ${a}+${b} → 합`);
-        ganhapResult.push(`${a}${b}`);   // ← 글자만
-      } else if (간합MAP[b] === a) {
-        console.log(`✅ ${b}+${a} → 합`);
-        ganhapResult.push(`${b}${a}`);   // ← 글자만
-      }
+    if (aObj?.type === "daewoon") aLabel += "(대운)";
+    if (aObj?.type === "sewoon") aLabel += "(세운)";
+    if (bObj?.type === "daewoon") bLabel += "(대운)";
+    if (bObj?.type === "sewoon") bLabel += "(세운)";
+
+    if (간합MAP[a] === b) {
+      ganhapResult.push(`${aLabel}${bLabel}`);
+    } else if (간합MAP[b] === a) {
+      ganhapResult.push(`${bLabel}${aLabel}`);
     }
   }
-} else {
-  console.warn("⚠ ganList2비어있음:", ganList2);
 }
 
-const ganhapStr = ganhapResult.length 
-  ? ganhapResult.join(", ") 
-  : "<span style='color:red;'>X</span>";
 
+  const ganhapStr = ganhapResult.length
+    ? [...new Set(ganhapResult)].join(", ")
+    : "<span style='color:red;'>X</span>";
 
-
-console.log("👉 jijiList:", jijiList);
-console.log("👉 ganList2:", ganList2);
-console.log("👉 월지:", monthBranch);
-console.log("👉 지지 관계 결과:", result);
-console.log("👉 천간합 결과:", ganhapStr);
-
+  console.log("👉 월지:", monthBranch);
+  console.log("👉 지지 관계 결과:", result);
+  console.log("👉 천간합 결과:", ganhapStr);
+  console.groupEnd();
 
   return `
-    <table 
-      style="border-collapse:collapse; 
-             width:100%; 
-             text-align:center; 
-             font-size:12px;"
-      border="1">
+    <table style="border-collapse:collapse;width:100%;text-align:center;font-size:12px;" border="1">
       <tbody>
-          <tr style="background-color:#e6f7ff;">
-          <td style="border:1px solid #ccc; padding:2px; line-height:1.2;">육합</td>
-          <td style="border:1px solid #ccc; padding:2px; line-height:1.2;">삼합</td>
-          <td style="border:1px solid #ccc; padding:2px; line-height:1.2;">방합</td>
-          <td style="border:1px solid #ccc; padding:2px; line-height:1.2;">배열</td>
-          <td style="border:1px solid #ccc; padding:2px; line-height:1.2;">충</td>
-          <td style="border:1px solid #ccc; padding:2px; line-height:1.2;">형</td>
-          <td style="border:1px solid #ccc; padding:2px; line-height:1.2;">간합</td>
+        <tr style="background-color:#e6f7ff;">
+          <td>육합</td>
+          <td>삼합</td>
+          <td>방합</td>
+          <td>배열</td>
+          <td>충</td>
+          <td>형</td>
+          <td>간합</td>
         </tr>
-
         <tr>
-          <td style="padding:2px;"><span style='color:blue;'>${withMonth(result.육합)}</span></td>
-          <td style="padding:2px;"><span style='color:blue;'>${withMonth(result.삼합)}</span></td>
-          <td style="padding:2px;"><span style='color:blue;'>${withMonth(result.방합)}</span></td>
-          <td style="padding:2px;"><span style='color:blue;'>${withMonth(result.배열)}</span></td>
-          <td style="padding:2px;"><span style='color:blue;'>${withMonth(result.충)}</span></td>
-          <td style="padding:2px;"><span style='color:blue;'>${withMonth(result.형)}</span></td>
-          <td style="padding:2px;"><span style='color:blue;'>${ganhapStr}</span></td>
+          <td>${result.육합 || "<span style='color:red;'>X</span>"}</td>
+          <td>${result.삼합 || "<span style='color:red;'>X</span>"}</td>
+          <td>${result.방합 || "<span style='color:red;'>X</span>"}</td>
+          <td>${result.배열 || "<span style='color:red;'>X</span>"}</td>
+          <td>${result.충   || "<span style='color:red;'>X</span>"}</td>
+          <td>${result.형   || "<span style='color:red;'>X</span>"}</td>
+          <td>${ganhapStr}</td>
         </tr>
       </tbody>
     </table>
@@ -2216,49 +2404,47 @@ console.log("👉 천간합 결과:", ganhapStr);
 }
 
 
-function extractSajuRelations(monthBranch, jijiList, ganList2) {
-
+// --- 지지 관계 추출 함수 ---
+function extractSajuRelations(monthBranch, jijiList, { daewoon, sewoon } = {}) {
   const relations = 형충회합Map[monthBranch] || [];
+  const result = { 육합: [], 삼합: [], 방합: [], 배열: [], 충: [], 형: [], 간합: [] };
 
-  // 결과 틀
-  const result = {
-    육합: [],
-    삼합: [],
-    방합: [],
-    배열: [],
-    충: [],
-    형: [],
-    간합: []
-  };
+  console.group("▶ extractSajuRelations 실행");
+  console.log("월지:", monthBranch, "입력 jijiList:", jijiList);
 
-for (const { target, tags } of relations) {
-  if (!jijiList.includes(target)) continue;
+  for (const { target, tags } of relations) {
+    const matchedList = jijiList.filter(x => x?.value === target);
+    if (matchedList.length === 0) continue;
 
-  // tags가 배열인지 문자열인지에 따라 나눔
-  let tagList = [];
-  if (Array.isArray(tags)) {
-    // ["육합/방합/배열"] 또는 ["육합","방합"] 가능
-    tags.forEach(t => {
-      tagList.push(...t.split('/')); 
-    });
-  } else if (typeof tags === "string") {
-    tagList = tags.split('/');
-  }
+    let tagList = Array.isArray(tags) ? tags.flatMap(t => t.split('/')) : tags.split('/');
 
-  for (const tag of tagList) {
-    if (result[tag] !== undefined) {
-      result[tag].push(target);
+    for (const tag of tagList) {
+      if (result[tag] !== undefined) {
+        matchedList.forEach(matched => {
+          let decorated = matched.value;
+
+          // 🔹 type에 따라 꼬리표 부여
+          if (matched.type === "daewoon") decorated += "(대운)";
+          if (matched.type === "sewoon") decorated += "(세운)";
+
+          if (matched.value !== monthBranch) decorated = monthBranch + decorated;
+
+          console.log(`✅ ${tag} 추가됨:`, decorated, "(type:", matched.type, ")");
+          result[tag].push(decorated);
+        });
+      }
     }
   }
-}
 
-
-  // 값들을 문자열로 정리 (없으면 빈칸)
   Object.keys(result).forEach(key => {
-    result[key] = result[key].length ? result[key].join(' ') : '';
+    result[key] = result[key].length > 0 ? [...new Set(result[key])].join(", ") : "";
   });
+
+  console.log("👉 최종 결과:", result);
+  console.groupEnd();
 
   return result;
 }
+
 
 

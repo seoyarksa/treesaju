@@ -25,7 +25,7 @@ import {
   간합MAP, 
   SAMHAP_SUPPORT,
   GYEOKGUK_TYPES,
-  jijiToSibganMap2,
+  jijiToSibganMap2,jijiToSibganMap3,
   HEESIN_GISIN_COMBINED, 
   HEESIN_BY_DANGRYEONG_POSITION, 
   GISIN_BY_DANGRYEONG_POSITION, 
@@ -88,7 +88,8 @@ import {
   renderTodaySajuBox,
   createDangryeongTableHtml,
   renderDangryeongHeesinGisin,
-  arrangeByPosition, renderBasicDaeyunTable, handleBasicDaeyunClick
+  arrangeByPosition, renderBasicDaeyunTable, handleBasicDaeyunClick,basicSewoonClick, 
+  highlightInitialDaeyun, highlightInitialSewoon
 } from './renderUtils.js';
 
 import {
@@ -137,6 +138,199 @@ window.handleDaeyunClick = handleDaeyunClick;
 window.handleSewoonClick = handleSewoonClick;
 // ✅ 전역에 노출
 window.handleBasicDaeyunClick = handleBasicDaeyunClick;
+window.basicSewoonClick = basicSewoonClick;
+// app.js 최상단
+window.selectedDaewoon = {
+  type: "daewoon",
+  stem: null,     // 천간
+  sibshin: null,  // 십신
+  branch: null    // 지지
+};
+
+window.selectedSewoon = {
+  type: "sewoon",
+  year: null,
+  stem: null,
+  sibshin: null,
+  branch: null
+};
+
+console.log("▶ 전역 초기화:", {
+  selectedDaewoon: window.selectedDaewoon,
+  selectedSewoon: window.selectedSewoon
+});
+
+async function initDaewoonSewoon() {
+  highlightInitialDaeyun();
+  highlightInitialSewoon();
+  console.log("▶ 전역 초기화 완료:", {
+    daewoon: window.selectedDaewoon,
+    sewoon: window.selectedSewoon
+  });
+}
+
+
+//사주+대운+세운 간, 지 리스트 모음
+// 사주+대운+세운 간, 지 리스트 모음
+export function getAllCompareLists(saju) {
+  if (!saju) {
+    console.warn("⚠️ saju 객체가 없습니다:", saju);
+    const empty = { 
+      allStemList: [], allBranchList1: [], allBranchList2: [], allGanjiList: [],
+      daewoonSewoonStemList: [], daewoonSewoonBranchList1: [], daewoonSewoonBranchList2: [],
+      sajuStemList: [], sajuBranchList1: [], sajuBranchList2: []
+    };
+    Object.assign(window, empty); // 전역 등록
+    return empty;
+  }
+
+  // 1. 배열로 변환
+  const chunganArr = [saju.yearGan, saju.monthGan, saju.dayGan, saju.hourGan];
+  const jijiArr    = [saju.yearBranch, saju.monthBranch, saju.dayBranch, saju.hourBranch];
+
+  // --- (추가) 사주 전용 리스트 (사주만 별도 추출)
+  const sajuStemList = chunganArr.map(x => ({ type: "saju", value: x }));
+  const sajuBranchList1 = jijiArr.map(x => ({ type: "saju", value: x }));
+  const sajuBranchList2 = [];
+  sajuBranchList1.forEach(item => {
+    const sibgans = jijiToSibganMap3[item.value] || [];
+    sibgans.forEach(sib => {
+      sajuBranchList2.push({
+        type: "saju",
+        value: sib,
+        isMiddle: false
+      });
+    });
+  });
+
+  // --- 2. 천간 리스트 (사주+대운+세운)
+  const allStemList = [
+    ...sajuStemList
+  ];
+  if (window.selectedDaewoon?.stem) {
+    allStemList.push({ type: "daewoon", value: window.selectedDaewoon.stem });
+  }
+  if (window.selectedSewoon?.stem) {
+    allStemList.push({ type: "sewoon", value: window.selectedSewoon.stem });
+  }
+
+  // --- 3. 지지 리스트 (사주+대운+세운)
+  const allBranchList1 = [
+    ...sajuBranchList1
+  ];
+  if (window.selectedDaewoon?.branch) {
+    allBranchList1.push({ type: "daewoon", value: window.selectedDaewoon.branch });
+  }
+  if (window.selectedSewoon?.branch) {
+    allBranchList1.push({ type: "sewoon", value: window.selectedSewoon.branch });
+  }
+
+  // 지지→지장간 변환
+  const allBranchList2 = [
+    ...sajuBranchList2
+  ];
+  allBranchList1.forEach(item => {
+    if (item.type === "saju") return; // 이미 사주는 위에서 처리됨
+    const sibgans = jijiToSibganMap3[item.value] || [];
+    sibgans.forEach(sib => {
+      allBranchList2.push({
+        type: item.type,
+        value: sib,
+        isMiddle: false
+      });
+    });
+  });
+
+  // --- 4. 간지 리스트 (사주+대운+세운)
+  const allGanjiList = chunganArr.map((stem, i) => ({
+    type: "saju",
+    value: stem + (jijiArr[i] || "")
+  }));
+  if (window.selectedDaewoon?.stem && window.selectedDaewoon?.branch) {
+    allGanjiList.push({
+      type: "daewoon",
+      value: window.selectedDaewoon.stem + window.selectedDaewoon.branch
+    });
+  }
+  if (window.selectedSewoon?.stem && window.selectedSewoon?.branch) {
+    allGanjiList.push({
+      type: "sewoon",
+      value: window.selectedSewoon.stem + window.selectedSewoon.branch
+    });
+  }
+
+  // --- 5. 대운+세운 전용 리스트 ---
+  const daewoonSewoonStemList = [];
+  if (window.selectedDaewoon?.stem) {
+    daewoonSewoonStemList.push({ type: "daewoon", value: window.selectedDaewoon.stem });
+  }
+  if (window.selectedSewoon?.stem) {
+    daewoonSewoonStemList.push({ type: "sewoon", value: window.selectedSewoon.stem });
+  }
+
+  const daewoonSewoonBranchList1 = [];
+  if (window.selectedDaewoon?.branch) {
+    daewoonSewoonBranchList1.push({ type: "daewoon", value: window.selectedDaewoon.branch });
+  }
+  if (window.selectedSewoon?.branch) {
+    daewoonSewoonBranchList1.push({ type: "sewoon", value: window.selectedSewoon.branch });
+  }
+
+  const daewoonSewoonBranchList2 = [];
+  daewoonSewoonBranchList1.forEach(item => {
+    const sibgans = jijiToSibganMap3[item.value] || [];
+    sibgans.forEach(sib => {
+      daewoonSewoonBranchList2.push({
+        type: item.type,
+        value: sib,
+        isMiddle: false
+      });
+    });
+  });
+
+const { cheonganHeesinList, cheonganGisinList } = extractCheonganHeesinGisin(window.trueDangryeongChar);
+const { jijiHeesinList, jijiGisinList } = extractJijiHeesinGisin(window.trueDangryeongChar);
+
+
+   const result = {
+    allStemList,            // 사주+대운+세운 천간
+    allBranchList1,         // 사주+대운+세운 지지
+    allBranchList2,         // 사주+대운+세운 지장간
+    allGanjiList,           // 사주+대운+세운 간지
+
+    daewoonSewoonStemList,      // 대운+세운 천간
+    daewoonSewoonBranchList1,   // 대운+세운 지지
+    daewoonSewoonBranchList2,   // 대운+세운 지장간
+
+    sajuStemList,           // (추가) 사주 천간
+    sajuBranchList1,        // (추가) 사주 지지
+    sajuBranchList2,         // (추가) 사주 지장간
+
+
+  };
+  // 🔹 디버깅 로그
+  console.group("▶ getAllCompareLists 결과");
+  console.log("allStemList:", result.allStemList);
+  console.log("allBranchList1:", result.allBranchList1);
+  console.log("allBranchList2:", result.allBranchList2);
+  console.log("allGanjiList:", result.allGanjiList);
+  console.log("daewoonSewoonStemList:", result.daewoonSewoonStemList);
+  console.log("daewoonSewoonBranchList1:", result.daewoonSewoonBranchList1);
+  console.log("daewoonSewoonBranchList2:", result.daewoonSewoonBranchList2);
+  console.log("sajuStemList:", result.sajuStemList);
+  console.log("sajuBranchList1:", result.sajuBranchList1);
+  console.log("sajuBranchList2:", result.sajuBranchList2);
+  console.groupEnd();
+  // --- 🔹 전역 등록 ---
+  Object.assign(window, result);
+console.log("📌 전역 sajuJijiArray:", window.sajuJijiArray);
+  return result;
+}
+
+
+
+
+window.getAllCompareLists = getAllCompareLists;
 
 // 기존 할당 보존
 const _origDaeyunClick = handleDaeyunClick;
@@ -417,179 +611,105 @@ body: JSON.stringify({
 
 const data = await response.json();
 console.log('서버에서 받은 data:', data);
-console.log('🎯 birthYear:', data.birthYear);
 
-
-//console.log('ganji:', data.ganji);
-//console.log('서버 응답 전체:', JSON.stringify(data, null, 2));
-
-// fetch 응답 후에 추가!
-// 서버에서 받은 생년월일 데이터를 전역 변수에 저장
-window.birthYear = data.birthYear || year;
-window.birthMonth = data.solar?.month || month;
-window.birthDay = data.solar?.day || day;
-window.birthHour = data.solar?.hour ?? 0;
+// ----------------------
+// 1. 출생 관련 전역 등록
+// ----------------------
+window.birthYear   = data.birthYear || year;
+window.birthMonth  = data.solar?.month || month;
+window.birthDay    = data.solar?.day || day;
+window.birthHour   = data.solar?.hour ?? 0;
 window.birthMinute = data.solar?.minute ?? 0;
 
-// ✅ 직접 받은 birthYear 사용
-birthYear = data.birthYear;
-// 당령 계산에 필요한 값 꺼내기
-
-// 대운 시작 나이도 그대로 사용
-// ✅ 서버에서 계산한 값을 사용해야 함
-// daeyunAge 계산부 (예시)
-const yearStemKor = data.yearStemKor; // ✅ 오류 발생 지점 수정됨
-const birthDateObj = new Date(window.birthYear, window.birthMonth - 1, window.birthDay, window.birthHour, window.birthMinute);
-//console.log('▶ birthDateObj:', birthDateObj);
-//console.log('window.birthYear:', window.birthYear);
-//console.log('window.birthMonth:', window.birthMonth);
-//console.log('window.birthDay:', window.birthDay);
-//console.log('window.birthHour:', window.birthHour);
-//console.log('window.birthMinute:', window.birthMinute);
-
-
-
-  // 절기테스트  임시////////////////////
-
-
-
-
-// 1. 출생일 Date 객체 준비
-// 1. 생일 객체 생성
-const birthDate = new Date(window.birthYear, window.birthMonth - 1, window.birthDay, window.birthHour, window.birthMinute);
-console.log("▶ 생년월일시 (KST):", birthDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }));
-
-// 2. 절입일 구하기 (동기 API 사용 가정)
-// ✅ 올바른 방식으로 호출
-//const jeolipDate = new Date(await getJeolipDateFromAPI(window.birthYear, window.birthMonth, window.birthDay));
-
-let html = "";   // ✅ 반드시 선언
-
-// ⚡ 먼저 분해 (이미 app.js 안에서 하고 있음)
+// ----------------------
+// 2. 천간/지지 분해
+// ----------------------
 const yearGanji  = splitGanji(data.ganji.year);
 const monthGanji = splitGanji(data.ganji.month);
 const dayGanji   = splitGanji(data.ganji.day);
 const timeGanji  = splitGanji(data.ganji.time);
 
-const ganList2 = [
-  yearGanji.gan,  // 예: "己"
-  monthGanji.gan, // 예: "壬"
-  dayGanji.gan,   // 예: "庚"
-  timeGanji.gan   // 예: "丁"
-];
+const ganList2 = [yearGanji.gan, monthGanji.gan, dayGanji.gan, timeGanji.gan];
 const jijiList = [
-  data.ganji.year.slice(1),   // 酉
-  data.ganji.month.slice(1),  // 申
-  data.ganji.day.slice(1),    // 午
-  data.ganji.time.slice(1)    // 丑
+  data.ganji.year.slice(1),
+  data.ganji.month.slice(1),
+  data.ganji.day.slice(1),
+  data.ganji.time.slice(1)
 ];
 
 
 
-
-console.log("👉 jijiList:", jijiList);
-console.log("👉 ganList2:", ganList2);
-
-const target = document.querySelector("#saju-relations");
-if (target) {
-  target.innerHTML = makeSajuInfoTable(jijiList, ganList2);
-}
-
-// 원본 값 (소수점 유지)
+// ----------------------
+// 3. 대운 시작 나이/순행·역행
+// ----------------------
 const daeyunAgeRaw = data.daeyunAge;
-window.daeyunAgeRaw = daeyunAgeRaw;
-
-// 표시용 값 (소수점 1자리, 반올림 또는 버림)
 const daeyunAge = Number(daeyunAgeRaw.toFixed(2));
-window.daeyunAge = daeyunAge;
 
-//console.log('▶ daeyunAge2:', daeyunAge);
-
-
-
-    if (!response.ok) throw new Error('서버 오류 발생');
-
-
-
-
-
-
-window.dayGanKorGan = convertHanToKorStem(dayGanji.gan); // ✅ 일간 한글 천간을 전역에 저장
-
-
-    const yearJiKor = normalizeBranch(yearGanji.ji);
-    const monthJiKor = normalizeBranch(monthGanji.ji);
-    const dayJiKor = normalizeBranch(dayGanji.ji);
-    const timeJiKor = normalizeBranch(timeGanji.ji);
-
-   const yearLines = hiddenStemsMap[yearJiKor] || [];
-const monthLines = hiddenStemsMap[monthJiKor] || [];
-const dayLines = hiddenStemsMap[dayJiKor] || [];
-const timeLines = hiddenStemsMap[timeJiKor] || [];
-
-// 한자 → 한글 천간 변환 함수 필요 (파일 상단에 선언되어 있어야 함)
-const dayGanKorGan = convertHanToKorStem(dayGanji.gan);
-
-// 당령 구하기
-
-// 출생 월, 일 (전역변수에서)
-
-const monthJi = monthGanji.ji;  // 월지(예: '子', '丑' 등)
-
+const yearStemKor = data.yearStemKor;
 const daYunDirection = getDaYunDirection(gender, yearStemKor);
-//console.log('gender:', gender);
-//console.log('yearStemKor:', yearStemKor);
-//console.log('⚡ daYunDirection (1: 순행, -1: 역행):', daYunDirection);
-//console.log('🎯 daeyunAge1[역행적용전]:', data.daeyunAge);
-window.daYunDirection = getDaYunDirection(gender, yearStemKor);
-// 당령 구하는 함수 호출 (sajuUtils.js에서 import 되어 있어야 함)
+window.daYunDirection = daYunDirection;
+
+// ----------------------
+// 4. 당령/사령 계산 (순서 보장됨)
+// ----------------------
 const dangryeong = getDangryeong(monthGanji.ji, daeyunAge, daYunDirection);
+const saryeong   = getSaryeong(monthGanji.ji, daeyunAge, daYunDirection);
 
-//console.log('▶ before getSaryeong call, daeyunAge:', daeyunAge, 'monthJi:', monthJi);
-
-const saryeong = getSaryeong(monthGanji.ji, daeyunAge, window.daYunDirection);
-
-
-//createDangryeongTableHtml(dangryeong, saryeong, dangryeongShikArray, monthJi);
-//console.log("사령:", saryeong);
-
-// 당령 결과를 UI에 표시하거나 전역 변수로 저장 가능
 window.dangryeong = dangryeong;
+window.saryeong   = saryeong;
+window.trueDangryeongChar = dangryeong; // 희·기신용
 
-// 사주 천간과 지지를 result에서 추출
-
-
- // console.log('월간 천간:', monthGanji.gan);
- // console.log('월지 지지:', monthGanji.ji);
-  // ✅ 일간(한자)을 한글로 변환하여 전역 변수로 저장
-
-
-
-
-const sajuChungan = [timeGanji.gan, dayGanji.gan, monthGanji.gan, yearGanji.gan];
-const sajuJiji = [timeGanji.ji, dayGanji.ji, monthGanji.ji, yearGanji.ji];
-
-
-
-const chunganList = [timeGanji.gan, monthGanji.gan, yearGanji.gan]; //격을 구분할때는 일간을 제외
-const dayGan = dayGanji.gan;  // 일간 천간
-// 격국 분석 호출
+// ----------------------
+// 5. 사주 객체 생성 (dangryeong 넣지 말 것!)
+// ----------------------
 const saju = {
-  yearGan: yearGanji.gan,
-  monthGan: monthGanji.gan,
-  dayGan: dayGanji.gan,
-  hourGan: timeGanji.gan,
-  yearBranch: yearGanji.ji,
+  yearGan:   yearGanji.gan,
+  monthGan:  monthGanji.gan,
+  dayGan:    dayGanji.gan,
+  hourGan:   timeGanji.gan,
+  yearBranch:  yearGanji.ji,
   monthBranch: monthGanji.ji,
-  dayBranch: dayGanji.ji,
-  hourBranch: timeGanji.ji,
-  dangryeong,
-    // ✅ 태과불급 태그 저장용
+  dayBranch:   dayGanji.ji,
+  hourBranch:  timeGanji.ji,
   johuTags: []
 };
-
-// 전역에서도 쓸 수 있게 등록
 window.saju = saju;
+
+// ----------------------
+// 6. 비교용 리스트 생성 + 전역 등록
+// ----------------------
+
+
+
+// ----------------------
+// 7. 당령 관련 리스트 생성
+// ----------------------
+const { cheonganHeesinList, cheonganGisinList } =
+  extractCheonganHeesinGisin(window.trueDangryeongChar);
+
+const { jijiHeesinList, jijiGisinList } =
+  extractJijiHeesinGisin(window.trueDangryeongChar, window.sajuBranchList1);
+
+const dangryeongArray = DANGRYEONGSHIK_MAP[window.trueDangryeongChar] || [];
+window.dangryeongList = dangryeongArray.map((char, idx) => ({
+  pos: idx + 1,
+  char
+}));
+
+// ----------------------
+// 8. 지지 배열 (역순 저장)
+// ----------------------
+window.sajuJijiArray = [
+  saju.hourBranch,
+  saju.dayBranch,
+  saju.monthBranch,
+  saju.yearBranch
+];
+
+
+
+
+
 
 // 2. 천간/지지 리스트 뽑기
 const ganList = extractSajuGanList(saju);
@@ -729,7 +849,8 @@ function doRender() {
 
   // 사주 지지 십간 리스트 (지지 속 십간을 중복 포함해 뽑기)
 // 당령 글자 (진짜 당령)
-const trueDangryeongChar = dangryeong;  // 예: '庚'
+
+
 
 const dangryeongArray = DANGRYEONGSHIK_MAP[dangryeong];  // ['己', '辛', '癸', '甲', '丙']
 //console.log('[DEBUG] 당령 천간 배열:', dangryeongArray);
@@ -744,10 +865,11 @@ const sajuJijiCheonganListraw = sajuJijiList.flatMap(jiji =>
 );
 
 
-const { cheonganHeesinList, cheonganGisinList } = extractCheonganHeesinGisin(dangryeong, sajuCheonganList);
-const sajuJijiArray =[timeGanji.ji, dayGanji.ji, monthGanji.ji, yearGanji.ji];
-const flatSibganList = extractJijiSibgansWithMiddleInfo(sajuJijiArray);
-const { jijiHeesinList, jijiGisinList } = extractJijiHeesinGisin(dangryeong, sajuJijiArray);
+const { cheonganHeesinList, cheonganGisinList } = extractCheonganHeesinGisin();
+
+
+const flatSibganList = extractJijiSibgansWithMiddleInfo(window.sajuJijiArray);
+const { jijiHeesinList, jijiGisinList } = extractJijiHeesinGisin(dangryeong, window.sajuJijiArray);
 
 
 //console.log('사주 천간:', sajuChungan);
@@ -1245,9 +1367,10 @@ window.handleDaeyunClick = handleDaeyunClick;
 
 
 .basic-daeyun-table {
-  width: 100%;              /* 화면 너비에 맞춰 늘어나고 줄어듦 */
+  width: 80%;
   border-collapse: collapse;
-  table-layout: fixed;       /* 셀 크기를 균등하게 분배 */
+  table-layout: fixed;
+  margin-top: 8px;   /* ✅ 위쪽 여백 추가 */
 }
 
 .basic-daeyun-table th,
@@ -1255,9 +1378,12 @@ window.handleDaeyunClick = handleDaeyunClick;
   border: 1px solid #ccc;
   padding: 4px;
   text-align: center;
-  word-wrap: break-word;     /* 글자가 길면 줄바꿈 */
-  font-size: 0.9rem;
+  vertical-align: middle;
+  word-wrap: break-word;
+  font-size: 0.7rem;
+  display: table-cell; /* ✅ 강제로 table-cell 지정 */
 }
+
 
 .basic-daeyun-table th {
   background: #f5f5f5;
@@ -1270,6 +1396,26 @@ window.handleDaeyunClick = handleDaeyunClick;
     padding: 2px;
   }
 }
+
+.basic-daeyun-table td.selected {
+  background-color: #ffe08a !important;  /* 노란색 강조 */
+  font-weight: bold;
+}
+
+td.classList.add("sewoon-cell");
+td.onclick = () => {
+  document.querySelectorAll('#basic-daeyun-table .sewoon-cell').forEach(x => x.classList.remove('selected'));
+  td.classList.add("selected");
+};
+.basic-daeyun-table .sewoon-cell.selected {
+  background-color: #c2e0ff !important; /* 파란빛 강조 */
+  font-weight: bold;
+}
+const td = document.createElement("td");
+td.classList.add("sewoon-cell");   // ✅ 세운은 반드시 sewoon-cell
+
+td.classList.add("sewoon-cell");
+td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
 
           
 </style>
@@ -1420,10 +1566,18 @@ window.handleDaeyunClick = handleDaeyunClick;
     <thead></thead>
     <tbody>
       <tr>
-        <td style="border:1px solid #ccc; padding:4px;">${dangryeongHtml || "-"}</td>
+<td style="border:1px solid #ccc; padding:4px;">
+  <div id="dangryeong-cell" style="margin-bottom:8px;">
+    ${makeSajuInfoTable()}
+  </div>
+  ${dangryeongHtml || "-"}
+</td>
+
+  
+
         <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-display"></div><br>
                                                         <div id="hapshin-box"></div>
-</div></td>
+</td>
        
       </tr>
       <tr>
@@ -1953,8 +2107,12 @@ renderBasicDaeyunTable({
    direction: daYunDirection,
 });
 
-
-
+// ✅ 첫 로딩 시 현재 대운/세운 자동 선택
+// 렌더 끝나면 바로 실행 (requestAnimationFrame: 렌더 후 1프레임 뒤)
+requestAnimationFrame(() => {
+  highlightInitialDaeyun();
+  highlightInitialSewoon();
+});
 
 // 🔥 자동 출력 시작!
 
