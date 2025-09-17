@@ -27,7 +27,7 @@ import {
   GYEOKGUK_TYPES,
   jijiToSibganMap2,jijiToSibganMap3,
   HEESIN_GISIN_COMBINED, 
-  HEESIN_BY_DANGRYEONG_POSITION, 
+  HEESIN_BY_DANGRYEONG_POSITION,
   GISIN_BY_DANGRYEONG_POSITION, 
   johuBasis, johuMap, johuMeaning, SANGSAENG_MAP, SANGGEUK_MAP
 } from './constants.js';
@@ -73,7 +73,7 @@ getCurrentDaeyunIndexFromStartAge,
  extractJijiSibgansWithMiddleInfo,
   extractCheonganHeesinGisin, extractJijiHeesinGisin,   
   renderJohuCell, extractSajuGanList, getJohuApplyType, calculateTaegwaBulgeup,
-  renderTaegwaBulgeupList, buildCountMap, makeSajuInfoTable
+  renderTaegwaBulgeupList, buildCountMap, makeSajuInfoTable, renderSimpleTable, updateSimpleTable
 } from './sajuUtils.js';
 //
 
@@ -304,18 +304,18 @@ function getAllCompareLists(saju) {
     sajuBranchList2         // (추가) 사주 지장간
   };
   // 🔹 디버깅 로그
-  console.group("▶ getAllCompareLists 결과");
-  console.log("allStemList:", result.allStemList);
-  console.log("allBranchList1:", result.allBranchList1);
-  console.log("allBranchList2:", result.allBranchList2);
-  console.log("allGanjiList:", result.allGanjiList);
-  console.log("daewoonSewoonStemList:", result.daewoonSewoonStemList);
-  console.log("daewoonSewoonBranchList1:", result.daewoonSewoonBranchList1);
-  console.log("daewoonSewoonBranchList2:", result.daewoonSewoonBranchList2);
-  console.log("sajuStemList:", result.sajuStemList);
-  console.log("sajuBranchList1:", result.sajuBranchList1);
-  console.log("sajuBranchList2:", result.sajuBranchList2);
-  console.groupEnd();
+ // console.group("▶ getAllCompareLists 결과");
+  //console.log("allStemList:", result.allStemList);
+  //console.log("allBranchList1:", result.allBranchList1);
+ // console.log("allBranchList2:", result.allBranchList2);
+ // console.log("allGanjiList:", result.allGanjiList);
+// console.log("daewoonSewoonStemList:", result.daewoonSewoonStemList);
+ // console.log("daewoonSewoonBranchList1:", result.daewoonSewoonBranchList1);
+ // console.log("daewoonSewoonBranchList2:", result.daewoonSewoonBranchList2);
+ // console.log("sajuStemList:", result.sajuStemList);
+ // console.log("sajuBranchList1:", result.sajuBranchList1);
+ // console.log("sajuBranchList2:", result.sajuBranchList2);
+ // console.groupEnd();
   // --- 🔹 전역 등록 ---
   Object.assign(window, result);
 
@@ -874,14 +874,17 @@ console.log("호출 직전 saju:", saju);
 const taegwaResult = calculateTaegwaBulgeup(saju, dangryeong);
 
 // sanity check
-console.log("📦 taegwaResult type:", typeof taegwaResult, Array.isArray(taegwaResult) ? "Array" : "");
+//console.log("📦 taegwaResult type:", typeof taegwaResult, Array.isArray(taegwaResult) ? "Array" : "");
 if (taegwaResult && typeof taegwaResult === "object") {
-  console.log("📦 taegwaResult keys:", Object.keys(taegwaResult));
-  console.log("📦 taegwaResult.detail len:", Array.isArray(taegwaResult.detail) ? taegwaResult.detail.length : "no detail");
-  console.log("📦 taegwaResult.list len:", Array.isArray(taegwaResult.list) ? taegwaResult.list.length : "no list");
+ // console.log("📦 taegwaResult keys:", Object.keys(taegwaResult));
+  //console.log("📦 taegwaResult.detail len:", Array.isArray(taegwaResult.detail) ? taegwaResult.detail.length : "no detail");
+  //console.log("📦 taegwaResult.list len:", Array.isArray(taegwaResult.list) ? taegwaResult.list.length : "no list");
 }
 
+console.log("🚩 renderTaegwaBulgeupList 호출 직전:", taegwaResult);
 const { html: tb, johuTags } = renderTaegwaBulgeupList(taegwaResult, saju, ganList, countMap);
+//console.log("✅ renderTaegwaBulgeupList 호출 이후:", tb, johuTags);
+
 saju.johuTags = johuTags || [];
 
 let combinedHTML = tb;
@@ -1020,11 +1023,24 @@ const sajuJijiCheonganListraw = sajuJijiList.flatMap(jiji =>
 );
 
 
-const { cheonganHeesinList, cheonganGisinList } = extractCheonganHeesinGisin(dangryeong, sajuCheonganList);
+
 const sajuJijiArray =[timeGanji.ji, dayGanji.ji, monthGanji.ji, yearGanji.ji];
 const flatSibganList = extractJijiSibgansWithMiddleInfo(sajuJijiArray);
+const { cheonganHeesinList, cheonganGisinList } = extractCheonganHeesinGisin(dangryeong, sajuCheonganList);
 const { jijiHeesinList, jijiGisinList } = extractJijiHeesinGisin(dangryeong, sajuJijiArray);
 
+// ✅ 전역 등록
+window.cheonganHeesinList = cheonganHeesinList;
+window.cheonganGisinList = cheonganGisinList;
+window.jijiHeesinList = jijiHeesinList;
+window.jijiGisinList = jijiGisinList;
+
+console.log("🌍 전역 등록 완료:", {
+  cheonganHeesinList,
+  cheonganGisinList,
+  jijiHeesinList,
+  jijiGisinList
+});
 
 //console.log('사주 천간:', sajuChungan);
 //console.log('사주 지지:', sajuJijiList);
@@ -1337,73 +1353,83 @@ window.handleDaeyunClick = handleDaeyunClick;
 
 
 .daeyun-table {
-  font-size: 0.85rem;        /* 전체 글자 크기 ↓ */
+  font-size: 0.85rem;
   text-align: center;
-  min-width: 450px;  /* ✅ 최소 크기 지정 */
-  margin: 10px auto;      /* 위아래 여백 ↓ */
+  width: 100%;              /* ✅ 부모 폭에 맞춤 */
+  margin: 10px auto;
   border-collapse: collapse;
-}
-.daeyun-table th,
-.daeyun-table td {
-  width: 35px;               /* 칸 너비 ↓ */
-  padding: 2px;          /* 여백 ↓ */
+  table-layout: fixed;       /* ✅ 칸 비율로 강제 */
+  word-break: break-word;
+  white-space: normal;       /* ✅ 줄바꿈 허용 */
 }
 
+.daeyun-table,
+.sewoon-table,
+.wolwoon-table {
+  margin: 0;              /* 위아래 여백 제거 */
+  border-collapse: collapse;
+}
+
+#yearly-series,
+#yearly-ganji-container {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.daeyun-table th,
+.daeyun-table td {
+  width: 14%;                /* ✅ 7칸이면 100/7 → 비율로 자동 */
+  padding: 0.3rem;
+}
+
+/* 셀 내부 */
 .daeyun-cell {
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 1px;                  /* 줄 간격 ↓ */
-  font-size: 0.85rem;        /* 셀 글자 크기 ↓ */
-  line-height: 1.1;          /* 행 높이 촘촘하게 */
+  gap: 2px;
+  font-size: 0.85rem;
+  line-height: 1.2;
+  text-align: center;
+  word-break: break-word;
+  white-space: normal;
 }
 
- .daeyun-table,
-.sinsal-table {
-  table-layout: fixed;  /* 자동 확장 막기 */
-  width: 100%;          /* 부모 폭에 맞춤 */
-  word-wrap: break-word;
-  white-space: nowrap;  /* 줄바꿈 비허용 허용시 nowrap대신 normal */
-}
-
-
-/* ✅ td 자체에 하이라이트 적용 */
+/* 선택 효과는 그대로 */
 .daeyun-table tbody tr:nth-child(2) td.daeyun-selected {
   background: rgba(255, 235, 59, 0.45) !important;
   box-shadow: inset 0 0 0 2px #f1c40f !important;
   border-radius: 6px;
 }
-
-/* ❌ 내부 div만 칠하는 부분은 제거 (더 이상 필요 없음) */
-/* .daeyun-table tbody tr:nth-child(2) td.daeyun-selected .daeyun-cell { ... } */
-
-/* ✅ 선택된 .daeyun-cell 추가 효과 (테두리만 남김, 원하면 유지 가능) */
 .daeyun-cell.selected {
   border: 2px solid rgb(225, 231, 167);
   border-radius: 6px;
 }
 
+/* 세운/연간지 표도 동일하게 비율 기반 */
 #yearly-series td,
-#yearly-ganji-container td {
-  width: 20px;             /* 원하는 만큼 좁게 */
+#yearly-ganji-container td,
+.sewoon-table td, 
+.wolwoon-table td {
+  width: auto;              /* ✅ px → auto */
   padding: 2px;
-  font-size: 0.7rem;       /* 글자 크기 축소 */
-  white-space: normal;     /* 줄바꿈 허용 */
-  word-break: break-word;  /* 글자 강제 줄바꿈 */
+  font-size: 0.75rem;
+  white-space: normal;       /* ✅ 줄바꿈 허용 */
+  word-break: break-word;
   text-align: center;
   vertical-align: middle;
 }
-/* 세운 셀 크기 줄이기 */
 .sewoon-cell {
-  width: 30px;            /* 원하는 고정 폭 (예: 40px → 필요시 더 줄여도 됨) */
-  padding: 2px !important;/* 안쪽 여백 최소화 */
-  font-size: 0.7rem;      /* 글자 크기 축소 */
-  line-height: 1.1;       /* 줄 간격 조절 */
+  padding: 2px !important;
+  font-size: 0.7rem;
+  line-height: 1.1;
   text-align: center;
   vertical-align: top;
-  word-wrap: break-word;  /* 긴 글자도 셀 안에서 줄바꿈 */
+  white-space: normal;
+  word-break: break-word;
 }
+
 
 
 /* 세운/월운 테이블 전용 */
@@ -1414,6 +1440,17 @@ window.handleDaeyunClick = handleDaeyunClick;
   font-size: 0.75rem;       /* 글자 크기 줄이기 */
   line-height: 1.1;         /* 줄 간격 압축 */
 }
+
+.sewoon-table,
+.wolwoon-table {
+  border-collapse: collapse;
+  margin: 0 auto;        /* 위아래 여백 제거 */
+}
+
+.sewoon-table + .wolwoon-table {
+  margin-top: 0;       /* 두 표 사이 간격만 최소 */
+}
+
 
 .dangryeong-table {
   border-collapse: collapse;
@@ -1569,7 +1606,129 @@ td.classList.add("sewoon-cell");   // ✅ 세운은 반드시 sewoon-cell
 td.classList.add("sewoon-cell");
 td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
 
-          
+
+
+/* 조후셀 안에 있는 표를 부모 td 안으로 가두기 */
+#johuyongsin-cell {
+  max-width: 100%;        /* 부모 td 크기 이상 커지지 않음 */
+  min-width: 0;           /* 강제 최소 크기 제거 */
+  overflow-x: hidden;     /* 넘치는 부분 잘라내기 */
+  word-break: break-word; /* 긴 글자 강제 줄바꿈 */
+  white-space: normal;    /* 줄바꿈 허용 */
+  box-sizing: border-box;
+}
+
+/* 조후표 자체도 td 폭에 맞게 */
+#johuyongsin-cell table {
+  width: 100% !important;   /* 부모 td 폭에 맞게 */
+  min-width: 0 !important;  /* 고정 크기 제거 */
+  table-layout: fixed;      /* 내용이 커도 칸을 td 폭에 강제로 맞춤 */
+}
+
+/* 부모 div가 감싸면서 강제로 폭 제한 */
+#dangryeong-cell {
+  max-width: 100%;
+  overflow-x: hidden;       /* 넘치면 잘라내기 */
+  box-sizing: border-box;
+}
+
+/* 안쪽 표는 무조건 부모에 맞추기 */
+#dangryeong-cell table {
+  width: 100% !important;   /* 부모 폭에 맞게 강제 */
+  min-width: 0 !important;  /* 고정 크기 제거 */
+  table-layout: fixed;      /* 칸 강제 줄어들기 */
+  border-collapse: collapse;
+}
+
+/* 셀 안의 글자 줄바꿈 허용 */
+#dangryeong-cell td,
+#dangryeong-cell th {
+  white-space: normal;      /* 줄바꿈 허용 */
+  word-break: break-word;   /* 긴 글자 강제 줄바꿈 */
+  overflow-wrap: break-word;
+}
+
+
+  .responsive-table {
+    width: 100%;
+    max-width: 800px; /* 필요시 최대 크기 제한 */
+    margin: auto;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+
+  .responsive-table th,
+  .responsive-table td {
+    padding: 4px;
+    text-align: center;
+    word-break: keep-all; /* 글자 줄바꿈 방지 */
+  }
+
+  /* 작은 화면에서 폰트와 간격 줄이기 */
+  @media screen and (max-width: 600px) {
+    .responsive-table {
+      font-size: 12px;
+    }
+    .responsive-table th,
+    .responsive-table td {
+      padding: 2px;
+    }
+  }
+        
+  /* 부모 레이아웃 테이블 */
+.layout-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;   /* 칸 크기 고정 배분 */
+}
+
+/* 셀 공통 스타일 */
+.layout-table td {
+  vertical-align: top;
+  padding: 0.5rem;
+  border: none;
+  word-break: break-all;   /* 글자가 셀 크기보다 길면 줄바꿈 */
+  white-space: normal;     /* 강제로 한 줄 유지하지 않음 */
+  overflow-wrap: break-word;
+}
+
+/* 자식 박스가 부모를 뚫지 않게 */
+.daeyun-table-container,
+#yearly-series,
+#yearly-ganji-container,
+#sinsal-box,
+#etc-sinsal-box {
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* 내부 표도 같이 줄어들게 */
+.daeyun-table-container table,
+#sinsal-box table,
+#etc-sinsal-box table {
+  width: 100%;
+  table-layout: fixed;
+  font-size: 0.9rem; /* 기본 크기 */
+}
+
+/* 작은 화면에서는 글자 크기 줄이기 */
+@media screen and (max-width: 768px) {
+  .daeyun-table-container table,
+  #sinsal-box table,
+  #etc-sinsal-box table {
+    font-size: 0.8rem;
+  }
+}
+@media screen and (max-width: 480px) {
+  .daeyun-table-container table,
+  #sinsal-box table,
+  #etc-sinsal-box table {
+    font-size: 0.7rem;
+  }
+}
+
+  
 </style>
 
 <table class="parent">
@@ -1748,11 +1907,13 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
         </tr>
         <!-- 태과불급 전용 한 칸 -->
 <tr>
-  <td colspan="2" style="border:1px solid #ccc; padding:4px; color:purple;" id="taegwa-bulgeup-cell">
- ${tb}
+  <td colspan="2" style="border:1px solid #ccc; padding:4px; color:purple;" >
+ <div id="taegwa-bulgeup-cell">${tb} </div><div id="simple-table-box"></div>
 </td>
-
 </tr>
+
+
+
     </tbody>
   </table>
 </div>
@@ -1771,23 +1932,19 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
 document.getElementById('sinsal-section').innerHTML = `
 
 
-<table style="border-collapse:collapse; width:100%; border:none; text-align:center;">
+<table class="layout-table">
   <tr>
-    <!-- 왼쪽 칸: 대운/세운/월운 -->
-    <td style="vertical-align:top; padding:8px; width:70%; border:none;">
+    <td style="width:50%;">
       <div class="daeyun-table-container"></div>
       <div id="yearly-series" style="margin-top: 1rem;"></div>
       <div id="yearly-ganji-container" style="margin-top: 20px;"></div>
     </td>
-
-    <!-- 오른쪽 칸: 기본신살 -->
-    <td style="vertical-align:top; padding:8px; width:30%; border:none;">
+    <td style="width:50%;">
       <div id="sinsal-box"></div>
     </td>
   </tr>
   <tr>
-    <!-- 두 번째 줄: 기타신살 -->
-    <td colspan="2" style="padding:8px; border:none;">
+    <td colspan="2">
       <div id="etc-sinsal-box"></div>
     </td>
   </tr>
@@ -1818,66 +1975,37 @@ if (secondaryGyeokResult?.primary && secondaryGyeokResult?.secondary) {
   // 생지(복수격)
   gyeokDisplayText = `
     <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;"><b>
-      ${secondaryGyeokResult.primary.char}</b>
-    </span>
+      ${window.gyeokName}${window.gyeokStem ? '' : ''}
+    </b></span>
     <span style="font-size:0.92em;"> (보조격: </span>
     <span id="gyeok-secondary" style="cursor:pointer; color:#ff8844;">
       <b>${secondaryGyeokResult.secondary.char}</b>
     </span>
     <span style="font-size:0.92em;">)</span>
-        <div style="font-size:0.85em; color:#888; margin-top:2px;">
+    <div style="font-size:0.85em; color:#888; margin-top:2px;">
       (격이름을 클릭시 격국식을 볼 수 있습니다)
     </div>
   `;
-} else if (secondaryGyeokResult && secondaryGyeokResult.char && secondaryGyeokResult.stem) {
-  // 왕지/고지: 단일 보조격
-  if (gyeok && typeof gyeok === 'object' && gyeok.stem) {
-    gyeokDisplayText = `
-      <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;">
-        ${getGyeokName(dayGan, gyeok.stem)}
-      </span>
-      <span style="font-size:0.92em;"> (보조격: </span>
-      <span id="gyeok-secondary" style="cursor:pointer; color:#ff8844;">
-        ${secondaryGyeokResult.char}
-      </span>
-      <span style="font-size:0.92em;">)</span>
-          <div style="font-size:0.85em; color:#888; margin-top:2px;">
-      (격이름을 클릭시 격국식을 볼 수 있습니다)
-    </div>
-    `;
-  } else if (typeof gyeok === 'string') {
-    gyeokDisplayText = `
-      <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;">
-        ${gyeok}
-      </span>
-      <span style="font-size:0.92em;"> (보조격: </span>
-      <span id="gyeok-secondary" style="cursor:pointer; color:#ff8844;">
-        ${secondaryGyeokResult.char}
-      </span>
-      <span style="font-size:0.92em;">)</span>
-          <div style="font-size:0.85em; color:#888; margin-top:2px;">
-      (격이름을 클릭시 격국식을 볼 수 있습니다)
-    </div>
-    `;
-  }
-} else if (gyeok && typeof gyeok === 'object' && gyeok.stem) {
-  if (gyeok.char === '월비격' || gyeok.char === '월겁격') {
-    gyeokDisplayText = `
-      <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;">
-        ${gyeok.char}(${gyeok.stem})
-      </span>
-    `;
-  } else {
-    gyeokDisplayText = `
-      <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;">
-        ${getGyeokName(dayGan, gyeok.stem)}
-      </span>
-    `;
-  }
-} else if (typeof gyeok === 'string') {
+} else if (secondaryGyeokResult && secondaryGyeokResult.char) {
+  // 단일 보조격
   gyeokDisplayText = `
     <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;">
-      ${gyeok}
+      ${window.gyeokName}${window.gyeokStem ? '' : ''}
+    </span>
+    <span style="font-size:0.92em;"> (보조격: </span>
+    <span id="gyeok-secondary" style="cursor:pointer; color:#ff8844;">
+      ${secondaryGyeokResult.char}
+    </span>
+    <span style="font-size:0.92em;">)</span>
+    <div style="font-size:0.85em; color:#888; margin-top:2px;">
+      (격이름을 클릭시 격국식을 볼 수 있습니다)
+    </div>
+  `;
+} else if (window.gyeokName) {
+  // 보조격 없는 주격
+  gyeokDisplayText = `
+    <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;">
+      ${window.gyeokName}${window.gyeokStem ? '' : ''}
     </span>
   `;
 }
@@ -1966,7 +2094,9 @@ document.getElementById('gyeok-secondary')?.addEventListener('click', () => {
 
 document.querySelector("#hapshin-box").innerHTML = renderhapshinTable();
 
-
+// ✅ 새로 분리된 simple table 출력
+document.querySelector("#simple-table-box").innerHTML =
+  renderSimpleTable();
 
 
 ///////////////////////// 12운성, 12신살  기타 신살류 출력부//////////////////////////////////////

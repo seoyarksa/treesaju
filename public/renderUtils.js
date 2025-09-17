@@ -14,7 +14,7 @@ import {
          HEESIN_GISIN_COMBINED, 
          HEESIN_BY_DANGRYEONG_POSITION, 
          GISIN_BY_DANGRYEONG_POSITION,
-         tenGodMap,
+         tenGodMap,jijiToSibganMap2,
          tenGodMapKor,branchOrder2, 충MAP, 지지십간MAP, 형충회합Map
       } from './constants.js';
 
@@ -44,7 +44,7 @@ getDangryeong,
   getdangryeongshik,
   getSaryeongshikHtml,renderJohuCell,
   getDangryeongCheongans,
-  extractCheonganHeesinGisin, extractJijiHeesinGisin, makeSajuInfoTable, 
+  extractCheonganHeesinGisin, extractJijiHeesinGisin, makeSajuInfoTable, updateSimpleTable, renderSimpleTable, 
 } from './sajuUtils.js';
 
 
@@ -321,7 +321,13 @@ renderDangryeongHeesinGisin();
 document.querySelector("#johuyongsin-cell").innerHTML = renderJohuCell();
 
 document.querySelector("#hapshin-box").innerHTML = renderhapshinTable();
+// ✅ 여기서 바로 selectedSewoon 초기화 보정
+if (!window.selectedSewoon && window.sewoonList?.length > 0) {
+  window.selectedSewoon = window.sewoonList[0];
+}
 
+// simpleTable 렌더링
+  updateSimpleTable();
 }
 
 
@@ -355,6 +361,13 @@ renderDangryeongHeesinGisin();
 document.querySelector("#johuyongsin-cell").innerHTML = renderJohuCell();
 
 document.querySelector("#hapshin-box").innerHTML = renderhapshinTable();
+// simpleTable 렌더링
+// ✅ 여기서 바로 selectedSewoon 초기화 보정
+if (!window.selectedSewoon && window.sewoonList?.length > 0) {
+  window.selectedSewoon = window.sewoonList[0];
+}
+
+  updateSimpleTable();
 
 }
 
@@ -371,7 +384,7 @@ function toDecimalYear(year, month, day) {
 }
 
 
-
+// ✅ 초기 대운 자동 선택
 export function highlightInitialDaeyun() {
   const startAge = Math.floor(window.daeyunAge);
 
@@ -392,25 +405,25 @@ export function highlightInitialDaeyun() {
   if (daeyunCells[displayIndex]) {
     const cell = daeyunCells[displayIndex];
     const ganjiText = cell.innerText.trim().split("\n");
-    console.log("📌 선택된 대운 셀 내용:", ganjiText);
 
+    // ✅ 전역 등록
     window.selectedDaewoon = {
       type: "daewoon",
       stem: ganjiText[0] || cell.getAttribute("data-stem") || "",
       sibshin: (ganjiText[1] || "").replace(/[()]/g, ""),
       branch: ganjiText[2] || cell.getAttribute("data-branch") || ""
     };
-
     console.log("▶ 자동 선택된 대운:", window.selectedDaewoon);
 
-    cell.click(); // UI 반영
+    // ✅ 클릭 이벤트로 연동
+    cell.click();
   } else {
     console.warn("⚠️ highlightInitialDaeyun: 표시할 셀 없음", displayIndex);
   }
 }
 
 
-
+// ✅ 초기 세운 자동 선택
 export function highlightInitialSewoon() {
   const currentYear = new Date().getFullYear();
   const sewoonCells = document.querySelectorAll('#basic-daeyun-table .sewoon-cell');
@@ -429,8 +442,9 @@ export function highlightInitialSewoon() {
     sewoonCells.forEach(x => x.classList.remove("selected"));
     foundCell.classList.add("selected");
 
-    // 2) window.selectedSewoon 설정
     const ganjiText = foundCell.innerText.trim().split("\n");
+
+    // ✅ 전역 등록
     window.selectedSewoon = {
       type: "sewoon",
       year: foundCell.getAttribute("data-year") || "",
@@ -440,23 +454,12 @@ export function highlightInitialSewoon() {
     };
     console.log("▶ 자동 선택된 세운:", window.selectedSewoon);
 
-    // 3) 전역 saju가 있으면 리스트 생성 + 전역 등록
-    if (window.saju) {
-      const lists = getAllCompareLists(window.saju);
-      console.log("▶ highlightInitialSewoon 이후 리스트:", lists);
-
-      // 4) 테이블 갱신
-      document.querySelector("#dangryeong-cell").innerHTML = makeSajuInfoTable();
-
-      return lists; // 필요하면 반환도 해줌
-    } else {
-      console.warn("⚠️ window.saju가 아직 없습니다. 리스트를 만들 수 없습니다.");
-    }
+    // ✅ 클릭 이벤트로 연동 (대운과 동일하게)
+    foundCell.click();
   } else {
     console.warn("⚠️ 현재 연도 세운셀을 찾지 못했습니다.");
   }
 }
-
 
 
 
@@ -805,7 +808,7 @@ export function renderMonthlyGanjiSeries(baseYear, sewoonStem) {
   const { monthlyStems, monthlyBranches } = generateMonthlyGanjiSeriesByGanji(startStem, startBranch);
 
   // 3. HTML 출력
-  let html = `<table class="daeyun-table" style="margin-top:1rem;">
+  let html = `<table class="daeyun-table" style="margin-top:0;">
    <thead><tr><th colspan="12">월운 (${Math.floor(baseYear)}년)</th></tr>
     <tr>${Array.from({ length: 12 }, (_, i) => `<th style="font-size:0.85rem;">${12 - i}월</th>`).join('')}</tr>
     </thead><tbody><tr>`;
@@ -1401,14 +1404,27 @@ export function arrangeByPosition(listOrMap) {
 
 ////////////////////////////////////////////출력부분
 export function renderDangryeongHeesinGisin() {
-  console.log("전역 확인:", {
-    cheonganGisinList: window.cheonganGisinList,
-    cheonganHeesinList: window.cheonganHeesinList,
-    dangryeongList: window.dangryeongList,
-    jijiHeesinList: window.jijiHeesinList,
-    jijiGisinList: window.jijiGisinList,
-    trueDangryeongChar: window.trueDangryeongChar
-  });
+
+  const cheonganGisinList = window.cheonganGisinList;
+  const cheonganHeesinList = window.cheonganHeesinList;
+  const jijiHeesinList = window.jijiHeesinList;
+  const jijiGisinList = window.jijiGisinList;
+  const dangryeongList = window.dangryeongList;
+  if (!Array.isArray(dangryeongList)) {
+    console.warn("⚠️ dangryeongList가 배열이 아님:", dangryeongList);
+    return "";
+  }
+
+  const target = dangryeongList.find(
+    d => d.char === window.trueDangryeongChar
+  );
+  console.log("🎯 target:", target);
+
+  // target이 없으면 이후 로직도 조심
+  if (!target) {
+    console.warn("⚠️ trueDangryeongChar에 해당하는 항목 없음");
+    return "";
+  }
   const container = document.getElementById("dangryeongshik-container");
   if (!container) return;
 
@@ -1571,8 +1587,7 @@ const highlightIfNeeded = (charObj) => {
   }
 
   return char;
-};
-
+}
 
 const createSectionLineHTML = (title, posMap, sourceList = null) => {
   const commonStyle = "font-family:Consolas, 'Courier New', monospace; font-size:16px; line-height:1.8;";
@@ -1624,49 +1639,122 @@ leftCell += createDangryeongLineHTML("당령식", dangryeongList);
 leftCell += createSectionLineHTML("지지희신", jijiHeesinByPos);
 leftCell += createSectionLineHTML("지지기신", jijiGisinByPos);
 
+
+// ✅ 당령(dayLing, 즉 월령)을 기준으로,
+// 선택된 target (대운 or 세운)의 천간 + 지지 지장간을 비교
+function findHeeGiSin(dangryeong, target) {
+  // ✅ 세운/대운이 아예 선택되지 않은 경우 → "-"
+  if (target === undefined || target === null) {
+    return { cheonganHeesin: "-", jijiHeesin: "-", cheonganGisin: "-", jijiGisin: "-" };
+  }
+
+  if (!dangryeong || !HEESIN_GISIN_COMBINED[dangryeong]) {
+    return { cheonganHeesin: "X", jijiHeesin: "X", cheonganGisin: "X", jijiGisin: "X" };
+  }
+
+  const { heesin, gisin } = HEESIN_GISIN_COMBINED[dangryeong];
+  const firstHeesin = firstHeesinMap[dangryeong]; // ✅ 제1희신 추출
+
+  let cheonganHeesin = [], jijiHeesin = [];
+  let cheonganGisin = [], jijiGisin = [];
+
+  // --- 색상 지정 함수
+  function colorize(val, type, pos) {
+    let color = "black";
+    let bold = "";
+
+    if (val === dangryeong) {
+      color = "red"; // 당령
+      bold = "font-weight:bold;";
+    } else if (type === "heesin") {
+      if (val === firstHeesin) {
+        color = "green"; // 제1희신
+        bold = "font-weight:bold;";
+      } else {
+        color = "black"; // 일반 희신
+      }
+    } else if (type === "gisin") {
+      color = "orange"; // 기신
+    }
+
+    return `<span style="color:${color};${bold}">${val}(${pos})</span>`;
+  }
+
+  // 1) 천간 검사
+  if (target.stem) {
+    if (heesin.includes(target.stem))
+      cheonganHeesin.push(colorize(target.stem, "heesin", "天"));
+    if (gisin.includes(target.stem))
+      cheonganGisin.push(colorize(target.stem, "gisin", "天"));
+  }
+
+  // 2) 지지 → 지장간 검사
+  if (target.branch) {
+    const sibgans = jijiToSibganMap2[target.branch] || [];
+    sibgans.forEach(val => {
+      if (heesin.includes(val))
+        jijiHeesin.push(colorize(val, "heesin", "地"));
+      if (gisin.includes(val))
+        jijiGisin.push(colorize(val, "gisin", "地"));
+    });
+  }
+
+  return {
+    cheonganHeesin: cheonganHeesin.length ? cheonganHeesin.join(", ") : "X",
+    jijiHeesin: jijiHeesin.length ? jijiHeesin.join(", ") : "X",
+    cheonganGisin: cheonganGisin.length ? cheonganGisin.join(", ") : "X",
+    jijiGisin: jijiGisin.length ? jijiGisin.join(", ") : "X"
+  };
+}
+
+
+
+const dangryeong = window.dangryeong; // 당령 (월지 기반으로 산출된 글자)
+const daewoonResult = findHeeGiSin(dangryeong, window.selectedDaewoon);
+const sewoonResult  = findHeeGiSin(dangryeong, window.selectedSewoon);
+
+console.log("대운 희신:", daewoonResult.cheonganHeesin, "/", daewoonResult.jijiHeesin);
+console.log("대운 기신:", daewoonResult.cheonganGisin, "/", daewoonResult.jijiGisin);
+
+
 // 오른쪽 표 (대운/세운 희기신)
 let rightCell = `
-<table style="border-collapse:collapse; width:100%; text-align:center; font-size:12px; line-height:1.2;">
-  <tr style="background-color:#fff8dc;">
-    <th style="border:1px solid #ccc; padding:2px 4px;">구분</th>
-    <th style="border:1px solid #ccc; padding:2px 4px;">대운</th>
-    <th style="border:1px solid #ccc; padding:2px 4px;">세운</th>
-  </tr>
-  <tr>
-    <td rowspan="2" style="border:1px solid #ccc; padding:2px 4px; background-color:#e6f0ff;">희신</td>
-    <td style="border:1px solid #ccc; padding:2px 4px;">
-      ${result.daewoon.cheonganHeesin ? formatHeeGiSinItem(result.daewoon.cheonganHeesin) : "X"}
-    </td>
-    <td style="border:1px solid #ccc; padding:2px 4px;">
-      ${result.sewoon.cheonganHeesin ? formatHeeGiSinItem(result.sewoon.cheonganHeesin) : "X"}
-    </td>
-  </tr>
-  <tr>
-    <td style="border:1px solid #ccc; padding:2px 4px;">
-      ${result.daewoon.jijiHeesin ? formatHeeGiSinItem(result.daewoon.jijiHeesin) : "X"}
-    </td>
-    <td style="border:1px solid #ccc; padding:2px 4px;">
-      ${result.sewoon.jijiHeesin ? formatHeeGiSinItem(result.sewoon.jijiHeesin) : "X"}
-    </td>
-  </tr>
-  <tr>
-    <td rowspan="2" style="border:1px solid #ccc; padding:2px 4px; background-color:#e6f0ff;">기신</td>
-    <td style="border:1px solid #ccc; padding:2px 4px;">
-      ${result.daewoon.cheonganGisin ? formatHeeGiSinItem(result.daewoon.cheonganGisin) : "X"}
-    </td>
-    <td style="border:1px solid #ccc; padding:2px 4px;">
-      ${result.sewoon.cheonganGisin ? formatHeeGiSinItem(result.sewoon.cheonganGisin) : "X"}
-    </td>
-  </tr>
-  <tr>
-    <td style="border:1px solid #ccc; padding:2px 4px;">
-      ${result.daewoon.jijiGisin ? formatHeeGiSinItem(result.daewoon.jijiGisin) : "X"}
-    </td>
-    <td style="border:1px solid #ccc; padding:2px 4px;">
-      ${result.sewoon.jijiGisin ? formatHeeGiSinItem(result.sewoon.jijiGisin) : "X"}
-    </td>
-  </tr>
-</table>
+    <table style="border-collapse:collapse; width:100%; text-align:center; font-size:12px; line-height:1.2;">
+      <tr style="background-color:#fff8dc;">
+        <th style="border:1px solid #ccc; padding:2px 4px;">구분</th>
+        <th style="border:1px solid #ccc; padding:2px 4px;">대운</th>
+        <th style="border:1px solid #ccc; padding:2px 4px;">세운</th>
+      </tr>
+
+      <!-- 희신 : 천간 -->
+      <tr>
+        <td style="border:1px solid #ccc; padding:2px 4px; background-color:#e6f0ff;">희신(천간)</td>
+        <td style="border:1px solid #ccc; padding:2px 4px;">${daewoonResult.cheonganHeesin}</td>
+        <td style="border:1px solid #ccc; padding:2px 4px;">${sewoonResult.cheonganHeesin}</td>
+      </tr>
+
+      <!-- 희신 : 지지 -->
+      <tr>
+        <td style="border:1px solid #ccc; padding:2px 4px; background-color:#e6f0ff;">희신(지지)</td>
+        <td style="border:1px solid #ccc; padding:2px 4px;">${daewoonResult.jijiHeesin}</td>
+        <td style="border:1px solid #ccc; padding:2px 4px;">${sewoonResult.jijiHeesin}</td>
+      </tr>
+
+      <!-- 기신 : 천간 -->
+      <tr>
+        <td style="border:1px solid #ccc; padding:2px 4px; background-color:#e6f0ff;">기신(천간)</td>
+        <td style="border:1px solid #ccc; padding:2px 4px;">${daewoonResult.cheonganGisin}</td>
+        <td style="border:1px solid #ccc; padding:2px 4px;">${sewoonResult.cheonganGisin}</td>
+      </tr>
+
+      <!-- 기신 : 지지 -->
+      <tr>
+        <td style="border:1px solid #ccc; padding:2px 4px; background-color:#e6f0ff;">기신(지지)</td>
+        <td style="border:1px solid #ccc; padding:2px 4px;">${daewoonResult.jijiGisin}</td>
+        <td style="border:1px solid #ccc; padding:2px 4px;">${sewoonResult.jijiGisin}</td>
+      </tr>
+    </table>
+
 `;
 
 

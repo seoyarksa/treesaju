@@ -43,7 +43,7 @@ export function getSipsin(dayGan, targetGan) {
 
   // targetGan은 천간 10글자 중 하나
   const result = tenGodMap[dayGan]?.[targetGan] || "";
-  console.log("👉 십신 조회:", dayGan, "vs", targetGan, "=>", result);
+  //console.log("👉 십신 조회:", dayGan, "vs", targetGan, "=>", result);
 
   return result;
 }
@@ -816,7 +816,7 @@ const sinsalRowsGanji = sinsalRows.map(r => r.rowGanji).join('');
 // ▼ 표 A: 천간 + 지지
 // ▼ 표 A1: 천간 전용
 const tableA1 = `
-<table border="1" style="text-align:center; border-collapse:collapse; margin:auto; margin-top:16px; font-size:14px; min-width:400px;">
+<table border="1" class="responsive-table" style="text-align:center; border-collapse:collapse; margin:auto; margin-top:16px; font-size:14px; min-width:400px;">
 <tr>
   <th style="background:#efefef;" rowspan="2">신살류</th>
   <th colspan="6" style="background:#cfebfd;">천간[사주+대운+세운]</th>
@@ -845,7 +845,7 @@ ${sinsalRowsGan} <!-- 천간 신살 전용 행 -->
 
 // ▼ 표 A2: 지지 전용
 const tableA2 = `
-<table border="1" style="text-align:center; border-collapse:collapse; margin:auto; margin-top:16px; font-size:14px; min-width:400px;">
+<table border="1" class="responsive-table" style="text-align:center; border-collapse:collapse; margin:auto; margin-top:16px; font-size:14px; min-width:400px;">
 <tr>
   <th style="background:#efefef;" rowspan="2">신살류</th>
   <th colspan="6" style="background:#efcffd;">지지[사주+대운+세운]</th>
@@ -874,7 +874,7 @@ ${sinsalRowsJiji} <!-- 지지 신살 전용 행 -->
 
 // ▼ 표 B: 간지(동주)
 const tableB = `
-<table border="1" style="text-align:center; border-collapse:collapse; margin:auto; margin-top:16px; font-size:14px; min-width:400px;">
+<table border="1" class="responsive-table" style="text-align:center; border-collapse:collapse; margin:auto; margin-top:16px; font-size:14px; min-width:400px;">
 <tr>
   <th style="background:#efefef;" rowspan="2">신살류</th>
   <th colspan="6" style="background:#fdebcf;">간지(동주)[사주+대운+세운]</th>
