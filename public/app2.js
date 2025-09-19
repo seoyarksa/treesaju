@@ -112,10 +112,496 @@ import { renderSinsalTable,
 
 
 
+// =========================================
+// 출력 제한 로직 (비로그인 사용자 하루 3회 제한)
+// =========================================
+// ✅ 출력 제한 체크 함수
+// ✅ 출력 제한 체크 함수
+// === 출력 제한 ===
+/************************************
+ /************************************
+ * 1) 비로그인 출력 제한
+ ************************************/
+/************************************
+ * 1) 비로그인 출력 제한
+ ************************************/
+// ===== app.js (안전망 포함, 전체 교체용) =====
+
+// 0) 안전 헬퍼
+const $ = (sel) => document.querySelector(sel);
+const on = (el, ev, fn) => el && el.addEventListener(ev, fn);
+const supa = window.supabaseClient || window.client || null;
+
+function readyLog(stage, extra) {
+  console.log(`[APP] ${stage}`, extra || "");
+}
+
+// 0-1) Supabase 준비 확인
+if (!supa || !supa.auth) {
+  console.error("[APP] Supabase client가 준비되지 않았습니다. index.html의 초기화 스크립트 순서 확인!");
+  // 굳이 alert를 띄워 원인 파악을 빠르게:
+  alert("Supabase 초기화가 안 되어 있습니다. 페이지를 강력 새로고침(Ctrl+F5) 하거나, index.html에서 Supabase SDK 및 초기화 스크립트가 app.js보다 먼저 로드되는지 확인하세요.");
+}
+
+// === 안전 로그: 앱 로드 확인
+console.log("[app] loaded");
+
+// === 1) 비로그인 출력 제한
+// KST(Asia/Seoul) 기준 YYYY-MM-DD 키 만들기
+function getKSTDateKey() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+// ✅ 비로그인 1일 3회(한국 날짜 기준) 제한
+async function checkRenderAllowed() {
+  // 로그인 되어 있으면 프론트 제한은 패스(서버 RPC가 관리)
+  try {
+    const { data: { session } } = await window.supabaseClient.auth.getSession();
+    if (session) return true;
+  } catch (_) {}
+
+  const todayKST = getKSTDateKey();
+  const usage = JSON.parse(localStorage.getItem('sajuUsage') || '{}');
+
+  usage[todayKST] = (usage[todayKST] || 0) + 1;
+
+  if (usage[todayKST] > 3) {
+    alert('로그인하지 않은 사용자는 한국 날짜 기준으로 하루 3회까지만 사주 출력이 가능합니다.');
+    return false;
+  }
+  localStorage.setItem('sajuUsage', JSON.stringify(usage));
+  return true;
+}
+
+
+// === 2) 로그인 UI 토글
+async function updateAuthUI(session) {
+  const authSection =
+    document.getElementById("auth-section") ||
+    document.getElementById("login-form") ||
+    document.querySelector(".login-form");
+  const profileSection = document.getElementById("profile-section");
+  const nicknameEl = document.getElementById("user-nickname");
+  const historySection = document.getElementById("saju-history-section");
+
+  if (session && session.user) {
+    if (authSection) authSection.style.display = "none";
+    if (profileSection) profileSection.style.display = "block";
+
+    const user = session.user;
+
+    // ✅ 프로필 role 불러오기
+    const { data: profile } = await window.supabaseClient
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    let roleLabel = "";
+    switch (profile?.role) {
+      case "admin": roleLabel = "[관리자] "; break;
+      case "premium": roleLabel = "[정기회원] "; break;
+      case "special": roleLabel = "[특별회원] "; break;
+      default: roleLabel = "[일반회원] "; break;
+    }
+
+    const nickname =
+      user.user_metadata?.nickname ||
+      user.user_metadata?.name ||
+      user.user_metadata?.full_name ||
+      user.nickname ||
+      user.name ||
+      user.displayName ||
+      (user.email ? user.email.split("@")[0] : null) ||
+      "사용자";
+
+    if (nicknameEl) nicknameEl.textContent = roleLabel + nickname;
+
+    if (historySection) historySection.style.display = "block";
+    loadSajuHistory(user.id);
+    renderUserProfile();
+  } else {
+    if (authSection) authSection.style.display = "block";
+    if (profileSection) profileSection.style.display = "none";
+    if (nicknameEl) nicknameEl.textContent = "";
+    if (historySection) historySection.style.display = "none";
+  }
+}
+
+
+
+// === 사주 이력 불러오기 ===
+// === 사주 이력 불러오기 ===
+let currentPage = 1;
+const pageSize = 10;
+let currentUserId = null;
+let currentSearch = "";
+
+async function loadSajuHistory(userId, page = 1, search = "") {
+  currentUserId = userId;
+  currentPage = page;
+  currentSearch = search;
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = window.supabaseClient
+    .from("saju_records")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (search) {
+    // ⚠️ DB 컬럼명이 name이 맞는지 꼭 확인!
+    query = query.ilike("name", `%${search}%`);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error("이력 조회 오류:", error);
+    return;
+  }
+
+  // ✅ 테이블 tbody 채우기
+  const tbody = document.querySelector("#saju-history-table tbody");
+  if (!tbody) {
+    console.warn("saju-history-table tbody 요소를 찾을 수 없음");
+    return;
+  }
+  tbody.innerHTML = "";
+
+  data.forEach((record) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>
+        <span class="saju-record-link"
+              data-json='${JSON.stringify(record.input_json)}'
+              style="cursor:pointer; color:blue; text-decoration:underline;">
+          ${record.name}
+        </span>
+      </td>
+      <td>${record.birth_date}</td>
+      <td>${record.gender}</td>
+      <td>${new Date(record.created_at).toLocaleDateString()}</td>
+      <td><button class="delete-record-btn" data-id="${record.id}">삭제</button></td>
+
+    `;
+
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById("page-info").textContent = `페이지 ${page}`;
+}
+
+
+
+
+
+
+// === 3) 회원가입 모달 (전화번호 포함)
+function openSignupModal() {
+  const existed = document.getElementById("signup-modal");
+  if (existed) { existed.style.display = "block"; return; }
+
+  const modal = document.createElement("div");
+  modal.id = "signup-modal";
+  modal.style.cssText = `
+    position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+    display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 16px;
+  `;
+  const panel = document.createElement("div");
+  panel.style.cssText = `
+    background: #fff; width: 100%; max-width: 420px; border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden;
+  `;
+  panel.innerHTML = `
+    <div style="padding:14px 16px; background:#2c3e50; color:#fff; font-weight:bold;">회원가입</div>
+    <div style="padding:16px;">
+      <div style="margin-bottom:10px;">
+        <label style="display:block; margin-bottom:4px;">닉네임</label>
+        <input id="su-nickname" type="text" placeholder="표시할 닉네임" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="display:block; margin-bottom:4px;">이메일</label>
+        <input id="su-email" type="email" placeholder="you@example.com" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="display:block; margin-bottom:4px;">비밀번호</label>
+        <input id="su-password" type="password" placeholder="비밀번호(6자 이상)" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="display:block; margin-bottom:4px;">전화번호 (선택)</label>
+        <input id="su-phone" type="tel" placeholder="010-1234-5678" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;">
+      </div>
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+        <button id="su-cancel" type="button" style="padding:8px 12px; border:1px solid #ddd; background:#f5f5f5; border-radius:6px;">취소</button>
+        <button id="su-submit" type="button" style="padding:8px 12px; border:0; background:#27ae60; color:#fff; border-radius:6px;">가입하기</button>
+      </div>
+      <div style="margin-top:10px; font-size:12px; color:#666;">※ 이메일 인증을 켜두셨다면, 발송된 메일에서 인증을 완료해야 로그인됩니다.</div>
+    </div>
+  `;
+  modal.appendChild(panel);
+  document.body.appendChild(modal);
+
+  document.getElementById("su-cancel").onclick = () => { modal.style.display = "none"; };
+  document.getElementById("su-submit").onclick = async () => {
+    const nickname = document.getElementById("su-nickname").value.trim();
+    const email = document.getElementById("su-email").value.trim();
+    const password = document.getElementById("su-password").value;
+    const phoneRaw = document.getElementById("su-phone").value.trim();
+    const phone = phoneRaw ? normalizePhoneKR(phoneRaw, "intl") : ""; // ✅ 국제 포맷 적용
+
+    if (!nickname) return alert("닉네임을 입력하세요.");
+    if (!email) return alert("이메일을 입력하세요.");
+    if (!password || password.length < 6) return alert("비밀번호는 6자 이상 입력하세요.");
+    if (phoneRaw) {
+      const digits = phoneRaw.replace(/\D/g, "");
+      if (digits.length < 10 || digits.length > 11) return alert("전화번호 형식이 올바르지 않습니다.");
+    }
+
+    try {
+      const { data, error } = await window.supabaseClient.auth.signUp({
+        email, password,
+        options: {
+          data: { nickname, phone }, // user_metadata
+          emailRedirectTo: `${location.origin}${location.pathname}`,
+        },
+      });
+      if (error) throw error;
+
+      localStorage.setItem("pending_nickname", nickname);
+      if (phone) localStorage.setItem("pending_phone", phone);
+
+      alert("회원가입 요청 완료! 이메일 인증을 진행해 주세요.");
+      modal.style.display = "none";
+
+      const emailEl = document.getElementById("email");
+      const passEl  = document.getElementById("password");
+      if (emailEl) emailEl.value = email;
+      if (passEl)  passEl.value  = password;
+
+      updateAuthUI(data?.session ?? null);
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "회원가입에 실패했습니다.");
+    }
+  };
+}
+
+
+// ─── 전화 인증 모달 ───────────────────────────────────────────
+function openPhoneOtpModal() {
+  if (document.getElementById("phone-otp-modal")) {
+    document.getElementById("phone-otp-modal").style.display = "block";
+    return;
+  }
+
+  const modal = document.createElement("div");
+  modal.id = "phone-otp-modal";
+  modal.style.cssText = `
+    position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.35); padding:16px;
+  `;
+
+  const panel = document.createElement("div");
+  panel.style.cssText = `
+    width:100%; max-width:420px; background:#fff; border-radius:10px; overflow:hidden;
+    box-shadow:0 10px 30px rgba(0,0,0,.2); font-family:'Nanum Gothic',sans-serif;
+  `;
+  panel.innerHTML = `
+    <div style="padding:14px 16px; background:#2c3e50; color:#fff; font-weight:700;">전화번호 인증</div>
+    <div style="padding:16px; display:grid; gap:10px;">
+      <div>
+        <label style="display:block; margin-bottom:4px;">전화번호</label>
+        <input id="otp-phone" type="tel" placeholder="010-1234-5678" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;">
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button id="otp-send" type="button" class="btn-success" style="flex:1;">코드 받기</button>
+        <button id="otp-close" type="button" style="flex:1; border:1px solid #ddd; background:#f5f5f5; border-radius:6px;">나중에</button>
+      </div>
+      <div>
+        <label style="display:block; margin-bottom:4px;">인증 코드</label>
+        <input id="otp-code" type="text" inputmode="numeric" placeholder="숫자 6자리" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;">
+      </div>
+      <button id="otp-verify" type="button" class="btn-success">인증하기</button>
+      <div id="otp-help" style="font-size:12px; color:#666;">
+        ※ 휴대폰으로 전송된 코드를 입력해 주세요.
+      </div>
+    </div>
+  `;
+
+  modal.appendChild(panel);
+  document.body.appendChild(modal);
+
+  // 닫기
+  document.getElementById("otp-close").onclick = () => {
+    modal.style.display = "none";
+  };
+
+  // 코드 받기
+  document.getElementById("otp-send").onclick = async () => {
+    const raw = document.getElementById("otp-phone").value.trim();
+    if (!raw) return alert("전화번호를 입력하세요.");
+    const phone = normalizePhoneKR(raw, "intl"); // ✅ 국제번호(+82) 변환
+    try {
+      const { error } = await window.supabaseClient.auth.signInWithOtp({ phone });
+      if (error) throw error;
+      alert("인증 코드가 발송되었습니다.");
+    } catch (err) {
+      console.error("[OTP send] error:", err);
+      alert(err.message || "인증 코드를 보낼 수 없습니다.");
+    }
+  };
+
+  // 인증하기
+  document.getElementById("otp-verify").onclick = async () => {
+    const raw = document.getElementById("otp-phone").value.trim();
+    const token = document.getElementById("otp-code").value.trim();
+    if (!raw || !token) return alert("전화번호와 인증 코드를 입력하세요.");
+    const phone = normalizePhoneKR(raw, "intl"); // ✅ 국제번호(+82) 변환
+    try {
+      const { data, error } = await window.supabaseClient.auth.verifyOtp({
+        phone,
+        token,
+        type: "sms",
+      });
+      if (error) throw error;
+
+      alert("전화번호 인증이 완료되었습니다!");
+      modal.style.display = "none";
+
+      // ✅ 인증 후 UI 갱신
+      const { data: { session } } = await window.supabaseClient.auth.getSession();
+      updateAuthUI(session);
+    } catch (err) {
+      console.error("[OTP verify] error:", err);
+      alert(err.message || "인증에 실패했습니다.");
+    }
+  };
+}
+
+
+// ─── 로그인된 유저가 전화 인증 필요하면 모달을 띄우는 검사 ───
+async function requirePhoneVerificationIfNeeded() {
+  const { data: { session } } = await window.supabaseClient.auth.getSession();
+  if (!session) return;
+
+  try {
+    // profiles에서 phone_verified 조회 (RLS는 본인 행만 허용되도록 설정되어 있음)
+    const { data, error } = await window.supabaseClient
+      .from("profiles")
+      .select("phone_verified")
+      .eq("user_id", session.user.id)
+      .single();
+
+    if (error) throw error;
+
+    if (!data?.phone_verified) {
+      // ✅ 인증 안 되어 있으면 즉시 모달
+      openPhoneOtpModal();
+    }
+  } catch (e) {
+    console.warn("[requirePhoneVerificationIfNeeded] 조회 실패:", e);
+    // 조회 실패 시에도 UX상 바로 요구하고 싶다면 모달을 띄워도 됨:
+    // openPhoneOtpModal();
+  }
+}
+
+
+
+
+
+
+// === 4) 사주 제출 (완전한 한 개만 사용!)
+async function handleSajuSubmit(e) {
+  e.preventDefault();
+  console.log("[DEBUG] handleSajuSubmit 실행됨");
+
+  try {
+    // 1) 로그인 여부 확인
+    const { data: { session } } = await window.supabaseClient.auth.getSession();
+
+    if (!session) {
+      // 비로그인 → 로컬(KST) 3회 제한
+      const ok = await checkRenderAllowed();
+      if (!ok) return; // 비로그인 한도 초과
+    } else {
+      // ✅ 로그인 상태일 때 관리자 여부 먼저 확인
+      const { data: profile } = await window.supabaseClient
+        .from("profiles")
+        .select("role")
+          .eq("user_id", session.user.id)   // ✅ user_id
+        .single();
+
+      if (profile?.role === "admin") {
+        console.log("관리자 계정 로그인 ✅ (횟수 제한 무시)");
+        // → 그냥 통과
+      } else {
+        // 일반 사용자 → 기존 제한 검사
+        const { data: gate, error } = await window.supabaseClient.rpc("can_render_and_count");
+
+        if (error) {
+          console.error("[RPC] can_render_and_count error:", error);
+          alert("이용 제한 확인 중 오류가 발생했습니다.");
+          return;
+        }
+
+        if (!gate?.allowed) {
+          if (gate.reason === "PHONE_VERIFY_REQUIRED") {
+            if (typeof openPhoneOtpModal === "function") {
+              const msg = (gate.limit != null && gate.remaining != null)
+                ? `오늘은 ${gate.limit}회까지 이용할 수 있어요.\n현재 남은 횟수가 없어 전화번호 인증이 필요합니다.`
+                : "전화번호 인증이 필요합니다. 인증을 완료해 주세요.";
+              alert(msg);
+              openPhoneOtpModal();
+            } else {
+              alert("정기구독하려면 전화번호 인증이 필요합니다. 첫1개월 무료로 1일 30회, 이후 2개월부터 유료로 무제한 이용가능합니다.");
+            }
+            return;
+          }
+
+          if (gate.reason === "DAILY_LIMIT_REACHED") {
+            const msg = (gate.limit != null)
+              ? `오늘 사용 가능한 ${gate.limit}회를 모두 사용했습니다. 내일 다시 이용해 주세요.`
+              : "오늘 사용 가능한 횟수를 모두 사용했습니다.";
+            alert(msg);
+            return;
+          }
+
+          if (gate.reason === "NO_SESSION") {
+            const ok = await checkRenderAllowed();
+            if (!ok) return;
+          }
+
+          alert("이용이 제한되었습니다. 잠시 후 다시 시도해 주세요.");
+          return;
+        }
+
+        // allowed=true → 남은 횟수 로그
+        if (gate.limit != null && gate.remaining != null) {
+          console.log(`[limit] 남은 횟수: ${gate.remaining}/${gate.limit}`);
+        }
+      }
+    }
+
+    // 2) 🔻 여기부터 기존 사주 출력/DB 저장 로직 🔻
+    console.log("사주 출력 로직 실행 준비 완료!");
+
+
+
+
+
+
 
 const MONTH_TO_SOLAR_TERM = {
-  1: '소한',   // 1월 시작 절기 (소한) → 입춘 이전 절기
-  2: '입춘',   // 2월 시작 절기 (입춘)
+  1: '소한',
+  2: '입춘',
   3: '경칩',
   4: '청명',
   5: '입하',
@@ -127,10 +613,6 @@ const MONTH_TO_SOLAR_TERM = {
   11: '입동',
   12: '대설',
 };
-
-
-
-let outputMode = "basic"; // 기본값: 사주출력
 
 
 //
@@ -419,9 +901,14 @@ const birthInfoText = `
 
   const daeyunHTML = document.getElementById("result")?.innerHTML || "없음";
   const sewunHTML = document.getElementById("sewoon")?.innerHTML || "없음";
+// 추가 영역 HTML 추출
 
+
+const basicSectionHTML = document.getElementById("basic-section")?.innerHTML || "";
+const sinsalSectionHTML = document.getElementById("sinsal-section")?.innerHTML || "";
   // 최종 이메일 본문 (HTML로 구성)
-  const emailBody = `
+// 긴 HTML은 줄이고 링크만 포함
+const emailBody = `
   <div style="font-family: 'Nanum Gothic', sans-serif; line-height: 1.6;">
     <h2>질문 내용</h2>
     <p>${userMessage.replace(/\n/g, "<br />")}</p>
@@ -430,20 +917,19 @@ const birthInfoText = `
 
     <h3>사용자 생일 사주</h3>
     <pre style="background:#f9f9f9; padding:10px; border:1px solid #ddd;">${birthInfoText}</pre>
-    <strong>사주출력 페이지 보기:</strong> <a href="${sajuUrl}" target="_blank" rel="noopener noreferrer">${sajuUrl}</a>
 
-
-    <hr />
-
-
-    <h3>사주정보</h3>
-    <div>${daeyunHTML}</div>
+    <strong>사주출력 페이지 보기:</strong> 
+    <a href="${sajuUrl}" target="_blank" rel="noopener noreferrer">${sajuUrl}</a>
 
     <hr />
 
+    <h3>사주 요약</h3>
+    <div>${daeyunHTML.slice(0, 2000)} ... (생략)</div>
 
-    <h3>오늘의 사주</h3>
-    <div>${sajuHTML}</div>
+    <hr />
+
+    <p>📌 전체 사주 결과와 신살/연운은 아래 링크에서 확인하세요:</p>
+    <p><a href="${sajuUrl}" target="_blank">사주 전체 결과 페이지</a></p>
   </div>
 `;
 
@@ -490,6 +976,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('saju-form');
     if (form) {
       setTimeout(() => {
+            window.outputMode = window.outputMode || 'basic'; // ← 추가
         form.requestSubmit(); // ✅ 최신 브라우저에서는 이게 더 안전
       }, 200); // 약간의 지연 (렌더링 완료 후 실행)
     }
@@ -510,19 +997,6 @@ function pad(num) {
 ////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////
-// 버튼 이벤트 연결
-document.querySelector('.btn-success').addEventListener('click', () => {
-  outputMode = "basic";
-  document.getElementById("saju-form").requestSubmit();
-});
-
-document.getElementById('sinsalBtn').addEventListener('click', () => {
-  outputMode = "sinsal";
-  document.getElementById("saju-form").requestSubmit();
-});
-
-document.getElementById('saju-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
 
 
   const dateStr = document.getElementById('birth-date').value;
@@ -536,11 +1010,12 @@ const hour12 = parseInt(document.getElementById('hour-select').value);
   const minute = parseInt(document.getElementById('minute-select').value);
 const calendarType = document.getElementById('calendar-type').value;
   const genderInput = document.querySelector('input[name="gender"]:checked');
-  const gender = genderInput ? genderInput.value : null;
-   if (!gender) {
-    alert('성별을 선택하세요');
-    return;
-  }
+const gender = document.getElementById("gender")?.value || "";
+if (!gender) {
+  alert("성별을 선택해야 저장할 수 있습니다.");
+  return;
+}
+
    const value = document.getElementById('birth-date').value;
   const inputyear = parseInt(value.split('-')[0]);
 //if (inputyear < 1000 || inputyear > 9999) {
@@ -1265,6 +1740,8 @@ async function showBirthInfo(data) {
       console.log("⚠️ jeolipDate 파싱 실패:", data.jeolipDate);
       solarTerm = "절입시 정보 오류";
     }
+    
+
 
   } else {
     console.log("❌ 서버 절입 데이터도 없고 jeolipDate도 없음");
@@ -2389,128 +2866,463 @@ requestAnimationFrame(() => {
 
 
 
-
   // ✅ 여기 추가
-    // 공통은 항상 보이게
-    document.getElementById("result").style.display = "block";
-    document.getElementById("common-section").style.display = "block";
+  // 공통은 항상 보이게
+  // 🔹 모드 전환은 이 함수 맨 끝쯤에서:
+  document.getElementById("result").style.display = "block";
+  document.getElementById("common-section").style.display = "block";
+  if (window.outputMode === "basic") {
+    document.getElementById("basic-section").style.display = "block";
+    document.getElementById("sinsal-section").style.display = "none";
+  } else {
+    document.getElementById("basic-section").style.display = "none";
+    document.getElementById("sinsal-section").style.display = "block";
+  }
 
-    // 모드 전환
-    if (outputMode === "basic") {
-      document.getElementById("basic-section").style.display = "block";
-      document.getElementById("sinsal-section").style.display = "none";
-    } else if (outputMode === "sinsal") {
-      document.getElementById("basic-section").style.display = "none";
-      document.getElementById("sinsal-section").style.display = "block";
+
+
+
+  // 결과 영역 보여주기
+  document.getElementById("result").style.display = "block";
+
+  // 기본 정보 출력
+  await showBirthInfo({
+    ...data,
+    ...saju   // yearBranch, monthBranch, 등 전부 포함됨
+  });
+
+  // 사주 흐름(격) 렌더
+  renderGyeokFlowStyled(gyeok, saju, secondaryGyeokResult);
+
+  // 오늘 사주 영역 표시
+  document.getElementById("today-saju-container").style.display = "block";
+
+  // ✅ 생년 정보 객체 (하이라이트 계산에 사용)
+  const birthDateYMD = {
+    year: window.birthYear,
+    month: window.birthMonth,
+    day: window.birthDay
+  };
+
+  // ✅ 하이라이트 1회만! (함수 내부에서 클릭 이벤트 dispatch 가정)
+  const sortedIndex = highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD, {
+    container: document,
+    clsSelected: 'daeyun-selected'
+  });
+
+  if (sortedIndex < 0) {
+    console.warn('[daeyun] highlight failed: sortedIndex', sortedIndex);
+  }
+
+  // -------------------------------
+  // 오늘의 사주표 부분
+  // -------------------------------
+  const today = new Date();
+  const todayPayload = {
+    year: today.getFullYear(),
+    month: today.getMonth() + 1,
+    day: today.getDate(),
+    hour: today.getHours(),
+    minute: today.getMinutes(),
+    calendarType: 'solar',
+    gender: window.gender || 'male'
+  };
+
+  const todayStr = `${todayPayload.year}-${String(todayPayload.month).padStart(2, '0')}-${String(todayPayload.day).padStart(2, '0')}`;
+
+  const todayResponse = await fetch('/api/saju', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(todayPayload),
+  });
+
+  if (!todayResponse.ok) {
+    throw new Error(`오늘 사주 요청 실패: ${todayResponse.status}`);
+  }
+
+  const todayData = await todayResponse.json();
+
+  // 간지 분해
+  const yearGanji2 = splitGanji(todayData.ganji.year);
+  const monthGanji2 = splitGanji(todayData.ganji.month);
+  const dayGanji2 = splitGanji(todayData.ganji.day);
+  const timeGanji2 = splitGanji(todayData.ganji.time);
+  const dayGanKorGan2 = convertHanToKorStem(dayGanji2.gan);
+
+  // 🎯 오늘 사주 렌더링
+  renderTodaySajuBox({
+    yearGanji: yearGanji2,
+    monthGanji: monthGanji2,
+    dayGanji: dayGanji2,
+    timeGanji: timeGanji2,
+    dayGanKorGan: dayGanKorGan2,
+    todayStr,
+    birthSaju: { yearGanji, monthGanji, dayGanji, timeGanji }
+  });
+
+} catch (error) {
+  alert('에러 발생: ' + error.message);
+}
+
+
+  console.log("[saju] OK to render");
+  // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
+
+
+
+// 2) 입력 데이터 수집
+const formData = {
+      name: document.getElementById("customer-name")?.value.trim(),
+      birthDate: document.getElementById("birth-date")?.value,
+      calendarType: document.getElementById("calendar-type")?.value,
+      gender: document.getElementById("gender")?.value,
+      ampm: document.querySelector("input[name='ampm']:checked")?.value,
+      hour: document.getElementById("hour-select")?.value,
+      minute: document.getElementById("minute-select")?.value,
+    };
+
+    if (!formData.name) {
+      alert("이름을 입력해야 저장할 수 있습니다.");
+      return;
+    }
+    if (!formData.gender) {
+      alert("성별을 선택해야 저장할 수 있습니다.");
+      return;
     }
 
+    const birthTime = `${formData.ampm} ${formData.hour}:${formData.minute}`;
 
+   
 
-// 🔥 자동 출력 시작!
+    const { data: newRecord, error } = await window.supabaseClient
+      .from("saju_records")
+      .insert([{
+        user_id: session.user.id,
+        name: formData.name,
+        birth_date: formData.birthDate,
+        birth_time: birthTime,
+        gender: formData.gender,
+        calendar_type: formData.calendarType,   // ✅ 추가
+        input_json: formData,
+      
+      }])
+      .select()
+      .single();
 
-// 결과 영역 보여주기
-document.getElementById("result").style.display = "block";
+if (error) {
+  console.error("저장 오류:", error);
 
-// 기본 정보 출력
-await showBirthInfo({
-  ...data,
-  ...saju   // yearBranch, monthBranch, 등 전부 포함됨
-});
+  if (error.code === "23505" || error.code === "409") {
+    // 🔹 UNIQUE 제약 위반 시 → 그냥 무시 (알림 없음)
+    console.log("중복된 데이터 → 저장하지 않음");
+  } else {
+    // 다른 오류만 사용자에게 안내
+    alert("사주 데이터 저장 중 오류가 발생했습니다.");
+  }
 
-
-// 사주 흐름(격) 렌더
-renderGyeokFlowStyled(gyeok, saju, secondaryGyeokResult);
-
-// 오늘 사주 영역 표시
-document.getElementById("today-saju-container").style.display = "block";
-
-// ✅ 생년 정보 객체 (하이라이트 계산에 사용)
-const birthDateYMD = {
-  year: window.birthYear,
-  month: window.birthMonth,
-  day: window.birthDay
-};
-
-// ✅ 하이라이트 1회만! (함수 내부에서 클릭 이벤트 dispatch 가정)
-//    highlight 함수가 선택된 td에 'click'을 날리므로,
-//    inline onclick="handleDaeyunClick(...)" 도 자동으로 실행됩니다.
-const sortedIndex = highlightCurrentDaeyunByAge(correctedStartAge, birthDateYMD, {
-  // 필요시 특정 컨테이너로 범위 제한 가능
-  container: document,       // 또는 document.querySelector('.daeyun-wrapper') 처럼 좁힐 수 있음
-  clsSelected: 'daeyun-selected'
-});
-
-// 선택 실패시 로깅 (디버깅용)
-if (sortedIndex < 0) {
-  //console.warn('[daeyun] highlight failed: sortedIndex', sortedIndex);
+} else if (newRecord) {
+  console.log("사주 데이터 저장 완료:", newRecord);
+  alert("✅ 저장이 완료되었습니다. '내 사주 기록'에서 확인하세요.");
 }
 
-// -------------------------------
-//오늘의 사주표 부분
-// ✅ 오늘 날짜 기준 사주 요청 및 렌더
-// -------------------------------
-const today = new Date();
-const todayPayload = {
-  year: today.getFullYear(),
-  month: today.getMonth() + 1,
-  day: today.getDate(),
-  hour: today.getHours(),
-  minute: today.getMinutes(),
-  calendarType: 'solar',
-  gender: window.gender || 'male'  // window.gender가 없으면 기본값
-};
 
-const todayStr = `${todayPayload.year}-${String(todayPayload.month).padStart(2, '0')}-${String(todayPayload.day).padStart(2, '0')}`;
-
-const todayResponse = await fetch('/api/saju', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(todayPayload),
-});
-
-if (!todayResponse.ok) {
-  throw new Error(`오늘 사주 요청 실패: ${todayResponse.status}`);
+  } catch (err) {
+    console.error("[handleSajuSubmit] error:", err);
+    alert("요청 처리 중 오류가 발생했습니다.");
+  }
 }
 
-const todayData = await todayResponse.json();
 
-// 간지 분해
-const yearGanji2 = splitGanji(todayData.ganji.year);
-const monthGanji2 = splitGanji(todayData.ganji.month);
-const dayGanji2 = splitGanji(todayData.ganji.day);
-const timeGanji2 = splitGanji(todayData.ganji.time);
-const dayGanKorGan2 = convertHanToKorStem(dayGanji2.gan);
 
-// 🎯 오늘 사주 렌더링
-renderTodaySajuBox({
-  yearGanji: yearGanji2,
-  monthGanji: monthGanji2,
-  dayGanji: dayGanji2,
-  timeGanji: timeGanji2,
-  dayGanKorGan: dayGanKorGan2,
-  todayStr,
-    birthSaju: {
-    yearGanji,
-    monthGanji,
-    dayGanji,
-    timeGanji
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// renderUserProfile 정의는 그대로 유지
+async function renderUserProfile() {
+  const { data: { user } } = await window.supabaseClient.auth.getUser();
+  if (!user) return;
+
+  // 여기서는 이벤트 바인딩만!
+  document.getElementById("subscribeBtn")?.addEventListener("click", () => {
+    openPhoneOtpModal({
+      onSuccess: () => {
+        document.getElementById("subscriptionModal").style.display = "block";
+      }
+    });
+  });
+
+  document.getElementById("logoutBtn")?.addEventListener("click", async () => {
+    await window.supabaseClient.auth.signOut();
+    location.reload();
+  });
+}
+
+
+
+
+
+// === 초기화
+document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    console.log("[app] DOM ready");
+
+    const { data: { session } } = await window.supabaseClient.auth.getSession();
+    updateAuthUI(session);
+    window.supabaseClient.auth.onAuthStateChange((_ev, newSession) => {
+      updateAuthUI(newSession);
+    });
+
+    // 로그인 버튼, 회원가입 버튼, 소셜 로그인 바인딩은 그대로...
+  } catch (err) {
+    console.error("[init] fatal:", err);
+  }
+
+
+
+
+
+// ✅ 사주 기록 클릭 → 입력폼 채워넣기
+document.addEventListener("click", (e) => {
+  if (e.target.classList.contains("saju-record-link")) {
+    e.preventDefault();
+
+    const record = JSON.parse(e.target.dataset.json);
+
+    // ✅ 입력폼 값 채우기 (input_json 기준)
+    document.getElementById("customer-name").value = record.name || "";
+    document.getElementById("birth-date").value = record.birthDate || "";
+    document.getElementById("calendar-type").value = record.calendarType || "";
+    document.getElementById("gender").value = record.gender || "";
+
+    if (record.ampm) {
+      document.querySelector(`input[name="ampm"][value="${record.ampm}"]`).checked = true;
+    }
+    if (record.hour) {
+      document.getElementById("hour-select").value = record.hour;
+    }
+    if (record.minute) {
+      document.getElementById("minute-select").value = record.minute;
+    }
+
+   // alert("폼에 값이 채워졌습니다. 확인 후 '사주 출력'을 눌러주세요.");
+  }
+});
+
+
+// 삭제 버튼 이벤트 (이벤트 위임)
+document.addEventListener("click", async (e) => {
+  if (e.target.classList.contains("delete-record-btn")) {
+    const recordId = e.target.dataset.id;
+    if (!recordId) return;
+
+    if (!confirm("정말 이 기록을 삭제하시겠습니까?")) return;
+
+    const { error } = await window.supabaseClient
+      .from("saju_records")
+      .delete()
+      .eq("id", recordId);   // ✅ uuid가 아니라 id 컬럼 사용
+
+    if (error) {
+      console.error("삭제 오류:", error);
+      alert("삭제 중 문제가 발생했습니다.");
+      return;
+    }
+
+    // 삭제 성공 시 UI에서도 제거
+    e.target.closest("tr").remove();
+    console.log("삭제 완료:", recordId);
+  }
+});
+
+
+document.addEventListener("click", (e) => {
+  if (e.target.classList.contains("saju-record-link")) {
+    e.preventDefault();
+
+    const record = JSON.parse(e.target.dataset.json); 
+    // ⚠️ 이 record는 DB 전체가 아니라 input_json 부분임
+
+    // ✅ 입력폼에 값 채우기 (input_json 필드 기준)
+    document.getElementById("customer-name").value = record.name || "";
+    document.getElementById("birth-date").value = record.birthDate || "";
+    document.getElementById("calendar-type").value = record.calendarType || "";
+    document.getElementById("gender").value = record.gender || "";
+
+    if (record.ampm) {
+      const ampmInput = document.querySelector(`input[name="ampm"][value="${record.ampm}"]`);
+      if (ampmInput) ampmInput.checked = true;
+    }
+    if (record.hour) {
+      document.getElementById("hour-select").value = record.hour;
+    }
+    if (record.minute) {
+      document.getElementById("minute-select").value = record.minute;
+    }
+
+    // ✅ 선택 후 패널 닫기
+    document.getElementById("saju-history-panel").style.display = "none";
   }
 });
 
 
 
 
+// ✅ 내 사주 기록 버튼
+document.getElementById("toggle-history-btn")?.addEventListener("click", async () => {
+  const panel = document.getElementById("saju-history-panel");
+  const { data: { session } } = await window.supabaseClient.auth.getSession();
+  if (!session) {
+    alert("로그인 후 이용할 수 있습니다.");
+    return;
+  }
+  currentUserId = session.user.id;
 
-  } catch (error) {
-    alert('에러 발생: ' + error.message);
+  if (panel.style.display === "none") {
+    panel.style.display = "block";
+    currentPage = 1;
+    currentSearch = "";
+    await loadSajuHistory(currentUserId, currentPage, currentSearch);
+  } else {
+    panel.style.display = "none";
   }
 });
 
-// 신살류 버튼 전용 이벤트
-document.getElementById("sinsalBtn").addEventListener("click", (e) => {
-  e.preventDefault();
-  document.getElementById("basic-section").style.display = "none";
-  document.getElementById("sinsal-section").style.display = "block";
+// ✅ 검색 버튼 클릭
+document.getElementById("search-btn")?.addEventListener("click", () => {
+  const keyword = document.getElementById("search-name").value.trim();
+  loadSajuHistory(currentUserId, 1, keyword);
+});
+
+// ✅ 검색창에서 Enter 키 입력
+document.getElementById("search-name")?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault(); // 폼 submit 방지
+    const keyword = e.target.value.trim();
+    loadSajuHistory(currentUserId, 1, keyword);
+  }
 });
 
 
+// ✅ 페이지 네비게이션
+document.getElementById("prev-page")?.addEventListener("click", async () => {
+  if (currentPage > 1 && currentUserId) {
+    currentPage--;
+    await loadSajuHistory(currentUserId, currentPage, currentSearch);
+  }
+});
+document.getElementById("next-page")?.addEventListener("click", async () => {
+  if (currentUserId) {
+    currentPage++;
+    await loadSajuHistory(currentUserId, currentPage, currentSearch);
+  }
+});
+
+
+
+
+});
+
+
+
+
+
+
+// 정기구독 결제 함수
+function startGoogleSubscription() {
+  alert("Google 정기구독 결제 연동 예정");
+}
+function startKakaoSubscription() {
+  alert("Kakao 정기구독 결제 연동 예정");
+}
+
+
+// === 5) 초기화: 모든 바인딩은 여기에서만
+document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    console.log("[app] DOM ready");
+
+    // 세션 반영 + 감시
+    const { data: { session } } = await window.supabaseClient.auth.getSession();
+    updateAuthUI(session);
+    window.supabaseClient.auth.onAuthStateChange((_ev, newSession) => {
+      updateAuthUI(newSession);
+    });
+
+    // 로그인 버튼
+    const loginBtn = document.getElementById("loginBtn");
+    loginBtn?.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const email = document.getElementById("email")?.value?.trim();
+      const password = document.getElementById("password")?.value ?? "";
+      if (!email || !password) { alert("이메일과 비밀번호를 입력하세요."); return; }
+      try {
+        const { data, error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        updateAuthUI(data?.session ?? null);
+      } catch (err) {
+        console.error(err);
+        alert(err.message || "로그인에 실패했습니다.");
+      }
+    });
+
+    // 회원가입 버튼 → 모달
+    const signupBtn = document.getElementById("signupBtn");
+    signupBtn?.addEventListener("click", (e) => { e.preventDefault(); openSignupModal(); });
+
+    // 소셜 로그인
+    document.getElementById("googleLogin")?.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        await window.supabaseClient.auth.signInWithOAuth({
+          provider: "google",
+          options: { redirectTo: `${location.origin}${location.pathname}` },
+        });
+      } catch (err) { console.error(err); alert(err.message || "구글 로그인 오류"); }
+    });
+    document.getElementById("kakaoLogin")?.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        await window.supabaseClient.auth.signInWithOAuth({
+          provider: "kakao",
+          options: { redirectTo: `${location.origin}${location.pathname}` },
+        });
+      } catch (err) { console.error(err); alert(err.message || "카카오 로그인 오류"); }
+    });
+
+    // 로그아웃
+    document.getElementById("logoutBtn")?.addEventListener("click", async () => {
+      await window.supabaseClient.auth.signOut();
+      updateAuthUI(null);
+    });
+
+    // 사주 폼 바인딩
+    const form = document.getElementById("saju-form");
+    if (form) {
+      form.addEventListener("submit", handleSajuSubmit);
+      document.getElementById("sajuSubmit")?.addEventListener("click", () => {
+        window.outputMode = "basic";
+        form.requestSubmit(); // 폼 DOM 요소에 호출!
+      });
+      document.getElementById("sinsalBtn")?.addEventListener("click", () => {
+        window.outputMode = "sinsal";
+        form.requestSubmit();
+      });
+    }
+  } catch (err) {
+    console.error("[init] fatal:", err);
+  }
+
+    // ✅ 로그인 후 프로필/정기구독/로그아웃 UI 세팅
+  renderUserProfile();
+});

@@ -265,18 +265,18 @@
       <tr>
         <!-- 이메일 입력 -->
         <td>
-          <input type="email" id="email" placeholder="이메일" style="padding:5px; width:120px;">
+          <input type="email" id="email" placeholder="이메일" style="padding:5px; width:200px;">
         </td>
         <!-- 로그인 / 회원가입 -->
         <td>
           <button type="button" id="loginBtn" class="btn-success">로그인</button>
-          <button type="button" id="signupBtn" class="btn-success" style="margin-left:8px; background-color:#fab7b7; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">회원가입</button>
+          <button type="button" id="signupBtn" class="btn-success">회원가입</button>
         </td>
       </tr>
       <tr>
         <!-- 비밀번호 입력 -->
         <td>
-          <input type="password" id="password" placeholder="비밀번호" style="padding:5px; width:120px;">
+          <input type="password" id="password" placeholder="비밀번호" style="padding:5px; width:200px;">
         </td>
         <!-- 소셜 로그인 -->
         <td>
@@ -291,42 +291,8 @@
 <!-- 로그인 후 표시 -->
 <div id="profile-section" style="display:none; margin-top:8px;">
   <span id="user-nickname" style="font-weight:600; color: blue;"></span> 님 환영합니다
- 
-  <button id="logoutBtn" type="button" style="margin-left:8px; background-color:#fab7b7; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">로그아웃</button>
-  <button id="toggle-history-btn" style="background-color:#4CAF50; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">고객data</button>
-  <button id="subscribeBtn" type="button" style="margin-left:8px;background-color:#4CAF50; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">정기구독</button>
-
-
-<!-- 패널 (처음엔 숨김) -->
-<div id="saju-history-panel" style="display:none; margin-top:10px;">
-  <!-- 검색 -->
-  <div>
-    <input type="text" id="search-name" placeholder="이름 검색" style="background-color:#f7f4df; border:1px solid #ccc; padding:5px; border-radius:4px; width:60px;">
-    <button id="search-btn" style="background-color:#4CAF50; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">검색</button>
-  </div>
-
-  <!-- 테이블 -->
-  <table border="1" width="100%" id="saju-history-table">
-    <thead>
-      <tr>
-        <th>이름</th>
-        <th>생년월일</th>
-        <th>성별</th>
-        <th>등록일</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-
-  <!-- 페이지 컨트롤 -->
-  <div style="margin-top:10px;">
-    <button id="prev-page">이전</button>
-    <span id="page-info">페이지 1</span>
-    <button id="next-page">다음</button>
-  </div>
-</div>
-
-
+  <button id="subscribeBtn" type="button" style="margin-left:8px;">정기구독</button>
+  <button id="logoutBtn" type="button" style="margin-left:8px;">로그아웃</button>
 </div>
 
 <!-- 결제 모달 -->
@@ -341,30 +307,20 @@
 
 
     <form id="saju-form">
-      <label>고객명:</label>
-<input type="text" id="customer-name" placeholder="저장관리용" style="background-color:#f7f4df; border:1px solid #ccc; padding:5px; border-radius:4px; width:60px;" />
- <label for="gender">성별:</label>
-<select id="gender">
-  <option value="">선택</option>
-  <option value="male" selected>남자</option>
-  <option value="female">여자</option>
-</select>
-<br />
-
     <label>생년월일:</label> 
-    <input  type="text" id="birth-date" placeholder="YYYYMMDD" class="birthdate-input" style="background-color:#f7dff5; border:1px solid #ccc; padding:5px; border-radius:4px; width:80px;"/>
-
+    <input  type="text" id="birth-date" placeholder="YYYYMMDD" class="birthdate-input" />
+ 
     
     <select id="calendar-type" name="calendar-type">
       <option value="선택" ></option>
-                                    <option value="solar" selected>양력</option>
+      <option value="solar" selected="" >양력</option>
       <option value="lunar">음력</option>
-    </select>
-
-<br />
-
+    </select><br />
+    <label>성별:</label>
+    <label><input type="radio" name="gender" value="male" checked> 남자</label>
+    <label><input type="radio" name="gender" value="female"> 여자</label><br />
     <label>출생 시간:</label>
-                         <label><input type="radio" name="ampm" value="AM" checked> 오전</label>
+    <label><input type="radio" name="ampm" value="AM" checked> 오전</label>
     <label><input type="radio" name="ampm" value="PM"> 오후</label>
     <label>+</label>
     <select id="hour-select">
@@ -372,7 +328,7 @@
        <option value="0">0시</option>
       <option value="1">1시</option>
       <option value="2">2시</option>
-                                    <option value="3" selected>3시</option>
+      <option value="3"selected>3시</option>
       <option value="4">4시</option>
       <option value="5">5시</option>
       <option value="6">6시</option>
@@ -394,7 +350,7 @@
   <option value="7">7분</option>
   <option value="8">8분</option>
   <option value="9">9분</option>
-                             <option value="10" selected>10분</option>
+  <option value="10"selected>10분</option>
   <option value="11">11분</option>
   <option value="12">12분</option>
   <option value="13">13분</option>
