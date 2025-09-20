@@ -180,6 +180,7 @@ async function checkRenderAllowed() {
 
 
 // === 2) 로그인 UI 토글
+
 async function updateAuthUI(session) {
   const authSection =
     document.getElementById("auth-section") ||
@@ -233,6 +234,83 @@ async function updateAuthUI(session) {
   }
 }
 
+//첫한달간 회원별 제한 횟수 계산
+function getDailyLimit(profile) {
+  const role = profile.role;
+  const joinDate = new Date(profile.created_at);
+  const daysSinceJoin = Math.floor((Date.now() - joinDate) / (1000*60*60*24));
+
+  switch (role) {
+    case "guest": // 비회원
+      return 3;
+    case "normal": // 일반회원
+      return daysSinceJoin < 30 ? 10 : 3;
+    case "premium": // 정회원
+      return daysSinceJoin < 30 ? 50 : 200;
+    case "special": // 특별회원
+    case "admin":   // 관리자
+      return Infinity;
+    default:
+      return 0;
+  }
+}
+
+
+
+
+///오늘 출력횟수 표시
+function updateCountDisplay(todayCount, profile) {
+  const limit = getDailyLimit(profile);
+  const span = document.getElementById("count-display");
+  if (!span) return;
+
+  if (limit === Infinity) {
+    span.innerHTML = `(출력횟수: 오늘 총 <span class="count-num">${todayCount}</span>회)`;
+  } else {
+    span.innerHTML = `(출력횟수: 오늘 ${limit}회중 <span class="count-num">${todayCount}</span>회)`;
+  }
+}
+
+
+
+//오늘의 카운트 증가 갱신
+async function increaseTodayCount(userId, profile) {
+  const today = new Date().toISOString().slice(0, 10);
+
+  // 오늘자 카운트 조회
+  const { data: countRow, error: selectErr } = await window.supabaseClient
+    .from("saju_counts")
+    .select("count")
+    .eq("user_id", userId)
+    .eq("count_date", today)
+    .maybeSingle();
+
+  if (selectErr) {
+    console.error("카운트 조회 오류:", selectErr);
+    return;
+  }
+
+  const newCount = (countRow?.count || 0) + 1;
+
+  // upsert (있으면 업데이트, 없으면 삽입)
+  const { error: updateErr } = await window.supabaseClient
+    .from("saju_counts")
+    .upsert(
+      { user_id: userId, count_date: today, count: newCount },
+      { onConflict: "user_id,count_date" }
+    );
+
+  if (updateErr) {
+    console.error("카운트 업데이트 오류:", updateErr);
+    return;
+  }
+
+  // ✅ 화면 표시 갱신
+  updateCountDisplay(newCount, profile);
+}
+
+
+
 
 
 // === 사주 이력 불러오기 ===
@@ -258,7 +336,6 @@ async function loadSajuHistory(userId, page = 1, search = "") {
     .range(from, to);
 
   if (search) {
-    // ⚠️ DB 컬럼명이 name이 맞는지 꼭 확인!
     query = query.ilike("name", `%${search}%`);
   }
 
@@ -268,36 +345,77 @@ async function loadSajuHistory(userId, page = 1, search = "") {
     return;
   }
 
-  // ✅ 테이블 tbody 채우기
-  const tbody = document.querySelector("#saju-history-table tbody");
-  if (!tbody) {
-    console.warn("saju-history-table tbody 요소를 찾을 수 없음");
-    return;
-  }
-  tbody.innerHTML = "";
+  // ✅ 표 전체 다시 그리기
+  const tableContainer = document.getElementById("saju-history-table");
+  tableContainer.innerHTML = `
+    <table class="customer-table">
+      <thead>
+        <tr>
+          <th>이름</th>
+          <th>생년월일</th>
+          <th>성별</th>
+          <th>등록일</th>
+          <th>비고</th> <!-- ✅ 마지막 열 제목 -->
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  `;
+
+  const tbody = tableContainer.querySelector("tbody");
 
   data.forEach((record) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>
-        <span class="saju-record-link"
-              data-json='${JSON.stringify(record.input_json)}'
-              style="cursor:pointer; color:blue; text-decoration:underline;">
-          ${record.name}
-        </span>
+<span class="saju-record-link"
+      data-id="${record.id}"
+      data-json='${JSON.stringify(record.input_json)}'
+      style="cursor:pointer; color:blue; text-decoration:underline;">
+  ${record.name}
+</span>
+
+
       </td>
       <td>${record.birth_date}</td>
       <td>${record.gender}</td>
       <td>${new Date(record.created_at).toLocaleDateString()}</td>
       <td><button class="delete-record-btn" data-id="${record.id}">삭제</button></td>
-
     `;
-
     tbody.appendChild(tr);
   });
 
-  document.getElementById("page-info").textContent = `페이지 ${page}`;
+// ✅ 페이지네이션 계산
+const { count } = await window.supabaseClient
+  .from("saju_records")
+  .select("*", { count: "exact", head: true })
+  .eq("user_id", userId);
+
+const totalPages = Math.ceil(count / pageSize);
+let paginationHtml = "";
+
+// 페이지 번호 출력 (버튼X, 텍스트형태)
+for (let i = 1; i <= totalPages; i++) {
+  paginationHtml += `
+    <span class="page-num ${i === page ? "active" : ""}" data-page="${i}">
+      ${i}
+    </span>`;
 }
+
+document.getElementById("page-info").innerHTML = paginationHtml;
+
+// 페이지 번호 클릭 이벤트 등록
+document.querySelectorAll(".page-num").forEach((span) => {
+  span.addEventListener("click", () => {
+    const targetPage = parseInt(span.dataset.page, 10);
+    loadSajuHistory(currentUserId, targetPage, currentSearch);
+  });
+});
+
+
+}
+
+
 
 
 
@@ -479,6 +597,7 @@ function openPhoneOtpModal() {
       // ✅ 인증 후 UI 갱신
       const { data: { session } } = await window.supabaseClient.auth.getSession();
       updateAuthUI(session);
+      
     } catch (err) {
       console.error("[OTP verify] error:", err);
       alert(err.message || "인증에 실패했습니다.");
@@ -2966,12 +3085,15 @@ requestAnimationFrame(() => {
 
 
   console.log("[saju] OK to render");
-  // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
+  // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
+// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
+// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
 
 
 
-// 2) 입력 데이터 수집
-const formData = {
+
+ // 2) 입력 데이터 수집
+    const formData = {
       name: document.getElementById("customer-name")?.value.trim(),
       birthDate: document.getElementById("birth-date")?.value,
       calendarType: document.getElementById("calendar-type")?.value,
@@ -2992,47 +3114,51 @@ const formData = {
 
     const birthTime = `${formData.ampm} ${formData.hour}:${formData.minute}`;
 
-   
+    // ✅ 로그인 상태라면 DB insert 시도
+    if (session && session.user) {
+      const { data: newRecord, error } = await window.supabaseClient
+        .from("saju_records")
+        .insert([{
+          user_id: session.user.id,
+          name: formData.name,
+          birth_date: formData.birthDate,
+          birth_time: birthTime,
+          gender: formData.gender,
+          calendar_type: formData.calendarType,
+          input_json: formData,
+        }])
+        .select()
+        .single();
 
-    const { data: newRecord, error } = await window.supabaseClient
-      .from("saju_records")
-      .insert([{
-        user_id: session.user.id,
-        name: formData.name,
-        birth_date: formData.birthDate,
-        birth_time: birthTime,
-        gender: formData.gender,
-        calendar_type: formData.calendarType,   // ✅ 추가
-        input_json: formData,
-      
-      }])
-      .select()
-      .single();
+      if (error) {
+        console.error("저장 오류:", error);
+        if (error.code === "23505" || error.code === "409") {
+          console.log("중복된 데이터 → 저장하지 않음");
+        } else {
+          alert("사주 데이터 저장 중 오류가 발생했습니다.");
+        }
+      } else if (newRecord) {
+        console.log("사주 데이터 저장 완료:", newRecord);
+        alert("✅ 저장이 완료되었습니다. '내 사주 기록'에서 확인하세요.");
+      }
 
-if (error) {
-  console.error("저장 오류:", error);
+      // ✅ 프로필 가져와서 카운트 증가
+      const { data: profile, error: profileErr } = await window.supabaseClient
+        .from("profiles")
+        .select("role, created_at")
+        .eq("user_id", session.user.id)
+        .single();
 
-  if (error.code === "23505" || error.code === "409") {
-    // 🔹 UNIQUE 제약 위반 시 → 그냥 무시 (알림 없음)
-    console.log("중복된 데이터 → 저장하지 않음");
-  } else {
-    // 다른 오류만 사용자에게 안내
-    alert("사주 데이터 저장 중 오류가 발생했습니다.");
-  }
-
-} else if (newRecord) {
-  console.log("사주 데이터 저장 완료:", newRecord);
-  alert("✅ 저장이 완료되었습니다. '내 사주 기록'에서 확인하세요.");
-}
-
+      if (!profileErr && profile) {
+        await increaseTodayCount(session.user.id, profile);
+      }
+    }
 
   } catch (err) {
     console.error("[handleSajuSubmit] error:", err);
     alert("요청 처리 중 오류가 발생했습니다.");
   }
 }
-
-
 
 
 
@@ -3079,27 +3205,65 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const { data: { session } } = await window.supabaseClient.auth.getSession();
     updateAuthUI(session);
+
+    // ✅ 여기 추가: 출력횟수 초기화
+    if (session && session.user) {
+      const { data: profile } = await window.supabaseClient
+        .from("profiles")
+        .select("role, created_at")
+        .eq("user_id", session.user.id)
+        .single();
+
+      if (profile) {
+        const today = new Date().toISOString().slice(0, 10);
+        const { data: countRow } = await window.supabaseClient
+          .from("saju_counts")
+          .select("count")
+          .eq("user_id", session.user.id)
+          .eq("count_date", today)
+          .maybeSingle();
+
+        updateCountDisplay(countRow?.count || 0, profile);
+      }
+    } else {
+      const todayKST = getKSTDateKey();
+      const usage = JSON.parse(localStorage.getItem("sajuUsage") || "{}");
+      const todayCount = usage[todayKST] || 0;
+
+      const guestProfile = { role: "guest", created_at: new Date().toISOString() };
+      updateCountDisplay(todayCount, guestProfile);
+    }
+
+    // ✅ 이 아래는 원래 있던 로그인 상태 변경 처리 + 버튼 바인딩 코드
     window.supabaseClient.auth.onAuthStateChange((_ev, newSession) => {
       updateAuthUI(newSession);
     });
 
-    // 로그인 버튼, 회원가입 버튼, 소셜 로그인 바인딩은 그대로...
+    // ... (로그인 버튼, 회원가입 버튼, 소셜 로그인 등 바인딩 코드들 계속)
+
   } catch (err) {
     console.error("[init] fatal:", err);
   }
 
 
 
-
-
-// ✅ 사주 기록 클릭 → 입력폼 채워넣기
-document.addEventListener("click", (e) => {
+// ✅ 사주 기록 클릭 → 입력폼 채워넣기 + 바로 사주 출력
+document.addEventListener("click", async (e) => {
   if (e.target.classList.contains("saju-record-link")) {
     e.preventDefault();
 
     const record = JSON.parse(e.target.dataset.json);
+    const recordId = e.target.dataset.id;
 
-    // ✅ 입력폼 값 채우기 (input_json 기준)
+    // ✅ 열람 카운트 증가
+    if (recordId) {
+      await window.supabaseClient
+        .from("saju_records")
+        .update({ view_count: (record.view_count || 0) + 1 })
+        .eq("id", recordId);
+    }
+
+    // ✅ 입력폼 값 채우기
     document.getElementById("customer-name").value = record.name || "";
     document.getElementById("birth-date").value = record.birthDate || "";
     document.getElementById("calendar-type").value = record.calendarType || "";
@@ -3115,9 +3279,20 @@ document.addEventListener("click", (e) => {
       document.getElementById("minute-select").value = record.minute;
     }
 
-   // alert("폼에 값이 채워졌습니다. 확인 후 '사주 출력'을 눌러주세요.");
+    // ✅ 버튼 활성화 처리 → 신살 버튼 ON
+    const sajuBtn = document.getElementById("sajuSubmit");
+    const sinsalBtn = document.getElementById("sinsalBtn");
+    sajuBtn.classList.remove("active");
+    sinsalBtn.classList.add("active");
+
+    // ✅ 신살 출력 실행
+    handleSajuSubmit(new Event("click")); 
+    // ⚠️ 여기 함수명이 실제로는 handleSinsalSubmit 일 수도 있음 → 확인 필요
   }
 });
+
+
+
 
 
 // 삭제 버튼 이벤트 (이벤트 위임)

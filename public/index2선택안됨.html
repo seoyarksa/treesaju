@@ -235,6 +235,99 @@
   height: auto !important;     /* ✅ 높이도 자동 */
   white-space: nowrap;         /* ✅ 줄바꿈 방지 */
 }
+
+.btn-success.active {
+  background-color: #f18997; 
+  color: #fff;
+}
+
+/* 고객 이력 표 전체 */
+#saju-history-table {
+  width: 100%;
+  border-collapse: collapse; /* 이중선 제거 */
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+/* 셀 공통 스타일 */
+#saju-history-table th,
+#saju-history-table td {
+  border: 1px solid #e0e0e0;
+  padding: 8px 12px;
+  text-align: center;
+}
+
+/* 헤더 줄 */
+#saju-history-table th {
+  background-color: #f8f9fa;
+  font-weight: bold;
+}
+
+/* 줄무늬 효과 */
+#saju-history-table tr:nth-child(even) {
+  background-color: #fcfcfc;
+}
+
+/* hover 효과 */
+#saju-history-table tr:hover {
+  background-color: #f1f7ff;
+}
+
+/* 이름 클릭 링크 */
+.saju-record-link {
+  cursor: pointer;
+  color: #007bff;
+  text-decoration: underline;
+}
+
+/* 삭제 버튼 */
+.delete-record-btn {
+  background: #ff4d4f;
+  border: none;
+  color: white;
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.delete-record-btn:hover {
+  background: #d9363e;
+}
+
+
+
+
+#page-info {
+  margin-top: 12px;
+  text-align: center;   /* ✅ 전체 가운데 정렬 */
+}
+
+.page-btn,
+.page-num {
+  margin: 0 2px;          /* ✅ 간격 줄임 */
+  padding: 2px 4px;       /* ✅ 안쪽 여백도 줄임 */
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: #000;            /* 기본 검정색 */
+}
+
+.page-btn:hover,
+.page-num:hover {
+  text-decoration: underline;
+}
+
+.page-num.active {
+  font-weight: bold;
+  color: red;             /* ✅ 현재 페이지만 빨강 */
+  text-decoration: none;
+}
+
+
+
+
+
 </style>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -269,20 +362,34 @@
         </td>
         <!-- 로그인 / 회원가입 -->
         <td>
+            <input type="password" id="password" placeholder="비밀번호" style="padding:5px; width:60px;">
           <button type="button" id="loginBtn" class="btn-success">로그인</button>
           <button type="button" id="signupBtn" class="btn-success" style="margin-left:8px; background-color:#fab7b7; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">회원가입</button>
         </td>
       </tr>
       <tr>
         <!-- 비밀번호 입력 -->
-        <td>
-          <input type="password" id="password" placeholder="비밀번호" style="padding:5px; width:120px;">
-        </td>
-        <!-- 소셜 로그인 -->
-        <td>
-          <button type="button" id="googleLogin" class="btn-success">구글 로그인</button>
-          <button type="button" id="kakaoLogin" class="btn-success">카카오 로그인</button>
-        </td>
+<td style="text-align: right; color: blue;">
+  간편로그인:
+</td>
+
+
+  <td>
+  <div class="social-login">
+    <!-- 구글 로그인 버튼 -->
+    <img src="images/구글로그인.png" 
+         alt="Google 로그인" 
+         class="login-btn" 
+         id="googleLogin" />
+
+    <!-- 카카오 로그인 버튼 -->
+    <img src="images/카카오로그인.png" 
+         alt="Kakao 로그인" 
+         class="login-btn" 
+         id="kakaoLogin" />
+  </div>
+</td>
+
       </tr>
     </table>
   </form>
@@ -292,7 +399,7 @@
 <div id="profile-section" style="display:none; margin-top:8px;">
   <span id="user-nickname" style="font-weight:600; color: blue;"></span> 님 환영합니다
  
-  <button id="logoutBtn" type="button" style="margin-left:8px; background-color:#fab7b7; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">로그아웃</button>
+  <button id="logoutBtn" type="button" style="margin-left:8px; background-color:#fab7b7; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">로그아웃</button><br>
   <button id="toggle-history-btn" style="background-color:#4CAF50; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">고객data</button>
   <button id="subscribeBtn" type="button" style="margin-left:8px;background-color:#4CAF50; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">정기구독</button>
 
@@ -449,7 +556,7 @@
   <!-- 기존 버튼 -->
   <button type="button" id="sajuSubmit" class="btn-success">사주식 출력</button>
   <button type="button" id="sinsalBtn" class="btn-success">신살보기</button>
-
+<span id="count-display"></span>
  
   </form>
 
@@ -503,7 +610,18 @@
 <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
 <script type="module" src="app.js"></script>
 
+<script>
+  const buttons = document.querySelectorAll("#sajuSubmit, #sinsalBtn");
 
+  buttons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      // 모든 버튼에서 active 제거
+      buttons.forEach(b => b.classList.remove("active"));
+      // 클릭된 버튼에 active 추가
+      btn.classList.add("active");
+    });
+  });
+</script>
 
 
 </body>
