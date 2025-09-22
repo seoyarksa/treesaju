@@ -2,7 +2,7 @@
 
 
 // git add .
-// git commit -m "일간왕쇠강약"   
+// git commit -m "로그인횟수제한"   
 // git push origin main
 // git push
 //강제실행   vercel --prod --force
@@ -815,6 +815,8 @@ async function handleSajuSubmit(e) {
         }
 
         console.log(`[limit] 남은 횟수: ${gate.remaining}/${gate.limit}`);
+
+        // ✅ 카운트는 RPC에서만 처리 → UI 갱신도 여기서 한 번만
         updateCountDisplay(gate, profile);
       } else {
         console.log("관리자 계정 ✅ (무제한)");
@@ -824,7 +826,7 @@ async function handleSajuSubmit(e) {
     // 3) 출력 실행
     renderSaju(formData);
 
-    // 4) 로그인 사용자 → 저장 + 카운트
+    // 4) 로그인 사용자 → 저장 (카운트는 RPC에서 이미 처리됨)
     if (session?.user) {
       try {
         if (formData.name) {
@@ -854,22 +856,13 @@ async function handleSajuSubmit(e) {
             console.log("✅ 사주 데이터 저장 완료:", newRecord);
           }
         } else {
-          console.log("⚠️ 이름 없음 → 저장 건너뜀 (카운트만)");
+          console.log("⚠️ 이름 없음 → 저장 건너뜀 (카운트만 RPC에서 처리됨)");
         }
 
-        // ✅ 무조건 카운트 증가 (새로운 입력일 때만)
-        const { data: profile, error: profileErr } = await window.supabaseClient
-          .from("profiles")
-          .select("role, created_at")
-          .eq("user_id", session.user.id)
-          .single();
-
-        if (profile && !profileErr) {
-          await increaseTodayCount(session.user.id, profile);
-        }
+        // ❌ 여기서 더 이상 increaseTodayCount 호출 없음
       } catch (err) {
         console.error("❌ DB 처리 오류:", err);
-        alert("요청 처리 중 오류가 발생했습니다.");
+        alert("사주 데이터 저장 중 오류가 발생했습니다.");
       }
     }
   } catch (err) {
@@ -877,6 +870,7 @@ async function handleSajuSubmit(e) {
     alert("요청 처리 중 오류가 발생했습니다.");
   }
 }
+
 
 
 
@@ -3334,10 +3328,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       updateCountDisplay(todayCount, guestProfile);
     }
 
-    // ✅ 로그인 상태 변경 감시
-    window.supabaseClient.auth.onAuthStateChange((_ev, newSession) => {
-      updateAuthUI(newSession);
-    });
+// ✅ 로그인 상태 변경 감시
+window.supabaseClient.auth.onAuthStateChange((event, newSession) => {
+  console.log("[AuthStateChange]", event, newSession);
+
+  if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+    // 화면 전체 새로고침
+    window.location.reload();
+  } else {
+    // 그 외 상태 변화는 기존처럼 UI 업데이트만
+    updateAuthUI(newSession);
+  }
+});
 
     // ✅ 사주 기록 클릭 → 입력폼 채워넣기 + 출력
     document.addEventListener("click", async (e) => {
@@ -3370,31 +3372,43 @@ document.addEventListener("DOMContentLoaded", async () => {
         sinsalBtn.classList.add("active");
 
         handleSajuSubmit(new Event("click")); 
+
+    // ✅ 고객 데이터 모달 닫기
+    const modal = document.getElementById("saju-history-panel");
+    if (modal) {
+      modal.style.display = "none"; 
+    }
+
       }
     });
 
-    // ✅ 삭제 버튼 이벤트
-    document.addEventListener("click", async (e) => {
-      if (e.target.classList.contains("delete-record-btn")) {
-        const recordId = e.target.dataset.id;
-        if (!recordId) return;
-        if (!confirm("정말 이 기록을 삭제하시겠습니까?")) return;
+    
+// 삭제 버튼 이벤트 (이벤트 위임)
+// ✅ 전역에서 딱 한 번만 등록
+document.addEventListener("click", async (e) => {
+  if (e.target.classList.contains("delete-record-btn")) {
+    const recordId = e.target.dataset.id;
+    if (!recordId) return;
 
-        const { error } = await window.supabaseClient
-          .from("saju_records")
-          .delete()
-          .eq("id", recordId);
+    if (!confirm("정말 이 기록을 삭제하시겠습니까?")) return;
 
-        if (error) {
-          console.error("삭제 오류:", error);
-          alert("삭제 중 문제가 발생했습니다.");
-          return;
-        }
+    const { error } = await window.supabaseClient
+      .from("saju_records")
+      .delete()
+      .eq("id", recordId);   // ✅ uuid가 아니라 id 컬럼 사용
 
-        e.target.closest("tr").remove();
-        console.log("삭제 완료:", recordId);
-      }
-    });
+    if (error) {
+      console.error("삭제 오류:", error);
+      alert("삭제 중 문제가 발생했습니다.");
+      return;
+    }
+
+    // 삭제 성공 시 UI에서도 제거
+    e.target.closest("tr").remove();
+    console.log("삭제 완료:", recordId);
+  }
+});
+
 
     // ✅ 내 사주 기록 버튼
     document.getElementById("toggle-history-btn")?.addEventListener("click", async () => {
