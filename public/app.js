@@ -755,15 +755,41 @@ async function handleSajuSubmit(e) {
   console.log("[DEBUG] handleSajuSubmit 실행됨");
 
   try {
-    // 1) 로그인 여부 확인
+    // 1) 입력 데이터 수집
+    const formData = {
+      name: document.getElementById("customer-name")?.value.trim(),
+      birthDate: document.getElementById("birth-date")?.value,
+      calendarType: document.getElementById("calendar-type")?.value,
+      gender: document.getElementById("gender")?.value,
+      ampm: document.querySelector("input[name='ampm']:checked")?.value,
+      hour: document.getElementById("hour-select")?.value,
+      minute: document.getElementById("minute-select")?.value,
+    };
+
+    if (!formData.gender) {
+      alert("성별을 선택해야 합니다.");
+      return;
+    }
+
+    const formKey = JSON.stringify(formData);
+
+    // --- 동일 입력값이면 출력만 허용 (카운트/저장 ❌)
+    if (lastOutputData === formKey) {
+      console.log("⚠️ 동일 입력값 → 카운트 증가 안 함");
+      renderSaju(formData);
+      return;
+    }
+
+    // 여기 오면 새로운 입력 → 카운트 대상
+    lastOutputData = formKey;
+
+    // 2) 로그인 여부 확인
     const { data: { session } } = await window.supabaseClient.auth.getSession();
 
     if (!session) {
-      // 비로그인 제한
       const ok = await checkRenderAllowed();
       if (!ok) return;
     } else {
-      // 로그인 상태 → 관리자/제한 검사
       const { data: profile } = await window.supabaseClient
         .from("profiles")
         .select("role")
@@ -777,100 +803,69 @@ async function handleSajuSubmit(e) {
           alert("이용 제한 확인 중 오류가 발생했습니다.");
           return;
         }
-if (!gate?.allowed) {
-  let reason = "이용이 제한되었습니다.";
 
-  if (gate?.remaining === 0) {
-    reason = "오늘 사용 가능한 횟수를 모두 소진하셨습니다.";
-  } else if (gate?.limit === 0) {
-    reason = "구독이 필요합니다. 결제를 진행해주세요.";
-  } else if (gate?.message) {
-    // RPC에서 커스텀 메시지를 내려주는 경우
-    reason = gate.message;
-  }
+        if (!gate?.allowed) {
+          let reason = "이용이 제한되었습니다.";
+          if (gate?.remaining === 0) reason = "오늘 사용 가능한 횟수를 모두 소진하셨습니다.";
+          else if (gate?.limit === 0) reason = "구독이 필요합니다. 결제를 진행해주세요.";
+          else if (gate?.message) reason = gate.message;
 
-  alert(reason);
-  return;
-}
+          alert(reason);
+          return;
+        }
 
         console.log(`[limit] 남은 횟수: ${gate.remaining}/${gate.limit}`);
+        updateCountDisplay(gate, profile);
       } else {
         console.log("관리자 계정 ✅ (무제한)");
       }
     }
 
-    // 2) 입력 데이터 수집
-    const formData = {
-      name: document.getElementById("customer-name")?.value.trim(),
-      birthDate: document.getElementById("birth-date")?.value,
-      calendarType: document.getElementById("calendar-type")?.value,
-      gender: document.getElementById("gender")?.value,
-      ampm: document.querySelector("input[name='ampm']:checked")?.value,
-      hour: document.getElementById("hour-select")?.value,
-      minute: document.getElementById("minute-select")?.value,
-    };
-
-    if (!formData.name) {
-      alert("이름을 입력해야 저장할 수 있습니다.");
-      return;
-    }
-    if (!formData.gender) {
-      alert("성별을 선택해야 저장할 수 있습니다.");
-      return;
-    }
-
-    // --- 반복 출력 방지
-    const formKey = JSON.stringify(formData);
-    if (lastOutputData === formKey) {
-      console.log("⚠️ 동일 입력값 → 카운트 제외");
-    } else {
-      lastOutputData = formKey;
-    }
-
-    // 3) 실제 출력 실행 (여기 위치!)
+    // 3) 출력 실행
     renderSaju(formData);
 
-    // 4) 로그인 사용자 → DB 저장 + 카운트
+    // 4) 로그인 사용자 → 저장 + 카운트
     if (session?.user) {
       try {
-        const { data: newRecord, error: insertErr } = await window.supabaseClient
-          .from("saju_records")
-          .insert([{
-            user_id: session.user.id,
-            name: formData.name,
-            birth_date: formData.birthDate,
-            birth_time: `${formData.ampm} ${formData.hour}:${formData.minute}`,
-            gender: formData.gender,
-            calendar_type: formData.calendarType,
-            input_json: formData,
-          }])
-          .select()
-          .single();
-
-        if (insertErr) {
-          if (insertErr.code === "23505" || insertErr.code === "409") {
-            console.log("⚠️ 중복된 데이터 → 저장하지 않음 (카운트 제외)");
-          } else {
-            console.error("❌ 저장 오류:", insertErr);
-            alert("사주 데이터 저장 중 오류가 발생했습니다.");
-          }
-        } else if (newRecord) {
-          console.log("✅ 사주 데이터 저장 완료:", newRecord);
-        }
-
-        // 카운트 증가
-        if (lastOutputData === formKey && !insertErr) {
-          console.log("⏩ 반복 출력/오류 → 카운트 생략");
-        } else {
-          const { data: profile, error: profileErr } = await window.supabaseClient
-            .from("profiles")
-            .select("role, created_at")
-            .eq("user_id", session.user.id)
+        if (formData.name) {
+          // 이름이 있으면 저장
+          const { data: newRecord, error: insertErr } = await window.supabaseClient
+            .from("saju_records")
+            .insert([{
+              user_id: session.user.id,
+              name: formData.name,
+              birth_date: formData.birthDate,
+              birth_time: `${formData.ampm} ${formData.hour}:${formData.minute}`,
+              gender: formData.gender,
+              calendar_type: formData.calendarType,
+              input_json: formData,
+            }])
+            .select()
             .single();
 
-          if (profile && !profileErr) {
-            await increaseTodayCount(session.user.id, profile);
+          if (insertErr) {
+            if (insertErr.code === "23505" || insertErr.code === "409") {
+              console.log("⚠️ 중복된 데이터 → 저장하지 않음");
+            } else {
+              console.error("❌ 저장 오류:", insertErr);
+              alert("사주 데이터 저장 중 오류가 발생했습니다.");
+            }
+          } else if (newRecord) {
+            console.log("✅ 사주 데이터 저장 완료:", newRecord);
           }
+        } else {
+          console.log("⚠️ 이름 없음 → 저장 건너뜀 (카운트만)");
+        }
+
+        // ✅ 무조건 카운트 증가 (새로운 입력일 때만)
+        const { data: profile, error: profileErr } = await window.supabaseClient
+          .from("profiles")
+          .select("role, created_at")
+          .eq("user_id", session.user.id)
+          .single();
+
+        if (profile && !profileErr) {
+          await increaseTodayCount(session.user.id, profile);
         }
       } catch (err) {
         console.error("❌ DB 처리 오류:", err);
