@@ -321,39 +321,55 @@ function getGuestId() {
 
 
 //오늘의 카운트 증가 갱신
+let isCountUpdating = false;
+
 async function increaseTodayCount(userId, profile) {
-  const today = new Date().toISOString().slice(0, 10);
-
-  // 오늘자 카운트 조회
-  const { data: countRow, error: selectErr } = await window.supabaseClient
-    .from("saju_counts")
-    .select("count")
-    .eq("user_id", userId)
-    .eq("count_date", today)
-    .maybeSingle();
-
-  if (selectErr) {
-    console.error("카운트 조회 오류:", selectErr);
+  // 🚦 중복 실행 방지
+  if (isCountUpdating) {
+    console.warn("[DEBUG] increaseTodayCount 중복 실행 차단");
     return;
   }
+  isCountUpdating = true;
 
-  const newCount = (countRow?.count || 0) + 1;
+  try {
+    const today = new Date().toISOString().slice(0, 10);
 
-  // upsert (있으면 업데이트, 없으면 삽입)
-  const { error: updateErr } = await window.supabaseClient
-    .from("saju_counts")
-    .upsert(
-      { user_id: userId, count_date: today, count: newCount },
-      { onConflict: "user_id,count_date" }
-    );
+    // 오늘자 카운트 조회
+    const { data: countRow, error: selectErr } = await window.supabaseClient
+      .from("saju_counts")
+      .select("count")
+      .eq("user_id", userId)
+      .eq("count_date", today)
+      .maybeSingle();
 
-  if (updateErr) {
-    console.error("카운트 업데이트 오류:", updateErr);
-    return;
+    if (selectErr) {
+      console.error("카운트 조회 오류:", selectErr);
+      return;
+    }
+
+    const newCount = (countRow?.count || 0) + 1;
+
+    // upsert (있으면 업데이트, 없으면 삽입)
+    const { error: updateErr } = await window.supabaseClient
+      .from("saju_counts")
+      .upsert(
+        { user_id: userId, count_date: today, count: newCount },
+        { onConflict: "user_id,count_date" }
+      );
+
+    if (updateErr) {
+      console.error("카운트 업데이트 오류:", updateErr);
+      return;
+    }
+
+    // ✅ 화면 표시 갱신
+    updateCountDisplay(newCount, profile);
+
+    console.log("[DEBUG] increaseTodayCount 완료:", newCount);
+  } finally {
+    // 🚦 실행 끝나면 잠금 해제
+    isCountUpdating = false;
   }
-
-  // ✅ 화면 표시 갱신
-  updateCountDisplay(newCount, profile);
 }
 
 
