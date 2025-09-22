@@ -334,26 +334,32 @@ async function increaseTodayCount(userId, profile) {
 
   if (selectErr) {
     console.error("카운트 조회 오류:", selectErr);
-    return;
+    return null;
   }
 
   const newCount = (countRow?.count || 0) + 1;
 
-  // upsert (있으면 업데이트, 없으면 삽입)
-  const { error: updateErr } = await window.supabaseClient
+  // upsert → 최종 값 반환
+  const { data, error: upsertErr } = await window.supabaseClient
     .from("saju_counts")
     .upsert(
       { user_id: userId, count_date: today, count: newCount },
       { onConflict: "user_id,count_date" }
-    );
+    )
+    .select("count")
+    .single();
 
-  if (updateErr) {
-    console.error("카운트 업데이트 오류:", updateErr);
-    return;
+  if (upsertErr) {
+    console.error("카운트 업데이트 오류:", upsertErr);
+    return null;
   }
 
+  const finalCount = data?.count ?? newCount;
+
   // ✅ 화면 표시 갱신
-  updateCountDisplay(newCount, profile);
+  updateCountDisplay(finalCount, profile);
+
+  return finalCount;
 }
 
 
