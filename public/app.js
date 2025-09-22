@@ -168,8 +168,13 @@ async function updateCountDisplay(todayCount, profile) {
   const span = document.getElementById("count-display");
   if (!span) return;
 
+  // ✅ todayCount 보정: 객체일 경우 count 값만 사용
+  const today = typeof todayCount === "object" 
+    ? todayCount.count ?? 0 
+    : todayCount ?? 0;
+
   let totalCount = 0;
-  
+
   if (profile?.role !== "guest") {
     // 로그인 회원 → DB 누적 합
     const { data, error } = await window.supabaseClient
@@ -177,15 +182,14 @@ async function updateCountDisplay(todayCount, profile) {
       .select("count")
       .eq("user_id", profile.user_id);
 
-    if (!error && data) {
-      totalCount = data.reduce((sum, row) => sum + row.count, 0);
+    if (!error && Array.isArray(data)) {
+      totalCount = data.reduce((sum, row) => sum + (row.count ?? 0), 0);
     }
 
-    // ✅ 보정: DB 갱신 지연 시
-    if (totalCount < todayCount) {
-      totalCount = todayCount;
+    // ✅ DB 지연 대비: 오늘 카운트가 더 크면 보정
+    if (totalCount < today) {
+      totalCount = today;
     }
-
   } else {
     // 비회원 → localStorage 누적 합
     const usage = JSON.parse(localStorage.getItem("sajuUsage") || "{}");
@@ -193,12 +197,13 @@ async function updateCountDisplay(todayCount, profile) {
       .filter(v => typeof v === "number")
       .reduce((a, b) => a + b, 0);
 
-    if (totalCount < todayCount) {
-      totalCount = todayCount;
+    if (totalCount < today) {
+      totalCount = today;
     }
   }
 
-  span.innerHTML = `(누적 총 ${totalCount}회 / 오늘 ${todayCount}회)`;
+  // ✅ 최종 1회만 UI 갱신
+  span.textContent = `(누적 총 ${totalCount}회 / 오늘 ${today}회)`;
 }
 
 
@@ -334,32 +339,26 @@ async function increaseTodayCount(userId, profile) {
 
   if (selectErr) {
     console.error("카운트 조회 오류:", selectErr);
-    return null;
+    return;
   }
 
   const newCount = (countRow?.count || 0) + 1;
 
-  // upsert → 최종 값 반환
-  const { data, error: upsertErr } = await window.supabaseClient
+  // upsert (있으면 업데이트, 없으면 삽입)
+  const { error: updateErr } = await window.supabaseClient
     .from("saju_counts")
     .upsert(
       { user_id: userId, count_date: today, count: newCount },
       { onConflict: "user_id,count_date" }
-    )
-    .select("count")
-    .single();
+    );
 
-  if (upsertErr) {
-    console.error("카운트 업데이트 오류:", upsertErr);
-    return null;
+  if (updateErr) {
+    console.error("카운트 업데이트 오류:", updateErr);
+    return;
   }
 
-  const finalCount = data?.count ?? newCount;
-
   // ✅ 화면 표시 갱신
-  updateCountDisplay(finalCount, profile);
-
-  return finalCount;
+  updateCountDisplay(newCount, profile);
 }
 
 
