@@ -326,7 +326,12 @@ function getGuestId() {
 
 
 //오늘의 카운트 증가 갱신
+let isCounting = false;
+
 async function increaseTodayCount(userId, profile) {
+  if (isCounting) return null;   // 🚫 이미 실행 중이면 무시
+  isCounting = true;
+
   const today = new Date().toISOString().slice(0, 10);
 
   // 오늘자 카운트 조회
@@ -339,27 +344,37 @@ async function increaseTodayCount(userId, profile) {
 
   if (selectErr) {
     console.error("카운트 조회 오류:", selectErr);
-    return;
+    isCounting = false;
+    return null;
   }
 
   const newCount = (countRow?.count || 0) + 1;
 
   // upsert (있으면 업데이트, 없으면 삽입)
-  const { error: updateErr } = await window.supabaseClient
+  const { data, error: upsertErr } = await window.supabaseClient
     .from("saju_counts")
     .upsert(
       { user_id: userId, count_date: today, count: newCount },
       { onConflict: "user_id,count_date" }
-    );
+    )
+    .select("count")
+    .single();
 
-  if (updateErr) {
-    console.error("카운트 업데이트 오류:", updateErr);
-    return;
+  if (upsertErr) {
+    console.error("카운트 업데이트 오류:", upsertErr);
+    isCounting = false;
+    return null;
   }
 
-  // ✅ 화면 표시 갱신
-  updateCountDisplay(newCount, profile);
+  const finalCount = data?.count ?? newCount;
+
+  // ✅ 화면 표시 갱신 (딱 한 번만)
+  updateCountDisplay(finalCount, profile);
+
+  isCounting = false;
+  return finalCount;
 }
+
 
 
 
