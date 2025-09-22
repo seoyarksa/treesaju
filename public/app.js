@@ -164,47 +164,13 @@ function getKSTDateKey() {
 
 
 // ✅ 출력횟수 표시 (회원/비회원 공통)
-async function updateCountDisplay(todayCount, profile) {
+function updateCountDisplay(todayCount, totalCount, remain, dailyLimit) {
   const span = document.getElementById("count-display");
   if (!span) return;
 
-  // ✅ todayCount 보정: 객체일 경우 count 값만 사용
-  const today = typeof todayCount === "object" 
-    ? todayCount.count ?? 0 
-    : todayCount ?? 0;
-
-  let totalCount = 0;
-
-  if (profile?.role !== "guest") {
-    // 로그인 회원 → DB 누적 합
-    const { data, error } = await window.supabaseClient
-      .from("saju_counts")
-      .select("count")
-      .eq("user_id", profile.user_id);
-
-    if (!error && Array.isArray(data)) {
-      totalCount = data.reduce((sum, row) => sum + (row.count ?? 0), 0);
-    }
-
-    // ✅ DB 지연 대비: 오늘 카운트가 더 크면 보정
-    if (totalCount < today) {
-      totalCount = today;
-    }
-  } else {
-    // 비회원 → localStorage 누적 합
-    const usage = JSON.parse(localStorage.getItem("sajuUsage") || "{}");
-    totalCount = Object.values(usage)
-      .filter(v => typeof v === "number")
-      .reduce((a, b) => a + b, 0);
-
-    if (totalCount < today) {
-      totalCount = today;
-    }
-  }
-
-  // ✅ 최종 1회만 UI 갱신
-  span.textContent = `(누적 총 ${totalCount}회 / 오늘 ${today}회)`;
+  span.textContent = `남은 횟수 (${remain}/${dailyLimit}) / 누적 총 ${totalCount}회`;
 }
+
 
 
 
@@ -326,12 +292,7 @@ function getGuestId() {
 
 
 //오늘의 카운트 증가 갱신
-let isCounting = false;
-
 async function increaseTodayCount(userId, profile) {
-  if (isCounting) return null;   // 🚫 이미 실행 중이면 무시
-  isCounting = true;
-
   const today = new Date().toISOString().slice(0, 10);
 
   // 오늘자 카운트 조회
@@ -344,36 +305,43 @@ async function increaseTodayCount(userId, profile) {
 
   if (selectErr) {
     console.error("카운트 조회 오류:", selectErr);
-    isCounting = false;
-    return null;
+    return;
   }
 
   const newCount = (countRow?.count || 0) + 1;
 
-  // upsert (있으면 업데이트, 없으면 삽입)
-  const { data, error: upsertErr } = await window.supabaseClient
+  // upsert (오늘 카운트 증가)
+  const { error: upsertErr } = await window.supabaseClient
     .from("saju_counts")
     .upsert(
       { user_id: userId, count_date: today, count: newCount },
       { onConflict: "user_id,count_date" }
-    )
-    .select("count")
-    .single();
+    );
 
   if (upsertErr) {
     console.error("카운트 업데이트 오류:", upsertErr);
-    isCounting = false;
-    return null;
+    return;
   }
 
-  const finalCount = data?.count ?? newCount;
+  // ✅ 누적 총 카운트 구하기
+  let totalCount = 0;
+  const { data: allRows, error: totalErr } = await window.supabaseClient
+    .from("saju_counts")
+    .select("count")
+    .eq("user_id", userId);
 
-  // ✅ 화면 표시 갱신 (딱 한 번만)
-  updateCountDisplay(finalCount, profile);
+  if (!totalErr && Array.isArray(allRows)) {
+    totalCount = allRows.reduce((sum, row) => sum + (row.count ?? 0), 0);
+  }
 
-  isCounting = false;
-  return finalCount;
+  // ✅ 회원별 limit 불러오기
+  const dailyLimit = profile?.daily_limit ?? 20; // 기본 20
+  const remain = dailyLimit - newCount;
+
+  // ✅ 화면 갱신
+  updateCountDisplay(newCount, totalCount, remain, dailyLimit);
 }
+
 
 
 
@@ -796,6 +764,7 @@ function checkGuestMonthlyLimit() {
 let lastOutputData = null;
 
 async function handleSajuSubmit(e) {
+
   e.preventDefault();
   console.log("[DEBUG] handleSajuSubmit 실행됨");
 
