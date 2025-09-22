@@ -160,6 +160,9 @@ function getKSTDateKey() {
 // ✅ 비로그인 1일 3회(한국 날짜 기준) 제한
 // ✅ 출력횟수 표시 (회원 구분 없음)
 
+
+
+
 // ✅ 출력횟수 표시 (회원/비회원 공통)
 async function updateCountDisplay(todayCount, profile) {
   const span = document.getElementById("count-display");
@@ -774,10 +777,22 @@ async function handleSajuSubmit(e) {
           alert("이용 제한 확인 중 오류가 발생했습니다.");
           return;
         }
-        if (!gate?.allowed) {
-          alert("이용이 제한되었습니다.");
-          return;
-        }
+if (!gate?.allowed) {
+  let reason = "이용이 제한되었습니다.";
+
+  if (gate?.remaining === 0) {
+    reason = "오늘 사용 가능한 횟수를 모두 소진하셨습니다.";
+  } else if (gate?.limit === 0) {
+    reason = "구독이 필요합니다. 결제를 진행해주세요.";
+  } else if (gate?.message) {
+    // RPC에서 커스텀 메시지를 내려주는 경우
+    reason = gate.message;
+  }
+
+  alert(reason);
+  return;
+}
+
         console.log(`[limit] 남은 횟수: ${gate.remaining}/${gate.limit}`);
       } else {
         console.log("관리자 계정 ✅ (무제한)");
