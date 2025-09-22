@@ -321,65 +321,39 @@ function getGuestId() {
 
 
 //오늘의 카운트 증가 갱신
-let isCountUpdating = false;
-let lastCountDate = null; // 오늘 날짜 저장
-let lastCountUser = null; // 마지막 카운트 처리된 유저ID 저장
-
 async function increaseTodayCount(userId, profile) {
   const today = new Date().toISOString().slice(0, 10);
 
-  // 🚦 중복 실행 방지 (소셜 로그인 같은 날 2번 방지)
-  if (isCountUpdating) {
-    console.warn("[DEBUG] increaseTodayCount 실행중 → 차단");
+  // 오늘자 카운트 조회
+  const { data: countRow, error: selectErr } = await window.supabaseClient
+    .from("saju_counts")
+    .select("count")
+    .eq("user_id", userId)
+    .eq("count_date", today)
+    .maybeSingle();
+
+  if (selectErr) {
+    console.error("카운트 조회 오류:", selectErr);
     return;
   }
-  if (lastCountUser === userId && lastCountDate === today) {
-    console.warn("[DEBUG] 오늘 이미 카운트 처리된 유저 → 차단");
+
+  const newCount = (countRow?.count || 0) + 1;
+
+  // upsert (있으면 업데이트, 없으면 삽입)
+  const { error: updateErr } = await window.supabaseClient
+    .from("saju_counts")
+    .upsert(
+      { user_id: userId, count_date: today, count: newCount },
+      { onConflict: "user_id,count_date" }
+    );
+
+  if (updateErr) {
+    console.error("카운트 업데이트 오류:", updateErr);
     return;
   }
 
-  isCountUpdating = true;
-
-  try {
-    // 오늘자 카운트 조회
-    const { data: countRow, error: selectErr } = await window.supabaseClient
-      .from("saju_counts")
-      .select("count")
-      .eq("user_id", userId)
-      .eq("count_date", today)
-      .maybeSingle();
-
-    if (selectErr) {
-      console.error("카운트 조회 오류:", selectErr);
-      return;
-    }
-
-    const newCount = (countRow?.count || 0) + 1;
-
-    // upsert (있으면 업데이트, 없으면 삽입)
-    const { error: updateErr } = await window.supabaseClient
-      .from("saju_counts")
-      .upsert(
-        { user_id: userId, count_date: today, count: newCount },
-        { onConflict: "user_id,count_date" }
-      );
-
-    if (updateErr) {
-      console.error("카운트 업데이트 오류:", updateErr);
-      return;
-    }
-
-    // ✅ 화면 표시 갱신
-    updateCountDisplay(newCount, profile);
-
-    // 🚩 오늘 처리한 유저/날짜 기억
-    lastCountUser = userId;
-    lastCountDate = today;
-
-    console.log("[DEBUG] increaseTodayCount 완료:", newCount);
-  } finally {
-    isCountUpdating = false;
-  }
+  // ✅ 화면 표시 갱신
+  updateCountDisplay(newCount, profile);
 }
 
 
@@ -866,7 +840,7 @@ async function handleSajuSubmit(e) {
         }
 
         console.log(`[limit] 남은 횟수: ${gate.remaining}/${gate.limit}`);
-        updateCountDisplay(gate.remaining, profile);
+        updateCountDisplay(gate, profile);
       } else {
         console.log("관리자 계정 ✅ (무제한)");
       }
@@ -3389,21 +3363,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 window.supabaseClient.auth.onAuthStateChange((event, newSession) => {
   console.log("[AuthStateChange]", event, newSession);
 
-  if (event === "INITIAL_SESSION") {
-    // 🚫 최초 로딩 시 카운트 증가 안 함
-    updateAuthUI(newSession); 
-    return;
-  }
-
   if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
-    // 새 로그인/로그아웃 → 새로고침
+    // 화면 전체 새로고침
     window.location.reload();
   } else {
-    // 그 외 상태 변화 → UI만 갱신
+    // 그 외 상태 변화는 기존처럼 UI 업데이트만
     updateAuthUI(newSession);
   }
 });
-
 
     // ✅ 사주 기록 클릭 → 입력폼 채워넣기 + 출력
     document.addEventListener("click", async (e) => {
