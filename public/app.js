@@ -169,7 +169,7 @@ async function updateCountDisplay(todayCount, profile) {
   if (!span) return;
 
   let totalCount = 0;
-
+  
   if (profile?.role !== "guest") {
     // 로그인 회원 → DB 누적 합
     const { data, error } = await window.supabaseClient
@@ -180,12 +180,22 @@ async function updateCountDisplay(todayCount, profile) {
     if (!error && data) {
       totalCount = data.reduce((sum, row) => sum + row.count, 0);
     }
+
+    // ✅ 보정: DB 갱신 지연 시
+    if (totalCount < todayCount) {
+      totalCount = todayCount;
+    }
+
   } else {
     // 비회원 → localStorage 누적 합
     const usage = JSON.parse(localStorage.getItem("sajuUsage") || "{}");
     totalCount = Object.values(usage)
       .filter(v => typeof v === "number")
       .reduce((a, b) => a + b, 0);
+
+    if (totalCount < todayCount) {
+      totalCount = todayCount;
+    }
   }
 
   span.innerHTML = `(누적 총 ${totalCount}회 / 오늘 ${todayCount}회)`;
@@ -211,6 +221,17 @@ async function updateAuthUI(session) {
   const historySection = document.getElementById("saju-history-section");
 
   if (session && session.user) {
+    // ✅ 여기서 토큰 저장 처리
+    const token = session.access_token;
+    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+    const isMobile = /android|iphone|ipad|ipod/i.test(userAgent);
+
+    if (isMobile) {
+      localStorage.setItem("authToken", token);
+    } else {
+      sessionStorage.setItem("authToken", token);
+    }
+
     if (authSection) authSection.style.display = "none";
     if (profileSection) profileSection.style.display = "block";
 
@@ -247,6 +268,10 @@ async function updateAuthUI(session) {
     loadSajuHistory(user.id);
     renderUserProfile();
   } else {
+    // ✅ 로그아웃 시 스토리지 정리
+    localStorage.removeItem("authToken");
+    sessionStorage.removeItem("authToken");
+
     if (authSection) authSection.style.display = "block";
     if (profileSection) profileSection.style.display = "none";
     if (nicknameEl) nicknameEl.textContent = "";
@@ -815,8 +840,6 @@ async function handleSajuSubmit(e) {
         }
 
         console.log(`[limit] 남은 횟수: ${gate.remaining}/${gate.limit}`);
-
-        // ✅ 카운트는 RPC에서만 처리 → UI 갱신도 여기서 한 번만
         updateCountDisplay(gate, profile);
       } else {
         console.log("관리자 계정 ✅ (무제한)");
@@ -826,7 +849,7 @@ async function handleSajuSubmit(e) {
     // 3) 출력 실행
     renderSaju(formData);
 
-    // 4) 로그인 사용자 → 저장 (카운트는 RPC에서 이미 처리됨)
+    // 4) 로그인 사용자 → 저장 + 카운트
     if (session?.user) {
       try {
         if (formData.name) {
@@ -856,13 +879,22 @@ async function handleSajuSubmit(e) {
             console.log("✅ 사주 데이터 저장 완료:", newRecord);
           }
         } else {
-          console.log("⚠️ 이름 없음 → 저장 건너뜀 (카운트만 RPC에서 처리됨)");
+          console.log("⚠️ 이름 없음 → 저장 건너뜀 (카운트만)");
         }
 
-        // ❌ 여기서 더 이상 increaseTodayCount 호출 없음
+        // ✅ 무조건 카운트 증가 (새로운 입력일 때만)
+        const { data: profile, error: profileErr } = await window.supabaseClient
+          .from("profiles")
+          .select("role, created_at")
+          .eq("user_id", session.user.id)
+          .single();
+
+        if (profile && !profileErr) {
+          await increaseTodayCount(session.user.id, profile);
+        }
       } catch (err) {
         console.error("❌ DB 처리 오류:", err);
-        alert("사주 데이터 저장 중 오류가 발생했습니다.");
+        alert("요청 처리 중 오류가 발생했습니다.");
       }
     }
   } catch (err) {
@@ -870,7 +902,6 @@ async function handleSajuSubmit(e) {
     alert("요청 처리 중 오류가 발생했습니다.");
   }
 }
-
 
 
 
@@ -3504,6 +3535,12 @@ document.addEventListener("click", async (e) => {
         form.requestSubmit();
       });
     }
+
+
+
+
+
+
 
     // ✅ 로그인 후 프로필/정기구독/로그아웃 UI 세팅
     renderUserProfile();

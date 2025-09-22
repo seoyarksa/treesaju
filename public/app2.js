@@ -2,7 +2,7 @@
 
 
 // git add .
-// git commit -m "일간왕쇠강약"   
+// git commit -m "로그인횟수제한"   
 // git push origin main
 // git push
 //강제실행   vercel --prod --force
@@ -158,25 +158,55 @@ function getKSTDateKey() {
 }
 
 // ✅ 비로그인 1일 3회(한국 날짜 기준) 제한
-async function checkRenderAllowed() {
-  // 로그인 되어 있으면 프론트 제한은 패스(서버 RPC가 관리)
-  try {
-    const { data: { session } } = await window.supabaseClient.auth.getSession();
-    if (session) return true;
-  } catch (_) {}
+// ✅ 출력횟수 표시 (회원 구분 없음)
 
-  const todayKST = getKSTDateKey();
-  const usage = JSON.parse(localStorage.getItem('sajuUsage') || '{}');
 
-  usage[todayKST] = (usage[todayKST] || 0) + 1;
 
-  if (usage[todayKST] > 3) {
-    alert('로그인하지 않은 사용자는 한국 날짜 기준으로 하루 3회까지만 사주 출력이 가능합니다.');
-    return false;
+
+// ✅ 출력횟수 표시 (회원/비회원 공통)
+async function updateCountDisplay(todayCount, profile) {
+  const span = document.getElementById("count-display");
+  if (!span) return;
+
+  let totalCount = 0;
+  
+  if (profile?.role !== "guest") {
+    // 로그인 회원 → DB 누적 합
+    const { data, error } = await window.supabaseClient
+      .from("saju_counts")
+      .select("count")
+      .eq("user_id", profile.user_id);
+
+    if (!error && data) {
+      totalCount = data.reduce((sum, row) => sum + row.count, 0);
+    }
+
+    // ✅ 보정: DB 갱신 지연 시
+    if (totalCount < todayCount) {
+      totalCount = todayCount;
+    }
+
+  } else {
+    // 비회원 → localStorage 누적 합
+    const usage = JSON.parse(localStorage.getItem("sajuUsage") || "{}");
+    totalCount = Object.values(usage)
+      .filter(v => typeof v === "number")
+      .reduce((a, b) => a + b, 0);
+
+    if (totalCount < todayCount) {
+      totalCount = todayCount;
+    }
   }
-  localStorage.setItem('sajuUsage', JSON.stringify(usage));
-  return true;
+
+  span.innerHTML = `(누적 총 ${totalCount}회 / 오늘 ${todayCount}회)`;
 }
+
+
+
+
+
+
+
 
 
 // === 2) 로그인 UI 토글
@@ -191,6 +221,17 @@ async function updateAuthUI(session) {
   const historySection = document.getElementById("saju-history-section");
 
   if (session && session.user) {
+    // ✅ 여기서 토큰 저장 처리
+    const token = session.access_token;
+    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+    const isMobile = /android|iphone|ipad|ipod/i.test(userAgent);
+
+    if (isMobile) {
+      localStorage.setItem("authToken", token);
+    } else {
+      sessionStorage.setItem("authToken", token);
+    }
+
     if (authSection) authSection.style.display = "none";
     if (profileSection) profileSection.style.display = "block";
 
@@ -227,6 +268,10 @@ async function updateAuthUI(session) {
     loadSajuHistory(user.id);
     renderUserProfile();
   } else {
+    // ✅ 로그아웃 시 스토리지 정리
+    localStorage.removeItem("authToken");
+    sessionStorage.removeItem("authToken");
+
     if (authSection) authSection.style.display = "block";
     if (profileSection) profileSection.style.display = "none";
     if (nicknameEl) nicknameEl.textContent = "";
@@ -237,14 +282,19 @@ async function updateAuthUI(session) {
 //첫한달간 회원별 제한 횟수 계산
 function getDailyLimit(profile) {
   const role = profile.role;
-  const joinDate = new Date(profile.created_at);
+  const joinDate = new Date(profile.created_at || Date.now());
   const daysSinceJoin = Math.floor((Date.now() - joinDate) / (1000*60*60*24));
 
   switch (role) {
-    case "guest": // 비회원
-      return 3;
+    case "guest": {
+      if (daysSinceJoin > 90) {
+        // 3개월 초과 → 회원가입 유도
+        return 0;
+      }
+      return 3; // 하루 3회
+    }
     case "normal": // 일반회원
-      return daysSinceJoin < 30 ? 10 : 3;
+      return 20;
     case "premium": // 정회원
       return daysSinceJoin < 30 ? 50 : 200;
     case "special": // 특별회원
@@ -257,19 +307,16 @@ function getDailyLimit(profile) {
 
 
 
-
-///오늘 출력횟수 표시
-function updateCountDisplay(todayCount, profile) {
-  const limit = getDailyLimit(profile);
-  const span = document.getElementById("count-display");
-  if (!span) return;
-
-  if (limit === Infinity) {
-    span.innerHTML = `(출력횟수: 오늘 총 <span class="count-num">${todayCount}</span>회)`;
-  } else {
-    span.innerHTML = `(출력횟수: 오늘 ${limit}회중 <span class="count-num">${todayCount}</span>회)`;
+function getGuestId() {
+  let guestId = localStorage.getItem("guest_id");
+  if (!guestId) {
+    guestId = crypto.randomUUID(); // 브라우저 내장 UUID 생성
+    localStorage.setItem("guest_id", guestId);
   }
+  return guestId;
 }
+
+
 
 
 
@@ -634,82 +681,235 @@ async function requirePhoneVerificationIfNeeded() {
 
 
 
+function getCurrentFormData() {
+  return {
+    name: document.getElementById("customer-name").value.trim(),
+    birthDate: document.getElementById("birth-date").value,
+    calendarType: document.getElementById("calendar-type").value,
+    gender: document.getElementById("gender").value,
+    ampm: document.querySelector("input[name='ampm']:checked")?.value,
+    hour: document.getElementById("hour-select").value,
+    minute: document.getElementById("minute-select").value,
+  };
+}
+
+
+
+
+
+// ✅ 비회원/회원 출력 제한 체크
+async function checkRenderAllowed() {
+  // 1) 로그인 사용자 → 서버(DB)에서 제한
+  try {
+    const { data: { session } } = await window.supabaseClient.auth.getSession();
+    if (session) {
+      return true; // 로그인 사용자는 서버 쪽에서 제한 처리
+    }
+  } catch (_) {}
+
+  // 2) 비회원 → localStorage로 제한
+  const todayKST = getKSTDateKey();
+  const usage = JSON.parse(localStorage.getItem("sajuUsage") || "{}");
+
+  // 오늘 카운트 증가
+  usage[todayKST] = (usage[todayKST] || 0) + 1;
+
+  // ✅ 월간 카운트 계산
+  const monthKey = todayKST.slice(0, 7); // YYYY-MM
+  let monthCount = 0;
+  for (let key in usage) {
+    if (key.startsWith(monthKey)) {
+      monthCount += usage[key];
+    }
+  }
+
+  // ✅ 최초 접속일 추적 (비회원 3개월 제한)
+  if (!usage.firstVisit) {
+    usage.firstVisit = todayKST; // 최초 접속일 저장
+  }
+  const firstVisitDate = new Date(usage.firstVisit);
+  const now = new Date(todayKST);
+  const diffDays = Math.floor((now - firstVisitDate) / (1000 * 60 * 60 * 24));
+
+  // 제한 체크
+  if (diffDays > 90) {
+    alert("비회원 이용 가능 기간(3개월)이 만료되었습니다.\n회원가입 후 계속 이용해주세요.");
+    return false;
+  }
+  if (usage[todayKST] > 3) {
+    alert("비회원은 하루 3회까지만 출력 가능합니다.");
+    return false;
+  }
+  if (monthCount > 20) {
+    alert("비회원은 한 달 총 20회까지만 출력 가능합니다.");
+    return false;
+  }
+
+  // 저장
+  localStorage.setItem("sajuUsage", JSON.stringify(usage));
+  return true;
+}
+
+
+
+// ✅ 비회원 월간 제한 (localStorage 이용)
+function checkGuestMonthlyLimit() {
+  const usage = JSON.parse(localStorage.getItem("sajuUsageMonthly") || "{}");
+  const monthKey = new Date().toISOString().slice(0, 7); // 예: "2025-09"
+
+  usage[monthKey] = (usage[monthKey] || 0) + 1;
+
+  if (usage[monthKey] > 20) {
+    alert("비회원은 한 달간 최대 20회까지만 이용 가능합니다.\n회원가입 후 더 많은 기능을 이용하세요!");
+    return false;
+  }
+
+  localStorage.setItem("sajuUsageMonthly", JSON.stringify(usage));
+  return true;
+}
+
 
 
 
 // === 4) 사주 제출 (완전한 한 개만 사용!)
+// === 4) 사주 제출 (완전한 한 개만 사용!)
+let lastOutputData = null;
+
 async function handleSajuSubmit(e) {
   e.preventDefault();
   console.log("[DEBUG] handleSajuSubmit 실행됨");
 
   try {
-    // 1) 로그인 여부 확인
+    // 1) 입력 데이터 수집
+    const formData = {
+      name: document.getElementById("customer-name")?.value.trim(),
+      birthDate: document.getElementById("birth-date")?.value,
+      calendarType: document.getElementById("calendar-type")?.value,
+      gender: document.getElementById("gender")?.value,
+      ampm: document.querySelector("input[name='ampm']:checked")?.value,
+      hour: document.getElementById("hour-select")?.value,
+      minute: document.getElementById("minute-select")?.value,
+    };
+
+    if (!formData.gender) {
+      alert("성별을 선택해야 합니다.");
+      return;
+    }
+
+    const formKey = JSON.stringify(formData);
+
+    // --- 동일 입력값이면 출력만 허용 (카운트/저장 ❌)
+    if (lastOutputData === formKey) {
+      console.log("⚠️ 동일 입력값 → 카운트 증가 안 함");
+      renderSaju(formData);
+      return;
+    }
+
+    // 여기 오면 새로운 입력 → 카운트 대상
+    lastOutputData = formKey;
+
+    // 2) 로그인 여부 확인
     const { data: { session } } = await window.supabaseClient.auth.getSession();
 
     if (!session) {
-      // 비로그인 → 로컬(KST) 3회 제한
       const ok = await checkRenderAllowed();
-      if (!ok) return; // 비로그인 한도 초과
+      if (!ok) return;
     } else {
-      // ✅ 로그인 상태일 때 관리자 여부 먼저 확인
       const { data: profile } = await window.supabaseClient
         .from("profiles")
         .select("role")
-          .eq("user_id", session.user.id)   // ✅ user_id
+        .eq("user_id", session.user.id)
         .single();
 
-      if (profile?.role === "admin") {
-        console.log("관리자 계정 로그인 ✅ (횟수 제한 무시)");
-        // → 그냥 통과
-      } else {
-        // 일반 사용자 → 기존 제한 검사
+      if (profile?.role !== "admin") {
         const { data: gate, error } = await window.supabaseClient.rpc("can_render_and_count");
-
         if (error) {
-          console.error("[RPC] can_render_and_count error:", error);
+          console.error("[RPC] 오류:", error);
           alert("이용 제한 확인 중 오류가 발생했습니다.");
           return;
         }
 
         if (!gate?.allowed) {
-          if (gate.reason === "PHONE_VERIFY_REQUIRED") {
-            if (typeof openPhoneOtpModal === "function") {
-              const msg = (gate.limit != null && gate.remaining != null)
-                ? `오늘은 ${gate.limit}회까지 이용할 수 있어요.\n현재 남은 횟수가 없어 전화번호 인증이 필요합니다.`
-                : "전화번호 인증이 필요합니다. 인증을 완료해 주세요.";
-              alert(msg);
-              openPhoneOtpModal();
-            } else {
-              alert("정기구독하려면 전화번호 인증이 필요합니다. 첫1개월 무료로 1일 30회, 이후 2개월부터 유료로 무제한 이용가능합니다.");
-            }
-            return;
-          }
+          let reason = "이용이 제한되었습니다.";
+          if (gate?.remaining === 0) reason = "오늘 사용 가능한 횟수를 모두 소진하셨습니다.";
+          else if (gate?.limit === 0) reason = "구독이 필요합니다. 결제를 진행해주세요.";
+          else if (gate?.message) reason = gate.message;
 
-          if (gate.reason === "DAILY_LIMIT_REACHED") {
-            const msg = (gate.limit != null)
-              ? `오늘 사용 가능한 ${gate.limit}회를 모두 사용했습니다. 내일 다시 이용해 주세요.`
-              : "오늘 사용 가능한 횟수를 모두 사용했습니다.";
-            alert(msg);
-            return;
-          }
-
-          if (gate.reason === "NO_SESSION") {
-            const ok = await checkRenderAllowed();
-            if (!ok) return;
-          }
-
-          alert("이용이 제한되었습니다. 잠시 후 다시 시도해 주세요.");
+          alert(reason);
           return;
         }
 
-        // allowed=true → 남은 횟수 로그
-        if (gate.limit != null && gate.remaining != null) {
-          console.log(`[limit] 남은 횟수: ${gate.remaining}/${gate.limit}`);
-        }
+        console.log(`[limit] 남은 횟수: ${gate.remaining}/${gate.limit}`);
+        updateCountDisplay(gate, profile);
+      } else {
+        console.log("관리자 계정 ✅ (무제한)");
       }
     }
 
-    // 2) 🔻 여기부터 기존 사주 출력/DB 저장 로직 🔻
+    // 3) 출력 실행
+    renderSaju(formData);
+
+    // 4) 로그인 사용자 → 저장 + 카운트
+    if (session?.user) {
+      try {
+        if (formData.name) {
+          // 이름이 있으면 저장
+          const { data: newRecord, error: insertErr } = await window.supabaseClient
+            .from("saju_records")
+            .insert([{
+              user_id: session.user.id,
+              name: formData.name,
+              birth_date: formData.birthDate,
+              birth_time: `${formData.ampm} ${formData.hour}:${formData.minute}`,
+              gender: formData.gender,
+              calendar_type: formData.calendarType,
+              input_json: formData,
+            }])
+            .select()
+            .single();
+
+          if (insertErr) {
+            if (insertErr.code === "23505" || insertErr.code === "409") {
+              console.log("⚠️ 중복된 데이터 → 저장하지 않음");
+            } else {
+              console.error("❌ 저장 오류:", insertErr);
+              alert("사주 데이터 저장 중 오류가 발생했습니다.");
+            }
+          } else if (newRecord) {
+            console.log("✅ 사주 데이터 저장 완료:", newRecord);
+          }
+        } else {
+          console.log("⚠️ 이름 없음 → 저장 건너뜀 (카운트만)");
+        }
+
+        // ✅ 무조건 카운트 증가 (새로운 입력일 때만)
+        const { data: profile, error: profileErr } = await window.supabaseClient
+          .from("profiles")
+          .select("role, created_at")
+          .eq("user_id", session.user.id)
+          .single();
+
+        if (profile && !profileErr) {
+          await increaseTodayCount(session.user.id, profile);
+        }
+      } catch (err) {
+        console.error("❌ DB 처리 오류:", err);
+        alert("요청 처리 중 오류가 발생했습니다.");
+      }
+    }
+  } catch (err) {
+    console.error("❌ handleSajuSubmit error:", err);
+    alert("요청 처리 중 오류가 발생했습니다.");
+  }
+}
+
+
+
+
+
+async  function renderSaju(formdata) {
+
+    // 2) 🔻 여기부터 사주 출력/DB 저장 로직 🔻
     console.log("사주 출력 로직 실행 준비 완료!");
 
 
@@ -3089,82 +3289,7 @@ requestAnimationFrame(() => {
 // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
 // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
 
-
-
-
- // 2) 입력 데이터 수집
-    const formData = {
-      name: document.getElementById("customer-name")?.value.trim(),
-      birthDate: document.getElementById("birth-date")?.value,
-      calendarType: document.getElementById("calendar-type")?.value,
-      gender: document.getElementById("gender")?.value,
-      ampm: document.querySelector("input[name='ampm']:checked")?.value,
-      hour: document.getElementById("hour-select")?.value,
-      minute: document.getElementById("minute-select")?.value,
-    };
-
-    if (!formData.name) {
-      alert("이름을 입력해야 저장할 수 있습니다.");
-      return;
-    }
-    if (!formData.gender) {
-      alert("성별을 선택해야 저장할 수 있습니다.");
-      return;
-    }
-
-    const birthTime = `${formData.ampm} ${formData.hour}:${formData.minute}`;
-
-    // ✅ 로그인 상태라면 DB insert 시도
-    if (session && session.user) {
-      const { data: newRecord, error } = await window.supabaseClient
-        .from("saju_records")
-        .insert([{
-          user_id: session.user.id,
-          name: formData.name,
-          birth_date: formData.birthDate,
-          birth_time: birthTime,
-          gender: formData.gender,
-          calendar_type: formData.calendarType,
-          input_json: formData,
-        }])
-        .select()
-        .single();
-
-      if (error) {
-        console.error("저장 오류:", error);
-        if (error.code === "23505" || error.code === "409") {
-          console.log("중복된 데이터 → 저장하지 않음");
-        } else {
-          alert("사주 데이터 저장 중 오류가 발생했습니다.");
-        }
-      } else if (newRecord) {
-        console.log("사주 데이터 저장 완료:", newRecord);
-        alert("✅ 저장이 완료되었습니다. '내 사주 기록'에서 확인하세요.");
-      }
-
-      // ✅ 프로필 가져와서 카운트 증가
-      const { data: profile, error: profileErr } = await window.supabaseClient
-        .from("profiles")
-        .select("role, created_at")
-        .eq("user_id", session.user.id)
-        .single();
-
-      if (!profileErr && profile) {
-        await increaseTodayCount(session.user.id, profile);
-      }
-    }
-
-  } catch (err) {
-    console.error("[handleSajuSubmit] error:", err);
-    alert("요청 처리 중 오류가 발생했습니다.");
   }
-}
-
-
-
-
-
-
 
 
 
@@ -3198,15 +3323,16 @@ async function renderUserProfile() {
 
 
 
-// === 초기화
+// === 초기화 (하나로 통합)
 document.addEventListener("DOMContentLoaded", async () => {
   try {
     console.log("[app] DOM ready");
 
+    // ✅ 세션 확인 및 UI 갱신
     const { data: { session } } = await window.supabaseClient.auth.getSession();
     updateAuthUI(session);
 
-    // ✅ 여기 추가: 출력횟수 초기화
+    // ✅ 출력횟수 초기화
     if (session && session.user) {
       const { data: profile } = await window.supabaseClient
         .from("profiles")
@@ -3214,88 +3340,82 @@ document.addEventListener("DOMContentLoaded", async () => {
         .eq("user_id", session.user.id)
         .single();
 
-      if (profile) {
-        const today = new Date().toISOString().slice(0, 10);
-        const { data: countRow } = await window.supabaseClient
-          .from("saju_counts")
-          .select("count")
-          .eq("user_id", session.user.id)
-          .eq("count_date", today)
-          .maybeSingle();
+   if (profile) {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: countRow } = await window.supabaseClient
+    .from("saju_counts")
+    .select("count")
+    .eq("user_id", session.user.id)
+    .eq("count_date", today)
+    .maybeSingle();
 
-        updateCountDisplay(countRow?.count || 0, profile);
-      }
+      updateCountDisplay(countRow?.count || 0, { ...profile, user_id: session.user.id });
+}
     } else {
       const todayKST = getKSTDateKey();
       const usage = JSON.parse(localStorage.getItem("sajuUsage") || "{}");
       const todayCount = usage[todayKST] || 0;
-
       const guestProfile = { role: "guest", created_at: new Date().toISOString() };
       updateCountDisplay(todayCount, guestProfile);
     }
 
-    // ✅ 이 아래는 원래 있던 로그인 상태 변경 처리 + 버튼 바인딩 코드
-    window.supabaseClient.auth.onAuthStateChange((_ev, newSession) => {
-      updateAuthUI(newSession);
-    });
+// ✅ 로그인 상태 변경 감시
+window.supabaseClient.auth.onAuthStateChange((event, newSession) => {
+  console.log("[AuthStateChange]", event, newSession);
 
-    // ... (로그인 버튼, 회원가입 버튼, 소셜 로그인 등 바인딩 코드들 계속)
-
-  } catch (err) {
-    console.error("[init] fatal:", err);
-  }
-
-
-
-// ✅ 사주 기록 클릭 → 입력폼 채워넣기 + 바로 사주 출력
-document.addEventListener("click", async (e) => {
-  if (e.target.classList.contains("saju-record-link")) {
-    e.preventDefault();
-
-    const record = JSON.parse(e.target.dataset.json);
-    const recordId = e.target.dataset.id;
-
-    // ✅ 열람 카운트 증가
-    if (recordId) {
-      await window.supabaseClient
-        .from("saju_records")
-        .update({ view_count: (record.view_count || 0) + 1 })
-        .eq("id", recordId);
-    }
-
-    // ✅ 입력폼 값 채우기
-    document.getElementById("customer-name").value = record.name || "";
-    document.getElementById("birth-date").value = record.birthDate || "";
-    document.getElementById("calendar-type").value = record.calendarType || "";
-    document.getElementById("gender").value = record.gender || "";
-
-    if (record.ampm) {
-      document.querySelector(`input[name="ampm"][value="${record.ampm}"]`).checked = true;
-    }
-    if (record.hour) {
-      document.getElementById("hour-select").value = record.hour;
-    }
-    if (record.minute) {
-      document.getElementById("minute-select").value = record.minute;
-    }
-
-    // ✅ 버튼 활성화 처리 → 신살 버튼 ON
-    const sajuBtn = document.getElementById("sajuSubmit");
-    const sinsalBtn = document.getElementById("sinsalBtn");
-    sajuBtn.classList.remove("active");
-    sinsalBtn.classList.add("active");
-
-    // ✅ 신살 출력 실행
-    handleSajuSubmit(new Event("click")); 
-    // ⚠️ 여기 함수명이 실제로는 handleSinsalSubmit 일 수도 있음 → 확인 필요
+  if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+    // 화면 전체 새로고침
+    window.location.reload();
+  } else {
+    // 그 외 상태 변화는 기존처럼 UI 업데이트만
+    updateAuthUI(newSession);
   }
 });
 
+    // ✅ 사주 기록 클릭 → 입력폼 채워넣기 + 출력
+    document.addEventListener("click", async (e) => {
+      if (e.target.classList.contains("saju-record-link")) {
+        e.preventDefault();
 
+        const record = JSON.parse(e.target.dataset.json);
+        const recordId = e.target.dataset.id;
 
+        if (recordId) {
+          await window.supabaseClient
+            .from("saju_records")
+            .update({ view_count: (record.view_count || 0) + 1 })
+            .eq("id", recordId);
+        }
 
+        // 입력폼 채우기
+        document.getElementById("customer-name").value = record.name || "";
+        document.getElementById("birth-date").value = record.birthDate || "";
+        document.getElementById("calendar-type").value = record.calendarType || "";
+        document.getElementById("gender").value = record.gender || "";
+        if (record.ampm) document.querySelector(`input[name="ampm"][value="${record.ampm}"]`).checked = true;
+        if (record.hour) document.getElementById("hour-select").value = record.hour;
+        if (record.minute) document.getElementById("minute-select").value = record.minute;
 
+        // 버튼 상태
+        const sajuBtn = document.getElementById("sajuSubmit");
+        const sinsalBtn = document.getElementById("sinsalBtn");
+        sajuBtn.classList.remove("active");
+        sinsalBtn.classList.add("active");
+
+        handleSajuSubmit(new Event("click")); 
+
+    // ✅ 고객 데이터 모달 닫기
+    const modal = document.getElementById("saju-history-panel");
+    if (modal) {
+      modal.style.display = "none"; 
+    }
+
+      }
+    });
+
+    
 // 삭제 버튼 이벤트 (이벤트 위임)
+// ✅ 전역에서 딱 한 번만 등록
 document.addEventListener("click", async (e) => {
   if (e.target.classList.contains("delete-record-btn")) {
     const recordId = e.target.dataset.id;
@@ -3321,126 +3441,58 @@ document.addEventListener("click", async (e) => {
 });
 
 
-document.addEventListener("click", (e) => {
-  if (e.target.classList.contains("saju-record-link")) {
-    e.preventDefault();
+    // ✅ 내 사주 기록 버튼
+    document.getElementById("toggle-history-btn")?.addEventListener("click", async () => {
+      const panel = document.getElementById("saju-history-panel");
+      if (!session) {
+        alert("로그인 후 이용할 수 있습니다.");
+        return;
+      }
+      currentUserId = session.user.id;
 
-    const record = JSON.parse(e.target.dataset.json); 
-    // ⚠️ 이 record는 DB 전체가 아니라 input_json 부분임
-
-    // ✅ 입력폼에 값 채우기 (input_json 필드 기준)
-    document.getElementById("customer-name").value = record.name || "";
-    document.getElementById("birth-date").value = record.birthDate || "";
-    document.getElementById("calendar-type").value = record.calendarType || "";
-    document.getElementById("gender").value = record.gender || "";
-
-    if (record.ampm) {
-      const ampmInput = document.querySelector(`input[name="ampm"][value="${record.ampm}"]`);
-      if (ampmInput) ampmInput.checked = true;
-    }
-    if (record.hour) {
-      document.getElementById("hour-select").value = record.hour;
-    }
-    if (record.minute) {
-      document.getElementById("minute-select").value = record.minute;
-    }
-
-    // ✅ 선택 후 패널 닫기
-    document.getElementById("saju-history-panel").style.display = "none";
-  }
-});
-
-
-
-
-// ✅ 내 사주 기록 버튼
-document.getElementById("toggle-history-btn")?.addEventListener("click", async () => {
-  const panel = document.getElementById("saju-history-panel");
-  const { data: { session } } = await window.supabaseClient.auth.getSession();
-  if (!session) {
-    alert("로그인 후 이용할 수 있습니다.");
-    return;
-  }
-  currentUserId = session.user.id;
-
-  if (panel.style.display === "none") {
-    panel.style.display = "block";
-    currentPage = 1;
-    currentSearch = "";
-    await loadSajuHistory(currentUserId, currentPage, currentSearch);
-  } else {
-    panel.style.display = "none";
-  }
-});
-
-// ✅ 검색 버튼 클릭
-document.getElementById("search-btn")?.addEventListener("click", () => {
-  const keyword = document.getElementById("search-name").value.trim();
-  loadSajuHistory(currentUserId, 1, keyword);
-});
-
-// ✅ 검색창에서 Enter 키 입력
-document.getElementById("search-name")?.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    e.preventDefault(); // 폼 submit 방지
-    const keyword = e.target.value.trim();
-    loadSajuHistory(currentUserId, 1, keyword);
-  }
-});
-
-
-// ✅ 페이지 네비게이션
-document.getElementById("prev-page")?.addEventListener("click", async () => {
-  if (currentPage > 1 && currentUserId) {
-    currentPage--;
-    await loadSajuHistory(currentUserId, currentPage, currentSearch);
-  }
-});
-document.getElementById("next-page")?.addEventListener("click", async () => {
-  if (currentUserId) {
-    currentPage++;
-    await loadSajuHistory(currentUserId, currentPage, currentSearch);
-  }
-});
-
-
-
-
-});
-
-
-
-
-
-
-// 정기구독 결제 함수
-function startGoogleSubscription() {
-  alert("Google 정기구독 결제 연동 예정");
-}
-function startKakaoSubscription() {
-  alert("Kakao 정기구독 결제 연동 예정");
-}
-
-
-// === 5) 초기화: 모든 바인딩은 여기에서만
-document.addEventListener("DOMContentLoaded", async () => {
-  try {
-    console.log("[app] DOM ready");
-
-    // 세션 반영 + 감시
-    const { data: { session } } = await window.supabaseClient.auth.getSession();
-    updateAuthUI(session);
-    window.supabaseClient.auth.onAuthStateChange((_ev, newSession) => {
-      updateAuthUI(newSession);
+      if (panel.style.display === "none") {
+        panel.style.display = "block";
+        currentPage = 1;
+        currentSearch = "";
+        await loadSajuHistory(currentUserId, currentPage, currentSearch);
+      } else {
+        panel.style.display = "none";
+      }
     });
 
-    // 로그인 버튼
-    const loginBtn = document.getElementById("loginBtn");
-    loginBtn?.addEventListener("click", async (e) => {
+    // ✅ 검색
+    document.getElementById("search-btn")?.addEventListener("click", () => {
+      const keyword = document.getElementById("search-name").value.trim();
+      loadSajuHistory(currentUserId, 1, keyword);
+    });
+    document.getElementById("search-name")?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const keyword = e.target.value.trim();
+        loadSajuHistory(currentUserId, 1, keyword);
+      }
+    });
+
+    // ✅ 페이지 네비게이션
+    document.getElementById("prev-page")?.addEventListener("click", async () => {
+      if (currentPage > 1 && currentUserId) {
+        currentPage--;
+        await loadSajuHistory(currentUserId, currentPage, currentSearch);
+      }
+    });
+    document.getElementById("next-page")?.addEventListener("click", async () => {
+      if (currentUserId) {
+        currentPage++;
+        await loadSajuHistory(currentUserId, currentPage, currentSearch);
+      }
+    });
+
+    // ✅ 로그인/회원가입/소셜 로그인/로그아웃 바인딩
+    document.getElementById("loginBtn")?.addEventListener("click", async (e) => {
       e.preventDefault();
       const email = document.getElementById("email")?.value?.trim();
       const password = document.getElementById("password")?.value ?? "";
-      if (!email || !password) { alert("이메일과 비밀번호를 입력하세요."); return; }
+      if (!email || !password) return alert("이메일과 비밀번호를 입력하세요.");
       try {
         const { data, error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -3450,54 +3502,50 @@ document.addEventListener("DOMContentLoaded", async () => {
         alert(err.message || "로그인에 실패했습니다.");
       }
     });
-
-    // 회원가입 버튼 → 모달
-    const signupBtn = document.getElementById("signupBtn");
-    signupBtn?.addEventListener("click", (e) => { e.preventDefault(); openSignupModal(); });
-
-    // 소셜 로그인
+    document.getElementById("signupBtn")?.addEventListener("click", (e) => { e.preventDefault(); openSignupModal(); });
     document.getElementById("googleLogin")?.addEventListener("click", async (e) => {
       e.preventDefault();
-      try {
-        await window.supabaseClient.auth.signInWithOAuth({
-          provider: "google",
-          options: { redirectTo: `${location.origin}${location.pathname}` },
-        });
-      } catch (err) { console.error(err); alert(err.message || "구글 로그인 오류"); }
+      await window.supabaseClient.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${location.origin}${location.pathname}` },
+      });
     });
     document.getElementById("kakaoLogin")?.addEventListener("click", async (e) => {
       e.preventDefault();
-      try {
-        await window.supabaseClient.auth.signInWithOAuth({
-          provider: "kakao",
-          options: { redirectTo: `${location.origin}${location.pathname}` },
-        });
-      } catch (err) { console.error(err); alert(err.message || "카카오 로그인 오류"); }
+      await window.supabaseClient.auth.signInWithOAuth({
+        provider: "kakao",
+        options: { redirectTo: `${location.origin}${location.pathname}` },
+      });
     });
-
-    // 로그아웃
     document.getElementById("logoutBtn")?.addEventListener("click", async () => {
       await window.supabaseClient.auth.signOut();
       updateAuthUI(null);
     });
 
-    // 사주 폼 바인딩
+    // ✅ 사주 폼 바인딩
     const form = document.getElementById("saju-form");
     if (form) {
       form.addEventListener("submit", handleSajuSubmit);
       document.getElementById("sajuSubmit")?.addEventListener("click", () => {
         window.outputMode = "basic";
-        form.requestSubmit(); // 폼 DOM 요소에 호출!
+        form.requestSubmit();
       });
       document.getElementById("sinsalBtn")?.addEventListener("click", () => {
         window.outputMode = "sinsal";
         form.requestSubmit();
       });
     }
+
+
+
+
+
+
+
+    // ✅ 로그인 후 프로필/정기구독/로그아웃 UI 세팅
+    renderUserProfile();
+
   } catch (err) {
     console.error("[init] fatal:", err);
   }
-
-    // ✅ 로그인 후 프로필/정기구독/로그아웃 UI 세팅
-  renderUserProfile();
 });

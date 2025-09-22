@@ -14,18 +14,31 @@
   
  <!-- 2) Supabase 초기화 (전역 등록) -->
 <script>
-  // SDK 로드 후 전역에 supabase 가 존재해야 함
   if (!window.supabase) {
     alert("Supabase SDK 로드 실패. 네트워크 또는 CDN 경로를 확인하세요.");
   }
+
+  const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+  const isMobile = /android|iphone|ipad|ipod/i.test(userAgent);
+
   window.supabaseClient = window.supabase.createClient(
     "https://dxrgobsgeeshkybkbnxo.supabase.co",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4cmdvYnNnZWVzaGt5YmtibnhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwOTAyNzIsImV4cCI6MjA3MzY2NjI3Mn0.vD1xSRezaTC2OUikZZJM7UntQaQWvOxRkvYiMl78UZA"
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4cmdvYnNnZWVzaGt5YmtibnhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwOTAyNzIsImV4cCI6MjA3MzY2NjI3Mn0.vD1xSRezaTC2OUikZZJM7UntQaQWvOxRkvYiMl78UZA",
+    {
+      auth: {
+        storage: isMobile ? window.localStorage : window.sessionStorage,
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
+    }
   );
+
   // 호환용
   window.client = window.supabaseClient;
   console.log("[INDEX] supabaseClient ready:", !!window.supabaseClient);
 </script>
+
 
 <style>
   body {
@@ -456,6 +469,7 @@
   <option value="male" >남자</option>
   <option value="female">여자</option>
 </select>
+<button id="reset-btn" type="button" style="margin-left:8px; background-color:#fcfdd0; color:rgb(5, 1, 1); border:none; padding:5px 10px; border-radius:4px; cursor:pointer;" >다시입력</button>
 <br />
 
     <label>생년월일:</label> 
@@ -463,15 +477,15 @@
 
     
     <select id="calendar-type" name="calendar-type">
-      <option value="선택" ></option>
-                                    <option value="solar" >양력</option>
+      <option value="">선택</option>
+                                    <option value="solar"  >양력</option>
       <option value="lunar">음력</option>
     </select>
 
 <br />
 
     <label>출생 시간:</label>
-                         <label><input type="radio" name="ampm" value="AM" > 오전</label>
+                         <label><input type="radio" name="ampm" value="AM"> 오전</label>
     <label><input type="radio" name="ampm" value="PM"> 오후</label>
     <label>+</label>
     <select id="hour-select">
@@ -501,7 +515,7 @@
   <option value="7">7분</option>
   <option value="8">8분</option>
   <option value="9">9분</option>
-                             <option value="10" >10분</option>
+                             <option value="10"  >10분</option>
   <option value="11">11분</option>
   <option value="12">12분</option>
   <option value="13">13분</option>
@@ -622,6 +636,67 @@
     });
   });
 </script>
+
+
+
+<!-- 리셋버튼작동 -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const resetBtn = document.getElementById("reset-btn");
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      console.log("✅ 리셋 버튼 눌림");
+
+      // ✅ 사주 입력 폼 전체 초기화
+      const form = document.getElementById("saju-form");
+      if (form) form.reset();
+
+      // ✅ 출력 전체 숨기기 및 내용 지우기
+      const resultContainer = document.getElementById("result");
+      if (resultContainer) {
+        resultContainer.style.display = "none";
+
+        // 내부 내용도 싹 지움
+        const birthInfo = document.getElementById("birth-info");
+        if (birthInfo) birthInfo.innerHTML = "";
+
+        const ganjiTable = document.getElementById("ganji-table");
+        if (ganjiTable) ganjiTable.innerHTML = "";
+
+        const todaySaju = document.getElementById("today-saju-container");
+        if (todaySaju) todaySaju.innerHTML = "";
+
+        const dangryeong = document.getElementById("dangryeong-table");
+        if (dangryeong) dangryeong.innerHTML = "";
+
+        const basicDaeyun = document.getElementById("basic-daeyun-table");
+        if (basicDaeyun) basicDaeyun.innerHTML = "";
+
+        const sinsalDaeyun = document.getElementById("sinsal-daeyun-table");
+        if (sinsalDaeyun) sinsalDaeyun.innerHTML = "";
+
+        const sinsalBox = document.getElementById("sinsal-box");
+        if (sinsalBox) sinsalBox.innerHTML = "";
+
+        const etcSinsalBox = document.getElementById("etc-sinsal-box");
+        if (etcSinsalBox) etcSinsalBox.innerHTML = "";
+      }
+
+      // ✅ 히스토리 숨기기
+      const historySection = document.getElementById("saju-history-section");
+      if (historySection) historySection.style.display = "none";
+
+      // ✅ 스크롤 맨 위로
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  } else {
+    console.log("❌ reset-btn 버튼을 찾을 수 없음");
+  }
+});
+</script>
+
+
+
 
 
 </body>
