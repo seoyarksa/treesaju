@@ -322,18 +322,25 @@ function getGuestId() {
 
 //오늘의 카운트 증가 갱신
 let isCountUpdating = false;
+let lastCountDate = null; // 오늘 날짜 저장
+let lastCountUser = null; // 마지막 카운트 처리된 유저ID 저장
 
 async function increaseTodayCount(userId, profile) {
-  // 🚦 중복 실행 방지
+  const today = new Date().toISOString().slice(0, 10);
+
+  // 🚦 중복 실행 방지 (소셜 로그인 같은 날 2번 방지)
   if (isCountUpdating) {
-    console.warn("[DEBUG] increaseTodayCount 중복 실행 차단");
+    console.warn("[DEBUG] increaseTodayCount 실행중 → 차단");
     return;
   }
+  if (lastCountUser === userId && lastCountDate === today) {
+    console.warn("[DEBUG] 오늘 이미 카운트 처리된 유저 → 차단");
+    return;
+  }
+
   isCountUpdating = true;
 
   try {
-    const today = new Date().toISOString().slice(0, 10);
-
     // 오늘자 카운트 조회
     const { data: countRow, error: selectErr } = await window.supabaseClient
       .from("saju_counts")
@@ -365,9 +372,12 @@ async function increaseTodayCount(userId, profile) {
     // ✅ 화면 표시 갱신
     updateCountDisplay(newCount, profile);
 
+    // 🚩 오늘 처리한 유저/날짜 기억
+    lastCountUser = userId;
+    lastCountDate = today;
+
     console.log("[DEBUG] increaseTodayCount 완료:", newCount);
   } finally {
-    // 🚦 실행 끝나면 잠금 해제
     isCountUpdating = false;
   }
 }
@@ -3379,14 +3389,24 @@ document.addEventListener("DOMContentLoaded", async () => {
 window.supabaseClient.auth.onAuthStateChange((event, newSession) => {
   console.log("[AuthStateChange]", event, newSession);
 
-  if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
-    // 화면 전체 새로고침
+  if (event === "SIGNED_IN") {
+    const provider = newSession?.user?.app_metadata?.provider;
+    if (provider === "google" || provider === "kakao") {
+      console.log("[AuthStateChange] 소셜 로그인 → reload 생략");
+      updateAuthUI(newSession);  // UI만 갱신
+      return;
+    }
+    // 일반 이메일 로그인일 때만 reload
     window.location.reload();
-  } else {
-    // 그 외 상태 변화는 기존처럼 UI 업데이트만
+  }
+  else if (event === "SIGNED_OUT") {
+    window.location.reload();
+  }
+  else {
     updateAuthUI(newSession);
   }
 });
+
 
     // ✅ 사주 기록 클릭 → 입력폼 채워넣기 + 출력
     document.addEventListener("click", async (e) => {
