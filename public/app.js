@@ -866,7 +866,7 @@ async function handleSajuSubmit(e) {
         }
 
         console.log(`[limit] 남은 횟수: ${gate.remaining}/${gate.limit}`);
-        updateCountDisplay(gate, profile);
+        updateCountDisplay(gate.remaining, profile);
       } else {
         console.log("관리자 계정 ✅ (무제한)");
       }
@@ -3389,20 +3389,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 window.supabaseClient.auth.onAuthStateChange((event, newSession) => {
   console.log("[AuthStateChange]", event, newSession);
 
-  if (event === "SIGNED_IN") {
-    const provider = newSession?.user?.app_metadata?.provider;
-    if (provider === "google" || provider === "kakao") {
-      console.log("[AuthStateChange] 소셜 로그인 → reload 생략");
-      updateAuthUI(newSession);  // UI만 갱신
-      return;
-    }
-    // 일반 이메일 로그인일 때만 reload
-    window.location.reload();
+  if (event === "INITIAL_SESSION") {
+    // 🚫 최초 로딩 시 카운트 증가 안 함
+    updateAuthUI(newSession); 
+    return;
   }
-  else if (event === "SIGNED_OUT") {
+
+  if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+    // 새 로그인/로그아웃 → 새로고침
     window.location.reload();
-  }
-  else {
+  } else {
+    // 그 외 상태 변화 → UI만 갱신
     updateAuthUI(newSession);
   }
 });
