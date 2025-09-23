@@ -207,7 +207,7 @@ async function updateAuthUI(session) {
     // ✅ 프로필 role 불러오기
     const { data: profile } = await window.supabaseClient
       .from("profiles")
-      .select("role")
+      .select("role, created_at, daily_limit")
       .eq("user_id", user.id)
       .single();
 
@@ -247,30 +247,42 @@ async function updateAuthUI(session) {
 }
 
 //첫한달간 회원별 제한 횟수 계산
-function getDailyLimit(profile) {
-  const role = profile.role;
-  const joinDate = new Date(profile.created_at || Date.now());
-  const daysSinceJoin = Math.floor((Date.now() - joinDate) / (1000*60*60*24));
+function getDailyLimit(profile = {}) {
+  // (선택) 개별 설정이 있다면 최우선 사용: 운영 중 특정 회원 커스텀 가능
+  const dl = profile.daily_limit;
+  if (dl === Infinity || dl === 'Infinity') return Infinity;
+  const n = Number(dl);
+  if (Number.isFinite(n)) return n;
+
+  // 기존 정책 유지: 등급/가입일 기반 "총 사용가능(일일) 횟수"만 결정
+  const role = profile.role || "normal";
+  const createdAt = profile.created_at ? new Date(profile.created_at) : new Date();
+  const daysSinceJoin = Math.max(
+    0,
+    Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24))
+  );
 
   switch (role) {
     case "guest": {
-      if (daysSinceJoin > 90) {
-        // 3개월 초과 → 회원가입 유도
-        return 0;
-      }
-      return 3; // 하루 3회
+      // 비회원: 3개월 초과 → 0, 그 전엔 하루 3회
+      if (daysSinceJoin > 90) return 0;
+      return 3;
     }
-    case "normal": // 일반회원
+    case "normal": // 일반회원: 20회
       return 20;
-    case "premium": // 정회원
+
+    case "premium": // 정회원: 30일 미만 50회, 이후 200회
       return daysSinceJoin < 30 ? 50 : 200;
-    case "special": // 특별회원
-    case "admin":   // 관리자
+
+    case "special": // 특별회원: 무제한
+    case "admin":   // 관리자: 무제한
       return Infinity;
+
     default:
-      return 0;
+      return 0; // 정의되지 않은 등급은 0
   }
 }
+
 
 
 
@@ -333,23 +345,20 @@ async function buildGateFromDb(userId, profile) {
 
 // 화면 갱신은 이 함수로만!
 function updateCountDisplayFromGate(gate) {
-  log("render gate", gate);
-  const span = document.getElementById("count-display");
-  if (!span) return;
+  const el = document.getElementById("count-display");
+  if (!el) return;
 
-  let remain = gate?.remaining;
-  let limit  = gate?.limit;
   const total = Number(gate?.totalCount) || 0;
 
-  if (limit === Infinity || remain === Infinity) {
-    span.textContent = `남은 횟수 (∞/∞) / 누적 총 ${total}회`;
+  if (gate?.limit === Infinity || gate?.remaining === Infinity) {
+    el.textContent = `남은 횟수 (∞/∞) / 누적 총 ${total}회`;
     return;
   }
-
-  remain = Number(remain) || 0;
-  limit  = Number(limit)  || 0;
-  span.textContent = `남은 횟수 (${remain}/${limit}) / 누적 총 ${total}회`;
+  const remain = Number(gate?.remaining) || 0;
+  const limit  = Number(gate?.limit) || 0;
+  el.textContent = `남은 횟수 (${remain}/${limit}) / 누적 총 ${total}회`;
 }
+
 
 
 
