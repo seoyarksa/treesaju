@@ -248,60 +248,50 @@ async function updateAuthUI(session) {
 
 //첫한달간 회원별 제한 횟수 계산
 function getDailyLimit(profile = {}) {
-  // 개별 설정(daily_limit)이 숫자면 최우선 사용
-  const dl = profile.daily_limit;
-  if (dl === Infinity || dl === 'Infinity') return Infinity;
-  const n = Number(dl);
-  if (Number.isFinite(n)) return n;
+  // role 정규화
+  const role = String(profile.role || "normal").toLowerCase();
 
-  const role = profile.role || "normal";
+  // admin은 고정
+  if (role === "admin") return 1000;
+
+  // special: 등급지정일로부터 6개월 200/일, 이후 0
+  if (role === "special") {
+    const addMonths = (d, m) => { const x = new Date(d); x.setMonth(x.getMonth() + m); return x; };
+    const createdAt = profile.created_at ? new Date(profile.created_at) : new Date();
+    const basis = profile.special_assigned_at || profile.role_assigned_at || profile.created_at;
+    const assignedAt = basis ? new Date(basis) : createdAt;
+    return Date.now() <= addMonths(assignedAt, 6).getTime() ? 200 : 0;
+  }
+
+  // 개별 daily_limit(숫자)은 admin/special 외 등급에서만 허용
+  const dl = Number(profile.daily_limit);
+  if (Number.isFinite(dl)) return dl;
+
   const createdAt = profile.created_at ? new Date(profile.created_at) : new Date();
-  const daysSinceJoin = Math.max(
-    0,
-    Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24))
-  );
-
-  // 헬퍼: 날짜에 개월 더하기
-  const addMonths = (date, months) => {
-    const d = new Date(date);
-    d.setMonth(d.getMonth() + months);
-    return d;
-  };
+  const daysSinceJoin = Math.max(0, Math.floor((Date.now() - createdAt.getTime()) / 86400000));
 
   switch (role) {
-    // 비회원
-    case "guest": {
-      // 비회원: 2개월 초과 → 0, 그 전엔 하루 3회
-      if (daysSinceJoin > 60) return 0;
-      return 3;
+    case "guest":
+      return daysSinceJoin > 60 ? 0 : 3;
+
+    case "normal":
+      // ✅ 과거 프리미엄 이력이 있으면 normal은 0(재가입 유도)
+      if (profile.has_ever_premium) return 0;
+      // 기존 신규 normal 정책(가입 30일 20회)
+      return daysSinceJoin >= 30 ? 0 : 20;
+
+    case "premium": {
+      // ✅ 프리미엄: 최초 프리미엄 부여의 첫 30일만 100, 그 외는 60
+      const firstAt = profile.premium_first_assigned_at ? new Date(profile.premium_first_assigned_at) : null;
+      const currAt  = profile.premium_assigned_at ? new Date(profile.premium_assigned_at) : null;
+
+      // 정보가 없으면 보수적으로 혜택 미적용(=60)
+      if (!firstAt || !currAt) return 60;
+
+      const firstWindow = firstAt.getTime() + (30 * 86400000); // 최초 부여 +30일
+      const isFirstWindow = Date.now() <= firstWindow && firstAt.getTime() === currAt.getTime();
+      return isFirstWindow ? 100 : 60;
     }
-
-    // 일반회원 - 회원가입만 한 경우
-    case "normal": {
-      // 일반: 가입 후 30일까지만 20회/일, 이후 0 (구독 유도)
-      if (daysSinceJoin >= 30) return 0;
-      return 20;
-    }
-
-    // 정회원 - 전화인증 후 정기구독
-    case "premium":
-      // 프리미엄: 첫달 100, 이후 60
-      return daysSinceJoin < 30 ? 100 : 60;
-
-    // 특별회원 - 특별상품(동영상/교육콘텐츠 등) 구매
-    case "special": {
-      // 등급지정일(special_assigned_at)로부터 6개월 동안 200/일, 이후 0
-      const basis = profile.special_assigned_at || profile.role_assigned_at || profile.created_at;
-      const assignedAt = basis ? new Date(basis) : createdAt;
-      const until = addMonths(assignedAt, 6);
-      if (Date.now() <= until.getTime()) return 200;
-      return 0; // 만료
-    }
-
-    // 관리자
-    case "admin":
-      // 관리자: 1000/일
-      return 1000;
 
     default:
       return 0;
@@ -947,7 +937,7 @@ async function handleSajuSubmit(e) {
       // ✅ 반드시 풀프로필 확보 (role, created_at, daily_limit)
       let { data: profile, error: pErr } = await window.supabaseClient
         .from("profiles")
-        .select("role, created_at, daily_limit, special_assigned_at")  // ← 추가
+        .select("role, created_at, daily_limit, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
         .eq("user_id", userId)
         .single();
 
@@ -3482,7 +3472,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // 프로필에 daily_limit 포함
       const { data: profile, error: profErr } = await window.supabaseClient
         .from("profiles")
-        .select("role, created_at, daily_limit")
+        .select("role, created_at, daily_limit, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
         .eq("user_id", session.user.id)
         .single();
 
@@ -3545,10 +3535,71 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     }
 
+ // ✅ 여기부터 넣으세요: 프로필 실시간 반영 (Realtime)
+    if (session?.user) {
+      const userId = session.user.id;
+
+      // 중복 구독 방지
+      if (window.__profileCh) {
+        try { window.supabaseClient.removeChannel(window.__profileCh); } catch (_) {}
+        window.__profileCh = null;
+      }
+
+      window.__profileCh =
+        window.supabaseClient
+          .channel("profile-changes")
+.on(
+  "postgres_changes",
+  { event: "*", schema: "public", table: "profiles", filter: `user_id=eq.${userId}` },
+  async (payload) => {
+    console.log("[PROFILE RT]", payload);
+
+    // 최신 프로필 로드 (에러/누락 시 안전 폴백)
+    const { data: profile, error: pErr } = await window.supabaseClient
+      .from("profiles")
+      .select("role, created_at, daily_limit, special_assigned_at")
+      .eq("user_id", userId)
+      .single();
+
+    const safeProfile = (pErr || !profile)
+      ? { role: "normal", created_at: new Date().toISOString() }
+      : profile;
+
+    const gate = await buildGateFromDb(userId, safeProfile);
+    updateCountDisplayFromGate(gate);
+
+    // 프로필 영역 갱신 필요 시
+    renderUserProfile?.();
+  }
+)
+
+          .subscribe((status) => {
+            console.log("[PROFILE RT] status:", status);
+          });
+    }
+
+    // (DOMContentLoaded try{} 안, Realtime 구독 설정한 뒤에)
+window.addEventListener("beforeunload", () => {
+  if (window.__profileCh) {
+    try { window.supabaseClient.removeChannel(window.__profileCh); } catch (_) {}
+    window.__profileCh = null;
+  }
+});
+
+    // 이미 있는 onAuthStateChange는 유지하되,
+    // SIGNED_OUT 때 구독 정리만 추가하면 좋아요.
+
     // ✅ 로그인 상태 변경 감시 (이중 새로고침 방지)
     let __reloading = false;
     window.supabaseClient.auth.onAuthStateChange((event, newSession) => {
       console.log("[AuthStateChange]", event);
+
+      if (event === "SIGNED_OUT") {
+        if (window.__profileCh) {
+          try { window.supabaseClient.removeChannel(window.__profileCh); } catch (_) {}
+          window.__profileCh = null;
+        }
+      }
 
       if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
         if (!__reloading) {
