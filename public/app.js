@@ -269,24 +269,28 @@ function getDailyLimit(profile = {}) {
   };
 
   switch (role) {
+    // 비회원
     case "guest": {
-      // 비회원: 3개월 초과 → 0, 그 전엔 하루 3회
-      if (daysSinceJoin > 90) return 0;
+      // 비회원: 2개월 초과 → 0, 그 전엔 하루 3회
+      if (daysSinceJoin > 60) return 0;
       return 3;
     }
 
+    // 일반회원 - 회원가입만 한 경우
     case "normal": {
       // 일반: 가입 후 30일까지만 20회/일, 이후 0 (구독 유도)
       if (daysSinceJoin >= 30) return 0;
       return 20;
     }
 
+    // 정회원 - 전화인증 후 정기구독
     case "premium":
-      // 프리미엄: 첫달 50, 이후 200
-      return daysSinceJoin < 30 ? 50 : 100;
+      // 프리미엄: 첫달 100, 이후 60
+      return daysSinceJoin < 30 ? 100 : 60;
 
+    // 특별회원 - 특별상품(동영상/교육콘텐츠 등) 구매
     case "special": {
-      // ✅ 특별: 등급지정일(special_assigned_at)로부터 6개월 동안 200/일, 이후 0
+      // 등급지정일(special_assigned_at)로부터 6개월 동안 200/일, 이후 0
       const basis = profile.special_assigned_at || profile.role_assigned_at || profile.created_at;
       const assignedAt = basis ? new Date(basis) : createdAt;
       const until = addMonths(assignedAt, 6);
@@ -294,6 +298,7 @@ function getDailyLimit(profile = {}) {
       return 0; // 만료
     }
 
+    // 관리자
     case "admin":
       // 관리자: 1000/일
       return 1000;
@@ -302,6 +307,7 @@ function getDailyLimit(profile = {}) {
       return 0;
   }
 }
+
 
 
 
