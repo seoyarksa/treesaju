@@ -373,12 +373,12 @@ function updateCountDisplayFromGate(gate) {
   const total = Number(gate?.totalCount) || 0;
 
   if (gate?.limit === Infinity || gate?.remaining === Infinity) {
-    el.textContent = `남은 횟수 (∞/∞) / 누적 총 ${total}회`;
+    el.textContent = `오늘 남은 횟수 (∞/∞) / 누적 총 ${total}회`;
     return;
   }
   const remain = Number(gate?.remaining) || 0;
   const limit  = Number(gate?.limit) || 0;
-  el.textContent = `남은 횟수 (${remain}/${limit}) / 누적 총 ${total}회`;
+  el.textContent = `오늘 남은 횟수 (${remain}/${limit}) / 누적 총 ${total}회`;
 }
 
 
@@ -453,7 +453,7 @@ async function increaseTodayCount(userId, profile) {
 
   // 6) 단일 소스(gate)로 로그/화면 동기화
   const gate = { limit, remaining, todayCount, totalCount };
-  console.log(`[limit] 남은 횟수: ${gate.remaining}/${gate.limit}`);
+  console.log(`[limit] 오늘 남은 횟수: ${gate.remaining}/${gate.limit}`);
   updateCountDisplayFromGate(gate);
 }
 
@@ -974,7 +974,7 @@ async function handleSajuSubmit(e) {
 
         // 2) ✅ RPC 통과 직후 — DB 기준 최종 gate 재계산해서 표시
         const gateDb = await buildGateFromDb(userId, profile);
-        console.log(`[limit] 남은 횟수: ${gateDb.remaining}/${gateDb.limit}`);
+        console.log(`[limit] 오늘 남은 횟수: ${gateDb.remaining}/${gateDb.limit}`);
         updateCountDisplayFromGate(gateDb);
 
       } else {
