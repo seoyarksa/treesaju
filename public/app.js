@@ -126,6 +126,24 @@ import { renderSinsalTable,
  * 1) 비로그인 출력 제한
  ************************************/
 // ===== app.js (안전망 포함, 전체 교체용) =====
+// 파일 상단 어딘가
+let __lastFormKey = null;
+
+// 입력을 안정적으로 키로 만드는 헬퍼
+function makeFormKey(fd) {
+  // 비교에 의미 없는 공백/대소문/형식을 정리
+  const norm = {
+    name: (fd.name || "").trim(),
+    birthDate: (fd.birthDate || "").trim(),
+    calendarType: (fd.calendarType || "").trim(),
+    gender: (fd.gender || "").trim(),
+    ampm: (fd.ampm || "").trim(),
+    hour: String(fd.hour ?? "").padStart(2, "0"),
+    minute: String(fd.minute ?? "").padStart(2, "0"),
+  };
+  return JSON.stringify(norm);
+}
+
 
 // 0) 안전 헬퍼
 const $ = (sel) => document.querySelector(sel);
@@ -888,7 +906,6 @@ async function handleSajuSubmit(e) {
       hour: document.getElementById("hour-select")?.value,
       minute: document.getElementById("minute-select")?.value,
     };
-
     if (!formData.gender) {
       alert("성별을 선택해야 합니다.");
       return;
@@ -896,95 +913,114 @@ async function handleSajuSubmit(e) {
 
     const formKey = JSON.stringify(formData);
 
-    // --- 동일 입력값이면 출력만 허용 (카운트/저장 ❌)
-    if (lastOutputData === formKey) {
-      console.log("⚠️ 동일 입력값 → 카운트 증가 안 함");
-      renderSaju(formData);
-      return;
-    }
-    // 여기 오면 새로운 입력 → 카운트 대상
-    lastOutputData = formKey;
-
     // 2) 로그인 여부 확인
     const { data: { session } } = await window.supabaseClient.auth.getSession();
 
     if (!session) {
-      // ── 비회원 제한 체크(로컬 카운트 증가 포함) ──
-      const ok = await checkRenderAllowed();
-      if (!ok) return;
-
-      // 비회원 화면 갱신 (localStorage 기준 gate)
+      // ── 비회원: '미리보기'로 초과 여부 먼저 판단 (증가 없음)
       const todayKST = getKSTDateKey();
       const usage = JSON.parse(localStorage.getItem("sajuUsage") || "{}");
       const todayCount = Number(usage[todayKST] || 0);
-      const totalGuest = Object.values(usage)
-        .filter(v => typeof v === "number")
-        .reduce((a, b) => a + b, 0);
       const guestProfile = { role: "guest", created_at: new Date().toISOString() };
-      const limitGuest = getDailyLimit(guestProfile); // 정책: 게스트 3 (3개월 초과 0)
-      const remainingGuest = (limitGuest === Infinity) ? Infinity : Math.max(limitGuest - todayCount, 0);
-      updateCountDisplayFromGate({
-        limit: limitGuest,
-        remaining: remainingGuest,
-        todayCount,
-        totalCount: totalGuest,
-      });
+      const limitGuest = getDailyLimit(guestProfile); // 정책 반영(60일 이후 0, 이전 3)
+      const remainingPreview = (limitGuest === Infinity) ? Infinity : Math.max(limitGuest - todayCount, 0);
 
-    } else {
-      // ── 로그인 사용자 ──
-      const userId = session.user.id;
-
-      // ✅ 반드시 풀프로필 확보 (role, created_at, daily_limit)
-      let { data: profile, error: pErr } = await window.supabaseClient
-        .from("profiles")
-        .select("role, created_at, daily_limit, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
-        .eq("user_id", userId)
-        .single();
-
-      // 방어적 보정: 프로필이 없거나 role 누락이면 normal 기본값
-      if (pErr || !profile || !profile.role) {
-        console.warn("[handleSajuSubmit] profile 보정 발생:", pErr);
-        profile = {
-          role: "normal",
-          created_at: session.user.created_at || new Date().toISOString(),
-          daily_limit: null,
-        };
+      if (limitGuest !== Infinity && remainingPreview <= 0) {
+        alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다.");
+        updateCountDisplayFromGate({
+          limit: limitGuest,
+          remaining: 0,
+          todayCount,
+          totalCount: Object.values(usage).filter(v => typeof v === "number").reduce((a,b)=>a+b,0),
+        });
+        return; // ✅ 출력 차단
       }
 
-      if (profile.role !== "admin") {
-        // 1) 제한 체크(+ 필요 시 서버에서 카운트 증가 수행)
-        const { data: ok, error } = await window.supabaseClient.rpc("can_render_and_count");
-        if (error) {
-          console.error("[RPC] 오류:", error);
-          alert("이용 제한 확인 중 오류가 발생했습니다.");
-          return;
-        }
-        if (!ok?.allowed) {
-          let reason = "이용이 제한되었습니다.";
-          if (ok?.remaining === 0) reason = "오늘 사용 가능한 횟수를 모두 소진하셨습니다.";
-          else if (ok?.limit === 0) reason = "구독이 필요합니다. 결제를 진행해주세요.";
-          else if (ok?.message) reason = ok.message;
-          alert(reason);
-          return;
-        }
+      // ✅ 직전과 동일할 때만 '카운트 없이' 출력 허용
+      if (lastOutputData === formKey) {
+        console.log("⚠️ 동일 입력(직전과 동일, 게스트) → 카운트 증가 없이 출력만");
+        renderSaju(formData);
+        return;
+      }
 
-        // 2) ✅ RPC 통과 직후 — DB 기준 최종 gate 재계산해서 표시
-        const gateDb = await buildGateFromDb(userId, profile);
-        console.log(`[limit] 오늘 남은 횟수: ${gateDb.remaining}/${gateDb.limit}`);
-        updateCountDisplayFromGate(gateDb);
+      // 실제 증가 수행
+      const ok = await checkRenderAllowed(); // 이 함수가 localStorage 증가/월간 제한까지 처리
+      if (!ok) return;
 
-      } else {
-        // 관리자: 무제한 표기 원하면 아래 2줄 주석 해제
-        const gateDb = await buildGateFromDb(userId, profile);
-        // gateDb.limit = Infinity;
-        // gateDb.remaining = Infinity;
-        console.log("관리자 계정 ✅ (무제한)", gateDb);
-        updateCountDisplayFromGate(gateDb);
+      // 출력 실행 + 직전키 갱신
+      renderSaju(formData);
+      lastOutputData = formKey;
+
+      // 화면 갱신(선택): 방금 증가한 값으로 다시 표시
+      const usage2 = JSON.parse(localStorage.getItem("sajuUsage") || "{}");
+      const today2 = Number(usage2[todayKST] || 0);
+      const total2 = Object.values(usage2).filter(v => typeof v === "number").reduce((a,b)=>a+b,0);
+      const remain2 = (limitGuest === Infinity) ? Infinity : Math.max(limitGuest - today2, 0);
+      updateCountDisplayFromGate({ limit: limitGuest, remaining: remain2, todayCount: today2, totalCount: total2 });
+      return;
+    }
+
+    // ── 로그인 사용자 ──
+    const userId = session.user.id;
+
+    // ✅ 반드시 풀프로필 확보 (정책 필드 포함)
+    let { data: profile, error: pErr } = await window.supabaseClient
+      .from("profiles")
+      .select("role, created_at, daily_limit, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
+      .eq("user_id", userId)
+      .single();
+
+    if (pErr || !profile || !profile.role) {
+      console.warn("[handleSajuSubmit] profile 보정 발생:", pErr);
+      profile = {
+        role: "normal",
+        created_at: session.user.created_at || new Date().toISOString(),
+        daily_limit: null,
+      };
+    }
+
+    // 2-1) 사전 차단 (증가 없이 현재 잔여 확인)
+    const preGate = await buildGateFromDb(userId, profile);
+    if (preGate.limit !== Infinity && preGate.remaining <= 0) {
+      // 등급별 메시지 커스터마이즈 가능
+      alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다.");
+      updateCountDisplayFromGate(preGate);
+      return; // ✅ 출력 차단
+    }
+
+    // ✅ 직전과 동일할 때만 '카운트 없이' 출력 허용
+    if (lastOutputData === formKey) {
+      console.log("⚠️ 동일 입력(직전과 동일, 로그인) → 카운트 증가 없이 출력만");
+      renderSaju(formData);
+      return;
+    }
+
+    if (profile.role !== "admin") {
+      // 2-2) 서버에서 제한/증가 처리
+      const { data: ok, error } = await window.supabaseClient.rpc("can_render_and_count");
+      if (error) {
+        console.error("[RPC] 오류:", error);
+        alert("이용 제한 확인 중 오류가 발생했습니다.");
+        return;
+      }
+      if (!ok?.allowed) {
+        let reason = "이용이 제한되었습니다.";
+        if (ok?.remaining === 0) reason = "오늘 사용 가능한 횟수를 모두 소진하셨습니다.";
+        else if (ok?.limit === 0) reason = "구독이 필요합니다. 결제를 진행해주세요.";
+        else if (ok?.message) reason = ok.message;
+        alert(reason);
+        return;
       }
     }
 
-    // 3) 출력 실행
+    // 2-3) 사후 동기화(최신 DB 기준 표시)
+    const gateDb = await buildGateFromDb(userId, profile);
+    console.log(`[limit] 오늘 남은 횟수: ${gateDb.remaining}/${gateDb.limit}`);
+    updateCountDisplayFromGate(gateDb);
+
+    // 3) 출력 실행 + 직전키 갱신
     renderSaju(formData);
+    lastOutputData = formKey;
 
     // 4) 로그인 사용자 → 이름이 있으면 기록 저장 (중복키 에러는 무시)
     if (session?.user) {
