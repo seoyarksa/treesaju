@@ -248,13 +248,12 @@ async function updateAuthUI(session) {
 
 //첫한달간 회원별 제한 횟수 계산
 function getDailyLimit(profile = {}) {
-  // (선택) 개별 설정이 있다면 최우선 사용: 운영 중 특정 회원 커스텀 가능
+  // 개별 설정(daily_limit)이 숫자면 최우선 사용
   const dl = profile.daily_limit;
   if (dl === Infinity || dl === 'Infinity') return Infinity;
   const n = Number(dl);
   if (Number.isFinite(n)) return n;
 
-  // 기존 정책 유지: 등급/가입일 기반 "총 사용가능(일일) 횟수"만 결정
   const role = profile.role || "normal";
   const createdAt = profile.created_at ? new Date(profile.created_at) : new Date();
   const daysSinceJoin = Math.max(
@@ -262,26 +261,49 @@ function getDailyLimit(profile = {}) {
     Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24))
   );
 
+  // 헬퍼: 날짜에 개월 더하기
+  const addMonths = (date, months) => {
+    const d = new Date(date);
+    d.setMonth(d.getMonth() + months);
+    return d;
+  };
+
   switch (role) {
     case "guest": {
       // 비회원: 3개월 초과 → 0, 그 전엔 하루 3회
       if (daysSinceJoin > 90) return 0;
       return 3;
     }
-    case "normal": // 일반회원: 20회
+
+    case "normal": {
+      // 일반: 가입 후 30일까지만 20회/일, 이후 0 (구독 유도)
+      if (daysSinceJoin >= 30) return 0;
       return 20;
+    }
 
-    case "premium": // 정회원: 30일 미만 50회, 이후 200회
-      return daysSinceJoin < 30 ? 50 : 200;
+    case "premium":
+      // 프리미엄: 첫달 50, 이후 200
+      return daysSinceJoin < 30 ? 50 : 100;
 
-    case "special": // 특별회원: 무제한
-    case "admin":   // 관리자: 무제한
-      return Infinity;
+    case "special": {
+      // ✅ 특별: 등급지정일(special_assigned_at)로부터 6개월 동안 200/일, 이후 0
+      const basis = profile.special_assigned_at || profile.role_assigned_at || profile.created_at;
+      const assignedAt = basis ? new Date(basis) : createdAt;
+      const until = addMonths(assignedAt, 6);
+      if (Date.now() <= until.getTime()) return 200;
+      return 0; // 만료
+    }
+
+    case "admin":
+      // 관리자: 1000/일
+      return 1000;
 
     default:
-      return 0; // 정의되지 않은 등급은 0
+      return 0;
   }
 }
+
+
 
 
 
@@ -919,7 +941,7 @@ async function handleSajuSubmit(e) {
       // ✅ 반드시 풀프로필 확보 (role, created_at, daily_limit)
       let { data: profile, error: pErr } = await window.supabaseClient
         .from("profiles")
-        .select("role, created_at, daily_limit")
+        .select("role, created_at, daily_limit, special_assigned_at")  // ← 추가
         .eq("user_id", userId)
         .single();
 
