@@ -168,9 +168,13 @@ function updateCountDisplay(todayCount, totalCount, remain, dailyLimit) {
   const span = document.getElementById("count-display");
   if (!span) return;
 
-  span.textContent = `남은 횟수 (${remain}/${dailyLimit}) / 누적 총 ${totalCount}회`;
-}
+  const safeToday = Number(todayCount) || 0;
+  const safeTotal = Number(totalCount) || 0;
+  const safeRemain = Number(remain) || 0;
+  const safeLimit = Number(dailyLimit) || 0;
 
+  span.textContent = `남은 횟수 (${safeRemain}/${safeLimit}) / 누적 총 ${safeTotal}회`;
+}
 
 
 
@@ -323,23 +327,24 @@ async function increaseTodayCount(userId, profile) {
     return;
   }
 
-  // ✅ 누적 총 카운트 구하기
-  let totalCount = 0;
-  const { data: allRows, error: totalErr } = await window.supabaseClient
-    .from("saju_counts")
-    .select("count")
-    .eq("user_id", userId);
+ // ✅ 누적 총 카운트 구하기
+let totalCount = 0;
+const { data: allRows, error: totalErr } = await window.supabaseClient
+  .from("saju_counts")
+  .select("count")
+  .eq("user_id", userId);
 
-  if (!totalErr && Array.isArray(allRows)) {
-    totalCount = allRows.reduce((sum, row) => sum + (row.count ?? 0), 0);
-  }
+if (!totalErr && Array.isArray(allRows)) {
+  totalCount = allRows.reduce((sum, row) => sum + (row.count ?? 0), 0);
+}
 
-  // ✅ 회원별 limit 불러오기
-  const dailyLimit = profile?.daily_limit ?? 20; // 기본 20
-  const remain = dailyLimit - newCount;
+// ✅ 회원별 limit 가져오기 (profile.daily_limit)
+const dailyLimit = profile?.daily_limit ?? 20;
+const remain = dailyLimit - newCount;
 
-  // ✅ 화면 갱신
-  updateCountDisplay(newCount, totalCount, remain, dailyLimit);
+// ✅ 딱 숫자만 넘기기
+updateCountDisplay(newCount, totalCount, remain, dailyLimit);
+
 }
 
 
