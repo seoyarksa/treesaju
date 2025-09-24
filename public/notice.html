@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>공지 상세</title>
+</head>
+<body>
+  <div id="notice-detail">불러오는 중...</div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+
+    fetch(`/api/notice/${id}`)
+      .then(res => res.json())
+      .then(notice => {
+        document.getElementById('notice-detail').innerHTML = `
+          <h2>${notice.title}</h2>
+          <p>${notice.content}</p>
+          <small>작성일: ${new Date(notice.created_at).toLocaleString()} | 조회수: ${notice.views}</small>
+        `;
+      });
+  </script>
+</body>
+</html>

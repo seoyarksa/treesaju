@@ -1,3 +1,9 @@
+ <!-- //         git add .
+//               git commit -m "로그인횟수제한"   
+//               git push origin main
+//               git push
+//               강제실행   vercel --prod --force
+-->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -14,18 +20,31 @@
   
  <!-- 2) Supabase 초기화 (전역 등록) -->
 <script>
-  // SDK 로드 후 전역에 supabase 가 존재해야 함
   if (!window.supabase) {
     alert("Supabase SDK 로드 실패. 네트워크 또는 CDN 경로를 확인하세요.");
   }
+
+  const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+  const isMobile = /android|iphone|ipad|ipod/i.test(userAgent);
+
   window.supabaseClient = window.supabase.createClient(
     "https://dxrgobsgeeshkybkbnxo.supabase.co",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4cmdvYnNnZWVzaGt5YmtibnhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwOTAyNzIsImV4cCI6MjA3MzY2NjI3Mn0.vD1xSRezaTC2OUikZZJM7UntQaQWvOxRkvYiMl78UZA"
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4cmdvYnNnZWVzaGt5YmtibnhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwOTAyNzIsImV4cCI6MjA3MzY2NjI3Mn0.vD1xSRezaTC2OUikZZJM7UntQaQWvOxRkvYiMl78UZA",
+    {
+      auth: {
+        storage: isMobile ? window.localStorage : window.sessionStorage,
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
+    }
   );
+
   // 호환용
   window.client = window.supabaseClient;
   console.log("[INDEX] supabaseClient ready:", !!window.supabaseClient);
 </script>
+
 
 <style>
   body {
@@ -235,6 +254,99 @@
   height: auto !important;     /* ✅ 높이도 자동 */
   white-space: nowrap;         /* ✅ 줄바꿈 방지 */
 }
+
+.btn-success.active {
+  background-color: #f18997; 
+  color: #fff;
+}
+
+/* 고객 이력 표 전체 */
+#saju-history-table {
+  width: 100%;
+  border-collapse: collapse; /* 이중선 제거 */
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+/* 셀 공통 스타일 */
+#saju-history-table th,
+#saju-history-table td {
+  border: 1px solid #e0e0e0;
+  padding: 8px 12px;
+  text-align: center;
+}
+
+/* 헤더 줄 */
+#saju-history-table th {
+  background-color: #f8f9fa;
+  font-weight: bold;
+}
+
+/* 줄무늬 효과 */
+#saju-history-table tr:nth-child(even) {
+  background-color: #fcfcfc;
+}
+
+/* hover 효과 */
+#saju-history-table tr:hover {
+  background-color: #f1f7ff;
+}
+
+/* 이름 클릭 링크 */
+.saju-record-link {
+  cursor: pointer;
+  color: #007bff;
+  text-decoration: underline;
+}
+
+/* 삭제 버튼 */
+.delete-record-btn {
+  background: #ff4d4f;
+  border: none;
+  color: white;
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.delete-record-btn:hover {
+  background: #d9363e;
+}
+
+
+
+
+#page-info {
+  margin-top: 12px;
+  text-align: center;   /* ✅ 전체 가운데 정렬 */
+}
+
+.page-btn,
+.page-num {
+  margin: 0 2px;          /* ✅ 간격 줄임 */
+  padding: 2px 4px;       /* ✅ 안쪽 여백도 줄임 */
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: #000;            /* 기본 검정색 */
+}
+
+.page-btn:hover,
+.page-num:hover {
+  text-decoration: underline;
+}
+
+.page-num.active {
+  font-weight: bold;
+  color: red;             /* ✅ 현재 페이지만 빨강 */
+  text-decoration: none;
+}
+
+
+
+
+
 </style>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -258,6 +370,15 @@
   <div class="vine-deco vine-bottom-right"></div>
 
   <h1>트리 만세력</h1>
+
+  <h2>📌 공지사항</h2>
+  <button id="add-btn" style="display:none;">공지 추가</button>
+  <ul id="notice-list"></ul>
+
+
+
+
+  
 <!-- 로그인/로그아웃 영역 -->
 <div id="auth-section" class="auth-section" style="margin-top:20px;">
   <form id="login-form">
@@ -265,24 +386,38 @@
       <tr>
         <!-- 이메일 입력 -->
         <td>
-          <input type="email" id="email" placeholder="이메일" style="padding:5px; width:200px;">
+          <input type="email" id="email" placeholder="이메일" style="padding:5px; width:120px;">
         </td>
         <!-- 로그인 / 회원가입 -->
         <td>
+            <input type="password" id="password" placeholder="비밀번호" style="padding:5px; width:60px;">
           <button type="button" id="loginBtn" class="btn-success">로그인</button>
-          <button type="button" id="signupBtn" class="btn-success">회원가입</button>
+          <button type="button" id="signupBtn" class="btn-success" style="margin-left:8px; background-color:#fab7b7; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">회원가입</button>
         </td>
       </tr>
       <tr>
         <!-- 비밀번호 입력 -->
-        <td>
-          <input type="password" id="password" placeholder="비밀번호" style="padding:5px; width:200px;">
-        </td>
-        <!-- 소셜 로그인 -->
-        <td>
-          <button type="button" id="googleLogin" class="btn-success">구글 로그인</button>
-          <button type="button" id="kakaoLogin" class="btn-success">카카오 로그인</button>
-        </td>
+<td style="text-align: right; color: blue;">
+  간편로그인:
+</td>
+
+
+  <td>
+  <div class="social-login">
+    <!-- 구글 로그인 버튼 -->
+    <img src="images/구글로그인.png" 
+         alt="Google 로그인" 
+         class="login-btn" 
+         id="googleLogin" />
+
+    <!-- 카카오 로그인 버튼 -->
+    <img src="images/카카오로그인.png" 
+         alt="Kakao 로그인" 
+         class="login-btn" 
+         id="kakaoLogin" />
+  </div>
+</td>
+
       </tr>
     </table>
   </form>
@@ -291,8 +426,42 @@
 <!-- 로그인 후 표시 -->
 <div id="profile-section" style="display:none; margin-top:8px;">
   <span id="user-nickname" style="font-weight:600; color: blue;"></span> 님 환영합니다
-  <button id="subscribeBtn" type="button" style="margin-left:8px;">정기구독</button>
-  <button id="logoutBtn" type="button" style="margin-left:8px;">로그아웃</button>
+ 
+  <button id="logoutBtn" type="button" style="margin-left:8px; background-color:#fab7b7; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">로그아웃</button><br>
+  <button id="toggle-history-btn" style="background-color:#4CAF50; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">고객data</button>
+  <button id="subscribeBtn" type="button" style="margin-left:8px;background-color:#4CAF50; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">정기구독</button>
+
+
+<!-- 패널 (처음엔 숨김) -->
+<div id="saju-history-panel" style="display:none; margin-top:10px;">
+  <!-- 검색 -->
+  <div>
+    <input type="text" id="search-name" placeholder="이름 검색" style="background-color:#f7f4df; border:1px solid #ccc; padding:5px; border-radius:4px; width:60px;">
+    <button id="search-btn" style="background-color:#4CAF50; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">검색</button>
+  </div>
+
+  <!-- 테이블 -->
+  <table border="1" width="100%" id="saju-history-table">
+    <thead>
+      <tr>
+        <th>이름</th>
+        <th>생년월일</th>
+        <th>성별</th>
+        <th>등록일</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <!-- 페이지 컨트롤 -->
+  <div style="margin-top:10px;">
+    <button id="prev-page">이전</button>
+    <span id="page-info">페이지 1</span>
+    <button id="next-page">다음</button>
+  </div>
+</div>
+
+
 </div>
 
 <!-- 결제 모달 -->
@@ -307,20 +476,31 @@
 
 
     <form id="saju-form">
+      <label>고객명:</label>
+<input type="text" id="customer-name" placeholder="저장관리용" style="background-color:#f7f4df; border:1px solid #ccc; padding:5px; border-radius:4px; width:60px;" />
+ <label for="gender">성별:</label>
+<select id="gender">
+  <option value="">선택</option>
+  <option value="male" >남자</option>
+  <option value="female">여자</option>
+</select>
+<button id="reset-btn" type="button" style="margin-left:8px; background-color:#fcfdd0; color:rgb(5, 1, 1); border:none; padding:5px 10px; border-radius:4px; cursor:pointer;" >다시입력</button>
+<br />
+
     <label>생년월일:</label> 
-    <input  type="text" id="birth-date" placeholder="YYYYMMDD" class="birthdate-input" />
- 
+    <input  type="text" id="birth-date" placeholder="YYYYMMDD" class="birthdate-input" style="background-color:#f7dff5; border:1px solid #ccc; padding:5px; border-radius:4px; width:80px;"/>
+
     
     <select id="calendar-type" name="calendar-type">
-      <option value="선택" ></option>
-      <option value="solar" selected="" >양력</option>
+      <option value="">선택</option>
+                                    <option value="solar"  >양력</option>
       <option value="lunar">음력</option>
-    </select><br />
-    <label>성별:</label>
-    <label><input type="radio" name="gender" value="male" checked> 남자</label>
-    <label><input type="radio" name="gender" value="female"> 여자</label><br />
+    </select>
+
+<br />
+
     <label>출생 시간:</label>
-    <label><input type="radio" name="ampm" value="AM" checked> 오전</label>
+                         <label><input type="radio" name="ampm" value="AM"> 오전</label>
     <label><input type="radio" name="ampm" value="PM"> 오후</label>
     <label>+</label>
     <select id="hour-select">
@@ -328,7 +508,7 @@
        <option value="0">0시</option>
       <option value="1">1시</option>
       <option value="2">2시</option>
-      <option value="3"selected>3시</option>
+                                    <option value="3" >3시</option>
       <option value="4">4시</option>
       <option value="5">5시</option>
       <option value="6">6시</option>
@@ -350,7 +530,7 @@
   <option value="7">7분</option>
   <option value="8">8분</option>
   <option value="9">9분</option>
-  <option value="10"selected>10분</option>
+                             <option value="10"  >10분</option>
   <option value="11">11분</option>
   <option value="12">12분</option>
   <option value="13">13분</option>
@@ -405,7 +585,7 @@
   <!-- 기존 버튼 -->
   <button type="button" id="sajuSubmit" class="btn-success">사주식 출력</button>
   <button type="button" id="sinsalBtn" class="btn-success">신살보기</button>
-
+<span id="count-display"></span>
  
   </form>
 
@@ -458,6 +638,229 @@
 <!-- EmailJS SDK 추가 -->
 <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
 <script type="module" src="app.js"></script>
+
+<script>
+  const buttons = document.querySelectorAll("#sajuSubmit, #sinsalBtn");
+
+  buttons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      // 모든 버튼에서 active 제거
+      buttons.forEach(b => b.classList.remove("active"));
+      // 클릭된 버튼에 active 추가
+      btn.classList.add("active");
+    });
+  });
+</script>
+
+
+
+
+
+<!-- 공지사항 게시판 -->
+
+<script>
+  const supabase = window.supabaseClient;
+
+  // 공지 목록 렌더
+  async function renderNotices() {
+    const res = await fetch('/api/notice');
+    const data = await res.json();
+
+    const list = document.getElementById('notice-list');
+    const addBtn = document.getElementById('add-btn');
+    const role = localStorage.getItem('userRole') || 'normal';
+
+    // 버튼 표시/숨김 안전망
+    if (addBtn) addBtn.style.display = role === 'admin' ? 'inline' : 'none';
+
+    list.innerHTML = '';
+    data.forEach(n => {
+      const li = document.createElement('li');
+      li.innerHTML = `<a href="javascript:void(0)" onclick="openNotice(${n.id})">${n.title}</a>`;
+      if (role === 'admin') {
+        li.innerHTML += `
+          <button onclick="editNotice(${n.id})">수정</button>
+          <button onclick="deleteNotice(${n.id})">삭제</button>
+        `;
+      }
+      list.appendChild(li);
+    });
+  }
+
+  // 팝업으로 공지 상세 열기
+  function openNotice(id) {
+    window.open(`/notice.html?id=${id}`, 'noticePopup',
+      'width=600,height=400,resizable=yes,scrollbars=yes');
+  }
+
+  // 공지 추가
+  document.getElementById('add-btn')?.addEventListener('click', async () => {
+    const title = prompt("제목을 입력하세요:");
+    const content = prompt("내용을 입력하세요:");
+    if (!title || !content) return;
+
+    await fetch('/api/notice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, content })
+    });
+    renderNotices();
+  });
+
+  // 공지 수정/삭제
+  async function editNotice(id) {
+    const title = prompt("새 제목을 입력하세요:");
+    const content = prompt("새 내용을 입력하세요:");
+    if (!title || !content) return;
+
+    await fetch(`/api/notice/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, content })
+    });
+    renderNotices();
+  }
+  async function deleteNotice(id) {
+    if (!confirm("정말 삭제하시겠습니까?")) return;
+    await fetch(`/api/notice/${id}`, { method: 'DELETE' });
+    renderNotices();
+  }
+
+  // 로그인 UI 업데이트 (당신의 기존 함수에 "role 저장/삭제"와 버튼 처리만 보강)
+  async function updateAuthUI(session) {
+    const authSection =
+      document.getElementById("auth-section") ||
+      document.getElementById("login-form") ||
+      document.querySelector(".login-form");
+    const profileSection = document.getElementById("profile-section");
+    const nicknameEl = document.getElementById("user-nickname");
+    const historySection = document.getElementById("saju-history-section");
+
+    if (session && session.user) {
+      const token = session.access_token;
+      const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent || '');
+
+      if (isMobile) localStorage.setItem("authToken", token);
+      else sessionStorage.setItem("authToken", token);
+
+      if (authSection) authSection.style.display = "none";
+      if (profileSection) profileSection.style.display = "block";
+
+      const user = session.user;
+
+      // 프로필 불러와 role 저장
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role, created_at, daily_limit")
+        .eq("user_id", user.id)
+        .single();
+
+      const role = (profile?.role || "normal").toLowerCase();
+      localStorage.setItem("userRole", role); // ✅ 로그인 시 항상 갱신
+
+      // (선택) 프로필 라벨 및 닉네임 처리 – 기존 코드 유지
+      // ...
+
+    } else {
+      // ✅ 로그아웃 시 토큰과 role 모두 제거
+      localStorage.removeItem("authToken");
+      sessionStorage.removeItem("authToken");
+      localStorage.removeItem("userRole");
+
+      if (authSection) authSection.style.display = "block";
+      if (profileSection) profileSection.style.display = "none";
+      if (nicknameEl) nicknameEl.textContent = "";
+      if (historySection) historySection.style.display = "none";
+    }
+
+    // add-btn 즉시 반영(깜빡임 방지)
+    const addBtn = document.getElementById('add-btn');
+    if (addBtn) {
+      const roleNow = localStorage.getItem('userRole') || 'normal';
+      addBtn.style.display = roleNow === 'admin' ? 'inline' : 'none';
+    }
+  }
+
+  // 초기/변경 모두 동일한 흐름으로 갱신
+  (async function init() {
+    // 초기엔 버튼 숨김으로 시작(깜빡임 방지)
+    const addBtn = document.getElementById('add-btn');
+    if (addBtn) addBtn.style.display = 'none';
+
+    const { data: { session } } = await supabase.auth.getSession();
+    await updateAuthUI(session);   // role 저장/버튼 상태 갱신
+    await renderNotices();         // role 반영된 후 목록 렌더
+
+    supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      await updateAuthUI(newSession); // 로그인/로그아웃마다 role 갱신
+      await renderNotices();          // 그리고 목록 다시 렌더
+    });
+  })();
+</script>
+
+
+
+
+
+
+
+
+<!-- 리셋버튼작동 -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const resetBtn = document.getElementById("reset-btn");
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      console.log("✅ 리셋 버튼 눌림");
+
+      // ✅ 사주 입력 폼 전체 초기화
+      const form = document.getElementById("saju-form");
+      if (form) form.reset();
+
+      // ✅ 출력 전체 숨기기 및 내용 지우기
+      const resultContainer = document.getElementById("result");
+      if (resultContainer) {
+        resultContainer.style.display = "none";
+
+        // 내부 내용도 싹 지움
+        const birthInfo = document.getElementById("birth-info");
+        if (birthInfo) birthInfo.innerHTML = "";
+
+        const ganjiTable = document.getElementById("ganji-table");
+        if (ganjiTable) ganjiTable.innerHTML = "";
+
+        const todaySaju = document.getElementById("today-saju-container");
+        if (todaySaju) todaySaju.innerHTML = "";
+
+        const dangryeong = document.getElementById("dangryeong-table");
+        if (dangryeong) dangryeong.innerHTML = "";
+
+        const basicDaeyun = document.getElementById("basic-daeyun-table");
+        if (basicDaeyun) basicDaeyun.innerHTML = "";
+
+        const sinsalDaeyun = document.getElementById("sinsal-daeyun-table");
+        if (sinsalDaeyun) sinsalDaeyun.innerHTML = "";
+
+        const sinsalBox = document.getElementById("sinsal-box");
+        if (sinsalBox) sinsalBox.innerHTML = "";
+
+        const etcSinsalBox = document.getElementById("etc-sinsal-box");
+        if (etcSinsalBox) etcSinsalBox.innerHTML = "";
+      }
+
+      // ✅ 히스토리 숨기기
+      const historySection = document.getElementById("saju-history-section");
+      if (historySection) historySection.style.display = "none";
+
+      // ✅ 스크롤 맨 위로
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  } else {
+    console.log("❌ reset-btn 버튼을 찾을 수 없음");
+  }
+});
+</script>
+
 
 
 

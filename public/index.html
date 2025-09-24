@@ -344,8 +344,68 @@
 }
 
 
+  /* 공지 1줄: 길면 말줄임 */
+.notice-bar{
+  display:flex; align-items:center;
+  padding:8px 12px; border:1px solid #eee; background:#fff; font-size:14px;
+}
+.notice-bar .label{ flex:0 0 auto; }
+.notice-bar .title{
+  flex:1 1 auto; min-width:0;               /* ← 핵심: 공간 최대 활용 */
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+#latest-notice,
+#latest-notice:visited {
+  color: #1976d2 !important;
+  text-decoration: none;
+}
+
+  /* 가로 메뉴 기본 스타일 */
+  .top-menu{
+    margin-top:8px;
+    border:1px solid #eee;
+    background:#fafafa;
+    padding:6px 10px;
+    font-size:14px;
+  }
+  .top-menu ul{
+    list-style:none;
+    margin:0;
+    padding:0;
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:0; /* 항목 사이 간격은 구분자에서 처리 */
+  }
+  .top-menu li{
+    display:inline-block;
+  }
+  .top-menu li + li::before{
+    content:"|";
+    color:#aaa;
+    margin:0 8px;
+  }
+  .top-menu a{
+    text-decoration:none;   /* 밑줄 제거 */
+    color:#333;
+  }
+  .top-menu a:hover{
+    text-decoration:underline; /* 원하면 제거해도 됨 */
+  }
 
 
+    .notice-inline{
+    display:flex; align-items:center; gap:6px;
+    padding:8px 12px; border:1px solid #eee; background:#fff; 
+    white-space:nowrap; overflow:hidden;
+  }
+  .notice-title{ flex:1; min-width:0; }           /* 말줄임 가능한 영역 */
+  .notice-title ul{ margin:0; padding:0; list-style:none; }
+  .notice-title li{ display:block; }              /* 스크립트가 li를 채움 */
+  .notice-title a{
+    display:block; text-decoration:none; color:#333;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
 
 </style>
 
@@ -369,7 +429,89 @@
   <div class="vine-deco vine-bottom-left"></div>
   <div class="vine-deco vine-bottom-right"></div>
 
-  <h1>트리 만세력</h1>
+
+
+
+
+
+
+
+
+
+
+
+ <!-- 레이아웃: 1행 2칸 테이블 -->
+<table style="width:500px; border-collapse:collapse; table-layout:fixed;">
+  <colgroup>
+    <col style="width: 1fr;">
+    <col style="width: 240px;"> <!-- 우측 메뉴 폭 -->
+  </colgroup>
+  <tr>
+    <th colspan="2" style="text-align:left; padding:16px 0; font-size:28px;">
+      트리 만세력
+    </th>
+  </tr>
+  <tr>
+
+
+
+<!-- 가로 메뉴: 밑줄 제거 + 구분자 자동 -->
+<nav class="top-menu">
+  <ul>
+    <li><a href="/index.html">공지게시판</a></li>
+<li>
+  <a href="javascript:void(0)"
+     onclick="window.open('https://cafe.naver.com/f-e/cafes/22418538/menus/288?t=1758692524163',
+                          'free',
+                          'width=1200,height=800,scrollbars=yes')">
+     소통창
+  </a>
+</li>
+
+
+<li>
+  <a href="javascript:void(0)"
+     onclick="window.open('https://cafe.naver.com/f-e/cafes/22418538/menus/327?t=1758693680522',
+                          'faq',
+                          'width=1200,height=800,scrollbars=yes')">
+     FAQ
+  </a>
+</li>
+
+<li>
+  <a href="javascript:void(0)"
+     onclick="window.open('https://cafe.naver.com/f-e/cafes/22418538/menus/328?t=1758693700672',
+                          'contact',
+                          'width=1200,height=800,scrollbars=yes')">
+     문의하기
+  </a>
+</li>
+
+<li><a id="admin-menu" href="javascript:void(0)" 
+       onclick="window.open('/member-admin.html','memberAdmin','width=1200,height=800,scrollbars=yes')" 
+       style="display:none;">
+  회원관리
+</a></li>
+
+
+  </ul>
+</nav>
+
+
+
+  </tr>
+</table>
+
+
+
+
+
+<div class="notice-inline">
+  <strong>📌 공지사항:&nbsp;</strong>
+  <div class="notice-title">
+    <ul id="notice-list"></ul> <!-- 기존 스크립트가 여기 채움 (최신 1개) -->
+  </div> <button id="add-btn" style="display:none;">공지 추가</button>
+</div>
 <!-- 로그인/로그아웃 영역 -->
 <div id="auth-section" class="auth-section" style="margin-top:20px;">
   <form id="login-form">
@@ -462,6 +604,13 @@
   <button onclick="startGoogleSubscription()">Google 정기구독 결제</button>
   <button onclick="startKakaoSubscription()">Kakao 정기구독 결제</button>
 </div>
+
+
+
+
+
+
+
 
 
 
@@ -645,6 +794,245 @@
 
 
 
+
+
+<!-- 공지사항 게시판 -->
+
+<script>
+  const supabase = window.supabaseClient;
+
+  // 토큰/롤 헬퍼
+  const getToken = () =>
+    localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+  const getRole = () =>
+    (localStorage.getItem('userRole') || 'normal').toLowerCase();
+
+  // 공지 목록 렌더 (최신 1개만)
+  async function renderNotices() {
+    const res = await fetch('/api/notice');
+    const data = await res.json();
+
+    const list = document.getElementById('notice-list');
+    const addBtn = document.getElementById('add-btn');
+    const role = getRole();
+
+    // 버튼 표시/숨김
+    if (addBtn) addBtn.style.display = role === 'admin' ? 'inline' : 'none';
+
+    list.innerHTML = '';
+
+    // 최신 1개만
+    const n = Array.isArray(data) && data.length ? data[0] : null;
+    if (!n) {
+      const li = document.createElement('li');
+      li.textContent = '등록된 공지가 없습니다.';
+      list.appendChild(li);
+      return;
+    }
+
+    const li = document.createElement('li');
+    li.innerHTML = `<a href="javascript:void(0)" onclick="openNotice(${n.id})">${n.title}</a>`;
+
+    if (role === 'admin') {
+      li.innerHTML += `
+        <button onclick="editNotice(${n.id})">수정</button>
+        <button onclick="deleteNotice(${n.id})">삭제</button>
+      `;
+    }
+
+    list.appendChild(li);
+  }
+
+  // 팝업으로 공지 상세 열기
+  function openNotice(id) {
+    window.open(
+      `/notice.html?id=${id}`,
+      'noticePopup',
+      'width=600,height=400,resizable=yes,scrollbars=yes'
+    );
+  }
+
+  // 공지 추가 (제목+내용)
+  document.getElementById('add-btn')?.addEventListener('click', async () => {
+    const title = prompt('새 공지의 제목을 입력하세요:');
+    if (title === null) return;
+    const content = prompt('내용을 입력하세요:\n(줄바꿈 가능)');
+    if (content === null) return;
+
+    const newTitle = title.trim();
+    const newContent = (content ?? '').trim();
+    if (!newTitle || !newContent) {
+      alert('제목과 내용을 모두 입력하세요.');
+      return;
+    }
+
+    const token = getToken();
+    const resp = await fetch('/api/notice', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ title: newTitle, content: newContent })
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      alert(err.error || '공지 추가 실패(권한 또는 서버 오류)');
+      return;
+    }
+
+    renderNotices();
+  });
+
+  // 공지 수정: 제목+내용 모두 변경
+  async function editNotice(id) {
+    // 현재 데이터 조회
+    const cur = await fetch(`/api/notice/${id}`).then(r => r.json());
+    if (!cur || !cur.id) {
+      alert('공지 정보를 불러오지 못했습니다.');
+      return;
+    }
+
+    const title = prompt('새 제목을 입력하세요:', cur.title || '');
+    if (title === null) return;
+
+    const content = prompt('새 내용을 입력하세요:\n(줄바꿈 가능)', cur.content || '');
+    if (content === null) return;
+
+    const newTitle = title.trim();
+    const newContent = (content ?? '').trim();
+    if (!newTitle || !newContent) {
+      alert('제목과 내용을 모두 입력하세요.');
+      return;
+    }
+
+    const token = getToken();
+    const resp = await fetch(`/api/notice/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ title: newTitle, content: newContent })
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      alert(err.error || '공지 수정 실패(권한 또는 서버 오류)');
+      return;
+    }
+
+    renderNotices();
+  }
+
+  // 공지 삭제
+  async function deleteNotice(id) {
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+
+    const token = getToken();
+    const resp = await fetch(`/api/notice/${id}`, {
+      method: 'DELETE',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      alert(err.error || '공지 삭제 실패(권한 또는 서버 오류)');
+      return;
+    }
+
+    renderNotices();
+  }
+
+  // 로그인 UI 업데이트 (role 저장/삭제 및 버튼 상태 반영)
+  async function updateAuthUI(session) {
+    const authSection =
+      document.getElementById('auth-section') ||
+      document.getElementById('login-form') ||
+      document.querySelector('.login-form');
+    const profileSection = document.getElementById('profile-section');
+    const nicknameEl = document.getElementById('user-nickname');
+    const historySection = document.getElementById('saju-history-section');
+
+    if (session && session.user) {
+      const token = session.access_token;
+      const isMobile = /android|iphone|ipad|ipod/i.test(
+        navigator.userAgent || ''
+      );
+
+      if (isMobile) localStorage.setItem('authToken', token);
+      else sessionStorage.setItem('authToken', token);
+
+      if (authSection) authSection.style.display = 'none';
+      if (profileSection) profileSection.style.display = 'block';
+
+      const user = session.user;
+
+      // 프로필 불러와 role 저장
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, created_at, daily_limit')
+        .eq('user_id', user.id)
+        .single();
+
+      const role = (profile?.role || 'normal').toLowerCase();
+      localStorage.setItem('userRole', role); // 로그인 시 갱신
+    } else {
+      // 로그아웃 시 스토리지 정리
+      localStorage.removeItem('authToken');
+      sessionStorage.removeItem('authToken');
+      localStorage.removeItem('userRole');
+
+      if (authSection) authSection.style.display = 'block';
+      if (profileSection) profileSection.style.display = 'none';
+      if (nicknameEl) nicknameEl.textContent = '';
+      if (historySection) historySection.style.display = 'none';
+    }
+
+    // add-btn 즉시 반영
+    const addBtn = document.getElementById('add-btn');
+    if (addBtn) {
+      addBtn.style.display = getRole() === 'admin' ? 'inline' : 'none';
+    }
+  }
+
+  // 초기/변경 동일 흐름으로 갱신
+  (async function init() {
+    // 초기엔 버튼 숨김(깜빡임 방지)
+    const addBtn = document.getElementById('add-btn');
+    if (addBtn) addBtn.style.display = 'none';
+
+    const { data: { session } } = await supabase.auth.getSession();
+    await updateAuthUI(session);   // role 저장/버튼 상태 갱신
+    await renderNotices();         // role 반영 후 목록 렌더
+
+    supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      await updateAuthUI(newSession); // 로그인/로그아웃마다 role 갱신
+      await renderNotices();          // 그리고 목록 다시 렌더
+    });
+  })();
+</script>
+
+
+
+<!-- 관리자 메뉴관리 -->
+<script>
+  // role에 따라 요소 표시/숨김
+  function showIfAdmin(selector) {
+    const el = document.querySelector(selector);
+    if (!el) return;
+    const role = (localStorage.getItem('userRole') || 'normal').toLowerCase();
+    el.style.display = role === 'admin' ? 'inline' : 'none';
+  }
+</script>
+
+
+
+
+
 <!-- 리셋버튼작동 -->
 <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -702,11 +1090,25 @@ document.addEventListener("DOMContentLoaded", () => {
 </script>
 
 
+<!-- 공지게시판목록 새창 띄우기 -->
+<script>
+  // 공지게시판 메뉴를 작은 팝업 창으로 열기
+  document.querySelector('.top-menu a[href="/index.html"]')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    window.open(
+      '/notice-list.html',
+      'noticeWin',
+      'width=900,height=650,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes'
+    );
+  });
+</script>
+
 
 
 
 </body>
 </html>
+
 
 
 

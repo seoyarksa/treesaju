@@ -2,7 +2,7 @@
 
 
 // git add .
-// git commit -m "일간왕쇠강약"   
+// git commit -m "로그인횟수제한"   
 // git push origin main
 // git push
 //강제실행   vercel --prod --force
@@ -126,11 +126,37 @@ import { renderSinsalTable,
  * 1) 비로그인 출력 제한
  ************************************/
 // ===== app.js (안전망 포함, 전체 교체용) =====
+// 파일 상단 어딘가
+let __lastFormKey = null;
+
+// 입력을 안정적으로 키로 만드는 헬퍼
+function makeFormKey(fd) {
+  // 비교에 의미 없는 공백/대소문/형식을 정리
+  const norm = {
+    name: (fd.name || "").trim(),
+    birthDate: (fd.birthDate || "").trim(),
+    calendarType: (fd.calendarType || "").trim(),
+    gender: (fd.gender || "").trim(),
+    ampm: (fd.ampm || "").trim(),
+    hour: String(fd.hour ?? "").padStart(2, "0"),
+    minute: String(fd.minute ?? "").padStart(2, "0"),
+  };
+  return JSON.stringify(norm);
+}
+
 
 // 0) 안전 헬퍼
 const $ = (sel) => document.querySelector(sel);
 const on = (el, ev, fn) => el && el.addEventListener(ev, fn);
 const supa = window.supabaseClient || window.client || null;
+
+
+// ✅ 여기! (로거를 가장 위에 두면 아래 모든 함수에서 사용 가능)
+const DEBUG = true;
+const log = (...args) => DEBUG && console.log("[COUNT]", ...args);
+const warn = (...args) => DEBUG && console.warn("[COUNT]", ...args);
+
+
 
 function readyLog(stage, extra) {
   console.log(`[APP] ${stage}`, extra || "");
@@ -147,48 +173,422 @@ if (!supa || !supa.auth) {
 console.log("[app] loaded");
 
 // === 1) 비로그인 출력 제한
-async function checkRenderAllowed() {
-  const { data: { session } } = await window.supabaseClient.auth.getSession();
-  if (session) return true;
-
-  const today = new Date().toISOString().slice(0, 10);
-  const usage = JSON.parse(localStorage.getItem("sajuUsage") || "{}");
-  usage[today] = (usage[today] || 0) + 1;
-
-  if (usage[today] > 3) {
-    alert("로그인하지 않은 사용자는 하루 3회까지만 사주 출력이 가능합니다.");
-    return false;
-  }
-  localStorage.setItem("sajuUsage", JSON.stringify(usage));
-  return true;
+// KST(Asia/Seoul) 기준 YYYY-MM-DD 키 만들기
+function getKSTDateKey() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
 }
 
+// ✅ 비로그인 1일 3회(한국 날짜 기준) 제한
+// ✅ 출력횟수 표시 (회원 구분 없음)
+
+
+
+
+
+
+
+
+
 // === 2) 로그인 UI 토글
-function updateAuthUI(session) {
+
+async function updateAuthUI(session) {
   const authSection =
     document.getElementById("auth-section") ||
     document.getElementById("login-form") ||
     document.querySelector(".login-form");
   const profileSection = document.getElementById("profile-section");
   const nicknameEl = document.getElementById("user-nickname");
+  const historySection = document.getElementById("saju-history-section");
 
-  if (session) {
+  if (session && session.user) {
+    // ✅ 여기서 토큰 저장 처리
+    const token = session.access_token;
+    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+    const isMobile = /android|iphone|ipad|ipod/i.test(userAgent);
+
+    if (isMobile) {
+      localStorage.setItem("authToken", token);
+    } else {
+      sessionStorage.setItem("authToken", token);
+    }
+
     if (authSection) authSection.style.display = "none";
     if (profileSection) profileSection.style.display = "block";
-    const user = session.user || {};
+
+    const user = session.user;
+
+    // ✅ 프로필 role 불러오기
+    const { data: profile } = await window.supabaseClient
+      .from("profiles")
+      .select("role, created_at, daily_limit")
+      .eq("user_id", user.id)
+      .single();
+
+const role = profile?.role || "normal";
+localStorage.setItem("userRole", role);
+
+    let roleLabel = "";
+    switch (profile?.role) {
+      case "admin": roleLabel = "[관리자] "; break;
+      case "premium": roleLabel = "[정기회원] "; break;
+      case "special": roleLabel = "[특별회원] "; break;
+      default: roleLabel = "[일반회원] "; break;
+    }
+
     const nickname =
       user.user_metadata?.nickname ||
       user.user_metadata?.name ||
       user.user_metadata?.full_name ||
+      user.nickname ||
+      user.name ||
+      user.displayName ||
       (user.email ? user.email.split("@")[0] : null) ||
       "사용자";
-    if (nicknameEl) nicknameEl.textContent = nickname;
-  } else {
-    if (authSection) authSection.style.display = "";
-    if (profileSection) profileSection.style.display = "none";
-    if (nicknameEl) nicknameEl.textContent = "";
+
+    if (nicknameEl) nicknameEl.textContent = roleLabel + nickname;
+
+    if (historySection) historySection.style.display = "block";
+    loadSajuHistory(user.id);
+    renderUserProfile();
+} else {
+  // ✅ 로그아웃 시 스토리지 정리
+  localStorage.removeItem("authToken");
+  sessionStorage.removeItem("authToken");
+  localStorage.removeItem("userRole");   // ← 이 줄 추가
+
+  if (authSection) authSection.style.display = "block";
+  if (profileSection) profileSection.style.display = "none";
+  if (nicknameEl) nicknameEl.textContent = "";
+  if (historySection) historySection.style.display = "none";
+}
+
+}
+
+//첫한달간 회원별 제한 횟수 계산
+function getDailyLimit(profile = {}) {
+  // role 정규화
+  const role = String(profile.role || "normal").toLowerCase();
+
+  // admin은 고정
+  if (role === "admin") return 1000;
+
+  // special: 등급지정일로부터 6개월 200/일, 이후 0
+  if (role === "special") {
+    const addMonths = (d, m) => { const x = new Date(d); x.setMonth(x.getMonth() + m); return x; };
+    const createdAt = profile.created_at ? new Date(profile.created_at) : new Date();
+    const basis = profile.special_assigned_at || profile.role_assigned_at || profile.created_at;
+    const assignedAt = basis ? new Date(basis) : createdAt;
+    return Date.now() <= addMonths(assignedAt, 6).getTime() ? 200 : 0;
+  }
+
+  // 개별 daily_limit(숫자)은 admin/special 외 등급에서만 허용
+  const dl = Number(profile.daily_limit);
+  if (Number.isFinite(dl)) return dl;
+
+  const createdAt = profile.created_at ? new Date(profile.created_at) : new Date();
+  const daysSinceJoin = Math.max(0, Math.floor((Date.now() - createdAt.getTime()) / 86400000));
+
+  switch (role) {
+    case "guest":
+      return daysSinceJoin > 60 ? 0 : 3;
+
+    case "normal":
+      // ✅ 과거 프리미엄 이력이 있으면 normal은 0(재가입 유도)
+      if (profile.has_ever_premium) return 0;
+      // 기존 신규 normal 정책(가입 30일 20회)
+      return daysSinceJoin >= 30 ? 0 : 20;
+
+    case "premium": {
+      // ✅ 프리미엄: 최초 프리미엄 부여의 첫 30일만 100, 그 외는 60
+      const firstAt = profile.premium_first_assigned_at ? new Date(profile.premium_first_assigned_at) : null;
+      const currAt  = profile.premium_assigned_at ? new Date(profile.premium_assigned_at) : null;
+
+      // 정보가 없으면 보수적으로 혜택 미적용(=60)
+      if (!firstAt || !currAt) return 60;
+
+      const firstWindow = firstAt.getTime() + (30 * 86400000); // 최초 부여 +30일
+      const isFirstWindow = Date.now() <= firstWindow && firstAt.getTime() === currAt.getTime();
+      return isFirstWindow ? 100 : 60;
+    }
+
+    default:
+      return 0;
   }
 }
+
+
+
+
+
+
+
+function getGuestId() {
+  let guestId = localStorage.getItem("guest_id");
+  if (!guestId) {
+    guestId = crypto.randomUUID(); // 브라우저 내장 UUID 생성
+    localStorage.setItem("guest_id", guestId);
+  }
+  return guestId;
+}
+
+
+async function buildGateFromDb(userId, profile) {
+  const t0 = performance.now();
+  const today = getKSTDateKey();
+  log("buildGateFromDb → start", { userId, today, role: profile?.role, created_at: profile?.created_at, daily_limit: profile?.daily_limit });
+
+  const { data: todayRow, error: e1 } = await window.supabaseClient
+    .from("saju_counts")
+    .select("count")
+    .eq("user_id", userId)
+    .eq("count_date", today)
+    .maybeSingle();
+  if (e1) warn("today select error", e1);
+  const todayCount = Number(todayRow?.count || 0);
+  log("todayCount", todayCount, "raw:", todayRow);
+
+  const { data: allRows, error: e2 } = await window.supabaseClient
+    .from("saju_counts")
+    .select("count")
+    .eq("user_id", userId);
+  if (e2) warn("all select error", e2);
+
+  let totalCount = 0;
+  if (Array.isArray(allRows)) {
+    console.table?.(allRows); // 각 row.count 확인
+    totalCount = allRows.reduce((s, r) => s + (Number(r.count) || 0), 0);
+  }
+  log("totalCount(sum of rows)", totalCount, "rows:", allRows?.length ?? 0);
+
+  const configured = Number(profile?.daily_limit ?? NaN);
+  const limit = Number.isFinite(configured) ? configured : Number(getDailyLimit(profile));
+  const remaining = !Number.isFinite(limit) ? Infinity : Math.max(limit - todayCount, 0);
+
+  const gate = { limit, remaining, todayCount, totalCount };
+  log("gate(final)", gate, `elapsed ${Math.round(performance.now() - t0)}ms`);
+
+  // 비정상 패턴 자동 추적
+  if (totalCount === 0 && Array.isArray(allRows) && allRows.length > 0) {
+    console.trace("[COUNT] totalCount=0 but rows exist → check reduce and row.count types");
+  }
+  return gate;
+}
+
+
+
+
+//오늘의 카운트 증가 갱신
+
+// 화면 갱신은 이 함수로만!
+function updateCountDisplayFromGate(gate) {
+  const el = document.getElementById("count-display");
+  if (!el) return;
+
+  const total = Number(gate?.totalCount) || 0;
+
+  if (gate?.limit === Infinity || gate?.remaining === Infinity) {
+    el.textContent = `오늘 남은 횟수 (∞/∞) / 누적 총 ${total}회`;
+    return;
+  }
+  const remain = Number(gate?.remaining) || 0;
+  const limit  = Number(gate?.limit) || 0;
+  el.textContent = `오늘 남은 횟수 (${remain}/${limit}) / 누적 총 ${total}회`;
+}
+
+
+
+
+
+
+
+
+
+// 오늘 카운트 증가 + 로그/화면 동기화
+async function increaseTodayCount(userId, profile) {
+  const today = getKSTDateKey(); // ✅ KST 날짜키
+
+  // 1) 현재값 조회
+  const { data: beforeRow, error: selErr } = await window.supabaseClient
+    .from("saju_counts")
+    .select("count")
+    .eq("user_id", userId)
+    .eq("count_date", today)           // ⚠️ count_date는 DATE 타입이 가장 안전
+    .maybeSingle();
+
+  if (selErr) {
+    console.error("카운트 조회 오류:", selErr);
+    return;
+  }
+
+  const nextCount = (Number(beforeRow?.count) || 0) + 1;
+
+  // 2) upsert (오늘 카운트 증가)
+  const { error: upsertErr } = await window.supabaseClient
+    .from("saju_counts")
+    .upsert(
+      { user_id: userId, count_date: today, count: nextCount },
+      { onConflict: "user_id,count_date" }
+    );
+
+  if (upsertErr) {
+    console.error("카운트 업데이트 오류:", upsertErr);
+    return;
+  }
+
+  // 3) authoritative 재조회 (경쟁/지연 대비)
+  const { data: todayRow, error: todayErr } = await window.supabaseClient
+    .from("saju_counts")
+    .select("count")
+    .eq("user_id", userId)
+    .eq("count_date", today)
+    .maybeSingle();
+
+  if (todayErr) {
+    console.error("오늘 카운트 재조회 오류:", todayErr);
+    return;
+  }
+
+  const todayCount = Number(todayRow?.count || nextCount);
+
+  // 4) 누적 합
+  let totalCount = 0;
+  const { data: allRows, error: totalErr } = await window.supabaseClient
+    .from("saju_counts")
+    .select("count")
+    .eq("user_id", userId);
+
+  if (!totalErr && Array.isArray(allRows)) {
+    totalCount = allRows.reduce((sum, r) => sum + (Number(r.count) || 0), 0);
+  }
+
+  // 5) 회원별 limit
+  const limit = Number(profile?.daily_limit ?? 20);
+  const remaining = Math.max(limit - todayCount, 0);
+
+  // 6) 단일 소스(gate)로 로그/화면 동기화
+  const gate = { limit, remaining, todayCount, totalCount };
+  console.log(`[limit] 오늘 남은 횟수: ${gate.remaining}/${gate.limit}`);
+  updateCountDisplayFromGate(gate);
+}
+
+
+
+
+
+
+// === 사주 이력 불러오기 ===
+// === 사주 이력 불러오기 ===
+let currentPage = 1;
+const pageSize = 10;
+let currentUserId = null;
+let currentSearch = "";
+
+async function loadSajuHistory(userId, page = 1, search = "") {
+  currentUserId = userId;
+  currentPage = page;
+  currentSearch = search;
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = window.supabaseClient
+    .from("saju_records")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (search) {
+    query = query.ilike("name", `%${search}%`);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error("이력 조회 오류:", error);
+    return;
+  }
+
+  // ✅ 표 전체 다시 그리기
+  const tableContainer = document.getElementById("saju-history-table");
+  tableContainer.innerHTML = `
+    <table class="customer-table">
+      <thead>
+        <tr>
+          <th>이름</th>
+          <th>생년월일</th>
+          <th>성별</th>
+          <th>등록일</th>
+          <th>비고</th> <!-- ✅ 마지막 열 제목 -->
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  `;
+
+  const tbody = tableContainer.querySelector("tbody");
+
+  data.forEach((record) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>
+<span class="saju-record-link"
+      data-id="${record.id}"
+      data-json='${JSON.stringify(record.input_json)}'
+      style="cursor:pointer; color:blue; text-decoration:underline;">
+  ${record.name}
+</span>
+
+
+      </td>
+      <td>${record.birth_date}</td>
+      <td>${record.gender}</td>
+      <td>${new Date(record.created_at).toLocaleDateString()}</td>
+      <td><button class="delete-record-btn" data-id="${record.id}">삭제</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+// ✅ 페이지네이션 계산
+const { count } = await window.supabaseClient
+  .from("saju_records")
+  .select("*", { count: "exact", head: true })
+  .eq("user_id", userId);
+
+const totalPages = Math.ceil(count / pageSize);
+let paginationHtml = "";
+
+// 페이지 번호 출력 (버튼X, 텍스트형태)
+for (let i = 1; i <= totalPages; i++) {
+  paginationHtml += `
+    <span class="page-num ${i === page ? "active" : ""}" data-page="${i}">
+      ${i}
+    </span>`;
+}
+
+document.getElementById("page-info").innerHTML = paginationHtml;
+
+// 페이지 번호 클릭 이벤트 등록
+document.querySelectorAll(".page-num").forEach((span) => {
+  span.addEventListener("click", () => {
+    const targetPage = parseInt(span.dataset.page, 10);
+    loadSajuHistory(currentUserId, targetPage, currentSearch);
+  });
+});
+
+
+}
+
+
+
+
+
+
+
 
 // === 3) 회원가입 모달 (전화번호 포함)
 function openSignupModal() {
@@ -235,20 +635,13 @@ function openSignupModal() {
   modal.appendChild(panel);
   document.body.appendChild(modal);
 
-  const normalizePhone = (val) => {
-    const digits = (val || "").replace(/\D/g, "");
-    if (digits.length === 10) return digits.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
-    if (digits.length === 11) return digits.replace(/(\d{3})(\d{4})(\d{4})/, "$1-$2-$3");
-    return val;
-  };
-
   document.getElementById("su-cancel").onclick = () => { modal.style.display = "none"; };
   document.getElementById("su-submit").onclick = async () => {
     const nickname = document.getElementById("su-nickname").value.trim();
     const email = document.getElementById("su-email").value.trim();
     const password = document.getElementById("su-password").value;
     const phoneRaw = document.getElementById("su-phone").value.trim();
-    const phone = phoneRaw ? normalizePhone(phoneRaw) : "";
+    const phone = phoneRaw ? normalizePhoneKR(phoneRaw, "intl") : ""; // ✅ 국제 포맷 적용
 
     if (!nickname) return alert("닉네임을 입력하세요.");
     if (!email) return alert("이메일을 입력하세요.");
@@ -287,14 +680,416 @@ function openSignupModal() {
   };
 }
 
+
+// ─── 전화 인증 모달 ───────────────────────────────────────────
+function openPhoneOtpModal() {
+  if (document.getElementById("phone-otp-modal")) {
+    document.getElementById("phone-otp-modal").style.display = "block";
+    return;
+  }
+
+  const modal = document.createElement("div");
+  modal.id = "phone-otp-modal";
+  modal.style.cssText = `
+    position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.35); padding:16px;
+  `;
+
+  const panel = document.createElement("div");
+  panel.style.cssText = `
+    width:100%; max-width:420px; background:#fff; border-radius:10px; overflow:hidden;
+    box-shadow:0 10px 30px rgba(0,0,0,.2); font-family:'Nanum Gothic',sans-serif;
+  `;
+  panel.innerHTML = `
+    <div style="padding:14px 16px; background:#2c3e50; color:#fff; font-weight:700;">전화번호 인증</div>
+    <div style="padding:16px; display:grid; gap:10px;">
+      <div>
+        <label style="display:block; margin-bottom:4px;">전화번호</label>
+        <input id="otp-phone" type="tel" placeholder="010-1234-5678" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;">
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button id="otp-send" type="button" class="btn-success" style="flex:1;">코드 받기</button>
+        <button id="otp-close" type="button" style="flex:1; border:1px solid #ddd; background:#f5f5f5; border-radius:6px;">나중에</button>
+      </div>
+      <div>
+        <label style="display:block; margin-bottom:4px;">인증 코드</label>
+        <input id="otp-code" type="text" inputmode="numeric" placeholder="숫자 6자리" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;">
+      </div>
+      <button id="otp-verify" type="button" class="btn-success">인증하기</button>
+      <div id="otp-help" style="font-size:12px; color:#666;">
+        ※ 휴대폰으로 전송된 코드를 입력해 주세요.
+      </div>
+    </div>
+  `;
+
+  modal.appendChild(panel);
+  document.body.appendChild(modal);
+
+  // 닫기
+  document.getElementById("otp-close").onclick = () => {
+    modal.style.display = "none";
+  };
+
+  // 코드 받기
+  document.getElementById("otp-send").onclick = async () => {
+    const raw = document.getElementById("otp-phone").value.trim();
+    if (!raw) return alert("전화번호를 입력하세요.");
+    const phone = normalizePhoneKR(raw, "intl"); // ✅ 국제번호(+82) 변환
+    try {
+      const { error } = await window.supabaseClient.auth.signInWithOtp({ phone });
+      if (error) throw error;
+      alert("인증 코드가 발송되었습니다.");
+    } catch (err) {
+      console.error("[OTP send] error:", err);
+      alert(err.message || "인증 코드를 보낼 수 없습니다.");
+    }
+  };
+
+  // 인증하기
+  document.getElementById("otp-verify").onclick = async () => {
+    const raw = document.getElementById("otp-phone").value.trim();
+    const token = document.getElementById("otp-code").value.trim();
+    if (!raw || !token) return alert("전화번호와 인증 코드를 입력하세요.");
+    const phone = normalizePhoneKR(raw, "intl"); // ✅ 국제번호(+82) 변환
+    try {
+      const { data, error } = await window.supabaseClient.auth.verifyOtp({
+        phone,
+        token,
+        type: "sms",
+      });
+      if (error) throw error;
+
+      alert("전화번호 인증이 완료되었습니다!");
+      modal.style.display = "none";
+
+      // ✅ 인증 후 UI 갱신
+      const { data: { session } } = await window.supabaseClient.auth.getSession();
+      updateAuthUI(session);
+      
+    } catch (err) {
+      console.error("[OTP verify] error:", err);
+      alert(err.message || "인증에 실패했습니다.");
+    }
+  };
+}
+
+
+// ─── 로그인된 유저가 전화 인증 필요하면 모달을 띄우는 검사 ───
+async function requirePhoneVerificationIfNeeded() {
+  const { data: { session } } = await window.supabaseClient.auth.getSession();
+  if (!session) return;
+
+  try {
+    // profiles에서 phone_verified 조회 (RLS는 본인 행만 허용되도록 설정되어 있음)
+    const { data, error } = await window.supabaseClient
+      .from("profiles")
+      .select("phone_verified")
+      .eq("user_id", session.user.id)
+      .single();
+
+    if (error) throw error;
+
+    if (!data?.phone_verified) {
+      // ✅ 인증 안 되어 있으면 즉시 모달
+      openPhoneOtpModal();
+    }
+  } catch (e) {
+    console.warn("[requirePhoneVerificationIfNeeded] 조회 실패:", e);
+    // 조회 실패 시에도 UX상 바로 요구하고 싶다면 모달을 띄워도 됨:
+    // openPhoneOtpModal();
+  }
+}
+
+
+
+function getCurrentFormData() {
+  return {
+    name: document.getElementById("customer-name").value.trim(),
+    birthDate: document.getElementById("birth-date").value,
+    calendarType: document.getElementById("calendar-type").value,
+    gender: document.getElementById("gender").value,
+    ampm: document.querySelector("input[name='ampm']:checked")?.value,
+    hour: document.getElementById("hour-select").value,
+    minute: document.getElementById("minute-select").value,
+  };
+}
+
+
+
+
+
+// ✅ 비회원/회원 출력 제한 체크
+async function checkRenderAllowed() {
+  // 1) 로그인 사용자 → 서버(DB)에서 제한
+  try {
+    const { data: { session } } = await window.supabaseClient.auth.getSession();
+    if (session) {
+      return true; // 로그인 사용자는 서버 쪽에서 제한 처리
+    }
+  } catch (_) {}
+
+  // 2) 비회원 → localStorage로 제한
+  const todayKST = getKSTDateKey();
+  const usage = JSON.parse(localStorage.getItem("sajuUsage") || "{}");
+
+  // 오늘 카운트 증가
+  usage[todayKST] = (usage[todayKST] || 0) + 1;
+
+  // ✅ 월간 카운트 계산
+  const monthKey = todayKST.slice(0, 7); // YYYY-MM
+  let monthCount = 0;
+  for (let key in usage) {
+    if (key.startsWith(monthKey)) {
+      monthCount += usage[key];
+    }
+  }
+
+  // ✅ 최초 접속일 추적 (비회원 3개월 제한)
+  if (!usage.firstVisit) {
+    usage.firstVisit = todayKST; // 최초 접속일 저장
+  }
+  const firstVisitDate = new Date(usage.firstVisit);
+  const now = new Date(todayKST);
+  const diffDays = Math.floor((now - firstVisitDate) / (1000 * 60 * 60 * 24));
+
+  // 제한 체크
+  if (diffDays > 90) {
+    alert("비회원 이용 가능 기간(3개월)이 만료되었습니다.\n회원가입 후 계속 이용해주세요.");
+    return false;
+  }
+  if (usage[todayKST] > 3) {
+    alert("비회원은 하루 3회까지만 출력 가능합니다.");
+    return false;
+  }
+  if (monthCount > 20) {
+    alert("비회원은 한 달 총 20회까지만 출력 가능합니다.");
+    return false;
+  }
+
+  // 저장
+  localStorage.setItem("sajuUsage", JSON.stringify(usage));
+  return true;
+}
+
+
+
+// ✅ 비회원 월간 제한 (localStorage 이용)
+function checkGuestMonthlyLimit() {
+  const usage = JSON.parse(localStorage.getItem("sajuUsageMonthly") || "{}");
+  const monthKey = new Date().toISOString().slice(0, 7); // 예: "2025-09"
+
+  usage[monthKey] = (usage[monthKey] || 0) + 1;
+
+  if (usage[monthKey] > 20) {
+    alert("비회원은 한 달간 최대 20회까지만 이용 가능합니다.\n회원가입 후 더 많은 기능을 이용하세요!");
+    return false;
+  }
+
+  localStorage.setItem("sajuUsageMonthly", JSON.stringify(usage));
+  return true;
+}
+
+
+
+
 // === 4) 사주 제출 (완전한 한 개만 사용!)
+// === 4) 사주 제출 (완전한 한 개만 사용!)
+let lastOutputData = null;
+
 async function handleSajuSubmit(e) {
   e.preventDefault();
-  const allowed = await checkRenderAllowed();
-  if (!allowed) return;
+  console.log("[DEBUG] handleSajuSubmit 실행됨");
 
-  // ⬇⬇⬇ 여기부터 “기존 사주 로직” 그대로 붙여 넣으세요 ⬇⬇⬇
-  // buildBirthInfo(...); renderGanji(...); drawTables(...); 등
+  try {
+    // 1) 입력 데이터 수집
+    const formData = {
+      name: document.getElementById("customer-name")?.value.trim(),
+      birthDate: document.getElementById("birth-date")?.value,
+      calendarType: document.getElementById("calendar-type")?.value,
+      gender: document.getElementById("gender")?.value,
+      ampm: document.querySelector("input[name='ampm']:checked")?.value,
+      hour: document.getElementById("hour-select")?.value,
+      minute: document.getElementById("minute-select")?.value,
+    };
+    if (!formData.gender) {
+      alert("성별을 선택해야 합니다.");
+      return;
+    }
+
+    const formKey = JSON.stringify(formData);
+
+    // 2) 로그인 여부 확인
+    const { data: { session } } = await window.supabaseClient.auth.getSession();
+
+    if (!session) {
+      // ── 비회원: '미리보기'로 초과 여부 먼저 판단 (증가 없음)
+      const todayKST = getKSTDateKey();
+      const usage = JSON.parse(localStorage.getItem("sajuUsage") || "{}");
+      const todayCount = Number(usage[todayKST] || 0);
+      const guestProfile = { role: "guest", created_at: new Date().toISOString() };
+      const limitGuest = getDailyLimit(guestProfile); // 정책 반영(60일 이후 0, 이전 3)
+      const remainingPreview = (limitGuest === Infinity) ? Infinity : Math.max(limitGuest - todayCount, 0);
+
+      if (limitGuest !== Infinity && remainingPreview <= 0) {
+        alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다.");
+        updateCountDisplayFromGate({
+          limit: limitGuest,
+          remaining: 0,
+          todayCount,
+          totalCount: Object.values(usage).filter(v => typeof v === "number").reduce((a,b)=>a+b,0),
+        });
+        return; // ✅ 출력 차단
+      }
+
+      // ✅ 직전과 동일할 때만 '카운트 없이' 출력 허용
+      if (lastOutputData === formKey) {
+        console.log("⚠️ 동일 입력(직전과 동일, 게스트) → 카운트 증가 없이 출력만");
+        renderSaju(formData);
+        return;
+      }
+
+      // 실제 증가 수행
+      const ok = await checkRenderAllowed(); // 이 함수가 localStorage 증가/월간 제한까지 처리
+      if (!ok) return;
+
+      // 출력 실행 + 직전키 갱신
+      renderSaju(formData);
+      lastOutputData = formKey;
+
+      // 화면 갱신(선택): 방금 증가한 값으로 다시 표시
+      const usage2 = JSON.parse(localStorage.getItem("sajuUsage") || "{}");
+      const today2 = Number(usage2[todayKST] || 0);
+      const total2 = Object.values(usage2).filter(v => typeof v === "number").reduce((a,b)=>a+b,0);
+      const remain2 = (limitGuest === Infinity) ? Infinity : Math.max(limitGuest - today2, 0);
+      updateCountDisplayFromGate({ limit: limitGuest, remaining: remain2, todayCount: today2, totalCount: total2 });
+      return;
+    }
+
+    // ── 로그인 사용자 ──
+    const userId = session.user.id;
+
+    // ✅ 반드시 풀프로필 확보 (정책 필드 포함)
+    let { data: profile, error: pErr } = await window.supabaseClient
+      .from("profiles")
+      .select("role, created_at, daily_limit, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
+      .eq("user_id", userId)
+      .single();
+
+    if (pErr || !profile || !profile.role) {
+      console.warn("[handleSajuSubmit] profile 보정 발생:", pErr);
+      profile = {
+        role: "normal",
+        created_at: session.user.created_at || new Date().toISOString(),
+        daily_limit: null,
+      };
+    }
+
+    // 2-1) 사전 차단 (증가 없이 현재 잔여 확인)
+    const preGate = await buildGateFromDb(userId, profile);
+    if (preGate.limit !== Infinity && preGate.remaining <= 0) {
+      // 등급별 메시지 커스터마이즈 가능
+      alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다.");
+      updateCountDisplayFromGate(preGate);
+      return; // ✅ 출력 차단
+    }
+
+    // ✅ 직전과 동일할 때만 '카운트 없이' 출력 허용
+    if (lastOutputData === formKey) {
+      console.log("⚠️ 동일 입력(직전과 동일, 로그인) → 카운트 증가 없이 출력만");
+      renderSaju(formData);
+      return;
+    }
+
+    if (profile.role !== "admin") {
+      // 2-2) 서버에서 제한/증가 처리
+      const { data: ok, error } = await window.supabaseClient.rpc("can_render_and_count");
+      if (error) {
+        console.error("[RPC] 오류:", error);
+        alert("이용 제한 확인 중 오류가 발생했습니다.");
+        return;
+      }
+      if (!ok?.allowed) {
+        let reason = "이용이 제한되었습니다.";
+        if (ok?.remaining === 0) reason = "오늘 사용 가능한 횟수를 모두 소진하셨습니다.";
+        else if (ok?.limit === 0) reason = "구독이 필요합니다. 결제를 진행해주세요.";
+        else if (ok?.message) reason = ok.message;
+        alert(reason);
+        return;
+      }
+    }
+
+    // 2-3) 사후 동기화(최신 DB 기준 표시)
+    const gateDb = await buildGateFromDb(userId, profile);
+    console.log(`[limit] 오늘 남은 횟수: ${gateDb.remaining}/${gateDb.limit}`);
+    updateCountDisplayFromGate(gateDb);
+
+    // 3) 출력 실행 + 직전키 갱신
+    renderSaju(formData);
+    lastOutputData = formKey;
+
+    // 4) 로그인 사용자 → 이름이 있으면 기록 저장 (중복키 에러는 무시)
+    if (session?.user) {
+      try {
+        if (formData.name) {
+          const { data: newRecord, error: insertErr } = await window.supabaseClient
+            .from("saju_records")
+            .insert([{
+              user_id: session.user.id,
+              name: formData.name,
+              birth_date: formData.birthDate,
+              birth_time: `${formData.ampm} ${formData.hour}:${formData.minute}`,
+              gender: formData.gender,
+              calendar_type: formData.calendarType,
+              input_json: formData,
+            }])
+            .select()
+            .single();
+
+          if (insertErr) {
+            if (insertErr.code === "23505" || insertErr.code === "409") {
+              console.log("⚠️ 중복된 데이터 → 저장하지 않음");
+            } else {
+              console.error("❌ 저장 오류:", insertErr);
+              alert("사주 데이터 저장 중 오류가 발생했습니다.");
+            }
+          } else if (newRecord) {
+            console.log("✅ 사주 데이터 저장 완료:", newRecord);
+          }
+        } else {
+          console.log("⚠️ 이름 없음 → 저장 건너뜀");
+        }
+
+        // ❌ (중요) 여기서 별도 카운트 증가는 하지 않음!
+        //  - 이유: 로그인 사용자는 위 RPC(can_render_and_count)에서
+        //          이미 카운트를 처리한다고 가정하고 UI는 buildGateFromDb로 갱신.
+        //  - 만약 RPC가 '체크 전용'이라면:
+        //      1) 별도 increaseTodayCount(userId, profile) 호출
+        //      2) const gateDb = await buildGateFromDb(userId, profile);
+        //      3) updateCountDisplayFromGate(gateDb);
+        //     로 단일 경로 유지하세요.
+
+      } catch (err) {
+        console.error("❌ DB 처리 오류:", err);
+        alert("요청 처리 중 오류가 발생했습니다.");
+      }
+    }
+  } catch (err) {
+    console.error("❌ handleSajuSubmit error:", err);
+    alert("요청 처리 중 오류가 발생했습니다.");
+  }
+}
+
+
+
+
+
+async  function renderSaju(formdata) {
+
+    // 2) 🔻 여기부터 사주 출력/DB 저장 로직 🔻
+    console.log("사주 출력 로직 실행 준비 완료!");
+
+
+
 
 
 
@@ -710,11 +1505,12 @@ const hour12 = parseInt(document.getElementById('hour-select').value);
   const minute = parseInt(document.getElementById('minute-select').value);
 const calendarType = document.getElementById('calendar-type').value;
   const genderInput = document.querySelector('input[name="gender"]:checked');
-  const gender = genderInput ? genderInput.value : null;
-   if (!gender) {
-    alert('성별을 선택하세요');
-    return;
-  }
+const gender = document.getElementById("gender")?.value || "";
+if (!gender) {
+  alert("성별을 선택해야 저장할 수 있습니다.");
+  return;
+}
+
    const value = document.getElementById('birth-date').value;
   const inputyear = parseInt(value.split('-')[0]);
 //if (inputyear < 1000 || inputyear > 9999) {
@@ -2665,28 +3461,317 @@ requestAnimationFrame(() => {
 
 
   console.log("[saju] OK to render");
-  // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
+  // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
+// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
+// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
+
+  }
+
+
+
+
+
+
+
+
+
+// renderUserProfile 정의는 그대로 유지
+async function renderUserProfile() {
+  const { data: { user } } = await window.supabaseClient.auth.getUser();
+  if (!user) return;
+
+  // 여기서는 이벤트 바인딩만!
+  document.getElementById("subscribeBtn")?.addEventListener("click", () => {
+    openPhoneOtpModal({
+      onSuccess: () => {
+        document.getElementById("subscriptionModal").style.display = "block";
+      }
+    });
+  });
+
+  document.getElementById("logoutBtn")?.addEventListener("click", async () => {
+    await window.supabaseClient.auth.signOut();
+    location.reload();
+  });
 }
 
-// === 5) 초기화: 모든 바인딩은 여기에서만
+
+
+
+
+// === 초기화 (하나로 통합)
 document.addEventListener("DOMContentLoaded", async () => {
   try {
     console.log("[app] DOM ready");
 
-    // 세션 반영 + 감시
+    // ✅ 세션 확인 및 UI 갱신
     const { data: { session } } = await window.supabaseClient.auth.getSession();
     updateAuthUI(session);
-    window.supabaseClient.auth.onAuthStateChange((_ev, newSession) => {
+
+    // ✅ 출력횟수 초기화
+    if (session && session.user) {
+      // 프로필에 daily_limit 포함
+      const { data: profile, error: profErr } = await window.supabaseClient
+        .from("profiles")
+        .select("role, created_at, daily_limit, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
+        .eq("user_id", session.user.id)
+        .single();
+
+      if (!profErr && profile) {
+        // ✅ KST 기준 날짜
+        const today = getKSTDateKey();
+
+        // 오늘 카운트
+        const { data: countRow } = await window.supabaseClient
+          .from("saju_counts")
+          .select("count")
+          .eq("user_id", session.user.id)
+          .eq("count_date", today)
+          .maybeSingle();
+        const todayCount = Number(countRow?.count || 0);
+
+        // 누적 합
+        let totalCount = 0;
+        const { data: allRows } = await window.supabaseClient
+          .from("saju_counts")
+          .select("count")
+          .eq("user_id", session.user.id);
+        if (Array.isArray(allRows)) {
+          totalCount = allRows.reduce((s, r) => s + (Number(r.count) || 0), 0);
+        }
+
+        // 회원별 일일 제한 (프로필 daily_limit 우선, 없으면 getDailyLimit)
+        const configured = Number(profile.daily_limit ?? NaN);
+        const limit = Number.isFinite(configured) ? configured : Number(getDailyLimit(profile));
+        const remaining = !Number.isFinite(limit) ? Infinity : Math.max(limit - todayCount, 0);
+
+        // ✅ 단일 소스 gate로 화면 출력
+        updateCountDisplayFromGate({ limit, remaining, todayCount, totalCount });
+      }
+    } else {
+      // ✅ 출력횟수 초기화 (세션 없음 = 비로그인)
+      const todayKST = getKSTDateKey();
+
+      // 비회원 프로필( getDailyLimit 이 role/created_at을 쓰므로 최소 필드 채움 )
+      const guestProfile = { role: "guest", created_at: new Date().toISOString() };
+
+      // 오늘/누적 집계 (localStorage)
+      const usage = JSON.parse(localStorage.getItem("sajuUsage") || "{}");
+      const todayCount = Number(usage[todayKST] || 0);
+      const totalGuest = Object
+        .values(usage)
+        .filter(v => typeof v === "number")
+        .reduce((a, b) => a + b, 0);
+
+      // 회원별(=게스트) 하루 제한
+      const limitGuest = Number(getDailyLimit(guestProfile)); // 보통 3
+      const remainingGuest = Math.max(limitGuest - todayCount, 0);
+
+      // ✅ 단일 소스 gate 로 출력
+      updateCountDisplayFromGate({
+        limit: limitGuest,
+        remaining: remainingGuest,
+        todayCount,
+        totalCount: totalGuest,
+      });
+    }
+
+ // ✅ 여기부터 넣으세요: 프로필 실시간 반영 (Realtime)
+    if (session?.user) {
+      const userId = session.user.id;
+
+      // 중복 구독 방지
+      if (window.__profileCh) {
+        try { window.supabaseClient.removeChannel(window.__profileCh); } catch (_) {}
+        window.__profileCh = null;
+      }
+
+      window.__profileCh =
+        window.supabaseClient
+          .channel("profile-changes")
+.on(
+  "postgres_changes",
+  { event: "*", schema: "public", table: "profiles", filter: `user_id=eq.${userId}` },
+  async (payload) => {
+    console.log("[PROFILE RT]", payload);
+
+    // 최신 프로필 로드 (에러/누락 시 안전 폴백)
+    const { data: profile, error: pErr } = await window.supabaseClient
+      .from("profiles")
+      .select("role, created_at, daily_limit, special_assigned_at")
+      .eq("user_id", userId)
+      .single();
+
+    const safeProfile = (pErr || !profile)
+      ? { role: "normal", created_at: new Date().toISOString() }
+      : profile;
+
+    const gate = await buildGateFromDb(userId, safeProfile);
+    updateCountDisplayFromGate(gate);
+
+    // 프로필 영역 갱신 필요 시
+    renderUserProfile?.();
+  }
+)
+
+          .subscribe((status) => {
+            console.log("[PROFILE RT] status:", status);
+          });
+    }
+
+    // (DOMContentLoaded try{} 안, Realtime 구독 설정한 뒤에)
+window.addEventListener("beforeunload", () => {
+  if (window.__profileCh) {
+    try { window.supabaseClient.removeChannel(window.__profileCh); } catch (_) {}
+    window.__profileCh = null;
+  }
+});
+
+    // 이미 있는 onAuthStateChange는 유지하되,
+    // SIGNED_OUT 때 구독 정리만 추가하면 좋아요.
+
+    // ✅ 로그인 상태 변경 감시 (이중 새로고침 방지)
+    let __reloading = false;
+    window.supabaseClient.auth.onAuthStateChange((event, newSession) => {
+      console.log("[AuthStateChange]", event);
+
+      if (event === "SIGNED_OUT") {
+        if (window.__profileCh) {
+          try { window.supabaseClient.removeChannel(window.__profileCh); } catch (_) {}
+          window.__profileCh = null;
+        }
+      }
+
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+        if (!__reloading) {
+          __reloading = true;
+          if (window.location.hash) {
+            history.replaceState(null, "", window.location.pathname + window.location.search);
+          }
+          window.location.reload();
+        }
+        return;
+      }
       updateAuthUI(newSession);
     });
 
-    // 로그인 버튼
-    const loginBtn = document.getElementById("loginBtn");
-    loginBtn?.addEventListener("click", async (e) => {
+    // ✅ 사주 기록 클릭 → 입력폼 채워넣기 + 출력
+    document.addEventListener("click", async (e) => {
+      if (e.target.classList.contains("saju-record-link")) {
+        e.preventDefault();
+
+        const record = JSON.parse(e.target.dataset.json);
+        const recordId = e.target.dataset.id;
+
+        if (recordId) {
+          await window.supabaseClient
+            .from("saju_records")
+            .update({ view_count: (record.view_count || 0) + 1 })
+            .eq("id", recordId);
+        }
+
+        // 입력폼 채우기
+        document.getElementById("customer-name").value = record.name || "";
+        document.getElementById("birth-date").value = record.birthDate || "";
+        document.getElementById("calendar-type").value = record.calendarType || "";
+        document.getElementById("gender").value = record.gender || "";
+        if (record.ampm) document.querySelector(`input[name="ampm"][value="${record.ampm}"]`).checked = true;
+        if (record.hour) document.getElementById("hour-select").value = record.hour;
+        if (record.minute) document.getElementById("minute-select").value = record.minute;
+
+        // 버튼 상태
+        const sajuBtn = document.getElementById("sajuSubmit");
+        const sinsalBtn = document.getElementById("sinsalBtn");
+        sajuBtn.classList.remove("active");
+        sinsalBtn.classList.add("active");
+
+        handleSajuSubmit(new Event("click"));
+
+        // ✅ 고객 데이터 모달 닫기
+        const modal = document.getElementById("saju-history-panel");
+        if (modal) {
+          modal.style.display = "none";
+        }
+      }
+    });
+
+    // 삭제 버튼 이벤트 (이벤트 위임)
+    document.addEventListener("click", async (e) => {
+      if (e.target.classList.contains("delete-record-btn")) {
+        const recordId = e.target.dataset.id;
+        if (!recordId) return;
+
+        if (!confirm("정말 이 기록을 삭제하시겠습니까?")) return;
+
+        const { error } = await window.supabaseClient
+          .from("saju_records")
+          .delete()
+          .eq("id", recordId);   // ✅ uuid가 아니라 id 컬럼 사용
+
+        if (error) {
+          console.error("삭제 오류:", error);
+          alert("삭제 중 문제가 발생했습니다.");
+          return;
+        }
+
+        // 삭제 성공 시 UI에서도 제거
+        e.target.closest("tr").remove();
+        console.log("삭제 완료:", recordId);
+      }
+    });
+
+    // ✅ 내 사주 기록 버튼
+    document.getElementById("toggle-history-btn")?.addEventListener("click", async () => {
+      const panel = document.getElementById("saju-history-panel");
+      if (!session) {
+        alert("로그인 후 이용할 수 있습니다.");
+        return;
+      }
+      currentUserId = session.user.id;
+
+      if (panel.style.display === "none") {
+        panel.style.display = "block";
+        currentPage = 1;
+        currentSearch = "";
+        await loadSajuHistory(currentUserId, currentPage, currentSearch);
+      } else {
+        panel.style.display = "none";
+      }
+    });
+
+    // ✅ 검색
+    document.getElementById("search-btn")?.addEventListener("click", () => {
+      const keyword = document.getElementById("search-name").value.trim();
+      loadSajuHistory(currentUserId, 1, keyword);
+    });
+    document.getElementById("search-name")?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const keyword = e.target.value.trim();
+        loadSajuHistory(currentUserId, 1, keyword);
+      }
+    });
+
+    // ✅ 페이지 네비게이션
+    document.getElementById("prev-page")?.addEventListener("click", async () => {
+      if (currentPage > 1 && currentUserId) {
+        currentPage--;
+        await loadSajuHistory(currentUserId, currentPage, currentSearch);
+      }
+    });
+    document.getElementById("next-page")?.addEventListener("click", async () => {
+      if (currentUserId) {
+        currentPage++;
+        await loadSajuHistory(currentUserId, currentPage, currentSearch);
+      }
+    });
+
+    // ✅ 로그인/회원가입/소셜 로그인/로그아웃 바인딩
+    document.getElementById("loginBtn")?.addEventListener("click", async (e) => {
       e.preventDefault();
       const email = document.getElementById("email")?.value?.trim();
       const password = document.getElementById("password")?.value ?? "";
-      if (!email || !password) { alert("이메일과 비밀번호를 입력하세요."); return; }
+      if (!email || !password) return alert("이메일과 비밀번호를 입력하세요.");
       try {
         const { data, error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -2696,51 +3781,45 @@ document.addEventListener("DOMContentLoaded", async () => {
         alert(err.message || "로그인에 실패했습니다.");
       }
     });
-
-    // 회원가입 버튼 → 모달
-    const signupBtn = document.getElementById("signupBtn");
-    signupBtn?.addEventListener("click", (e) => { e.preventDefault(); openSignupModal(); });
-
-    // 소셜 로그인
+    document.getElementById("signupBtn")?.addEventListener("click", (e) => { e.preventDefault(); openSignupModal(); });
     document.getElementById("googleLogin")?.addEventListener("click", async (e) => {
       e.preventDefault();
-      try {
-        await window.supabaseClient.auth.signInWithOAuth({
-          provider: "google",
-          options: { redirectTo: `${location.origin}${location.pathname}` },
-        });
-      } catch (err) { console.error(err); alert(err.message || "구글 로그인 오류"); }
+      await window.supabaseClient.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${location.origin}${location.pathname}` },
+      });
     });
     document.getElementById("kakaoLogin")?.addEventListener("click", async (e) => {
       e.preventDefault();
-      try {
-        await window.supabaseClient.auth.signInWithOAuth({
-          provider: "kakao",
-          options: { redirectTo: `${location.origin}${location.pathname}` },
-        });
-      } catch (err) { console.error(err); alert(err.message || "카카오 로그인 오류"); }
+      await window.supabaseClient.auth.signInWithOAuth({
+        provider: "kakao",
+        options: { redirectTo: `${location.origin}${location.pathname}` },
+      });
     });
-
-    // 로그아웃
     document.getElementById("logoutBtn")?.addEventListener("click", async () => {
       await window.supabaseClient.auth.signOut();
       updateAuthUI(null);
     });
 
-    // 사주 폼 바인딩
+    // ✅ 사주 폼 바인딩
     const form = document.getElementById("saju-form");
     if (form) {
       form.addEventListener("submit", handleSajuSubmit);
       document.getElementById("sajuSubmit")?.addEventListener("click", () => {
         window.outputMode = "basic";
-        form.requestSubmit(); // 폼 DOM 요소에 호출!
+        form.requestSubmit();
       });
       document.getElementById("sinsalBtn")?.addEventListener("click", () => {
         window.outputMode = "sinsal";
         form.requestSubmit();
       });
     }
+
+    // ✅ 로그인 후 프로필/정기구독/로그아웃 UI 세팅
+    renderUserProfile();
+
   } catch (err) {
     console.error("[init] fatal:", err);
   }
 });
+

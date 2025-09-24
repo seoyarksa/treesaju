@@ -196,6 +196,15 @@ function getKSTDateKey() {
 
 // === 2) 로그인 UI 토글
 
+// util: 쿠키 set/remove
+function setCookie(name, value, maxAgeSec) {
+  // 프로덕션은 반드시 https에서 Secure 유지
+  document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSec}; SameSite=Lax; Secure`;
+}
+function removeCookie(name) {
+  document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax; Secure`;
+}
+
 async function updateAuthUI(session) {
   const authSection =
     document.getElementById("auth-section") ||
@@ -206,28 +215,34 @@ async function updateAuthUI(session) {
   const historySection = document.getElementById("saju-history-section");
 
   if (session && session.user) {
-    // ✅ 여기서 토큰 저장 처리
     const token = session.access_token;
+
+    // ⬇ 기존 로컬/세션 스토리지 유지
     const userAgent = navigator.userAgent || navigator.vendor || window.opera;
     const isMobile = /android|iphone|ipad|ipod/i.test(userAgent);
+    if (isMobile) localStorage.setItem("authToken", token);
+    else sessionStorage.setItem("authToken", token);
 
-    if (isMobile) {
-      localStorage.setItem("authToken", token);
-    } else {
-      sessionStorage.setItem("authToken", token);
-    }
+    // ✅ 서버 게이트웨이가 읽을 수 있게 쿠키에도 저장 (예: 1시간)
+    setCookie("auth", token, 60 * 60);
 
     if (authSection) authSection.style.display = "none";
     if (profileSection) profileSection.style.display = "block";
 
     const user = session.user;
 
-    // ✅ 프로필 role 불러오기
+    // 프로필/권한 처리 (그대로)
     const { data: profile } = await window.supabaseClient
       .from("profiles")
       .select("role, created_at, daily_limit")
       .eq("user_id", user.id)
       .single();
+
+    const role = profile?.role || "normal";
+    localStorage.setItem("userRole", role);
+
+    const adminMenu = document.getElementById("admin-menu");
+    if (adminMenu) adminMenu.style.display = role === "admin" ? "inline" : "none";
 
     let roleLabel = "";
     switch (profile?.role) {
@@ -241,9 +256,7 @@ async function updateAuthUI(session) {
       user.user_metadata?.nickname ||
       user.user_metadata?.name ||
       user.user_metadata?.full_name ||
-      user.nickname ||
-      user.name ||
-      user.displayName ||
+      user.nickname || user.name || user.displayName ||
       (user.email ? user.email.split("@")[0] : null) ||
       "사용자";
 
@@ -253,9 +266,14 @@ async function updateAuthUI(session) {
     loadSajuHistory(user.id);
     renderUserProfile();
   } else {
-    // ✅ 로그아웃 시 스토리지 정리
+    // ✅ 로그아웃 시 정리
     localStorage.removeItem("authToken");
     sessionStorage.removeItem("authToken");
+    localStorage.removeItem("userRole");
+    removeCookie("auth"); // ← 추가
+
+    const adminMenu = document.getElementById("admin-menu");
+    if (adminMenu) adminMenu.style.display = "none";
 
     if (authSection) authSection.style.display = "block";
     if (profileSection) profileSection.style.display = "none";
@@ -3795,6 +3813,9 @@ window.addEventListener("beforeunload", () => {
       await window.supabaseClient.auth.signOut();
       updateAuthUI(null);
     });
+
+
+  showIfAdmin('#admin-menu');   // 회원관리 메뉴
 
     // ✅ 사주 폼 바인딩
     const form = document.getElementById("saju-form");

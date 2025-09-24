@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>회원관리</title>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background: #f5f5f5; }
+    .pagination { margin-top: 15px; text-align: center; }
+    .pagination button { margin: 0 3px; padding: 5px 10px; }
+    /* 모달 스타일 */
+    #editModal {
+      display:none; position:fixed; top:5%; left:10%;
+      width:80%; height:85%; overflow-y:scroll;
+      background:#fff; border:1px solid #ccc; padding:20px; z-index:1000;
+    }
+  </style>
+  <script src="https://unpkg.com/@supabase/supabase-js"></script>
+</head>
+<body>
+  <h2>회원관리</h2>
+
+  <input type="text" id="searchInput" placeholder="닉네임/이메일 검색" />
+  <button onclick="loadMembers(1)">검색</button>
+
+<table>
+  <thead>
+    <tr>
+      <th>유저 ID</th>
+      <th>닉네임</th>
+      <th>소셜닉네임</th>
+      <th>전화번호</th>
+      <th>전화번호 인증</th>
+      <th>등급</th>
+      <th>등급 오버라이드</th>
+      <th>권한(Role)</th>
+      <th>가입일</th>
+      <th>수정일</th>
+      <th>Trial 시작</th>
+      <th>Trial 종료</th>
+      <th>일일 사용일</th>
+      <th>일일 사용 횟수</th>
+      <th>일일 제한</th>
+      <th>Special 지정일</th>
+      <th>Premium 지정일</th>
+      <th>Premium 최초 지정일</th>
+      <th>Premium 사용 이력</th>
+      <th>관리</th>
+    </tr>
+  </thead>
+  <tbody id="memberTable"></tbody>
+</table>
+
+<div class="pagination" id="pagination"></div>
+
+<!-- 수정 모달 -->
+<div id="editModal">
+  <h3>회원 수정</h3>
+  <form id="editForm">
+    <label>유저 ID: <input type="text" id="edit-user_id" readonly></label><br>
+    <label>닉네임: <input type="text" id="edit-nickname" readonly></label><br>
+    <label>전화번호: <input type="text" id="edit-phone"></label><br>
+    <label>등급: <input type="text" id="edit-grade"></label><br>
+    <label>Role:
+      <select id="edit-role">
+        <option value="normal">일반</option>
+        <option value="premium">정기회원</option>
+        <option value="special">특별회원</option>
+        <option value="admin">관리자</option>
+      </select>
+    </label><br>
+    <label>Trial 시작: <input type="date" id="edit-trial_started_at"></label><br>
+    <label>Trial 종료: <input type="date" id="edit-trial_ends_at"></label><br>
+    <label>일일 제한: <input type="number" id="edit-daily_limit"></label><br>
+    <label>Special 지정일: <input type="date" id="edit-special_assigned_at"></label><br>
+    <label>Premium 지정일: <input type="date" id="edit-premium_assigned_at"></label><br>
+    <label>Premium 최초 지정일: <input type="date" id="edit-premium_first_assigned_at"></label><br>
+    <label>Premium 사용 이력:
+      <select id="edit-has_ever_premium">
+        <option value="true">예</option>
+        <option value="false">아니오</option>
+      </select>
+    </label><br><br>
+
+    <button type="button" onclick="saveEdit()">저장</button>
+    <button type="button" onclick="closeEditModal()">닫기</button>
+  </form>
+</div>
+
+<script>
+const supabase = window.supabase.createClient(
+  "https://dxrgobsgeeshkybkbnxo.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4cmdvYnNnZWVzaGt5YmtibnhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwOTAyNzIsImV4cCI6MjA3MzY2NjI3Mn0.vD1xSRezaTC2OUikZZJM7UntQaQWvOxRkvYiMl78UZA"
+);
+
+const pageSize = 10;
+let currentUserId = null;
+
+// ✅ 관리자 권한 확인
+window.addEventListener("DOMContentLoaded", () => {
+  const role = localStorage.getItem("userRole");
+  if (role !== "admin") {
+    alert("접근 권한이 없습니다. 관리자만 이용 가능합니다.");
+    window.close();
+    return;
+  }
+  loadMembers(1);
+});
+
+async function loadMembers(page=1) {
+  const search = document.getElementById("searchInput").value;
+  const from = (page-1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = supabase.from("profiles").select("*", { count: "exact" }).range(from, to);
+  if (search) {
+    query = query.or(`display_name.ilike.%${search}%,nickname.ilike.%${search}%,phone.ilike.%${search}%`);
+  }
+
+  const { data, count, error } = await query;
+  if (error) { console.error(error); return; }
+
+  const tbody = document.getElementById("memberTable");
+  tbody.innerHTML = "";
+  data.forEach(member => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${member.user_id}</td>
+      <td>${member.nickname || "-"}</td>
+      <td>${member.display_name || "-"}</td>
+      <td>${member.phone || "-"}</td>
+      <td>${member.phone_verified ? "✅" : "❌"}</td>
+      <td>${member.grade || "-"}</td>
+      <td>${member.grade_override || "-"}</td>
+      <td>${member.role || "-"}</td>
+      <td>${member.created_at ? new Date(member.created_at).toLocaleDateString() : "-"}</td>
+      <td>${member.updated_at ? new Date(member.updated_at).toLocaleDateString() : "-"}</td>
+      <td>${member.trial_started_at ? new Date(member.trial_started_at).toLocaleDateString() : "-"}</td>
+      <td>${member.trial_ends_at ? new Date(member.trial_ends_at).toLocaleDateString() : "-"}</td>
+      <td>${member.daily_usage_date || "-"}</td>
+      <td>${member.daily_usage_count ?? "-"}</td>
+      <td>${member.daily_limit ?? "-"}</td>
+      <td>${member.special_assigned_at ? new Date(member.special_assigned_at).toLocaleDateString() : "-"}</td>
+      <td>${member.premium_assigned_at ? new Date(member.premium_assigned_at).toLocaleDateString() : "-"}</td>
+      <td>${member.premium_first_assigned_at ? new Date(member.premium_first_assigned_at).toLocaleDateString() : "-"}</td>
+      <td>${member.has_ever_premium ? "예" : "아니오"}</td>
+      <td>
+        <button onclick="openEditModal('${member.user_id}')">수정</button>
+        <button onclick="deleteMember('${member.user_id}')">삭제</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  const totalPages = Math.ceil(count / pageSize);
+  const pagination = document.getElementById("pagination");
+  pagination.innerHTML = "";
+  for (let i=1; i<=totalPages; i++) {
+    const btn = document.createElement("button");
+    btn.textContent = i;
+    btn.onclick = () => loadMembers(i);
+    if (i === page) btn.disabled = true;
+    pagination.appendChild(btn);
+  }
+}
+
+// 모달 열기
+async function openEditModal(userId) {
+  currentUserId = userId;
+  const { data, error } = await supabase.from("profiles").select("*").eq("user_id", userId).single();
+  if (error) { alert("데이터 불러오기 실패: " + error.message); return; }
+
+  document.getElementById("edit-user_id").value = data.user_id;
+  document.getElementById("edit-nickname").value = data.nickname || data.display_name || "";
+  document.getElementById("edit-phone").value = data.phone || "";
+  document.getElementById("edit-grade").value = data.grade || "";
+  document.getElementById("edit-role").value = data.role || "normal";
+  document.getElementById("edit-trial_started_at").value = data.trial_started_at ? data.trial_started_at.split("T")[0] : "";
+  document.getElementById("edit-trial_ends_at").value = data.trial_ends_at ? data.trial_ends_at.split("T")[0] : "";
+  document.getElementById("edit-daily_limit").value = data.daily_limit ?? "";
+  document.getElementById("edit-special_assigned_at").value = data.special_assigned_at ? data.special_assigned_at.split("T")[0] : "";
+  document.getElementById("edit-premium_assigned_at").value = data.premium_assigned_at ? data.premium_assigned_at.split("T")[0] : "";
+  document.getElementById("edit-premium_first_assigned_at").value = data.premium_first_assigned_at ? data.premium_first_assigned_at.split("T")[0] : "";
+  document.getElementById("edit-has_ever_premium").value = data.has_ever_premium ? "true" : "false";
+
+  document.getElementById("editModal").style.display = "block";
+}
+
+function closeEditModal() {
+  document.getElementById("editModal").style.display = "none";
+}
+
+async function saveEdit() {
+  const updates = {
+    phone: document.getElementById("edit-phone").value,
+    grade: document.getElementById("edit-grade").value,
+    role: document.getElementById("edit-role").value,
+    trial_started_at: document.getElementById("edit-trial_started_at").value || null,
+    trial_ends_at: document.getElementById("edit-trial_ends_at").value || null,
+    daily_limit: document.getElementById("edit-daily_limit").value || null,
+    special_assigned_at: document.getElementById("edit-special_assigned_at").value || null,
+    premium_assigned_at: document.getElementById("edit-premium_assigned_at").value || null,
+    premium_first_assigned_at: document.getElementById("edit-premium_first_assigned_at").value || null,
+    has_ever_premium: document.getElementById("edit-has_ever_premium").value === "true"
+  };
+
+  const { error } = await supabase.from("profiles").update(updates).eq("user_id", currentUserId);
+  if (error) {
+    alert("저장 실패: " + error.message);
+  } else {
+    alert("저장 완료");
+    closeEditModal();
+    loadMembers();
+  }
+}
+
+// 삭제
+async function deleteMember(userId) {
+  if (!confirm("정말 삭제하시겠습니까?")) return;
+  const { error } = await supabase.from("profiles").delete().eq("user_id", userId);
+  if (!error) loadMembers(); else alert("삭제 실패: " + error.message);
+}
+</script>
+</body>
+</html>
