@@ -602,14 +602,20 @@
 <div id="profile-edit-panel" class="collapse" aria-hidden="true"
      style="display:none; margin-top:12px; padding:12px; border:1px solid #ddd; border-radius:8px; background:#fafafa;">
   <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
-    <label>닉네임
-      <input id="my-nickname" type="text" placeholder="닉네임" style="margin-left:6px;">
+ <label style="display:flex; flex-direction:column;">
+  <span>닉네임</span>
+  <input id="my-nickname" type="text" placeholder="닉네임" style="margin-top:6px;">
+</label>
+
+
+    <label style="display:flex; flex-direction:column;">
+      <span>이메일</span>
+      <input id="my-email" type="email" placeholder="you@example.com" style="margin-top:6px;" readonly>
     </label>
-    <label>이메일
-      <input id="my-email" type="email" placeholder="you@example.com" style="margin-left:6px;">
-    </label>
-    <label>전화번호
-      <input id="my-phone" type="tel" placeholder="010-1234-5678" style="margin-left:6px;">
+
+    <label style="display:flex; flex-direction:column;">
+      <span>전화번호</span>
+      <input id="my-phone" type="tel" placeholder="010-1234-5678" style="margin-top:6px;">
     </label>
 
     <div style="min-width:140px;">
@@ -1217,17 +1223,28 @@ async function fillMyProfileForm() {
   const gradeEl  = document.getElementById("my-grade");
   const countEl  = document.getElementById("my-daily-count");
 
-  if (nickEl)  nickEl.value  = profile?.nickname ?? "";
-  if (emailEl) emailEl.value = email;
+  if (nickEl) {
+    const nickVal = profile?.nickname ?? "";
+    nickEl.value = nickVal;
+    // 닉네임이 없을 때만 안내 멘트를 placeholder로
+    nickEl.placeholder = nickVal.trim()
+      ? "닉네임은 한 번 더 등록해주세요"
+      : "닉네임은 한 번 더 등록해주세요";
+  }
+
+  if (emailEl) {
+    emailEl.value = email;
+    emailEl.readOnly = true; // 이메일 수정 불가
+  }
+
   if (phoneEl) phoneEl.value = profile?.phone ?? "";
 
-  const used   = profile?.daily_usage_count ?? 0;
-  const limit  = profile?.daily_limit ?? 0;
+  const used  = profile?.daily_usage_count ?? 0;
+  const limit = profile?.daily_limit ?? 0;
   if (gradeEl) gradeEl.textContent = profile?.grade ?? "-";
   if (countEl) countEl.textContent = limit ? `${used}/${limit}` : `${used}/-`;
 
-  // ※ 플랜 B: 만약 일일 카운트/리밋을 saju_counts에서 관리한다면 주석 해제
-
+  // ※ 플랜 B: 일일 카운트/리밋이 saju_counts에 있을 경우 보정
   if (!limit) {
     const { data: sc } = await window.supabaseClient
       .from("saju_counts")
@@ -1238,8 +1255,8 @@ async function fillMyProfileForm() {
     const lim2  = sc?.daily_limit ?? limit;
     if (countEl) countEl.textContent = lim2 ? `${used2}/${lim2}` : `${used2}/-`;
   }
- 
 }
+
 
 // 저장
 async function saveMyProfile() {
