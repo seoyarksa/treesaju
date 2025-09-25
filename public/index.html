@@ -560,7 +560,30 @@
 <div id="profile-section" style="display:none; margin-top:8px;">
   <span id="user-nickname" style="font-weight:600; color: blue;"></span> 님 환영합니다
  
-  <button id="logoutBtn" type="button" style="margin-left:8px; background-color:#fab7b7; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">로그아웃</button><br>
+  <button id="logoutBtn" type="button" style="margin-left:8px; background-color:#fab7b7; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">로그아웃</button>
+   <!-- 회원정보 수정 버튼 -->
+  <button id="editProfileBtn" type="button" style="margin-left:8px;">
+    회원정보 수정
+  </button>
+
+  <!-- 드롭(슬라이드) 패널: 프로필 수정 -->
+  <div id="profile-edit-panel" class="collapse" aria-hidden="true"
+       style="display:none; margin-top:12px; padding:12px; border:1px solid #ddd; border-radius:8px; background:#fafafa;">
+    <div style="display:flex; gap:16px; flex-wrap:wrap;">
+      <label>닉네임
+        <input id="my-nickname" type="text" placeholder="닉네임" style="margin-left:6px;">
+      </label>
+      <label>전화번호
+        <input id="my-phone" type="tel" placeholder="010-1234-5678" style="margin-left:6px;">
+      </label>
+    </div>
+    <div style="margin-top:10px;">
+      <button id="my-profile-save"   type="button" style="background:#3b82f6; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer;">저장</button>
+      <button id="my-profile-cancel" type="button" style="margin-left:6px; border:1px solid #ddd; padding:6px 10px; border-radius:6px; cursor:pointer;">닫기</button>
+    </div>
+  </div>
+</div>
+  <br>
   <button id="toggle-history-btn" style="background-color:#4CAF50; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">고객data</button>
   <button id="subscribeBtn" type="button" style="margin-left:8px;background-color:#4CAF50; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">정기구독</button>
 
