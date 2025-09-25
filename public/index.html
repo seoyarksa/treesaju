@@ -407,6 +407,37 @@
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
 
+/* 접힌 상태 (완전 숨김) */
+#profile-edit-panel{
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  padding: 0 !important;          /* ← 한 줄 잔상 제거 핵심 */
+  border-width: 0 !important;     /* ← 테두리도 제거 */
+  margin-top: 0 !important;       /* ← 위 여백 제거 */
+  pointer-events: none;
+
+  /* 부드러운 전환 */
+  transition:
+    max-height .25s ease,
+    padding .2s ease,
+    margin .2s ease,
+    opacity .2s ease,
+    border-width .2s ease;
+}
+
+/* 펼친 상태만 보이게 */
+#profile-edit-panel.open{
+  max-height: 420px;
+  opacity: 1;
+  padding: 12px !important;
+  border: 1px solid #ddd !important;
+  margin-top: 12px !important;
+  pointer-events: auto;
+  background: #fafafa;            /* 필요 시 유지 */
+  border-radius: 8px;             /* 필요 시 유지 */
+}
+
 </style>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -567,21 +598,31 @@
   </button>
 
   <!-- 드롭(슬라이드) 패널: 프로필 수정 -->
-  <div id="profile-edit-panel" class="collapse" aria-hidden="true"
-       style="display:none; margin-top:12px; padding:12px; border:1px solid #ddd; border-radius:8px; background:#fafafa;">
-    <div style="display:flex; gap:16px; flex-wrap:wrap;">
-      <label>닉네임
-        <input id="my-nickname" type="text" placeholder="닉네임" style="margin-left:6px;">
-      </label>
-      <label>전화번호
-        <input id="my-phone" type="tel" placeholder="010-1234-5678" style="margin-left:6px;">
-      </label>
-    </div>
-    <div style="margin-top:10px;">
-      <button id="my-profile-save"   type="button" style="background:#3b82f6; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer;">저장</button>
-      <button id="my-profile-cancel" type="button" style="margin-left:6px; border:1px solid #ddd; padding:6px 10px; border-radius:6px; cursor:pointer;">닫기</button>
+<!-- 드롭(슬라이드) 패널: 프로필 수정 -->
+<div id="profile-edit-panel" class="collapse" aria-hidden="true"
+     style="display:none; margin-top:12px; padding:12px; border:1px solid #ddd; border-radius:8px; background:#fafafa;">
+  <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
+    <label>닉네임
+      <input id="my-nickname" type="text" placeholder="닉네임" style="margin-left:6px;">
+    </label>
+    <label>이메일
+      <input id="my-email" type="email" placeholder="you@example.com" style="margin-left:6px;">
+    </label>
+    <label>전화번호
+      <input id="my-phone" type="tel" placeholder="010-1234-5678" style="margin-left:6px;">
+    </label>
+
+    <div style="min-width:140px;">
+      <div><strong>회원등급</strong> : <span id="my-grade">-</span></div>
+      <div><strong>1일 카운트</strong> : <span id="my-daily-count">-</span></div>
     </div>
   </div>
+
+  <div style="margin-top:10px;">
+    <button id="my-profile-save"   type="button" style="background:#3b82f6; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer;">저장</button>
+    <button id="my-profile-cancel" type="button" style="margin-left:6px; border:1px solid #ddd; padding:6px 10px; border-radius:6px; cursor:pointer;">닫기</button>
+  </div>
+</div>
 
   <br>
   <button id="toggle-history-btn" style="background-color:#4CAF50; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">고객data</button>
@@ -1126,6 +1167,166 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 </script>
 
+<script>
+// 전화번호 포맷(있으면 사용)
+function normPhone(v){
+  const raw=(v||'').trim();
+  if(!raw) return null;
+  try{return typeof normalizePhoneKR==='function'?normalizePhoneKR(raw,"intl"):raw;}catch{return raw;}
+}
+
+// 패널 토글
+function toggleProfilePanel(forceOpen) {
+  const panel = document.getElementById('profile-edit-panel');
+  if (!panel) { console.warn('[profile] panel not found'); return; }
+
+  // 열기/닫기 결정
+  const wantOpen = (forceOpen === undefined)
+    ? !panel.classList.contains('open')
+    : !!forceOpen;
+
+  // 클래스 + display 함께 처리
+  panel.classList.toggle('open', wantOpen);
+  panel.setAttribute('aria-hidden', wantOpen ? 'false' : 'true');
+  panel.style.display = wantOpen ? 'block' : 'none';
+
+  console.log('[profile] togglePanel ->', wantOpen);
+}
+
+
+// 입력칸 채우기
+async function fillMyProfileForm() {
+  const { data: { user } } = await window.supabaseClient.auth.getUser();
+  if (!user) return;
+
+  // 프로필에서 기본 정보 가져오기
+  const { data: profile, error } = await window.supabaseClient
+    .from("profiles")
+    .select("nickname, phone, grade, daily_limit, daily_usage_count")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (error) console.warn('[profile] load error', error);
+
+  // 이메일은 auth.user에서
+  const email = user.email || "";
+
+  // 값 반영
+  const nickEl   = document.getElementById("my-nickname");
+  const emailEl  = document.getElementById("my-email");
+  const phoneEl  = document.getElementById("my-phone");
+  const gradeEl  = document.getElementById("my-grade");
+  const countEl  = document.getElementById("my-daily-count");
+
+  if (nickEl)  nickEl.value  = profile?.nickname ?? "";
+  if (emailEl) emailEl.value = email;
+  if (phoneEl) phoneEl.value = profile?.phone ?? "";
+
+  const used   = profile?.daily_usage_count ?? 0;
+  const limit  = profile?.daily_limit ?? 0;
+  if (gradeEl) gradeEl.textContent = profile?.grade ?? "-";
+  if (countEl) countEl.textContent = limit ? `${used}/${limit}` : `${used}/-`;
+
+  // ※ 플랜 B: 만약 일일 카운트/리밋을 saju_counts에서 관리한다면 주석 해제
+
+  if (!limit) {
+    const { data: sc } = await window.supabaseClient
+      .from("saju_counts")
+      .select("used_today, daily_limit")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const used2 = sc?.used_today ?? used;
+    const lim2  = sc?.daily_limit ?? limit;
+    if (countEl) countEl.textContent = lim2 ? `${used2}/${lim2}` : `${used2}/-`;
+  }
+ 
+}
+
+// 저장
+async function saveMyProfile() {
+  const { data: { user } } = await window.supabaseClient.auth.getUser();
+  if (!user) { alert("로그인이 필요합니다."); return; }
+
+  // 입력값
+  const nickname = document.getElementById("my-nickname")?.value?.trim() || null;
+  const newEmail = document.getElementById("my-email")?.value?.trim() || null;
+  const phone    = (function normPhone(v) {
+    const raw = (v || '').trim();
+    if (!raw) return null;
+    try { return typeof normalizePhoneKR === 'function' ? normalizePhoneKR(raw, "intl") : raw; }
+    catch { return raw; }
+  })(document.getElementById("my-phone")?.value || "");
+
+  // 1) 프로필 업데이트 (닉네임/전화번호)
+  const { error: pErr } = await window.supabaseClient
+    .from("profiles")
+    .update({ nickname, phone })
+    .eq("user_id", user.id);
+  if (pErr) {
+    alert("프로필 저장 실패: " + (pErr.message || "오류"));
+    return;
+  }
+
+  // 2) 이메일 변경이 있으면 auth 계정 이메일 업데이트
+  //    (주의: 구글/카카오 등 소셜 로그인 계정은 이메일 변경이 제한될 수 있음)
+  if (newEmail && newEmail !== (user.email || "")) {
+    const { data, error: eErr } = await window.supabaseClient.auth.updateUser({ email: newEmail });
+    if (eErr) {
+      alert("이메일 변경 실패: " + (eErr.message || "오류"));
+      // 이메일만 실패했어도 닉네임/전화번호는 이미 저장됨
+    } else {
+      // 이메일 변경은 확인 메일이 갈 수 있음 (Supabase 프로젝트 설정에 따름)
+      console.log('[profile] email update result:', data);
+    }
+  }
+
+  alert("저장 완료");
+
+  // 상단 닉네임/버튼 등 갱신
+  const { data: sess } = await window.supabaseClient.auth.getSession();
+  if (sess?.session) { updateAuthUI(sess.session); }
+
+  toggleProfilePanel(false);
+}
+
+// 이벤트 바인딩(중복 방지)
+function wireProfileEditEvents() {
+  const editBtn   = document.getElementById("editProfileBtn");
+  const saveBtn   = document.getElementById("my-profile-save");
+  const cancelBtn = document.getElementById("my-profile-cancel");
+
+  if (editBtn && !editBtn.dataset.bound) {
+    editBtn.addEventListener("click", async () => {
+      console.log('[profile] edit clicked'); // ← 클릭 확인
+      const { data: { user } } = await window.supabaseClient.auth.getUser();
+      if (!user) { alert("로그인이 필요합니다."); return; }
+      await fillMyProfileForm();   // 폼 채우기
+      toggleProfilePanel(true);    // 열기
+    });
+    editBtn.dataset.bound = "1";
+  }
+
+  if (saveBtn && !saveBtn.dataset.bound) {
+    saveBtn.addEventListener("click", saveMyProfile);
+    saveBtn.dataset.bound = "1";
+  }
+
+  if (cancelBtn && !cancelBtn.dataset.bound) {
+    cancelBtn.addEventListener("click", () => {
+      console.log('[profile] cancel clicked');
+      toggleProfilePanel(false);
+    });
+    cancelBtn.dataset.bound = "1";
+  }
+}
+
+
+// 초기화 시 한 번 호출
+document.addEventListener("DOMContentLoaded", ()=>{ wireProfileEditEvents(); });
+
+// 로그인 성공 후 UI 갱신 시에도 다시 보강 호출
+// updateAuthUI(session) 내부의 로그인 분기 끝부분에 아래 한 줄을 추가해 두세요:
+//   wireProfileEditEvents();
+</script>
 
 
 

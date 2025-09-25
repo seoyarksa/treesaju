@@ -245,6 +245,9 @@ async function updateAuthUI(session) {
 const role = profile?.role || "normal";
 localStorage.setItem("userRole", role);
 
+
+  // ✅ 여기 추가
+  wireProfileEditEvents();
 // ✅ 회원관리 메뉴 표시/숨김
 const adminMenu = document.getElementById("admin-menu");
 if (adminMenu) {
@@ -3520,7 +3523,7 @@ async function renderUserProfile() {
 
 
 
-
+ 
 
 // === 초기화 (하나로 통합)
 document.addEventListener("DOMContentLoaded", async () => {
@@ -3827,6 +3830,10 @@ window.addEventListener("beforeunload", () => {
 
   showIfAdmin('#admin-menu');   // 회원관리 메뉴
 
+
+
+ 
+
     // ✅ 사주 폼 바인딩
     const form = document.getElementById("saju-form");
     if (form) {
@@ -3843,6 +3850,8 @@ window.addEventListener("beforeunload", () => {
 
     // ✅ 로그인 후 프로필/정기구독/로그아웃 UI 세팅
     renderUserProfile();
+
+
 
   } catch (err) {
     console.error("[init] fatal:", err);

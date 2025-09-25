@@ -407,6 +407,37 @@
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
 
+/* 접힌 상태 (완전 숨김) */
+#profile-edit-panel{
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  padding: 0 !important;          /* ← 한 줄 잔상 제거 핵심 */
+  border-width: 0 !important;     /* ← 테두리도 제거 */
+  margin-top: 0 !important;       /* ← 위 여백 제거 */
+  pointer-events: none;
+
+  /* 부드러운 전환 */
+  transition:
+    max-height .25s ease,
+    padding .2s ease,
+    margin .2s ease,
+    opacity .2s ease,
+    border-width .2s ease;
+}
+
+/* 펼친 상태만 보이게 */
+#profile-edit-panel.open{
+  max-height: 420px;
+  opacity: 1;
+  padding: 12px !important;
+  border: 1px solid #ddd !important;
+  margin-top: 12px !important;
+  pointer-events: auto;
+  background: #fafafa;            /* 필요 시 유지 */
+  border-radius: 8px;             /* 필요 시 유지 */
+}
+
 </style>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -560,7 +591,30 @@
 <div id="profile-section" style="display:none; margin-top:8px;">
   <span id="user-nickname" style="font-weight:600; color: blue;"></span> 님 환영합니다
  
-  <button id="logoutBtn" type="button" style="margin-left:8px; background-color:#fab7b7; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">로그아웃</button><br>
+  <button id="logoutBtn" type="button" style="margin-left:8px; background-color:#fab7b7; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">로그아웃</button>
+   <!-- 회원정보 수정 버튼 -->
+  <button id="editProfileBtn" type="button" style="margin-left:8px;">
+    회원정보 수정
+  </button>
+
+  <!-- 드롭(슬라이드) 패널: 프로필 수정 -->
+<div id="profile-edit-panel" class="collapse" aria-hidden="true"
+     style="margin-top:12px; padding:12px; border:1px solid #ddd; border-radius:8px; background:#fafafa;">
+    <div style="display:flex; gap:16px; flex-wrap:wrap;">
+      <label>닉네임
+        <input id="my-nickname" type="text" placeholder="닉네임" style="margin-left:6px;">
+      </label>
+      <label>전화번호
+        <input id="my-phone" type="tel" placeholder="010-1234-5678" style="margin-left:6px;">
+      </label>
+    </div>
+    <div style="margin-top:10px;">
+      <button id="my-profile-save"   type="button" style="background:#3b82f6; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer;">저장</button>
+      <button id="my-profile-cancel" type="button" style="margin-left:6px; border:1px solid #ddd; padding:6px 10px; border-radius:6px; cursor:pointer;">닫기</button>
+    </div>
+  </div>
+
+  <br>
   <button id="toggle-history-btn" style="background-color:#4CAF50; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">고객data</button>
   <button id="subscribeBtn" type="button" style="margin-left:8px;background-color:#4CAF50; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">정기구독</button>
 
@@ -1103,6 +1157,89 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 </script>
 
+<script>
+// 전화번호 포맷(있으면 사용)
+function normPhone(v){
+  const raw=(v||'').trim();
+  if(!raw) return null;
+  try{return typeof normalizePhoneKR==='function'?normalizePhoneKR(raw,"intl"):raw;}catch{return raw;}
+}
+
+// 패널 토글
+function toggleProfilePanel(forceOpen){
+  const panel=document.getElementById('profile-edit-panel');
+  if(!panel){console.warn('[profile] panel not found');return;}
+  const open=(forceOpen===undefined)?!panel.classList.contains('open'):!!forceOpen;
+  panel.classList.toggle('open',open);
+  panel.setAttribute('aria-hidden',open?'false':'true');
+}
+
+// 입력칸 채우기
+async function fillMyProfileForm(){
+  const {data:{user}}=await window.supabaseClient.auth.getUser();
+  if(!user) return;
+  const {data:profile,error}=await window.supabaseClient
+    .from("profiles")
+    .select("nickname, phone")
+    .eq("user_id",user.id)
+    .maybeSingle();
+  if(error) console.warn('[profile] load error',error);
+  const nick=document.getElementById("my-nickname");
+  const phone=document.getElementById("my-phone");
+  if(nick)  nick.value  = profile?.nickname ?? "";
+  if(phone) phone.value = profile?.phone ?? "";
+}
+
+// 이벤트 바인딩(중복 방지)
+function wireProfileEditEvents(){
+  const editBtn=document.getElementById("editProfileBtn");
+  const saveBtn=document.getElementById("my-profile-save");
+  const cancelBtn=document.getElementById("my-profile-cancel");
+
+  if(editBtn && !editBtn.dataset.bound){
+    editBtn.addEventListener("click", async ()=>{
+      const {data:{user}}=await window.supabaseClient.auth.getUser();
+      if(!user){alert("로그인이 필요합니다.");return;}
+      await fillMyProfileForm();
+      toggleProfilePanel(true);
+    });
+    editBtn.dataset.bound="1";
+  }
+
+  if(saveBtn && !saveBtn.dataset.bound){
+    saveBtn.addEventListener("click", async ()=>{
+      const {data:{user}}=await window.supabaseClient.auth.getUser();
+      if(!user){alert("로그인이 필요합니다.");return;}
+      const nickname=document.getElementById("my-nickname")?.value?.trim()||null;
+      const phone=normPhone(document.getElementById("my-phone")?.value||"");
+
+      const {error}=await window.supabaseClient
+        .from("profiles")
+        .update({nickname, phone})
+        .eq("user_id",user.id);
+
+      if(error){alert("저장 실패: "+(error.message||"오류"));return;}
+      alert("저장 완료");
+      const {data:sess}=await window.supabaseClient.auth.getSession();
+      if(sess?.session){updateAuthUI(sess.session);}
+      toggleProfilePanel(false);
+    });
+    saveBtn.dataset.bound="1";
+  }
+
+  if(cancelBtn && !cancelBtn.dataset.bound){
+    cancelBtn.addEventListener("click",()=>toggleProfilePanel(false));
+    cancelBtn.dataset.bound="1";
+  }
+}
+
+// 초기화 시 한 번 호출
+document.addEventListener("DOMContentLoaded", ()=>{ wireProfileEditEvents(); });
+
+// 로그인 성공 후 UI 갱신 시에도 다시 보강 호출
+// updateAuthUI(session) 내부의 로그인 분기 끝부분에 아래 한 줄을 추가해 두세요:
+//   wireProfileEditEvents();
+</script>
 
 
 
