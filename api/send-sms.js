@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     ],
   };
 
-  await fetch(`https://sens.apigw.ntruss.com/alimtalk/v2/services/${serviceId}/messages`, {
+  await authFetch(`https://sens.apigw.ntruss.com/alimtalk/v2/services/${serviceId}/messages`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json; charset=utf-8",

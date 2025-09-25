@@ -45,6 +45,23 @@
   console.log("[INDEX] supabaseClient ready:", !!window.supabaseClient);
 </script>
 
+<!-- (이미 있는) supabaseClient 생성 스크립트 바로 다음 -->
+<script>
+  // 항상 최신 세션에서 직접 토큰을 꺼내 헤더에 붙여주는 fetch 래퍼
+  window.authFetch = async function (url, options = {}) {
+    const { data: { session } } = await window.supabaseClient.auth.getSession();
+    const token = session?.access_token || null;
+
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}), // 토큰이 있으면 붙임
+    };
+
+    return fetch(url, { ...options, headers });
+  };
+</script>
+
 
 <style>
   body {
@@ -879,7 +896,7 @@
 
   // 공지 목록 렌더 (최신 1개만)
   async function renderNotices() {
-    const res = await fetch('/api/notice');
+    const res = await authFetch('/api/notice');
     const data = await res.json();
 
     const list = document.getElementById('notice-list');
@@ -937,7 +954,7 @@
     }
 
     const token = getToken();
-    const resp = await fetch('/api/notice', {
+    const resp = await authFetch('/api/notice', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -958,7 +975,7 @@
   // 공지 수정: 제목+내용 모두 변경
   async function editNotice(id) {
     // 현재 데이터 조회
-    const cur = await fetch(`/api/notice/${id}`).then(r => r.json());
+    const cur = await authFetch(`/api/notice/${id}`).then(r => r.json());
     if (!cur || !cur.id) {
       alert('공지 정보를 불러오지 못했습니다.');
       return;
@@ -978,7 +995,7 @@
     }
 
     const token = getToken();
-    const resp = await fetch(`/api/notice/${id}`, {
+    const resp = await authFetch(`/api/notice/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -1001,7 +1018,7 @@
     if (!confirm('정말 삭제하시겠습니까?')) return;
 
     const token = getToken();
-    const resp = await fetch(`/api/notice/${id}`, {
+    const resp = await authFetch(`/api/notice/${id}`, {
       method: 'DELETE',
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {})

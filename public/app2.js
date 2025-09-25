@@ -3851,7 +3851,7 @@ window.addEventListener("beforeunload", () => {
     // ✅ 로그인 후 프로필/정기구독/로그아웃 UI 세팅
     renderUserProfile();
 
-
+wireProfileEditEvents();
 
   } catch (err) {
     console.error("[init] fatal:", err);
