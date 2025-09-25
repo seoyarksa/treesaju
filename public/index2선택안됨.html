@@ -447,7 +447,7 @@
     <col style="width: 240px;"> <!-- 우측 메뉴 폭 -->
   </colgroup>
   <tr>
-    <th colspan="2" style="text-align:center; padding:16px 0; font-size:28px;">
+    <th colspan="2" style="text-align:left; padding:16px 0; font-size:28px;">
       트리 만세력
     </th>
   </tr>
@@ -459,11 +459,41 @@
 <nav class="top-menu">
   <ul>
     <li><a href="/index.html">공지게시판</a></li>
-    <li><a href="javascript:void(0)" onclick="window.open('/freeboard.html','free','width=1000,height=800,scrollbars=yes')">소통창</a></li>
-    <li><a href="/faq.html">FAQ</a></li>
-    <li><a href="/contact.html">문의하기</a></li>
-    <!-- 관리자만 노출하려면 기본은 숨김, 기존 스크립트에서 보여주기 -->
-    <li><a id="admin-menu" href="/admin.html" style="display:none;">회원관리</a></li>
+<li>
+  <a href="javascript:void(0)"
+     onclick="window.open('https://cafe.naver.com/f-e/cafes/22418538/menus/288?t=1758692524163',
+                          'free',
+                          'width=1200,height=800,scrollbars=yes')">
+     소통창
+  </a>
+</li>
+
+
+<li>
+  <a href="javascript:void(0)"
+     onclick="window.open('https://cafe.naver.com/f-e/cafes/22418538/menus/327?t=1758693680522',
+                          'faq',
+                          'width=1200,height=800,scrollbars=yes')">
+     FAQ
+  </a>
+</li>
+
+<li>
+  <a href="javascript:void(0)"
+     onclick="window.open('https://cafe.naver.com/f-e/cafes/22418538/menus/328?t=1758693700672',
+                          'contact',
+                          'width=1200,height=800,scrollbars=yes')">
+     문의하기
+  </a>
+</li>
+
+<li><a id="admin-menu" href="javascript:void(0)" 
+       onclick="window.open('/member-admin.html','memberAdmin','width=1400,height=800,scrollbars=yes')" 
+       style="display:none;">
+  회원관리
+</a></li>
+
+
   </ul>
 </nav>
 
@@ -1059,6 +1089,19 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 </script>
 
+
+<!-- 공지게시판목록 새창 띄우기 -->
+<script>
+  // 공지게시판 메뉴를 작은 팝업 창으로 열기
+  document.querySelector('.top-menu a[href="/index.html"]')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    window.open(
+      '/notice-list.html',
+      'noticeWin',
+      'width=900,height=650,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes'
+    );
+  });
+</script>
 
 
 
