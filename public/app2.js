@@ -127,6 +127,19 @@ import { renderSinsalTable,
  ************************************/
 // ===== app.js (안전망 포함, 전체 교체용) =====
 // 파일 상단 어딘가
+// 부모 창 전역
+window.addEventListener('message', async (e) => {
+  if (e.origin !== location.origin) return;
+  if (e.data?.type !== 'REQUEST_SUPABASE_SESSION') return;
+  const { data: { session } } = await window.supabaseClient.auth.getSession();
+  const payload = session ? {
+    access_token: session.access_token,
+    refresh_token: session.refresh_token
+  } : null;
+  e.source?.postMessage({ type: 'SUPABASE_SESSION', session: payload }, e.origin);
+});
+
+
 let __lastFormKey = null;
 
 // 입력을 안정적으로 키로 만드는 헬퍼

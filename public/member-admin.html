@@ -17,11 +17,8 @@
       background:#fff; border:1px solid #ccc; padding:20px; z-index:1000;
     }
 
-  .cell-changed { color: red; font-weight: 600; }
-  /* 선택: 몇 초 후 색상 원복 애니메이션 원하면 */
-  .cell-flash { transition: color 0.6s ease; }
-
-
+    .cell-changed { color: red; font-weight: 600; }
+    .cell-flash { transition: color 0.6s ease; }
   </style>
   <script src="https://unpkg.com/@supabase/supabase-js"></script>
 </head>
@@ -31,386 +28,398 @@
   <input type="text" id="searchInput" placeholder="닉네임/이메일 검색" />
   <button onclick="loadMembers(1)">검색</button>
 
-<table>
-  <thead>
-    <tr>
-      <th>유저 ID</th>
-      <th>닉네임</th>
-      <th>소셜닉네임</th>
-      <th>전화번호</th>
-      <th>전화번호 인증</th>
-      <th>등급</th>
-      <th>등급 오버라이드</th>
-      <th>권한(Role)</th>
-      <th>가입일</th>
-      <th>수정일</th>
-      <th>Trial 시작</th>
-      <th>Trial 종료</th>
-      <th>일일 사용일</th>
-      <th>일일 사용 횟수</th>
-      <th>일일 제한</th>
-      <th>Special 지정일</th>
-      <th>Premium 지정일</th>
-      <th>Premium 최초 지정일</th>
-      <th>Premium 사용 이력</th>
-      <th>관리</th>
-    </tr>
-  </thead>
-  <tbody id="memberTable"></tbody>
-</table>
+  <table>
+    <thead>
+      <tr>
+        <th>유저 ID</th>
+        <th>닉네임</th>
+        <th>소셜닉네임</th>
+        <th>전화번호</th>
+        <th>전화번호 인증</th>
+        <th>등급</th>
+        <th>등급 오버라이드</th>
+        <th>권한(Role)</th>
+        <th>가입일</th>
+        <th>수정일</th>
+        <th>Trial 시작</th>
+        <th>Trial 종료</th>
+        <th>일일 사용일</th>
+        <th>일일 사용 횟수</th>
+        <th>일일 제한</th>
+        <th>Special 지정일</th>
+        <th>Premium 지정일</th>
+        <th>Premium 최초 지정일</th>
+        <th>Premium 사용 이력</th>
+        <th>관리</th>
+      </tr>
+    </thead>
+    <tbody id="memberTable"></tbody>
+  </table>
 
-<div class="pagination" id="pagination"></div>
+  <div class="pagination" id="pagination"></div>
 
-<!-- 수정 모달 -->
-<div id="editModal">
-  <h3>회원 수정</h3>
-  <form id="editForm">
-    <label>유저 ID: <input type="text" id="edit-user_id" readonly></label><br>
-    <label>닉네임: <input type="text" id="edit-nickname" readonly></label><br>
-    <label>전화번호: <input type="text" id="edit-phone"></label><br>
-    <!-- <label>등급: <input type="text" id="edit-grade"></label><br> -->
-<label>Role:
-  <select id="edit-role" onchange="syncGradeWithRole()">
-    <option value="normal">일반</option>
-    <option value="premium">정기회원</option>
-    <option value="special">특별회원</option>
-    <option value="admin">관리자</option>
-  </select>
-</label><br>
+  <!-- 수정 모달 -->
+  <div id="editModal">
+    <h3>회원 수정</h3>
+    <form id="editForm">
+      <label>유저 ID: <input type="text" id="edit-user_id" readonly></label><br>
+      <label>닉네임: <input type="text" id="edit-nickname" readonly></label><br>
+      <label>전화번호: <input type="text" id="edit-phone"></label><br>
 
-<label>Grade:
-  <select id="edit-grade">
-    <option value="basic">일반</option>
-    <option value="premium">정기회원</option>
-    <option value="special">특별회원</option>
-    <option value="admin">관리자</option>
-  </select>
-</label><br>
-    <label>Trial 시작: <input type="date" id="edit-trial_started_at"></label><br>
-    <label>Trial 종료: <input type="date" id="edit-trial_ends_at"></label><br>
-    <label>일일 제한: <input type="number" id="edit-daily_limit"></label><br>
-    <label>Special 지정일: <input type="date" id="edit-special_assigned_at"></label><br>
-    <label>Premium 지정일: <input type="date" id="edit-premium_assigned_at"></label><br>
-    <label>Premium 최초 지정일: <input type="date" id="edit-premium_first_assigned_at"></label><br>
-    <label>Premium 사용 이력:
-      <select id="edit-has_ever_premium">
-        <option value="true">예</option>
-        <option value="false">아니오</option>
-      </select>
-    </label><br><br>
+      <label>등급 (grade):
+        <select id="edit-grade">
+          <option value="basic">일반</option>
+          <option value="premium">정기회원</option>
+          <option value="special">특별회원</option>
+          <option value="admin">관리자</option>
+        </select>
+      </label><br>
 
-    <button type="button" onclick="saveEdit()">저장</button>
-    <button type="button" onclick="closeEditModal()">닫기</button>
-  </form>
-</div>
+      <label>권한 (role):
+        <select id="edit-role">
+          <option value="normal">일반</option>
+          <option value="premium">정기회원</option>
+          <option value="special">특별회원</option>
+          <option value="admin">관리자</option>
+        </select>
+      </label><br>
 
-<script>
-const supabase = window.supabase.createClient(
-  "https://dxrgobsgeeshkybkbnxo.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4cmdvYnNnZWVzaGt5YmtibnhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwOTAyNzIsImV4cCI6MjA3MzY2NjI3Mn0.vD1xSRezaTC2OUikZZJM7UntQaQWvOxRkvYiMl78UZA"
-);
+      <label>Trial 시작: <input type="date" id="edit-trial_started_at"></label><br>
+      <label>Trial 종료: <input type="date" id="edit-trial_ends_at"></label><br>
+      <label>일일 제한: <input type="number" id="edit-daily_limit"></label><br>
+      <label>Special 지정일: <input type="date" id="edit-special_assigned_at"></label><br>
+      <label>Premium 지정일: <input type="date" id="edit-premium_assigned_at"></label><br>
+      <label>Premium 최초 지정일: <input type="date" id="edit-premium_first_assigned_at"></label><br>
+      <label>Premium 사용 이력:
+        <select id="edit-has_ever_premium">
+          <option value="true">예</option>
+          <option value="false">아니오</option>
+        </select>
+      </label><br><br>
 
-const pageSize = 10;
-let currentUserId = null;
+      <button type="button" onclick="saveEdit()">저장</button>
+      <button type="button" onclick="closeEditModal()">닫기</button>
+    </form>
+  </div>
 
-// ✅ 관리자 권한 확인
-async function restoreSession() {
-  const saved = localStorage.getItem("supabase.auth.session");
-  if (saved) {
-    try {
-      const session = JSON.parse(saved);
-      const { data, error } = await supabase.auth.setSession(session);
-      console.log("팝업 세션 복원:", data, error);
-    } catch (e) {
-      console.error("세션 복원 실패:", e);
+  <script>
+    const supabase = window.supabase.createClient(
+      "https://dxrgobsgeeshkybkbnxo.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4cmdvYnNnZWVzaGt5YmtibnhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwOTAyNzIsImV4cCI6MjA3MzY2NjI3Mn0.vD1xSRezaTC2OUikZZJM7UntQaQWvOxRkvYiMl78UZA"
+    );
+
+    const pageSize = 10;
+    let currentUserId = null;
+    let currentPage = 1;
+
+    async function restoreSession() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) return session;
+
+      const keys = Object.keys(localStorage).filter(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+      for (const k of keys) {
+        try {
+          const raw = localStorage.getItem(k);
+          if (!raw) continue;
+          const parsed = JSON.parse(raw);
+          const access_token  = parsed?.access_token || parsed?.currentSession?.access_token;
+          const refresh_token = parsed?.refresh_token || parsed?.currentSession?.refresh_token;
+          if (access_token && refresh_token) {
+            const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
+            if (!error && data?.session) return data.session;
+          }
+        } catch {}
+      }
+
+      if (window.opener && window.opener !== window) {
+        const sameOrigin = (() => { try { return window.opener.location.origin === location.origin; } catch { return false; } })();
+        if (sameOrigin) {
+          const session = await new Promise(resolve => {
+            const handler = async (e) => {
+              if (e.origin !== location.origin) return;
+              if (e.data?.type === 'SUPABASE_SESSION' && e.data.session) {
+                window.removeEventListener('message', handler);
+                const { access_token, refresh_token } = e.data.session;
+                if (access_token && refresh_token) {
+                  const { data } = await supabase.auth.setSession({ access_token, refresh_token });
+                  return resolve(data?.session || null);
+                }
+                resolve(null);
+              }
+            };
+            window.addEventListener('message', handler);
+            window.opener.postMessage({ type: 'REQUEST_SUPABASE_SESSION' }, location.origin);
+            setTimeout(() => { window.removeEventListener('message', handler); resolve(null); }, 5000);
+          });
+          if (session) return session;
+        }
+      }
+      return null;
     }
-  }
-}
 
-window.addEventListener("DOMContentLoaded", async () => {
-  await restoreSession();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    alert("로그인이 필요합니다.");
-    window.close();
-    return;
-  }
+    window.addEventListener("DOMContentLoaded", async () => {
+      await restoreSession();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert("로그인이 필요합니다.");
+        window.close();
+        return;
+      }
 
-  console.log("팝업창에서 로그인된 UID:", user.id); // 👈 팝업에서 UID 로그
+      console.log("팝업창에서 로그인된 UID:", user.id);
 
-  // DB role 확인
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("user_id", user.id)
-    .single();
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("user_id", user.id)
+        .single();
 
-  if (!profile || profile.role !== "admin") {
-    alert("접근 권한이 없습니다.");
-    window.close();
-    return;
-  }
+      if (error) {
+        console.error("관리자 권한 확인 실패:", error);
+        alert("권한 확인 중 오류");
+        window.close();
+        return;
+      }
 
-  loadMembers(1);
-});
+      if (!profile || profile.role !== "admin") {
+        alert("접근 권한이 없습니다.");
+        window.close();
+        return;
+      }
 
+      loadMembers(1);
+    });
 
-
-
-let currentPage = 1;
-function renderCell(value, changed) {
-  return `<td style="${changed ? 'color:red;' : ''}">${value ?? "-"}</td>`;
-}
-
-async function loadMembers(page=1) {
-    currentPage = page; // 👈 현재 페이지 저장
-  const search = document.getElementById("searchInput").value;
-  const from = (page-1) * pageSize;
-  const to = from + pageSize - 1;
-
-  let query = supabase.from("profiles").select("*", { count: "exact" }).range(from, to);
-  if (search) {
-    query = query.or(`display_name.ilike.%${search}%,nickname.ilike.%${search}%,phone.ilike.%${search}%`);
-  }
-
-  const { data, count, error } = await query;
-  if (error) { console.error(error); return; }
-
-  const tbody = document.getElementById("memberTable");
-  tbody.innerHTML = "";
-  data.forEach(member => {
-    const tr = document.createElement("tr");
-const nicknameEl = document.getElementById("user-nickname");
-const currentNickname = nicknameEl ? nicknameEl.textContent : null;
-    
-    tr.innerHTML = `
-      <td>${member.user_id}</td>
-      <td>${member.nickname || "-"}</td>
-      <td>${member.display_name || "-"}</td>
-      <td>${member.phone || "-"}</td>
-      <td>${member.phone_verified ? "✅" : "❌"}</td>
-      <td>${member.grade || "-"}</td>
-      <td>${member.grade_override || "-"}</td>
-      <td>${member.role || "-"}</td>
-      <td>${member.created_at ? new Date(member.created_at).toLocaleDateString() : "-"}</td>
-      <td>${member.updated_at ? new Date(member.updated_at).toLocaleDateString() : "-"}</td>
-      <td>${member.trial_started_at ? new Date(member.trial_started_at).toLocaleDateString() : "-"}</td>
-      <td>${member.trial_ends_at ? new Date(member.trial_ends_at).toLocaleDateString() : "-"}</td>
-      <td>${member.daily_usage_date || "-"}</td>
-      <td>${member.daily_usage_count ?? "-"}</td>
-      <td>${member.daily_limit ?? "-"}</td>
-      <td>${member.special_assigned_at ? new Date(member.special_assigned_at).toLocaleDateString() : "-"}</td>
-      <td>${member.premium_assigned_at ? new Date(member.premium_assigned_at).toLocaleDateString() : "-"}</td>
-      <td>${member.premium_first_assigned_at ? new Date(member.premium_first_assigned_at).toLocaleDateString() : "-"}</td>
-      <td>${member.has_ever_premium ? "예" : "아니오"}</td>
-      <td>
-        <button onclick="openEditModal('${member.user_id}')">수정</button>
-        <button onclick="deleteMember('${member.user_id}')">삭제</button>
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  const totalPages = Math.ceil(count / pageSize);
-  const pagination = document.getElementById("pagination");
-  pagination.innerHTML = "";
-  for (let i=1; i<=totalPages; i++) {
-    const btn = document.createElement("button");
-    btn.textContent = i;
-    btn.onclick = () => loadMembers(i);
-    if (i === page) btn.disabled = true;
-    pagination.appendChild(btn);
-  }
-}
-
-
-//등급과 권한 동시 수정
-function onRoleChange(userId) {
-  const roleSelect = document.getElementById(`role-${userId}`);
-  const gradeSelect = document.getElementById(`grade-${userId}`);
-  const newRole = roleSelect.value;
-
-  // role 선택 시 grade를 강제로 맞추기
-  if (newRole === "normal") gradeSelect.value = "basic";
-  if (newRole === "premium") gradeSelect.value = "premium";
-  if (newRole === "special") gradeSelect.value = "special";
-  if (newRole === "admin")  gradeSelect.value = "premium"; // 관리자도 서비스 티어는 premium 으로
-}
-
-
-// 모달 열기
-
-async function openEditModal(userId) {
-  currentUserId = userId;   // 현재 선택된 row id 저장
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("user_id", userId)
-    .single();
-
-  if (error) { alert("데이터 불러오기 실패"); return; }
-  document.getElementById("edit-user_id").value = data.user_id;
-  document.getElementById("edit-nickname").value = data.nickname || data.display_name || "";
-  document.getElementById("edit-phone").value = data.phone || "";
-  document.getElementById("edit-grade").value = data.grade || "";
-  document.getElementById("edit-role").value = data.role || "normal";
-  document.getElementById("edit-trial_started_at").value = data.trial_started_at ? data.trial_started_at.split("T")[0] : "";
-  document.getElementById("edit-trial_ends_at").value = data.trial_ends_at ? data.trial_ends_at.split("T")[0] : "";
-  document.getElementById("edit-daily_limit").value = data.daily_limit ?? "";
-  document.getElementById("edit-special_assigned_at").value = data.special_assigned_at ? data.special_assigned_at.split("T")[0] : "";
-  document.getElementById("edit-premium_assigned_at").value = data.premium_assigned_at ? data.premium_assigned_at.split("T")[0] : "";
-  document.getElementById("edit-premium_first_assigned_at").value = data.premium_first_assigned_at ? data.premium_first_assigned_at.split("T")[0] : "";
-  document.getElementById("edit-has_ever_premium").value = data.has_ever_premium ? "true" : "false";
-
-  document.getElementById("editModal").style.display = "block";
-}
-
-function closeEditModal() {
-  document.getElementById("editModal").style.display = "none";
-}
-
-async function saveEdit() {
-  const updates = {
-    phone: document.getElementById("edit-phone").value,
-    grade: document.getElementById("edit-grade").value,
-    role: document.getElementById("edit-role").value,
-    trial_started_at: document.getElementById("edit-trial_started_at").value
-      ? new Date(document.getElementById("edit-trial_started_at").value).toISOString()
-      : null,
-    trial_ends_at: document.getElementById("edit-trial_ends_at").value
-      ? new Date(document.getElementById("edit-trial_ends_at").value).toISOString()
-      : null,
-    daily_limit: document.getElementById("edit-daily_limit").value || null,
-    special_assigned_at: document.getElementById("edit-special_assigned_at").value
-      ? new Date(document.getElementById("edit-special_assigned_at").value).toISOString()
-      : null,
-    premium_assigned_at: document.getElementById("edit-premium_assigned_at").value
-      ? new Date(document.getElementById("edit-premium_assigned_at").value).toISOString()
-      : null,
-    premium_first_assigned_at: document.getElementById("edit-premium_first_assigned_at").value
-      ? new Date(document.getElementById("edit-premium_first_assigned_at").value).toISOString()
-      : null,
-    has_ever_premium: document.getElementById("edit-has_ever_premium").value === "true"
-  };
-
-  const { data, error } = await supabase
-    .from("profiles")
-    .update(updates)
-    .eq("user_id", currentUserId)   // 👈 현재 row의 id 그대로 사용
-    .select();
-
-    console.log("currentUserId:", currentUserId);
-
-  console.log("업데이트 시도:", updates);
-  console.log("응답:", { data, error });
-
-  if (error) {
-    alert("저장 실패: " + error.message);
-  } else {
-    alert("저장 완료");
-    closeEditModal();
-    loadMembers(currentPage); // 👈 현재 페이지 그대로 새로고침
-  }
-}
-
-
-
-// 삭제
-async function deleteMember(userId) {
-  if (!confirm("정말 삭제하시겠습니까?")) return;
-
-  const { data, error } = await supabase
-    .from("profiles")
-    .delete()
-    .eq("user_id", userId)
-    .select();
-
-  console.log("삭제 시도 userId:", userId);
-  console.log("삭제 응답 data:", data);
-  console.log("삭제 응답 error:", error);
-
-  if (error) {
-    alert("삭제 실패: " + error.message);
-    return;
-  }
-
-  alert("삭제 완료");
-  // 성공 시 UI에서도 제거
-  const row = [...document.querySelectorAll("#memberTable tr")]
-    .find(tr => tr.children?.[0]?.textContent.trim() === userId);
-  if (row) row.remove();
-}
-
-</script>
-
-<!--수정사항 표시-->
-<script>
-function fmtDateOrDash(v) {
-  if (!v) return "-";
-  try { return new Date(v).toLocaleDateString(); } catch { return "-"; }
-}
-function fmtBoolYN(b) { return b ? "예" : "아니오"; }
-</script>
-<script>
-function patchAndHighlightRow(userId, updates, options = {clearAfterMs: 3500}) {
-  // 해당 행 찾기(맨 첫 셀의 텍스트가 userId 인 행)
-  const row = [...document.querySelectorAll("#memberTable tr")]
-    .find(tr => tr.children?.[0]?.textContent?.trim() === userId);
-  if (!row) return;
-
-  // 셀 헬퍼
-  const c = idx => row.children[idx];
-  const mark = idx => {
-    c(idx).classList.add("cell-changed","cell-flash");
-    if (options.clearAfterMs) {
-      setTimeout(() => c(idx).classList.remove("cell-changed"), options.clearAfterMs);
+    function renderCell(value, changed) {
+      return `<td style="${changed ? 'color:red;' : ''}">${value ?? "-"}</td>`;
     }
-  };
 
-  // 업데이트된 필드만 값 반영 + 강조
-  if ("phone" in updates) {
-    c(3).textContent = updates.phone || "-";
-    mark(3);
-  }
-  if ("grade" in updates) {
-    c(5).textContent = updates.grade || "-";
-    mark(5);
-  }
-  if ("grade_override" in updates) {
-    c(6).textContent = updates.grade_override || "-";
-    mark(6);
-  }
-  if ("role" in updates) {
-    c(7).textContent = updates.role || "-";
-    mark(7);
-  }
-  if ("daily_limit" in updates) {
-    c(14).textContent = (updates.daily_limit ?? "-");
-    mark(14);
-  }
-  if ("special_assigned_at" in updates) {
-    c(15).textContent = fmtDateOrDash(updates.special_assigned_at);
-    mark(15);
-  }
-  if ("premium_assigned_at" in updates) {
-    c(16).textContent = fmtDateOrDash(updates.premium_assigned_at);
-    mark(16);
-  }
-  if ("premium_first_assigned_at" in updates) {
-    c(17).textContent = fmtDateOrDash(updates.premium_first_assigned_at);
-    mark(17);
-  }
-  if ("has_ever_premium" in updates) {
-    c(18).textContent = fmtBoolYN(updates.has_ever_premium);
-    mark(18);
-  }
+    async function loadMembers(page = 1) {
+      currentPage = page;
+      const search = document.getElementById("searchInput").value;
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
 
-  // 선택: 수정일 칸(9번)도 현재 시각으로 표시/강조
-  c(9).textContent = new Date().toLocaleDateString();
-  mark(9);
-}
-</script>
+      let query = supabase
+        .from("profiles")
+        .select("*", { count: "exact" })
+        .order('updated_at', { ascending: false })  // 최신순
+        .range(from, to);
 
+      if (search) {
+        query = query.or(`display_name.ilike.%${search}%,nickname.ilike.%${search}%,phone.ilike.%${search}%`);
+      }
 
+      const { data, count, error } = await query;
+      if (error) { console.error(error); return; }
+
+      const tbody = document.getElementById("memberTable");
+      tbody.innerHTML = "";
+      data.forEach(member => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${member.user_id}</td>
+          <td>${member.nickname || "-"}</td>
+          <td>${member.display_name || "-"}</td>
+          <td>${member.phone || "-"}</td>
+          <td>${member.phone_verified ? "✅" : "❌"}</td>
+          <td>${member.grade || "-"}</td>
+          <td>${member.grade_override || "-"}</td>
+          <td>${member.role || "-"}</td>
+          <td>${member.created_at ? new Date(member.created_at).toLocaleDateString() : "-"}</td>
+          <td>${member.updated_at ? new Date(member.updated_at).toLocaleDateString() : "-"}</td>
+          <td>${member.trial_started_at ? new Date(member.trial_started_at).toLocaleDateString() : "-"}</td>
+          <td>${member.trial_ends_at ? new Date(member.trial_ends_at).toLocaleDateString() : "-"}</td>
+          <td>${member.daily_usage_date || "-"}</td>
+          <td>${member.daily_usage_count ?? "-"}</td>
+          <td>${member.daily_limit ?? "-"}</td>
+          <td>${member.special_assigned_at ? new Date(member.special_assigned_at).toLocaleDateString() : "-"}</td>
+          <td>${member.premium_assigned_at ? new Date(member.premium_assigned_at).toLocaleDateString() : "-"}</td>
+          <td>${member.premium_first_assigned_at ? new Date(member.premium_first_assigned_at).toLocaleDateString() : "-"}</td>
+          <td>${member.has_ever_premium ? "예" : "아니오"}</td>
+          <td>
+            <button onclick="openEditModal('${member.user_id}')">수정</button>
+            <button onclick="deleteMember('${member.user_id}')">삭제</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const totalPages = Math.ceil(count / pageSize);
+      const pagination = document.getElementById("pagination");
+      pagination.innerHTML = "";
+      for (let i = 1; i <= totalPages; i++) {
+        const btn = document.createElement("button");
+        btn.textContent = i;
+        btn.onclick = () => loadMembers(i);
+        if (i === page) btn.disabled = true;
+        pagination.appendChild(btn);
+      }
+    }
+
+    // 모달 열기
+    async function openEditModal(userId) {
+      currentUserId = userId;
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", userId)
+        .single();
+
+      if (error) { alert("데이터 불러오기 실패"); return; }
+
+      document.getElementById("edit-user_id").value = data.user_id;
+      document.getElementById("edit-nickname").value = data.nickname || data.display_name || "";
+      document.getElementById("edit-phone").value = data.phone || "";
+      document.getElementById("edit-grade").value = data.grade || "basic";
+      document.getElementById("edit-role").value  = data.role  || "normal";
+
+      const d = s => s ? s.split("T")[0] : "";
+      document.getElementById("edit-trial_started_at").value        = d(data.trial_started_at);
+      document.getElementById("edit-trial_ends_at").value           = d(data.trial_ends_at);
+      document.getElementById("edit-daily_limit").value             = data.daily_limit ?? "";
+      document.getElementById("edit-special_assigned_at").value     = d(data.special_assigned_at);
+      document.getElementById("edit-premium_assigned_at").value     = d(data.premium_assigned_at);
+      document.getElementById("edit-premium_first_assigned_at").value = d(data.premium_first_assigned_at);
+      document.getElementById("edit-has_ever_premium").value        = data.has_ever_premium ? "true" : "false";
+
+      document.getElementById("editModal").style.display = "block";
+    }
+
+    function closeEditModal() {
+      document.getElementById("editModal").style.display = "none";
+    }
+
+    // 저장
+    async function saveEdit() {
+      // 입력 정규화 유틸
+      const Vdate = (id) => {
+        const v = document.getElementById(id).value;
+        return v ? new Date(v + "T00:00:00Z").toISOString() : null;
+      };
+      const Vnum = (id) => {
+        const v = document.getElementById(id).value;
+        return (v === "" || v == null) ? null : Number(v);
+      };
+      const Vtxt = (id) => {
+        const v = document.getElementById(id).value;
+        return v?.trim() || null;
+      };
+
+      const updates = {
+        phone: Vtxt("edit-phone"),
+        grade: Vtxt("edit-grade"),
+        role:  Vtxt("edit-role"),
+        trial_started_at: Vdate("edit-trial_started_at"),
+        trial_ends_at:    Vdate("edit-trial_ends_at"),
+        daily_limit:      Vnum("edit-daily_limit"),
+        special_assigned_at:       Vdate("edit-special_assigned_at"),
+        premium_assigned_at:       Vdate("edit-premium_assigned_at"),
+        premium_first_assigned_at: Vdate("edit-premium_first_assigned_at"),
+        has_ever_premium: document.getElementById("edit-has_ever_premium").value === "true"
+      };
+
+      console.log("업데이트 시도:", { currentUserId, updates });
+
+      const { data, error, status, statusText } = await supabase
+        .from("profiles")
+        .update(updates)
+        .eq("user_id", currentUserId)
+        .select();
+
+      console.log("응답:", { status, statusText, data, error });
+
+      if (error) {
+        alert("저장 실패: " + (error.message || JSON.stringify(error)));
+        return;
+      }
+
+      // RLS/권한 이슈 등으로 0행 업데이트인 경우 바로 안내
+      if (!data || data.length === 0) {
+        alert("수정이 반영되지 않았습니다. (권한/RLS 정책 확인 필요)");
+        return;
+      }
+
+      // 서버가 돌려준 최신 행을 기준으로 테이블 즉시 패치
+      const row = data[0];
+      patchAndHighlightRow?.(currentUserId, {
+        phone: row.phone,
+        grade: row.grade,
+        role:  row.role,
+        daily_limit: row.daily_limit,
+        special_assigned_at: row.special_assigned_at,
+        premium_assigned_at: row.premium_assigned_at,
+        premium_first_assigned_at: row.premium_first_assigned_at,
+        has_ever_premium: row.has_ever_premium,
+      });
+
+      alert("저장 완료");
+      closeEditModal();
+      // 최종 동기화를 위해 재조회
+      loadMembers(currentPage);
+    }
+
+    // 삭제
+    async function deleteMember(userId) {
+      if (!confirm("정말 삭제하시겠습니까?")) return;
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("user_id", userId)
+        .select();
+
+      console.log("삭제 시도 userId:", userId);
+      console.log("삭제 응답 data:", data);
+      console.log("삭제 응답 error:", error);
+
+      if (error) {
+        alert("삭제 실패: " + error.message);
+        return;
+      }
+
+      alert("삭제 완료");
+      const row = [...document.querySelectorAll("#memberTable tr")]
+        .find(tr => tr.children?.[0]?.textContent.trim() === userId);
+      if (row) row.remove();
+    }
+  </script>
+
+  <!--수정사항 표시-->
+  <script>
+    function fmtDateOrDash(v) {
+      if (!v) return "-";
+      try { return new Date(v).toLocaleDateString(); } catch { return "-"; }
+    }
+    function fmtBoolYN(b) { return b ? "예" : "아니오"; }
+  </script>
+  <script>
+    function patchAndHighlightRow(userId, updates, options = {clearAfterMs: 3500}) {
+      const row = [...document.querySelectorAll("#memberTable tr")]
+        .find(tr => tr.children?.[0]?.textContent?.trim() === userId);
+      if (!row) return;
+
+      const c = idx => row.children[idx];
+      const mark = idx => {
+        c(idx).classList.add("cell-changed","cell-flash");
+        if (options.clearAfterMs) {
+          setTimeout(() => c(idx).classList.remove("cell-changed"), options.clearAfterMs);
+        }
+      };
+
+      if ("phone" in updates) { c(3).textContent = updates.phone || "-"; mark(3); }
+      if ("grade" in updates) { c(5).textContent = updates.grade || "-"; mark(5); }
+      if ("grade_override" in updates) { c(6).textContent = updates.grade_override || "-"; mark(6); }
+      if ("role" in updates)  { c(7).textContent = updates.role || "-"; mark(7); }
+      if ("daily_limit" in updates) { c(14).textContent = (updates.daily_limit ?? "-"); mark(14); }
+      if ("special_assigned_at" in updates) { c(15).textContent = fmtDateOrDash(updates.special_assigned_at); mark(15); }
+      if ("premium_assigned_at" in updates) { c(16).textContent = fmtDateOrDash(updates.premium_assigned_at); mark(16); }
+      if ("premium_first_assigned_at" in updates) { c(17).textContent = fmtDateOrDash(updates.premium_first_assigned_at); mark(17); }
+      if ("has_ever_premium" in updates) { c(18).textContent = fmtBoolYN(updates.has_ever_premium); mark(18); }
+
+      c(9).textContent = new Date().toLocaleDateString();
+      mark(9);
+    }
+  </script>
 </body>
 </html>
