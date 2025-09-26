@@ -112,7 +112,19 @@ import { renderSinsalTable,
 
 
 
-
+// =========================================
+// 출력 제한 로직 (비로그인 사용자 하루 3회 제한)
+// =========================================
+// ✅ 출력 제한 체크 함수
+// ✅ 출력 제한 체크 함수
+// === 출력 제한 ===
+/************************************
+ /************************************
+ * 1) 비로그인 출력 제한
+ ************************************/
+/************************************
+ * 1) 비로그인 출력 제한
+ ************************************/
 // ===== app.js (안전망 포함, 전체 교체용) =====
 // 파일 상단 어딘가
 // 부모 창 전역
@@ -127,8 +139,6 @@ window.addEventListener('message', async (e) => {
   e.source?.postMessage({ type: 'SUPABASE_SESSION', session: payload }, e.origin);
 });
 
-// app.js 최상단 어딘가
-const authFetch = window.authFetch || fetch;
 
 let __lastFormKey = null;
 
@@ -146,7 +156,6 @@ function makeFormKey(fd) {
   };
   return JSON.stringify(norm);
 }
-
 
 
 // 0) 안전 헬퍼
@@ -3442,7 +3451,7 @@ requestAnimationFrame(() => {
 
   const todayStr = `${todayPayload.year}-${String(todayPayload.month).padStart(2, '0')}-${String(todayPayload.day).padStart(2, '0')}`;
 
-  const todayResponse = await authFetch('/api/saju', {
+  const todayResponse = await fetch('/api/saju', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(todayPayload),

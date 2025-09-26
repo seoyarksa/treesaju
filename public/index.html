@@ -45,23 +45,6 @@
   console.log("[INDEX] supabaseClient ready:", !!window.supabaseClient);
 </script>
 
-<!-- (이미 있는) supabaseClient 생성 스크립트 바로 다음 -->
-<script>
-  // 항상 최신 세션에서 직접 토큰을 꺼내 헤더에 붙여주는 fetch 래퍼
-  window.authFetch = async function (url, options = {}) {
-    const { data: { session } } = await window.supabaseClient.auth.getSession();
-    const token = session?.access_token || null;
-
-    const headers = {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}), // 토큰이 있으면 붙임
-    };
-
-    return fetch(url, { ...options, headers });
-  };
-</script>
-
 
 <style>
   body {
@@ -637,13 +620,13 @@
 
     <div style="min-width:140px;">
       <div><strong>회원등급</strong> : <span id="my-grade">-</span></div>
-
+      <div><strong>1일 카운트</strong> : <span id="my-daily-count">-</span></div>
     </div>
   </div>
 
   <div style="margin-top:10px;">
     <button id="my-profile-save"   type="button" style="background:#3b82f6; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer;">저장</button>
-    <button id="my-profile-cancel" type="button" style="background:#3b82f6; margin-left:6px; border:1px solid #ddd; padding:6px 10px; border-radius:6px; cursor:pointer;">닫기</button>
+    <button id="my-profile-cancel" type="button" style="margin-left:6px; border:1px solid #ddd; padding:6px 10px; border-radius:6px; cursor:pointer;">닫기</button>
   </div>
 </div>
 
@@ -896,7 +879,7 @@
 
   // 공지 목록 렌더 (최신 1개만)
   async function renderNotices() {
-    const res = await authFetch('/api/notice');
+    const res = await fetch('/api/notice');
     const data = await res.json();
 
     const list = document.getElementById('notice-list');
@@ -954,7 +937,7 @@
     }
 
     const token = getToken();
-    const resp = await authFetch('/api/notice', {
+    const resp = await fetch('/api/notice', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -975,7 +958,7 @@
   // 공지 수정: 제목+내용 모두 변경
   async function editNotice(id) {
     // 현재 데이터 조회
-    const cur = await authFetch(`/api/notice/${id}`).then(r => r.json());
+    const cur = await fetch(`/api/notice/${id}`).then(r => r.json());
     if (!cur || !cur.id) {
       alert('공지 정보를 불러오지 못했습니다.');
       return;
@@ -995,7 +978,7 @@
     }
 
     const token = getToken();
-    const resp = await authFetch(`/api/notice/${id}`, {
+    const resp = await fetch(`/api/notice/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -1018,7 +1001,7 @@
     if (!confirm('정말 삭제하시겠습니까?')) return;
 
     const token = getToken();
-    const resp = await authFetch(`/api/notice/${id}`, {
+    const resp = await fetch(`/api/notice/${id}`, {
       method: 'DELETE',
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {})
@@ -1218,41 +1201,61 @@ function toggleProfilePanel(forceOpen) {
 
 
 // 입력칸 채우기
-// 입력칸 채우기
-// 입력칸 채우기 (카운트 관련 전부 제거)
 async function fillMyProfileForm() {
   const { data: { user } } = await window.supabaseClient.auth.getUser();
   if (!user) return;
 
-  // 프로필에서 기본 정보만 (nickname, phone, grade)
+  // 프로필에서 기본 정보 가져오기
   const { data: profile, error } = await window.supabaseClient
     .from("profiles")
-    .select("nickname, phone, grade")
+    .select("nickname, phone, grade, daily_limit, daily_usage_count")
     .eq("user_id", user.id)
     .maybeSingle();
   if (error) console.warn('[profile] load error', error);
 
+  // 이메일은 auth.user에서
   const email = user.email || "";
 
-  const nickEl  = document.getElementById("my-nickname");
-  const emailEl = document.getElementById("my-email");
-  const phoneEl = document.getElementById("my-phone");
-  const gradeEl = document.getElementById("my-grade");
+  // 값 반영
+  const nickEl   = document.getElementById("my-nickname");
+  const emailEl  = document.getElementById("my-email");
+  const phoneEl  = document.getElementById("my-phone");
+  const gradeEl  = document.getElementById("my-grade");
+  const countEl  = document.getElementById("my-daily-count");
 
-  if (nickEl)  {
-    nickEl.value = profile?.nickname ?? "";
-    if (!nickEl.value) nickEl.placeholder = "닉네임은 한 번 더 등록해주세요.";
+  if (nickEl) {
+    const nickVal = profile?.nickname ?? "";
+    nickEl.value = nickVal;
+    // 닉네임이 없을 때만 안내 멘트를 placeholder로
+    nickEl.placeholder = nickVal.trim()
+      ? "닉네임은 한 번 더 등록해주세요"
+      : "닉네임은 한 번 더 등록해주세요";
   }
+
   if (emailEl) {
     emailEl.value = email;
-    emailEl.readOnly = true;
-    emailEl.style.background = "#f3f3f3";
+    emailEl.readOnly = true; // 이메일 수정 불가
   }
+
   if (phoneEl) phoneEl.value = profile?.phone ?? "";
+
+  const used  = profile?.daily_usage_count ?? 0;
+  const limit = profile?.daily_limit ?? 0;
   if (gradeEl) gradeEl.textContent = profile?.grade ?? "-";
+  if (countEl) countEl.textContent = limit ? `${used}/${limit}` : `${used}/-`;
+
+  // ※ 플랜 B: 일일 카운트/리밋이 saju_counts에 있을 경우 보정
+  if (!limit) {
+    const { data: sc } = await window.supabaseClient
+      .from("saju_counts")
+      .select("used_today, daily_limit")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const used2 = sc?.used_today ?? used;
+    const lim2  = sc?.daily_limit ?? limit;
+    if (countEl) countEl.textContent = lim2 ? `${used2}/${lim2}` : `${used2}/-`;
+  }
 }
-
-
 
 
 // 저장
