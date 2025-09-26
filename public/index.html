@@ -58,7 +58,7 @@
       ...(token ? { Authorization: `Bearer ${token}` } : {}), // 토큰이 있으면 붙임
     };
 
-    return fetch(url, { ...(options || {}), headers });
+     return fetch(url, { ...options, headers });
 
   };
 </script>

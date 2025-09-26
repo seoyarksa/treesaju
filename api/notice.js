@@ -1,16 +1,14 @@
-import 'dotenv/config';
+import 'dotenv/config';     
 import express from 'express';
 import pool from '../db.js';
 import { createClient } from '@supabase/supabase-js';
-import serverless from 'serverless-http';
 
-const app = express();
-app.use(express.json());
+const router = express.Router();
 
 const { SUPABASE_URL, SUPABASE_SERVICE_ROLE } = process.env;
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
-// ✅ checkAdmin 그대로 유지
+// ✅ 관리자 확인 미들웨어
 async function checkAdmin(req, res, next) {
   try {
     const auth = req.headers.authorization || '';
@@ -38,8 +36,8 @@ async function checkAdmin(req, res, next) {
   }
 }
 
-// ✅ 라우터 대신 app에 직접 붙이기
-app.get('/api/notice', async (req, res) => {
+// ✅ 공지 목록 조회
+router.get('/', async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT id, title, created_at, views FROM notice_board ORDER BY created_at DESC LIMIT 20'
@@ -50,7 +48,8 @@ app.get('/api/notice', async (req, res) => {
   }
 });
 
-app.get('/api/notice/:id', async (req, res) => {
+// ✅ 공지 상세 조회
+router.get('/:id', async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('UPDATE notice_board SET views = views + 1 WHERE id = $1', [id]);
@@ -61,7 +60,8 @@ app.get('/api/notice/:id', async (req, res) => {
   }
 });
 
-app.post('/api/notice', checkAdmin, async (req, res) => {
+// ✅ 공지 작성 (관리자 전용)
+router.post('/', checkAdmin, async (req, res) => {
   const { title, content } = req.body;
   try {
     const result = await pool.query(
@@ -74,7 +74,8 @@ app.post('/api/notice', checkAdmin, async (req, res) => {
   }
 });
 
-app.put('/api/notice/:id', checkAdmin, async (req, res) => {
+// ✅ 공지 수정 (관리자 전용)
+router.put('/:id', checkAdmin, async (req, res) => {
   const { id } = req.params;
   const { title, content } = req.body;
   try {
@@ -88,7 +89,8 @@ app.put('/api/notice/:id', checkAdmin, async (req, res) => {
   }
 });
 
-app.delete('/api/notice/:id', checkAdmin, async (req, res) => {
+// ✅ 공지 삭제 (관리자 전용)
+router.delete('/:id', checkAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('DELETE FROM notice_board WHERE id = $1', [id]);
@@ -98,5 +100,4 @@ app.delete('/api/notice/:id', checkAdmin, async (req, res) => {
   }
 });
 
-// ✅ Vercel serverless function으로 export
-export default serverless(app);
+export default router;
