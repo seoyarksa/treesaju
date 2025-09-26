@@ -917,6 +917,31 @@ async function handleSajuSubmit(e) {
   e.preventDefault();
   console.log("[DEBUG] handleSajuSubmit 실행됨");
 
+  // ───────────────── RPC 호출 직전 점검 ─────────────────
+  const { data: { session } } = await window.supabaseClient.auth.getSession();
+  if (!session) {
+    alert("로그인이 필요합니다.");
+    return;
+  }
+  console.log("RPC with UID:", session.user.id);
+
+  const { data: ok, error } = await window.supabaseClient.rpc("can_render_and_count");
+  if (error) {
+    console.error("[RPC] 오류:", error);
+    alert("이용 제한 확인 중 오류가 발생했습니다.");
+    return;
+  }
+  if (!ok?.allowed) {
+    // 서버에서 사유를 넘겨줬다면 메시지 분기(선택)
+    if (ok?.reason === "DAILY_LIMIT_REACHED") {
+      alert("하루 사용 가능 횟수를 초과했습니다.");
+    } else {
+      alert("이용이 제한되었습니다.");
+    }
+    return;
+  }
+
+
   try {
     // 1) 입력 데이터 수집
     const formData = {
