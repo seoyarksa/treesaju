@@ -32,7 +32,7 @@ async function checkAdmin(req, res, next) {
     // profiles 테이블에서 role 확인
     const { data: profile, error: pErr } = await supabase
       .from('profiles')
-      .select('role')
+      .select('grade')
       .eq('user_id', user.id)
       .single();
 
