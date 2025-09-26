@@ -29,7 +29,7 @@ async function checkAdmin(req, res, next) {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user) return res.status(401).json({ error: 'Invalid token' });
 
-    // profiles 테이블에서 role 확인
+    // profiles 테이블에서 grade 확인
     const { data: profile, error: pErr } = await supabase
       .from('profiles')
       .select('grade')
@@ -37,7 +37,9 @@ async function checkAdmin(req, res, next) {
       .single();
 
     if (pErr) return res.status(500).json({ error: 'Profile lookup failed' });
-    if (!profile || String(profile.role).toLowerCase() !== 'admin') {
+
+    // grade가 admin인지 확인
+    if (!profile || String(profile.grade).toLowerCase() !== 'admin') {
       return res.status(403).json({ error: '관리자 권한 필요' });
     }
 
@@ -47,6 +49,7 @@ async function checkAdmin(req, res, next) {
     res.status(500).json({ error: 'Auth check failed' });
   }
 }
+
 
 // 1. 공지 목록 조회
 router.get('/', async (req, res) => {
