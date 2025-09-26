@@ -837,77 +837,55 @@ function getCurrentFormData() {
 
 // ✅ 비회원/회원 출력 제한 체크
 async function checkRenderAllowed() {
-  // 같은 supabase 인스턴스 사용: auth와 rpc가 동일 client여야 토큰이 자동 첨부됨
-  const supabase = window.supabaseClient;
-
+  // 1) 로그인 사용자 → 서버(DB)에서 제한
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-
-    // 1) 비회원: localStorage 제한 적용
-    if (!session) {
-      const todayKST = getKSTDateKey();
-      const usage = JSON.parse(localStorage.getItem("sajuUsage") || "{}");
-
-      usage[todayKST] = (usage[todayKST] || 0) + 1;
-
-      // 월간 누적
-      const monthKey = todayKST.slice(0, 7);
-      let monthCount = 0;
-      for (let key in usage) if (key.startsWith(monthKey)) monthCount += usage[key];
-
-      // 최초 접속일(3개월 제한)
-      if (!usage.firstVisit) usage.firstVisit = todayKST;
-      const diffDays = Math.floor(
-        (new Date(todayKST) - new Date(usage.firstVisit)) / (1000 * 60 * 60 * 24)
-      );
-
-      if (diffDays > 90) {
-        alert("비회원 이용 가능 기간(3개월)이 만료되었습니다.\n회원가입 후 계속 이용해주세요.");
-        return false;
-      }
-      if (usage[todayKST] > 3) {
-        alert("비회원은 하루 3회까지만 출력 가능합니다.");
-        return false;
-      }
-      if (monthCount > 20) {
-        alert("비회원은 한 달 총 20회까지만 출력 가능합니다.");
-        return false;
-      }
-
-      localStorage.setItem("sajuUsage", JSON.stringify(usage));
-      return true;
+    const { data: { session } } = await window.supabaseClient.auth.getSession();
+    if (session) {
+      return true; // 로그인 사용자는 서버 쪽에서 제한 처리
     }
+  } catch (_) {}
 
-    // 2) 로그인 사용자: DB(RPC)로 제한 확인
-    const { data, error } = await supabase.rpc("can_render_and_count");
-    if (error) {
-      console.error("[RPC ERROR]", error);
-      alert("이용 제한 확인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
-      return false;
+  // 2) 비회원 → localStorage로 제한
+  const todayKST = getKSTDateKey();
+  const usage = JSON.parse(localStorage.getItem("sajuUsage") || "{}");
+
+  // 오늘 카운트 증가
+  usage[todayKST] = (usage[todayKST] || 0) + 1;
+
+  // ✅ 월간 카운트 계산
+  const monthKey = todayKST.slice(0, 7); // YYYY-MM
+  let monthCount = 0;
+  for (let key in usage) {
+    if (key.startsWith(monthKey)) {
+      monthCount += usage[key];
     }
+  }
 
-    if (!data?.allowed) {
-      // 서버가 거절 사유를 내려줌: DAILY_LIMIT_REACHED, NO_SESSION 등
-      const reason = data?.reason || "UNKNOWN";
-      if (reason === "DAILY_LIMIT_REACHED") {
-        alert("하루 사용 한도를 모두 사용했습니다. 내일 다시 이용해주세요.");
-      } else if (reason === "NO_SESSION") {
-        alert("세션이 만료되었습니다. 다시 로그인 후 이용해주세요.");
-      } else {
-        alert("이용 제한으로 인해 실행할 수 없습니다.");
-      }
-      return false;
-    }
+  // ✅ 최초 접속일 추적 (비회원 3개월 제한)
+  if (!usage.firstVisit) {
+    usage.firstVisit = todayKST; // 최초 접속일 저장
+  }
+  const firstVisitDate = new Date(usage.firstVisit);
+  const now = new Date(todayKST);
+  const diffDays = Math.floor((now - firstVisitDate) / (1000 * 60 * 60 * 24));
 
-    // 허용됨: 남은 횟수 표시 등 UI 업데이트 가능
-    // data.limit, data.remaining, data.today, data.total, data.phone_verified
-    console.log("[LIMIT OK]", data);
-    return true;
-  } catch (e) {
-    console.error("[CHECK LIMIT ERROR]", e);
-    alert("이용 제한 확인 중 오류가 발생했습니다.");
+  // 제한 체크
+  if (diffDays > 90) {
+    alert("비회원 이용 가능 기간(3개월)이 만료되었습니다.\n회원가입 후 계속 이용해주세요.");
     return false;
   }
+  if (usage[todayKST] > 3) {
+    alert("비회원은 하루 3회까지만 출력 가능합니다.");
+    return false;
+  }
+  if (monthCount > 20) {
+    alert("비회원은 한 달 총 20회까지만 출력 가능합니다.");
+    return false;
+  }
+
+  // 저장
+  localStorage.setItem("sajuUsage", JSON.stringify(usage));
+  return true;
 }
 
 
