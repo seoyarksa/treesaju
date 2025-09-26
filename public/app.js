@@ -112,7 +112,19 @@ import { renderSinsalTable,
 
 
 
-
+// =========================================
+// 출력 제한 로직 (비로그인 사용자 하루 3회 제한)
+// =========================================
+// ✅ 출력 제한 체크 함수
+// ✅ 출력 제한 체크 함수
+// === 출력 제한 ===
+/************************************
+ /************************************
+ * 1) 비로그인 출력 제한
+ ************************************/
+/************************************
+ * 1) 비로그인 출력 제한
+ ************************************/
 // ===== app.js (안전망 포함, 전체 교체용) =====
 // 파일 상단 어딘가
 // 부모 창 전역
@@ -127,8 +139,6 @@ window.addEventListener('message', async (e) => {
   e.source?.postMessage({ type: 'SUPABASE_SESSION', session: payload }, e.origin);
 });
 
-// app.js 최상단 어딘가
-const authFetch = window.authFetch || fetch;
 
 let __lastFormKey = null;
 
@@ -146,7 +156,6 @@ function makeFormKey(fd) {
   };
   return JSON.stringify(norm);
 }
-
 
 
 // 0) 안전 헬퍼
@@ -916,31 +925,6 @@ let lastOutputData = null;
 async function handleSajuSubmit(e) {
   e.preventDefault();
   console.log("[DEBUG] handleSajuSubmit 실행됨");
-
-  // ───────────────── RPC 호출 직전 점검 ─────────────────
-  const { data: { session } } = await window.supabaseClient.auth.getSession();
-  if (!session) {
-    alert("로그인이 필요합니다.");
-    return;
-  }
-  console.log("RPC with UID:", session.user.id);
-
-  const { data: ok, error } = await window.supabaseClient.rpc("can_render_and_count");
-  if (error) {
-    console.error("[RPC] 오류:", error);
-    alert("이용 제한 확인 중 오류가 발생했습니다.");
-    return;
-  }
-  if (!ok?.allowed) {
-    // 서버에서 사유를 넘겨줬다면 메시지 분기(선택)
-    if (ok?.reason === "DAILY_LIMIT_REACHED") {
-      alert("하루 사용 가능 횟수를 초과했습니다.");
-    } else {
-      alert("이용이 제한되었습니다.");
-    }
-    return;
-  }
-
 
   try {
     // 1) 입력 데이터 수집
@@ -3467,7 +3451,7 @@ requestAnimationFrame(() => {
 
   const todayStr = `${todayPayload.year}-${String(todayPayload.month).padStart(2, '0')}-${String(todayPayload.day).padStart(2, '0')}`;
 
-  const todayResponse = await authFetch('/api/saju', {
+  const todayResponse = await fetch('/api/saju', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(todayPayload),
