@@ -5,7 +5,7 @@ import solarlunar from 'solarlunar'; // 기존 라이브러리
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
 import timezone from 'dayjs/plugin/timezone.js';
-import noticeRouter from './api/notice.js';
+import noticeRouter from './routes/notice.js';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import cors from 'cors';
