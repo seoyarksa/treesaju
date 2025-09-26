@@ -45,6 +45,23 @@
   console.log("[INDEX] supabaseClient ready:", !!window.supabaseClient);
 </script>
 
+<!-- (이미 있는) supabaseClient 생성 스크립트 바로 다음 -->
+<script>
+  // 항상 최신 세션에서 직접 토큰을 꺼내 헤더에 붙여주는 fetch 래퍼
+  window.authFetch = async function (url, options = {}) {
+    const { data: { session } } = await window.supabaseClient.auth.getSession();
+    const token = session?.access_token || null;
+
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}), // 토큰이 있으면 붙임
+    };
+
+    return fetch(url, { ...options, headers });
+  };
+</script>
+
 
 <style>
   body {
@@ -619,14 +636,15 @@
     </label>
 
     <div style="min-width:140px;">
-      <div><strong>회원등급</strong> : <span id="my-grade">-</span></div>
-      <div><strong>1일 카운트</strong> : <span id="my-daily-count">-</span></div>
+
+
     </div>
   </div>
 
   <div style="margin-top:10px;">
+     <strong>회원등급</strong> : <span id="my-grade">-</span>
     <button id="my-profile-save"   type="button" style="background:#3b82f6; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer;">저장</button>
-    <button id="my-profile-cancel" type="button" style="margin-left:6px; border:1px solid #ddd; padding:6px 10px; border-radius:6px; cursor:pointer;">닫기</button>
+    <button id="my-profile-cancel" type="button" style="background:#3b82f6; color:#fff; margin-left:6px; border:1px solid #ddd; padding:6px 10px; border-radius:6px; cursor:pointer;">닫기</button>
   </div>
 </div>
 
@@ -879,7 +897,7 @@
 
   // 공지 목록 렌더 (최신 1개만)
   async function renderNotices() {
-    const res = await fetch('/api/notice');
+    const res = await authFetch('/api/notice');
     const data = await res.json();
 
     const list = document.getElementById('notice-list');
@@ -937,7 +955,7 @@
     }
 
     const token = getToken();
-    const resp = await fetch('/api/notice', {
+    const resp = await authFetch('/api/notice', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -958,7 +976,7 @@
   // 공지 수정: 제목+내용 모두 변경
   async function editNotice(id) {
     // 현재 데이터 조회
-    const cur = await fetch(`/api/notice/${id}`).then(r => r.json());
+    const cur = await authFetch(`/api/notice/${id}`).then(r => r.json());
     if (!cur || !cur.id) {
       alert('공지 정보를 불러오지 못했습니다.');
       return;
@@ -978,7 +996,7 @@
     }
 
     const token = getToken();
-    const resp = await fetch(`/api/notice/${id}`, {
+    const resp = await authFetch(`/api/notice/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -1001,7 +1019,7 @@
     if (!confirm('정말 삭제하시겠습니까?')) return;
 
     const token = getToken();
-    const resp = await fetch(`/api/notice/${id}`, {
+    const resp = await authFetch(`/api/notice/${id}`, {
       method: 'DELETE',
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {})
@@ -1173,7 +1191,157 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 </script>
 
+<script>
+// 전화번호 포맷(있으면 사용)
+function normPhone(v){
+  const raw=(v||'').trim();
+  if(!raw) return null;
+  try{return typeof normalizePhoneKR==='function'?normalizePhoneKR(raw,"intl"):raw;}catch{return raw;}
+}
 
+// 패널 토글
+function toggleProfilePanel(forceOpen) {
+  const panel = document.getElementById('profile-edit-panel');
+  if (!panel) { console.warn('[profile] panel not found'); return; }
+
+  // 열기/닫기 결정
+  const wantOpen = (forceOpen === undefined)
+    ? !panel.classList.contains('open')
+    : !!forceOpen;
+
+  // 클래스 + display 함께 처리
+  panel.classList.toggle('open', wantOpen);
+  panel.setAttribute('aria-hidden', wantOpen ? 'false' : 'true');
+  panel.style.display = wantOpen ? 'block' : 'none';
+
+  console.log('[profile] togglePanel ->', wantOpen);
+}
+
+
+// 입력칸 채우기
+// 입력칸 채우기
+// 입력칸 채우기 (카운트 관련 전부 제거)
+async function fillMyProfileForm() {
+  const { data: { user } } = await window.supabaseClient.auth.getUser();
+  if (!user) return;
+
+  // 프로필에서 기본 정보만 (nickname, phone, grade)
+  const { data: profile, error } = await window.supabaseClient
+    .from("profiles")
+    .select("nickname, phone, grade")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (error) console.warn('[profile] load error', error);
+
+  const email = user.email || "";
+
+  const nickEl  = document.getElementById("my-nickname");
+  const emailEl = document.getElementById("my-email");
+  const phoneEl = document.getElementById("my-phone");
+  const gradeEl = document.getElementById("my-grade");
+
+  if (nickEl)  {
+    nickEl.value = profile?.nickname ?? "";
+    if (!nickEl.value) nickEl.placeholder = "닉네임은 한 번 더 등록해주세요.";
+  }
+  if (emailEl) {
+    emailEl.value = email;
+    emailEl.readOnly = true;
+    emailEl.style.background = "#f3f3f3";
+  }
+  if (phoneEl) phoneEl.value = profile?.phone ?? "";
+  if (gradeEl) gradeEl.textContent = profile?.grade ?? "-";
+}
+
+
+
+
+// 저장
+async function saveMyProfile() {
+  const { data: { user } } = await window.supabaseClient.auth.getUser();
+  if (!user) { alert("로그인이 필요합니다."); return; }
+
+  // 입력값
+  const nickname = document.getElementById("my-nickname")?.value?.trim() || null;
+  const newEmail = document.getElementById("my-email")?.value?.trim() || null;
+  const phone    = (function normPhone(v) {
+    const raw = (v || '').trim();
+    if (!raw) return null;
+    try { return typeof normalizePhoneKR === 'function' ? normalizePhoneKR(raw, "intl") : raw; }
+    catch { return raw; }
+  })(document.getElementById("my-phone")?.value || "");
+
+  // 1) 프로필 업데이트 (닉네임/전화번호)
+  const { error: pErr } = await window.supabaseClient
+    .from("profiles")
+    .update({ nickname, phone })
+    .eq("user_id", user.id);
+  if (pErr) {
+    alert("프로필 저장 실패: " + (pErr.message || "오류"));
+    return;
+  }
+
+  // 2) 이메일 변경이 있으면 auth 계정 이메일 업데이트
+  //    (주의: 구글/카카오 등 소셜 로그인 계정은 이메일 변경이 제한될 수 있음)
+  if (newEmail && newEmail !== (user.email || "")) {
+    const { data, error: eErr } = await window.supabaseClient.auth.updateUser({ email: newEmail });
+    if (eErr) {
+      alert("이메일 변경 실패: " + (eErr.message || "오류"));
+      // 이메일만 실패했어도 닉네임/전화번호는 이미 저장됨
+    } else {
+      // 이메일 변경은 확인 메일이 갈 수 있음 (Supabase 프로젝트 설정에 따름)
+      console.log('[profile] email update result:', data);
+    }
+  }
+
+  alert("저장 완료");
+
+  // 상단 닉네임/버튼 등 갱신
+  const { data: sess } = await window.supabaseClient.auth.getSession();
+  if (sess?.session) { updateAuthUI(sess.session); }
+
+  toggleProfilePanel(false);
+}
+
+// 이벤트 바인딩(중복 방지)
+function wireProfileEditEvents() {
+  const editBtn   = document.getElementById("editProfileBtn");
+  const saveBtn   = document.getElementById("my-profile-save");
+  const cancelBtn = document.getElementById("my-profile-cancel");
+
+  if (editBtn && !editBtn.dataset.bound) {
+    editBtn.addEventListener("click", async () => {
+      console.log('[profile] edit clicked'); // ← 클릭 확인
+      const { data: { user } } = await window.supabaseClient.auth.getUser();
+      if (!user) { alert("로그인이 필요합니다."); return; }
+      await fillMyProfileForm();   // 폼 채우기
+      toggleProfilePanel(true);    // 열기
+    });
+    editBtn.dataset.bound = "1";
+  }
+
+  if (saveBtn && !saveBtn.dataset.bound) {
+    saveBtn.addEventListener("click", saveMyProfile);
+    saveBtn.dataset.bound = "1";
+  }
+
+  if (cancelBtn && !cancelBtn.dataset.bound) {
+    cancelBtn.addEventListener("click", () => {
+      console.log('[profile] cancel clicked');
+      toggleProfilePanel(false);
+    });
+    cancelBtn.dataset.bound = "1";
+  }
+}
+
+
+// 초기화 시 한 번 호출
+document.addEventListener("DOMContentLoaded", ()=>{ wireProfileEditEvents(); });
+
+// 로그인 성공 후 UI 갱신 시에도 다시 보강 호출
+// updateAuthUI(session) 내부의 로그인 분기 끝부분에 아래 한 줄을 추가해 두세요:
+//   wireProfileEditEvents();
+</script>
 
 
 
