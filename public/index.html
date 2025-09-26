@@ -637,7 +637,7 @@
 
     <div style="min-width:140px;">
       <div><strong>회원등급</strong> : <span id="my-grade">-</span></div>
-      <div><strong>1일 카운트</strong> : <span id="my-daily-count">-</span></div>
+
     </div>
   </div>
 
@@ -1219,47 +1219,39 @@ function toggleProfilePanel(forceOpen) {
 
 // 입력칸 채우기
 // 입력칸 채우기
+// 입력칸 채우기 (카운트 관련 전부 제거)
 async function fillMyProfileForm() {
   const { data: { user } } = await window.supabaseClient.auth.getUser();
   if (!user) return;
 
-  // 프로필에서만 읽음 (saju_counts로 절대 떨어지지 않음)
+  // 프로필에서 기본 정보만 (nickname, phone, grade)
   const { data: profile, error } = await window.supabaseClient
     .from("profiles")
-    .select("nickname, phone, grade, daily_limit, daily_usage_count")
+    .select("nickname, phone, grade")
     .eq("user_id", user.id)
     .maybeSingle();
   if (error) console.warn('[profile] load error', error);
 
-  // 이메일은 auth.user
   const email = user.email || "";
 
-  // DOM 반영
   const nickEl  = document.getElementById("my-nickname");
   const emailEl = document.getElementById("my-email");
   const phoneEl = document.getElementById("my-phone");
   const gradeEl = document.getElementById("my-grade");
-  const countEl = document.getElementById("my-daily-count");
 
-  if (nickEl)  nickEl.value  = profile?.nickname ?? "";
+  if (nickEl)  {
+    nickEl.value = profile?.nickname ?? "";
+    if (!nickEl.value) nickEl.placeholder = "닉네임은 한 번 더 등록해주세요.";
+  }
   if (emailEl) {
     emailEl.value = email;
-    emailEl.readOnly = true;             // 이메일은 확인만
+    emailEl.readOnly = true;
     emailEl.style.background = "#f3f3f3";
   }
   if (phoneEl) phoneEl.value = profile?.phone ?? "";
-
-  const used  = profile?.daily_usage_count ?? 0;
-  const limit = profile?.daily_limit ?? 0;
-
   if (gradeEl) gradeEl.textContent = profile?.grade ?? "-";
-  if (countEl) countEl.textContent = limit ? `${used}/${limit}` : `${used}/-`;
-
-  // 닉네임 placeholder 안내(값 없을 때만)
-  if (nickEl && !nickEl.value) {
-    nickEl.placeholder = "닉네임은 한 번 더 등록해주세요.";
-  }
 }
+
 
 
 

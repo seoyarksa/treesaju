@@ -127,6 +127,8 @@ window.addEventListener('message', async (e) => {
   e.source?.postMessage({ type: 'SUPABASE_SESSION', session: payload }, e.origin);
 });
 
+// app.js 최상단 어딘가
+const authFetch = window.authFetch || fetch;
 
 let __lastFormKey = null;
 
