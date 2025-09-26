@@ -1,4 +1,5 @@
 // server.js 
+import dotenv from 'dotenv';
 import express from 'express';
 import solarlunar from 'solarlunar'; // 기존 라이브러리
 import dayjs from 'dayjs';
@@ -9,7 +10,7 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import cors from 'cors';
 import bodyParser from 'body-parser';
-import dotenv from 'dotenv';
+
 dotenv.config();
 
 // ✅ Supabase 서버측 토큰 검증용
