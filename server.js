@@ -34,8 +34,7 @@ dayjs.extend(timezone);
 const app = express();
 app.use(express.json());
 
-// 공지 게시판 API 연결 (원본 유지)
-app.use('/api/notice', noticeRouter);
+
 
 // ✅ 현재 로그인 사용자 정보 API (Supabase 토큰 기반)
 app.get('/api/me', async (req, res) => {
