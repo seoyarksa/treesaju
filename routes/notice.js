@@ -1,4 +1,4 @@
-// api/notice.js  (Express Router 버전)
+// routes/notice.js  (Express Router)
 import 'dotenv/config';
 import express from 'express';
 import pool from '../db.js';
@@ -11,7 +11,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE
 );
 
-// 관리자 확인 미들웨어
+// ✅ 관리자 미들웨어 (이름: checkAdmin)
 async function checkAdmin(req, res, next) {
   try {
     const auth = req.headers.authorization || '';
@@ -32,15 +32,14 @@ async function checkAdmin(req, res, next) {
       return res.status(403).json({ error: '관리자 권한 필요' });
     }
 
-    req.user = user;
     next();
   } catch (e) {
     res.status(500).json({ error: 'Auth check failed' });
   }
 }
 
-// 공지 목록 (최신 20개)
-router.get('/', async (req, res) => {
+// ✅ 공지 목록
+router.get('/', async (_req, res) => {
   try {
     const result = await pool.query(
       'SELECT id, title, created_at, views FROM notice_board ORDER BY created_at DESC LIMIT 20'
@@ -51,18 +50,16 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 공지 상세 (조회수 증가는 실패해도 무시)
+// ✅ 공지 상세 (SELECT 먼저, views UPDATE는 실패해도 무시)
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    // 1) 먼저 읽기 (회원만 허용하는 RLS일 수 있으므로 SELECT만 우선)
     const result = await pool.query('SELECT * FROM notice_board WHERE id = $1', [id]);
     const row = result.rows[0] || null;
 
-    // 2) 조회수 증가 (RLS에 막히면 조용히 무시)
     try {
       await pool.query('UPDATE notice_board SET views = views + 1 WHERE id = $1', [id]);
-    } catch (_) {}
+    } catch (_) {} // RLS로 막혀도 상세는 보여줘야 하므로 무시
 
     res.json(row);
   } catch (err) {
@@ -70,7 +67,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// 공지 작성 (관리자)
+// ✅ 공지 작성 (관리자)
 router.post('/', checkAdmin, async (req, res) => {
   const { title, content } = req.body || {};
   try {
@@ -84,7 +81,7 @@ router.post('/', checkAdmin, async (req, res) => {
   }
 });
 
-// 공지 수정 (관리자)
+// ✅ 공지 수정 (관리자)
 router.put('/:id', checkAdmin, async (req, res) => {
   const { id } = req.params;
   const { title, content } = req.body || {};
@@ -99,7 +96,7 @@ router.put('/:id', checkAdmin, async (req, res) => {
   }
 });
 
-// 공지 삭제 (관리자)
+// ✅ 공지 삭제 (관리자)
 router.delete('/:id', checkAdmin, async (req, res) => {
   const { id } = req.params;
   try {
