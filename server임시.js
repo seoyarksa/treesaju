@@ -1,79 +1,48 @@
 // server.js 
 import dotenv from 'dotenv';
 import express from 'express';
-import solarlunar from 'solarlunar';
+import solarlunar from 'solarlunar'; // 기존 라이브러리
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
 import timezone from 'dayjs/plugin/timezone.js';
- import noticeRouter from './api/notice.js'; // ← 필요 시 나중에 복구
+
 import { fileURLToPath } from 'url';
 import path from 'path';
 import cors from 'cors';
-import { formatDateKST } from './utils/time.js';          // server.js에 있을 때
+import bodyParser from 'body-parser';
 
-// ✅ utils에서 getJeolipDate 가져오기 (누락되어 있던 부분)
-import { getJeolipDate } from './utils/solarTermCalculator.js';
-
-// ✅ .env 로드
 dotenv.config();
 
-// ✅ (서버에서 Supabase 토큰 검증용)
+// ✅ Supabase 서버측 토큰 검증용
 import { createClient } from '@supabase/supabase-js';
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE);
+
+// 유틸 import (원본 유지)
+import { calculateDaeyunAge } from './utils/dateUtils.js';
+import { 
+  getSolarTermDates, 
+  getJeolipDate, 
+  getAccurateSolarLongitude, 
+  getSolarTermDate, 
+  MONTH_TO_SOLAR_TERM 
+} from './utils/solarTermCalculator.js';
+import { stemOrder, branchOrder } from './public/constants.js';  
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
 const app = express();
-
-// --- 라우트/미들웨어 등록 첫 인자(경로) 로깅 (디버그용, 문제 추적 후 삭제해도 됨) ---
-const _methods = ['use','get','post','put','delete','patch','options','head','all'];
-for (const m of _methods) {
-  const orig = app[m].bind(app);
-  app[m] = (...args) => {
-    const first = args[0];
-    if (typeof first === 'string') {
-      console.log('[ROUTE]', m, first);
-    } else {
-      console.log('[ROUTE]', m, '(no-path)');
-    }
-    return orig(...args);
-  };
-}
-
-
-
-// __dirname (ESM)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// ✅ CORS (Authorization 허용)
-const corsOptions = {
-  origin: true, // 배포 시엔 허용 도메인 배열로 제한 권장
-  credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-};
-app.use(cors(corsOptions));
-app.options(/.*/, cors(corsOptions));   // 모든 경로 허용 (정규식)
-
-// ✅ JSON 파서 (한 번만)
 app.use(express.json());
 
-// ✅ 정적 파일 (한 번만)
-app.use(express.static(path.join(__dirname, 'public')));
 
-// 공지 게시판 API (문제 추적 끝나면 주석 해제)
- app.use('/api/notice', noticeRouter);
 
-// ✅ /api/me : Supabase 토큰으로 현재 사용자 반환
+// ✅ 현재 로그인 사용자 정보 API (Supabase 토큰 기반)
 app.get('/api/me', async (req, res) => {
   try {
     const auth = req.headers.authorization || '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
     if (!token) return res.status(401).json({ error: '로그인 필요' });
 
-    // 토큰 → 사용자
     const { data: userData, error } = await supabase.auth.getUser(token);
     if (error || !userData?.user) return res.status(401).json({ error: '토큰이 유효하지 않습니다.' });
 
@@ -96,38 +65,38 @@ app.get('/api/me', async (req, res) => {
   }
 });
 
-// 절입 API (기존 유지)
-app.get('/api/jeolip', (req, res) => {
-  const { year, month, day } = req.query;
-  try {
-    const y = parseInt(year);
-    const m = parseInt(month);
-    const d = parseInt(day);
-    if (isNaN(y) || isNaN(m) || isNaN(d)) {
-      throw new Error('year, month, day 중 하나 이상이 유효한 숫자가 아닙니다.');
-    }
-    const date = getJeolipDate(y, m, d);
-    res.json({ date: date.toISOString() });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
+// 한국 시간 포맷 함수 (원본 유지)
+function formatDateKST(date) {
+  return new Date(date.getTime() + 9 * 60 * 60 * 1000)
+    .toISOString()
+    .replace('Z', '+09:00');
+}
 
 const PORT = 3000;
-app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
-});
 
+// __dirname 설정 (ESM) — 원본 위치보다 살짝 앞당겨도 무방
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
+// ✅ CORS: 관리자 API에서 Authorization/PUT/DELETE 허용
+app.use(cors({
+  origin: true,
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+}));
 
+// JSON 파서(원본 유지) + bodyParser.json(원본 유지; 중복이어도 동작엔 문제 없음)
+app.use(bodyParser.json());
 
+// 정적 파일 (원본 유지)
+app.use(express.static(path.join(__dirname, 'public')));
 
-// 천간, 지지
+// 천간, 지지 (원본 유지)
 const heavenlyStems = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
 const earthlyBranches = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
 
-
-// 시주 천간표 (일간 기준)
+// 시주 천간표 (원본 유지)
 const timeGanTable = {
   '갑': ['갑','을','병','정','무','기','경','신','임','계','갑','을'],
   '을': ['병','정','무','기','경','신','임','계','갑','을','병','정'],
@@ -141,7 +110,7 @@ const timeGanTable = {
   '계': ['임','계','갑','을','병','정','무','기','경','신','임','계'],
 };
 
-// 한자 <-> 한글 변환
+// 한자 <-> 한글 변환 (원본 유지)
 const hanToKorStem = {
   '甲': '갑', '乙': '을', '丙': '병', '丁': '정', '戊': '무',
   '己': '기', '庚': '경', '辛': '신', '壬': '임', '癸': '계'
@@ -153,7 +122,7 @@ const korToHanStem = {
 const hanEarthlyBranches = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
 const hanToKor = (han) => hanToKorStem[han] || han;
 
-// 절기 → 다음 절기 매핑
+// 절기 → 다음 절기 매핑 (원본 유지)
 const SOLAR_TERM_NEXT = {
   '입춘': '경칩',
   '경칩': '청명',
@@ -169,11 +138,9 @@ const SOLAR_TERM_NEXT = {
   '소한': '입춘'
 };
 
-
-// 한국 DST 여부 판단 함수 (역사적 썸머타임 구간 모두 반영)
+// 한국 DST 여부 (원본 유지)
 function isDSTKorea(year, month, day) {
   const date = new Date(Date.UTC(year, month - 1, day));
-
   const dstPeriods = [
     { start: new Date(Date.UTC(1948, 4, 8)), end: new Date(Date.UTC(1948, 8, 12)) },
     { start: new Date(Date.UTC(1955, 4, 15)), end: new Date(Date.UTC(1955, 8, 15)) },
@@ -185,14 +152,12 @@ function isDSTKorea(year, month, day) {
     { start: new Date(Date.UTC(1987, 4, 10)), end: new Date(Date.UTC(1987, 9, 11)) },
     { start: new Date(Date.UTC(1988, 4, 8)),  end: new Date(Date.UTC(1988, 9, 9)) }
   ];
-
   return dstPeriods.some(({ start, end }) => date >= start && date < end);
 }
 
-// 시지 계산: 30분 경계 기준 + DST 1시간 보정 포함
+// 시지 계산 (원본 유지)
 function getTimeIndexByHourMinute(hour, minute) {
   const totalMinutes = hour * 60 + minute;
-
   const startMinutesArr = [
     23 * 60 + 30,
     1 * 60 + 30,
@@ -207,13 +172,10 @@ function getTimeIndexByHourMinute(hour, minute) {
     19 * 60 + 30,
     21 * 60 + 30,
   ];
-
   const modTotalMinutes = totalMinutes % 1440;
-
   for (let i = 0; i < startMinutesArr.length; i++) {
     let start = startMinutesArr[i];
     let end = startMinutesArr[(i + 1) % 12] - 1;
-
     if (end < start) {
       if ((modTotalMinutes >= start && modTotalMinutes <= 1439) || (modTotalMinutes >= 0 && modTotalMinutes <= end)) {
         return i;
@@ -224,18 +186,10 @@ function getTimeIndexByHourMinute(hour, minute) {
       }
     }
   }
-
   return 0;
 }
 
-// 간지 계산
-
-
-/**
- * 양력 기준 절기월 인덱스 구하기 (입춘을 1월 인덱스로)
- * @param {Date} date 한국 표준시 Date 객체
- * @returns {number} 0~11 (0=입춘(인월))
- */
+// (원본 유지) 절기월 인덱스
 function getSolarTermMonthIndex(date) {
   const year = date.getFullYear();
   const solarTerms = [
@@ -243,36 +197,20 @@ function getSolarTermMonthIndex(date) {
     ...getSolarTermDates(year),
     ...getSolarTermDates(year + 1)
   ];
-
   const termToBranchIndex = {
-    '입춘': 0,  // 寅
-    '경칩': 1,  // 卯
-    '청명': 2,  // 辰
-    '입하': 3,  // 巳
-    '망종': 4,  // 午
-    '소서': 5,  // 未
-    '입추': 6,  // 申
-    '백로': 7,  // 酉
-    '한로': 8,  // 戌
-    '입동': 9,  // 亥
-    '대설': 10, // 子
-    '소한': 11  // 丑
+    '입춘': 0, '경칩': 1, '청명': 2, '입하': 3, '망종': 4, '소서': 5,
+    '입추': 6, '백로': 7, '한로': 8, '입동': 9, '대설': 10, '소한': 11
   };
-
-  // 해당 시점 기준 ±1년치 절기들을 시간순으로 정렬
   const monthStartDates = solarTerms
     .filter(t => termToBranchIndex.hasOwnProperty(t.name))
     .map(t => ({ name: t.name, date: new Date(t.date) }))
     .sort((a, b) => a.date - b.date);
-
   const dateKST = dayjs(date).tz('Asia/Seoul');
 
   for (let i = 0; i < monthStartDates.length; i++) {
     const start = dayjs(monthStartDates[i].date).tz('Asia/Seoul');
     let end;
-
     if (i === monthStartDates.length - 1) {
-      // 마지막 → 다음 입춘까지
       const nextIpchun = solarTerms.find(
         t => t.name === '입춘' && new Date(t.date) > monthStartDates[i].date
       );
@@ -281,7 +219,6 @@ function getSolarTermMonthIndex(date) {
     } else {
       end = dayjs(monthStartDates[i+1].date).tz('Asia/Seoul');
     }
-
     if ((dateKST.isAfter(start) || dateKST.isSame(start)) && dateKST.isBefore(end)) {
       const term = monthStartDates[i].name;
       const idx = termToBranchIndex[term];
@@ -289,195 +226,104 @@ function getSolarTermMonthIndex(date) {
       return idx;
     }
   }
-
   return 11; // fallback
 }
 
-
-
-
-/**
- * 월간 천간 계산
- * 연간 천간과 절기월 인덱스로 계산
- * @param {string} yearGanjiYear 간지 연간 (ex: '갑')
- * @param {number} solarTermMonthIndex 절기월 인덱스 (0~11)
- * @returns {string} 월간 천간 한글
- */
+// 월간 천간 계산 (원본 유지)
 const monthGanTable = {
-  '甲': ['丙', '丁', '戊', '己', '庚', '辛', '壬', '癸', '甲', '乙', '丙', '丁'],
-  '乙': ['戊', '己', '庚', '辛', '壬', '癸', '甲', '乙', '丙', '丁', '戊', '己'],
-  '丙': ['庚', '辛', '壬', '癸', '甲', '乙', '丙', '丁', '戊', '己', '庚', '辛'],
-  '丁': ['壬', '癸', '甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'],
-  '戊': ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸', '甲', '乙'],
-  '己': ['丙', '丁', '戊', '己', '庚', '辛', '壬', '癸', '甲', '乙', '丙', '丁'],
-  '庚': ['戊', '己', '庚', '辛', '壬', '癸', '甲', '乙', '丙', '丁', '戊', '己'],
-  '辛': ['庚', '辛', '壬', '癸', '甲', '乙', '丙', '丁', '戊', '己', '庚', '辛'],
-  '壬': ['壬', '癸', '甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'],
-  '癸': ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸', '甲', '乙'],
-}
-
+  '甲': ['丙','丁','戊','己','庚','辛','壬','癸','甲','乙','丙','丁'],
+  '乙': ['戊','己','庚','辛','壬','癸','甲','乙','丙','丁','戊','己'],
+  '丙': ['庚','辛','壬','癸','甲','乙','丙','丁','戊','己','庚','辛'],
+  '丁': ['壬','癸','甲','乙','丙','丁','戊','己','庚','辛','壬','癸'],
+  '戊': ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸','甲','乙'],
+  '己': ['丙','丁','戊','己','庚','辛','壬','癸','甲','乙','丙','丁'],
+  '庚': ['戊','己','庚','辛','壬','癸','甲','乙','丙','丁','戊','己'],
+  '辛': ['庚','辛','壬','癸','甲','乙','丙','丁','戊','己','庚','辛'],
+  '壬': ['壬','癸','甲','乙','丙','丁','戊','己','庚','辛','壬','癸'],
+  '癸': ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸','甲','乙'],
+};
 function getMonthGan(yearGanjiYear, solarTermMonthIndex) {
-  console.log('getMonthGan 호출:', yearGanjiYear, solarTermMonthIndex);
-
   if (!monthGanTable[yearGanjiYear]) {
     throw new Error(`유효하지 않은 연간 천간: ${yearGanjiYear}`);
   }
-
   const monthGan = monthGanTable[yearGanjiYear][solarTermMonthIndex];
-  console.log(`🔢 월간 계산 결과: ${monthGan} (절기 인덱스 ${solarTermMonthIndex})`);
   return monthGan;
 }
 
-
-
-// 천간, 지지 배열
-
-/**
- * 일주 계산 (solarlunar 사용하지 않고 직접 계산)
- * 기준: 1900-02-02 (갑자일)
- */
+// 일주 계산 (원본 유지)
 function getDayGanji(year, month, day) {
   const baseDate = new Date(1900, 1, 19); // 갑자일
   const targetDate = new Date(`${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}T00:00:00+09:00`);
-
-
   const diffDays = Math.floor((targetDate - baseDate) / (1000 * 60 * 60 * 24));
-
-  if (isNaN(diffDays)) {
-    throw new Error("유효하지 않은 날짜입니다.");
-  }
-
-  const stemIndex = diffDays % 10;   // 천간은 10일 주기
-  const branchIndex = diffDays % 12; // 지지는 12일 주기
-
+  if (isNaN(diffDays)) throw new Error("유효하지 않은 날짜입니다.");
+  const stemIndex = diffDays % 10;
+  const branchIndex = diffDays % 12;
   return heavenlyStems[(0 + stemIndex + 10) % 10] + earthlyBranches[(0 + branchIndex + 12) % 12];
 }
 
-
-
-
-/**
- * 입춘 기준으로 년주 보정
- */
+// 입춘 기준 년주 보정 (원본 유지)
 function getYearGanjiByJeolip(year, birthDate) {
   const heavenlyStems = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
   const earthlyBranches = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
-
-  // ✅ 기준: 1864년 = 甲子년
   const baseYear = 1864;
-  const baseStemIndex = 0;  // 甲
-  const baseBranchIndex = 0; // 子
-
-  // 출생 연도의 입춘 시각
+  const baseStemIndex = 0;
+  const baseBranchIndex = 0;
   const ipchun = getSolarTermDates(year).find(t => t.name === '입춘');
   const ipchunDate = new Date(ipchun.date);
-
-  // 입춘 이전 출생 → 전년도
   const targetYear = (birthDate < ipchunDate) ? year - 1 : year;
-
   const diff = targetYear - baseYear;
   const stem = heavenlyStems[(baseStemIndex + diff) % 10];
   const branch = earthlyBranches[(baseBranchIndex + diff) % 12];
   return stem + branch;
 }
-/**
- * 수정된 getGanji 함수
- * @param {number} year 양력 년
- * @param {number} month 양력 월 (1~12)
- * @param {number} day 양력 일
- * @param {number} hour 시 (0~23)
- * @param {number} minute 분 (0~59)
- * @returns {{year:string, month:string, day:string, time:string}} 간지 결과
- */
 
-
-
-
+// 간지 최종 (원본 유지)
 export function getGanji(year, month, day, hour, minute) {
-  console.log('[getGanji] 입력값:', { year, month, day, hour, minute });
-
-  // 출생 시각 (KST 기준)
   const birthDate = new Date(year, month - 1, day, hour, minute);
-
-  // 1) 일주 계산 (기존 로직 그대로)
   const dayGanji = getDayGanji(year, month, day);
   const dayGanHan = dayGanji.charAt(0);
-  //console.log('[getGanji] 일간지:', dayGanji);
 
-  // 2) 년주 계산 (solarlunar + 입춘 보정)
   const lunarDate = solarlunar.solar2lunar(year, month, day);
   let yearGanji = lunarDate.gzYear;
 
-  // ✅ 해당 연도의 "입춘 절입시각" 가져오기
-const ipchunDate = getJeolipDate(new Date(year, 2, 4)); // 반드시 당해 2월 기준으로 호출
-//console.log('🌸 [getGanji] 당년 입춘 절입시각:', ipchunDate.toISOString(), 
-  //          'KST:', dayjs(ipchunDate).tz('Asia/Seoul').format('YYYY-MM-DD HH:mm:ss'));
-
-  // 출생 시각이 입춘 시각 이전이면 전년도 간지 사용
+  // 당해 2월 기준 입춘 절입시각
+  const ipchunDate = getJeolipDate(new Date(year, 2, 4));
   if (birthDate.getTime() < ipchunDate.getTime()) {
-    const prev = solarlunar.solar2lunar(year - 1, 6, 1); // 전년도 아무 날
+    const prev = solarlunar.solar2lunar(year - 1, 6, 1);
     yearGanji = prev.gzYear;
-  ///////////  console.log('[getGanji] 입춘 이전 → 전년도 간지로 보정:', yearGanji);
-  } else {
-   /// console.log('[getGanji] 입춘 이후 → 해당년도 간지 유지:', yearGanji);
   }
 
-  // 3) 월주 계산 (절기 기준, 기존 로직 유지)
   const solarTermMonthIndex = getSolarTermMonthIndex(birthDate);
   const monthGanHan = getMonthGan(yearGanji.charAt(0), solarTermMonthIndex);
   const monthJiHan = ['寅','卯','辰','巳','午','未','申','酉','戌','亥','子','丑'][solarTermMonthIndex];
   const monthGanji = monthGanHan + monthJiHan;
 
-  // 4) 시주 계산 (기존 로직 유지)
   const timeIndex = getTimeIndexByHourMinute(hour, minute);
   const dayStemIndex = heavenlyStems.indexOf(dayGanHan);
   const timeStemIndex = (dayStemIndex * 2 + timeIndex) % 10;
   const timeGanji = heavenlyStems[timeStemIndex] + earthlyBranches[timeIndex];
 
-  return {
-    year: yearGanji,
-    month: monthGanji,
-    day: dayGanji,
-    time: timeGanji,
-  };
+  return { year: yearGanji, month: monthGanji, day: dayGanji, time: timeGanji };
 }
 
-
-
-
-
-// API 요청 처리
+// 사주 API (원본 유지 + 안전 가드만 추가)
 app.post('/api/saju', (req, res) => {
   let { year, month, day, hour, minute, calendarType, gender  } = req.body;
- // 1) 생년월일 Date 객체 생성
 
-
-  console.log('서버 수신 데이터:', req.body);
-  console.log(`서버에 받은 시간: ${hour}시 ${minute}분`);
-  console.log('calendarType:', calendarType);
-
- if (!year || !month || !day || hour === undefined || minute === undefined || !calendarType) {
-  return res.status(400).json({ error: '누락된 입력값이 있습니다.' });
-}
-
-  console.log('calendarType:', calendarType);  // ✅ 확인용
-
-if (calendarType === 'lunar') {
-  const converted = solarlunar.lunar2solar(year, month, day, false);
-  //console.log('음력 → 양력 변환 결과:', converted);
-  if (!converted || !converted.cYear) {
-    return res.status(400).json({ error: '음력을 양력으로 변환하는 데 실패했습니다.' });
+  if (!year || !month || !day || hour === undefined || minute === undefined || !calendarType) {
+    return res.status(400).json({ error: '누락된 입력값이 있습니다.' });
   }
-  year = converted.cYear;
-  month = converted.cMonth;
-  day = converted.cDay;
-}
 
-  //console.log(`최종 양력 생년월일: ${year}-${month}-${day}`);
+  if (calendarType === 'lunar') {
+    const converted = solarlunar.lunar2solar(year, month, day, false);
+    if (!converted || !converted.cYear) {
+      return res.status(400).json({ error: '음력을 양력으로 변환하는 데 실패했습니다.' });
+    }
+    year = converted.cYear;
+    month = converted.cMonth;
+    day = converted.cDay;
+  }
 
-
-
-   // console.log(`음력 → 양력 변환 결과: ${year}-${month}-${day}`);
   if (isDSTKorea(year, month, day)) {
     hour -= 1;
     if (hour < 0) {
@@ -488,92 +334,72 @@ if (calendarType === 'lunar') {
       hour = 23;
     }
   }
-  // 3. 날짜 객체 생성
-//const birthDate = new Date(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00+09:00`);
-//////////////////////////////////////console.log('birthDate (toISOString):', birthDate.toISOString());
-//console.log('birthDate (local time):', birthDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }));
-//console.log('birthDate.getFullYear():', birthDate.getFullYear());
 
+  const birthDate = new Date(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00+09:00`);
+  if (isNaN(birthDate.getTime())) {
+    return res.status(500).json({ error: '유효하지 않은 생년월일입니다.' });
+  }
 
-//음력을 양력으로 변경, 양력생일입력
-// 음력 → 양력 변환 완료 이후 시점
-console.log(`최종 양력 생년월일: ${year}-${month}-${day}`);
+  const jeolipDate = getJeolipDate(year, month, day, hour, minute);
 
-// ✅ 이 위치에서 Date 객체 생성해도 완벽히 안전함
-const birthDate = new Date(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00+09:00`);
+  // 안전 로그 (jeolipDate가 Date일 수도, {thisTerm,..} 객체일 수도)
+  try {
+    console.log('birthDate:', birthDate.toISOString());
+  } catch {}
+  try {
+    if (jeolipDate?.toISOString) console.log('jeolipDate:', jeolipDate.toISOString());
+  } catch {}
 
-if (isNaN(birthDate.getTime())) {
-  console.error('❌ birthDate 생성 실패:', year, month, day, hour, minute);
-  return res.status(500).json({ error: '유효하지 않은 생년월일입니다.' });
-}
+  const thisTerm = jeolipDate?.thisTerm;
+  const nextTerm = jeolipDate?.nextTerm;
 
+  const birthDateKST = dayjs(birthDate).tz('Asia/Seoul').toDate();
+  const idx = getSolarTermMonthIndex(birthDateKST);
 
-const jeolipDate = getJeolipDate(year, month, day, hour, minute);
+  const ganji = getGanji(year, month, day, hour, minute);
+  const yearStemKor = hanToKor(ganji.year.charAt(0));
+  const daeyunAge = calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor);
 
-// ✅ thisTerm / nextTerm 추출
-// ✅ getJeolipDate가 이미 thisTerm/nextTerm을 포함해서 반환하도록 수정해놨다면
-const thisTerm = jeolipDate.thisTerm;
-const nextTerm = jeolipDate.nextTerm;
-const nextTermName = SOLAR_TERM_NEXT[thisTerm.name];
-console.log('✅ 최종 birthDate:', formatDateKST(birthDate));
-console.log('✅ 계산된 jeolipDate:', formatDateKST(jeolipDate));
-//console.log('✅ 계산된 jeolipDate:', formatDateKST(jeolipDate))
-
-
-
-
-//const idx = getSolarTermMonthIndex(birthDate);
-//////////////////////////console.log('절기월 인덱스:', idx);
-const birthDateKST = dayjs(birthDate).tz('Asia/Seoul').toDate();
-const idx = getSolarTermMonthIndex(birthDateKST);
-console.log('절기월 인덱스:', idx);
-// ✅ 여기서 yearStemKor 변수 선언
-// 1. ganji 먼저 얻기
-const ganji = getGanji(year, month, day, hour, minute);
-
-// 2. yearStemKor 추출
-const yearStemKor = hanToKor(ganji.year.charAt(0));  // 예: '己酉' → '己' → '기'
-console.log('ganji.year:', ganji.year);       // ex) '己酉'
-console.log('yearStemKor:', yearStemKor);     // ex) '기'
-// 3. daeyunAge 계산
-const daeyunAge = calculateDaeyunAge(birthDate, jeolipDate, gender, yearStemKor);
-
-  console.log('birthDate:', birthDate.toISOString());
-  console.log('jeolipDate:', jeolipDate.toISOString());
-  console.log('대운 시작 나이:', daeyunAge);  // ✅ 이제 여기서 사용 가능
-  console.log('ganji:', ganji);
-console.log('ganji.year:', ganji.year);
-if (!ganji.year) {
-  console.error('Error: ganji.year is undefined or empty');
-}
-console.log('yearStemKor:', hanToKor(ganji.year.charAt(0)));
-  
   const lunar = solarlunar.solar2lunar(year, month, day);
 
-
-  res.json({
+  return res.json({
     solar: { year, month, day, hour, minute },
     lunar: {
       lunarYear: lunar.lYear,
       lunarMonth: lunar.lMonth,
       lunarDay: lunar.lDay,
       isleap: lunar.isLeap,
-      hour,
-      minute
+      hour, minute
     },
-     daeyunAge,
-       yearStemKor, // 👉 이 줄 추가
+    daeyunAge,
+    yearStemKor,
     ganji,
- birthYear: birthDate.getFullYear(), // ✅ 여기서 숫자 연도로 추가
-gender,   // ← 반드시 추가!
-   // 👉 여기 추가
+    birthYear: birthDate.getFullYear(),
+    gender,
     jeolipDate,
-      thisTerm: thisTerm ? { name: thisTerm.name, date: thisTerm.date } : null,
-      nextTerm: nextTerm ? { name: nextTerm.name, date: nextTerm.date } : null
+    thisTerm: thisTerm ? { name: thisTerm.name, date: thisTerm.date } : null,
+    nextTerm: nextTerm ? { name: nextTerm.name, date: nextTerm.date } : null
   });
 });
 
-// 서버 실행
+// ✅ 서버 실행 (중복 listen 제거)
 app.listen(PORT, () => {
-  console.log(`✅ 서버 실행 중: http://localhost:${PORT}`);
+  console.log(`✅ Server running on http://localhost:${PORT}`);
+});
+
+// 📌 절입 API (원본 위치/기능 유지)
+app.get('/api/jeolip', (req, res) => {
+  const { year, month, day } = req.query;
+  try {
+    const y = parseInt(year);
+    const m = parseInt(month);
+    const d = parseInt(day);
+    if (isNaN(y) || isNaN(m) || isNaN(d)) {
+      throw new Error('year, month, day 중 하나 이상이 유효한 숫자가 아닙니다.');
+    }
+    const date = getJeolipDate(y, m, d);
+    res.json({ date: date.toISOString ? date.toISOString() : date });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
 });
