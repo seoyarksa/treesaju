@@ -757,47 +757,55 @@ function openPhoneOtpModal() {
   };
 
   // 코드 받기
-  document.getElementById("otp-send").onclick = async () => {
-    const raw = document.getElementById("otp-phone").value.trim();
-    if (!raw) return alert("전화번호를 입력하세요.");
-    const phone = normalizePhoneKR(raw, "intl"); // ✅ 국제번호(+82) 변환
-    try {
-      const { error } = await window.supabaseClient.auth.signInWithOtp({ phone });
-      if (error) throw error;
-      alert("인증 코드가 발송되었습니다.");
-    } catch (err) {
-      console.error("[OTP send] error:", err);
-      alert(err.message || "인증 코드를 보낼 수 없습니다.");
-    }
-  };
+// 코드 받기
+document.getElementById("otp-send").onclick = async () => {
+  const raw = document.getElementById("otp-phone").value.trim();
+  if (!raw) return alert("전화번호를 입력하세요.");
+  const phone = normalizePhoneKR(raw, "intl");
+  try {
+    const resp = await fetch("/api/send-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone })
+    });
+    const data = await resp.json();
+    if (!data.ok) throw new Error(data.error || "전송 실패");
+    alert("인증 코드가 발급되었습니다. (console.log 확인)");
+  } catch (err) {
+    console.error("[OTP send] error:", err);
+    alert(err.message);
+  }
+};
+
 
   // 인증하기
-  document.getElementById("otp-verify").onclick = async () => {
-    const raw = document.getElementById("otp-phone").value.trim();
-    const token = document.getElementById("otp-code").value.trim();
-    if (!raw || !token) return alert("전화번호와 인증 코드를 입력하세요.");
-    const phone = normalizePhoneKR(raw, "intl"); // ✅ 국제번호(+82) 변환
-    try {
-      const { data, error } = await window.supabaseClient.auth.verifyOtp({
-        phone,
-        token,
-        type: "sms",
-      });
-      if (error) throw error;
+// 인증하기
+document.getElementById("otp-verify").onclick = async () => {
+  const raw = document.getElementById("otp-phone").value.trim();
+  const token = document.getElementById("otp-code").value.trim();
+  if (!raw || !token) return alert("전화번호와 인증 코드를 입력하세요.");
+  const phone = normalizePhoneKR(raw, "intl");
 
-      alert("전화번호 인증이 완료되었습니다!");
-      modal.style.display = "none";
+  const { data: { session } } = await window.supabaseClient.auth.getSession();
+  if (!session) return alert("로그인이 필요합니다.");
 
-      // ✅ 인증 후 UI 갱신
-      const { data: { session } } = await window.supabaseClient.auth.getSession();
-      updateAuthUI(session);
-      
-    } catch (err) {
-      console.error("[OTP verify] error:", err);
-      alert(err.message || "인증에 실패했습니다.");
-    }
-  };
-}
+  try {
+    const resp = await fetch("/api/verify-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, code: token, userId: session.user.id })
+    });
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error || "인증 실패");
+
+    alert("전화번호 인증이 완료되었습니다!");
+    document.getElementById("phone-otp-modal").style.display = "none";
+    updateAuthUI(session);
+  } catch (err) {
+    console.error("[OTP verify] error:", err);
+    alert(err.message);
+  }
+};
 
 
 // ─── 로그인된 유저가 전화 인증 필요하면 모달을 띄우는 검사 ───
