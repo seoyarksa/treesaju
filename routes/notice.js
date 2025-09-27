@@ -12,31 +12,96 @@ const supabase = createClient(
 );
 
 // ✅ 관리자 미들웨어 (이름: checkAdmin)
-async function checkAdmin(req, res, next) {
+async function checkAdmin(req) {
+  const auth = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (!token) return { ok: false, code: 401, error: 'Unauthorized' };
+
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) return { ok: false, code: 401, error: 'Invalid token' };
+
+  const { data: profile, error: pErr } = await supabase
+    .from('profiles')
+    .select('grade')
+    .eq('user_id', user.id)
+    .single();
+
+  if (pErr) return { ok: false, code: 500, error: 'Profile lookup failed' };
+  if (!profile || String(profile.grade).toLowerCase() !== 'admin') {
+    return { ok: false, code: 403, error: '관리자 권한 필요' };
+  }
+  return { ok: true };
+}
+
+function getIdFromReq(req) {
+  // /api/notice?id=123 or /api/notice/123 둘 다 지원
+  const qid = req.query?.id;
+  if (qid) return qid;
+  const parts = (req.url || '').split('?')[0].split('/').filter(Boolean);
+  const last = parts[parts.length - 1];
+  if (last && last !== 'notice') return last;
+  return null;
+}
+
+export default async function handler(req, res) {
   try {
-    const auth = req.headers.authorization || '';
-    const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
-    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+    const { method } = req;
 
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    if (error || !user) return res.status(401).json({ error: 'Invalid token' });
-
-    const { data: profile, error: pErr } = await supabase
-      .from('profiles')
-      .select('grade')
-      .eq('user_id', user.id)
-      .single();
-
-    if (pErr) return res.status(500).json({ error: 'Profile lookup failed' });
-    if (!profile || String(profile.grade).toLowerCase() !== 'admin') {
-      return res.status(403).json({ error: '관리자 권한 필요' });
+    if (method === 'GET') {
+      const id = getIdFromReq(req);
+      if (!id) {
+        // 목록
+        const result = await pool.query(
+          'SELECT id, title, created_at, views FROM notice_board ORDER BY created_at DESC LIMIT 20'
+        );
+        return res.status(200).json(result.rows);
+      } else {
+        // 상세
+        await pool.query('UPDATE notice_board SET views = views + 1 WHERE id = $1', [id]);
+        const result = await pool.query('SELECT * FROM notice_board WHERE id = $1', [id]);
+        return res.status(200).json(result.rows[0] || null);
+      }
     }
 
-    next();
-  } catch (e) {
-    res.status(500).json({ error: 'Auth check failed' });
+    if (method === 'POST') {
+      const gate = await checkAdmin(req);
+      if (!gate.ok) return res.status(gate.code).json({ error: gate.error });
+      const { title, content } = req.body || {};
+      const result = await pool.query(
+        'INSERT INTO notice_board (title, content) VALUES ($1, $2) RETURNING *',
+        [title, content]
+      );
+      return res.status(201).json(result.rows[0]);
+    }
+
+    if (method === 'PUT') {
+      const gate = await checkAdmin(req);
+      if (!gate.ok) return res.status(gate.code).json({ error: gate.error });
+      const id = getIdFromReq(req) || req.body?.id;
+      const { title, content } = req.body || {};
+      const result = await pool.query(
+        'UPDATE notice_board SET title = $1, content = $2 WHERE id = $3 RETURNING *',
+        [title, content, id]
+      );
+      return res.status(200).json(result.rows[0]);
+    }
+
+    if (method === 'DELETE') {
+      const gate = await checkAdmin(req);
+      if (!gate.ok) return res.status(gate.code).json({ error: gate.error });
+      const id = getIdFromReq(req) || req.body?.id;
+      await pool.query('DELETE FROM notice_board WHERE id = $1', [id]);
+      return res.status(200).json({ message: 'Deleted successfully' });
+    }
+
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  } catch (err) {
+    console.error('[NOTICE ERROR]', err);
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 }
+
+
 
 // ✅ 공지 목록
 router.get('/', async (_req, res) => {
@@ -107,4 +172,3 @@ router.delete('/:id', checkAdmin, async (req, res) => {
   }
 });
 
-export default router;
