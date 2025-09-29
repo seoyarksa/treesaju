@@ -3,13 +3,18 @@
   "functions": {
     "api/*.js": {
       "includeFiles": "utils/**"
-    }
+
   },
   "rewrites": [
     { "source": "/api/send-otp",   "destination": "/api/otp?action=send" },
-    { "source": "/api/verify-otp", "destination": "/api/otp?action=verify" }, 
-      { "source": "/api/start-subscription", "destination": "/api/pay?action=start" }
+    { "source": "/api/verify-otp", "destination": "/api/otp?action=verify" },
+    { "source": "/api/start-subscription", "destination": "/api/pay?action=start" }
+  ],
+  "headers": [
+    {
+      "source": "/app.js",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+    }
   ]
-  
-  
+}
 }

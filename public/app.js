@@ -129,32 +129,43 @@ import { renderSinsalTable,
 // ===== app.js (안전망 포함, 전체 교체용) =====
 // 파일 상단 어딘가
 
-console.log("APP BUILD otpfix-2025-09-29-02"); // ← 최신 파일 확인용
+// app.js 맨 위
+console.log("BUILD_TAG appjs-2025-09-29-04");
 
-
-// ✅ 공통 POST JSON 헬퍼 (app.js 어딘가 전역에 추가)
-// JSON 안전 POST 헬퍼 (서버가 HTML 에러 돌려줘도 로그 보이게)
-async function postJSON(url, payload) {
+// 공통 fetch 유틸 (반드시 상단에)
+async function postJSON(url, body) {
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body)
   });
-
-  const raw = await res.text(); // 먼저 문자열로 받기 (HTML일 수도)
-  let data = null;
-  try { data = JSON.parse(raw); } catch {}
-
+  const text = await res.text();
   if (!res.ok) {
-    console.error(`[${url}] HTTP ${res.status}\n--- raw response ---\n${raw}`);
-    throw new Error((data && (data.error || data.message)) || `Request failed: ${res.status}`);
+    console.error(`[${url}] HTTP ${res.status}\n--- raw ---\n${text}`);
+    try { throw new Error(JSON.parse(text).error || "Request failed: " + res.status); }
+    catch { throw new Error("Request failed: " + res.status); }
   }
-  if (!data) {
-    console.error(`[${url}] JSON parse failed\n--- raw response ---\n${raw}`);
-    throw new Error("서버가 올바른 JSON을 반환하지 않았습니다.");
+  try { return JSON.parse(text); }
+  catch {
+    console.error(`[${url}] not JSON:\n${text}`);
+    throw new Error("Invalid JSON response");
   }
-  return data;
 }
+
+
+if (!window.normalizePhoneKR) {
+  window.normalizePhoneKR = function (raw, mode = "intl") {
+    const digits = String(raw || "").replace(/\D/g, "");
+    if (digits.length === 11 && digits.startsWith("010")) {
+      return mode === "intl" ? "+82" + digits.slice(1) : digits.replace(/(\d{3})(\d{4})(\d{4})/, "$1-$2-$3");
+    }
+    if (digits.length === 10) {
+      return mode === "intl" ? "+82" + digits.slice(1) : digits.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
+    }
+    return raw;
+  };
+}
+
 
 
 // ─── 전화번호 정규화 ───────────────────────────────────────────
