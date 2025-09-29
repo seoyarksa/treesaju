@@ -3574,24 +3574,20 @@ document.getElementById("subscribeBtn").onclick = async () => {
     return openPhoneOtpModal(); // 인증 먼저
   }
 
-  // ✅ 인증된 경우 → 결제 API 호출
-// ✅ 인증된 경우 → 결제 API 호출
+// 인증된 경우 → 결제 API 호출
 try {
-  // 우선 새 라우트 시도
   let data;
   try {
     data = await postJSON("/api/pay?action=start", { user_id: user.id });
   } catch (e1) {
-    console.warn("[pay] /api/pay?action=start 실패, 구 라우트로 재시도:", e1?.message);
-    // 구 라우트(이전 코드 호환). 필요 없으면 이 재시도 부분은 지워도 됩니다.
+    console.warn("[pay] /api/pay?action=start 실패, /api/start-subscription 재시도:", e1?.message);
     data = await postJSON("/api/start-subscription", { user_id: user.id });
   }
-
-  // 카카오 결제창 이동
   window.location.href = data.redirectUrl;
 } catch (err) {
   alert(err.message);
 }
+
 
 };
 
