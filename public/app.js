@@ -11,7 +11,7 @@
 
 //로그 다시 실행
 //console.clear();  console.log("🔥 전체 다시 실행됨");  console.log("👉 현재 saju:", JSON.stringify(saju));
-
+//신규확인
 
 
 // 상수
@@ -171,8 +171,7 @@ window.normalizePhoneKR = window.normalizePhoneKR || function (raw, mode = "intl
   return raw;
 };
 
-// ✅ 모듈 내부에서도 `normalizePhoneKR(...)`를 바로 쓸 수 있게 별칭 추가
-const normalizePhoneKR = (...args) => window.normalizePhoneKR(...args);
+
 
 // 부모 창 전역
 window.addEventListener('message', async (e) => {
