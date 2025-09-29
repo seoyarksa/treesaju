@@ -134,50 +134,34 @@ console.log("BUILD_TAG appjs-2025-09-29-04");
 
 // 공통 fetch 유틸 (반드시 상단에)
 // 공통 fetch 헬퍼
-async function postJSON(url, data) {
+async function postJSON(url, data){
   const r = await fetch(url, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(data || {})
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(data||{})
   });
-  const text = await r.text();
-  try { return { status:r.status, json: JSON.parse(text) }; }
-  catch { return { status:r.status, text }; }
+  const t = await r.text();
+  let j = null; try { j = JSON.parse(t); } catch {}
+  return { status: r.status, json: j, text: t };
 }
 
-// 버튼 핸들러 연결
-const $phone  = document.getElementById('phone');
-const $code   = document.getElementById('code');
-const $send   = document.getElementById('btnSend');
-const $verify = document.getElementById('btnVerify');
+// === 인증 버튼 ===
+async function onVerify(){
+  const phone = phoneInput.value.trim();
+  const code  = codeInput.value.trim();
 
-// 코드받기
-fetch('/api/otp?action=send', {
-  method:'POST',
-  headers:{'Content-Type':'application/json'},
-  body: JSON.stringify({ phone:'+821012345678' })
-});
+  const { status, json, text } = await postJSON('/api/otp?action=verify', { phone, code });
 
-// 인증하기
-fetch('/api/otp?action=verify', {
-  method:'POST',
-  headers:{'Content-Type':'application/json'},
-  body: JSON.stringify({ phone:'+821012345678', code:'123456' })
-});
-
-
-
-if (!window.normalizePhoneKR) {
-  window.normalizePhoneKR = function (raw, mode = "intl") {
-    const digits = String(raw || "").replace(/\D/g, "");
-    if (digits.length === 11 && digits.startsWith("010")) {
-      return mode === "intl" ? "+82" + digits.slice(1) : digits.replace(/(\d{3})(\d{4})(\d{4})/, "$1-$2-$3");
-    }
-    if (digits.length === 10) {
-      return mode === "intl" ? "+82" + digits.slice(1) : digits.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
-    }
-    return raw;
-  };
+  // ✅ 성공 조건을 엄격히
+  const ok = (status === 200) && !!json?.ok && !!json?.verified;
+  if (!ok) {
+    // 실패 메시지에 서버의 사유를 보여주면 디버그가 쉬움
+    const reason = json?.error || text || `HTTP ${status}`;
+    alert(`인증 실패: ${reason}`);
+    return;
+  }
+  alert('인증 성공!');
+  location.href = '/subscribe'; // 임시 결제/다음 단계
 }
 
 
