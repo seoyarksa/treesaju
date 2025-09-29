@@ -7,6 +7,7 @@
 // git push
 //강제실행   vercel --prod --force
 
+//   vercel dev
 
 //로그 다시 실행
 //console.clear();  console.log("🔥 전체 다시 실행됨");  console.log("👉 현재 saju:", JSON.stringify(saju));
@@ -127,6 +128,54 @@ import { renderSinsalTable,
  ************************************/
 // ===== app.js (안전망 포함, 전체 교체용) =====
 // 파일 상단 어딘가
+
+// ✅ 글로벌 보장(IIFE보다 먼저, 정말 맨 위에 두세요)
+if (typeof window !== "undefined" && typeof window.normalizePhoneKR !== "function") {
+  window.normalizePhoneKR = function (raw, mode = "intl") {
+    const digits = String(raw || "").replace(/\D/g, "");
+    if (digits.length === 11 && digits.startsWith("010")) {
+      return mode === "intl" ? "+82" + digits.slice(1) : digits.replace(/(\d{3})(\d{4})(\d{4})/, "$1-$2-$3");
+    }
+    if (digits.length === 10) {
+      return mode === "intl" ? "+82" + digits.slice(1) : digits.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
+    }
+    return raw;
+  };
+}
+// ✅ 모듈 스코프 별칭(이걸로 어디서든 그냥 normalizePhoneKR(...)로 호출 가능)
+const normalizePhoneKR = (...args) => window.normalizePhoneKR?.(...args);
+
+
+
+// ─── 전화번호 정규화 ───────────────────────────────────────────
+// --- GLOBAL: 전화번호 정규화 함수 보장 등록 ---
+(function ensureNormalizePhoneKR() {
+  if (typeof window === "undefined") return;
+
+  if (typeof window.normalizePhoneKR !== "function") {
+    window.normalizePhoneKR = function (raw, mode = "intl") {
+      const digits = String(raw || "").replace(/\D/g, "");
+
+      // 010-xxxx-xxxx → +8210xxxxxxx
+      if (digits.length === 11 && digits.startsWith("010")) {
+        if (mode === "intl") return "+82" + digits.slice(1); // 010 → +8210
+        return digits.replace(/(\d{3})(\d{4})(\d{4})/, "$1-$2-$3");
+      }
+
+      // 지역번호(02 등) 포함 10자리
+      if (digits.length === 10) {
+        if (mode === "intl") return "+82" + digits.slice(1);
+        return digits.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
+      }
+
+      return raw;
+    };
+    console.log("[init] normalizePhoneKR ready");
+  }
+})();
+
+
+
 // 부모 창 전역
 window.addEventListener('message', async (e) => {
   if (e.origin !== location.origin) return;
@@ -141,6 +190,8 @@ window.addEventListener('message', async (e) => {
 
 
 let __lastFormKey = null;
+
+
 
 // 입력을 안정적으로 키로 만드는 헬퍼
 function makeFormKey(fd) {
@@ -198,9 +249,6 @@ function getKSTDateKey() {
 
 // ✅ 비로그인 1일 3회(한국 날짜 기준) 제한
 // ✅ 출력횟수 표시 (회원 구분 없음)
-
-
-
 
 
 
@@ -404,6 +452,7 @@ async function buildGateFromDb(userId, profile) {
   }
   return gate;
 }
+
 
 
 
@@ -667,7 +716,7 @@ function openSignupModal() {
     const email = document.getElementById("su-email").value.trim();
     const password = document.getElementById("su-password").value;
     const phoneRaw = document.getElementById("su-phone").value.trim();
-    const phone = phoneRaw ? normalizePhoneKR(phoneRaw, "intl") : ""; // ✅ 국제 포맷 적용
+    const phone = phoneRaw ? normalizePhoneKR(phoneRaw, "intl") : ""; // ✅ 전역 함수로 호출
 
     if (!nickname) return alert("닉네임을 입력하세요.");
     if (!email) return alert("이메일을 입력하세요.");
@@ -756,83 +805,66 @@ function openPhoneOtpModal() {
     modal.style.display = "none";
   };
 
-  // 코드 받기
-// 코드 받기
-document.getElementById("otp-send").onclick = async () => {
-  const raw = document.getElementById("otp-phone").value.trim();
-  if (!raw) return alert("전화번호를 입력하세요.");
-  const phone = normalizePhoneKR(raw, "intl");
-  try {
-    const resp = await fetch("/api/send-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone })
-    });
-    const data = await resp.json();
-    if (!data.ok) throw new Error(data.error || "전송 실패");
-    alert("인증 코드가 발급되었습니다. (console.log 확인)");
-  } catch (err) {
-    console.error("[OTP send] error:", err);
-    alert(err.message);
-  }
-};
+  // 📩 코드 받기
+  document.getElementById("otp-send").onclick = async () => {
+    const raw = document.getElementById("otp-phone").value.trim();
+    if (!raw) return alert("전화번호를 입력하세요.");
+    const phone = normalizePhoneKR(raw, "intl");
 
+    try {
+      const res = await fetch("/api/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
 
-  // 인증하기
-// 인증하기
-document.getElementById("otp-verify").onclick = async () => {
-  const raw = document.getElementById("otp-phone").value.trim();
-  const token = document.getElementById("otp-code").value.trim();
-  if (!raw || !token) return alert("전화번호와 인증 코드를 입력하세요.");
-  const phone = normalizePhoneKR(raw, "intl");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "OTP 발송 실패");
 
-  const { data: { session } } = await window.supabaseClient.auth.getSession();
-  if (!session) return alert("로그인이 필요합니다.");
-
-  try {
-    const resp = await fetch("/api/verify-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone, code: token, userId: session.user.id })
-    });
-    const result = await resp.json();
-    if (!result.ok) throw new Error(result.error || "인증 실패");
-
-    alert("전화번호 인증이 완료되었습니다!");
-    document.getElementById("phone-otp-modal").style.display = "none";
-    updateAuthUI(session);
-  } catch (err) {
-    console.error("[OTP verify] error:", err);
-    alert(err.message);
-  }
-};
-
-
-// ─── 로그인된 유저가 전화 인증 필요하면 모달을 띄우는 검사 ───
-async function requirePhoneVerificationIfNeeded() {
-  const { data: { session } } = await window.supabaseClient.auth.getSession();
-  if (!session) return;
-
-  try {
-    // profiles에서 phone_verified 조회 (RLS는 본인 행만 허용되도록 설정되어 있음)
-    const { data, error } = await window.supabaseClient
-      .from("profiles")
-      .select("phone_verified")
-      .eq("user_id", session.user.id)
-      .single();
-
-    if (error) throw error;
-
-    if (!data?.phone_verified) {
-      // ✅ 인증 안 되어 있으면 즉시 모달
-      openPhoneOtpModal();
+      alert("인증 코드가 발송되었습니다. (테스트 중이면 콘솔에서 확인)");
+    } catch (err) {
+      console.error("[OTP send] error:", err);
+      alert(err.message || "인증 코드를 보낼 수 없습니다.");
     }
-  } catch (e) {
-    console.warn("[requirePhoneVerificationIfNeeded] 조회 실패:", e);
-    // 조회 실패 시에도 UX상 바로 요구하고 싶다면 모달을 띄워도 됨:
-    // openPhoneOtpModal();
-  }
+  };
+
+
+
+  // ✅ 인증하기
+  document.getElementById("otp-verify").onclick = async () => {
+    const raw = document.getElementById("otp-phone").value.trim();
+    const token = document.getElementById("otp-code").value.trim();
+    if (!raw || !token) return alert("전화번호와 인증 코드를 입력하세요.");
+    const phone = normalizePhoneKR(raw, "intl");
+
+    try {
+      const { data: { user } } = await window.supabaseClient.auth.getUser();
+      if (!user) {
+        return alert("로그인 후 인증 가능합니다.");
+      }
+
+      const res = await fetch("/api/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, token, user_id: user.id }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "인증 실패");
+
+      alert("전화번호 인증이 완료되었습니다!");
+      modal.style.display = "none";
+
+      // ✅ 세션을 새로 덮어쓰지 않고, 단순히 UI 갱신
+      updateAuthUI({ user });
+    } catch (err) {
+      console.error("[OTP verify] error:", err);
+      alert(err.message || "인증에 실패했습니다.");
+    }
+  };
 }
+
+
 
 
 
@@ -3514,20 +3546,44 @@ async function renderUserProfile() {
   const { data: { user } } = await window.supabaseClient.auth.getUser();
   if (!user) return;
 
-  // 여기서는 이벤트 바인딩만!
-  document.getElementById("subscribeBtn")?.addEventListener("click", () => {
-    openPhoneOtpModal({
-      onSuccess: () => {
-        document.getElementById("subscriptionModal").style.display = "block";
-      }
-    });
-  });
 
-  document.getElementById("logoutBtn")?.addEventListener("click", async () => {
-    await window.supabaseClient.auth.signOut();
-    location.reload();
-  });
 }
+
+
+  // 여기서는 이벤트 바인딩만!
+document.getElementById("subscribeBtn").onclick = async () => {
+  // 현재 로그인 사용자 가져오기
+  const { data: { user } } = await window.supabaseClient.auth.getUser();
+  if (!user) return alert("로그인 후 이용해 주세요.");
+
+  // phone_verified 확인
+  const { data: profile } = await window.supabaseClient
+    .from("profiles")
+    .select("phone_verified")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!profile?.phone_verified) {
+    return openPhoneOtpModal(); // 인증 먼저
+  }
+
+  // ✅ 인증된 경우 → 결제 API 호출
+  try {
+    const res = await fetch("/api/start-subscription", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: user.id }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "결제 준비 실패");
+
+    // 카카오 결제창으로 이동
+    window.location.href = data.redirectUrl;
+  } catch (err) {
+    alert(err.message);
+  }
+};
+
 
 
 
