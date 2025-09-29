@@ -6,9 +6,10 @@
     }
   },
   "rewrites": [
-    { "source": "/api/send-otp",   "destination": "/api/phone?action=send" },
-    { "source": "/api/verify-otp", "destination": "/api/phone?action=verify" },
-    { "source": "/api/send-sms",   "destination": "/api/phone?action=send&via=sms" },
-    { "source": "/api/verify-sms", "destination": "/api/phone?action=verify&via=sms" }
+    { "source": "/api/send-otp",   "destination": "/api/otp?action=send" },
+    { "source": "/api/verify-otp", "destination": "/api/otp?action=verify" }, 
+      { "source": "/api/start-subscription", "destination": "/api/pay?action=start" }
   ]
+  
+  
 }

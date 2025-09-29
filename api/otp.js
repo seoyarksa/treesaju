@@ -1,52 +1,55 @@
 // api/otp.js
-import { createClient } from "@supabase/supabase-js";
+const { createClient } = require("@supabase/supabase-js");
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-export default async function handler(req, res) {
-  // (선택) CORS/캐시 헤더 – 로컬/프록시 환경 안정성
-  res.setHeader("Cache-Control", "no-store");
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "content-type");
+module.exports = async (req, res) => {
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  if (req.method !== "POST") {
+    return res.status(405).end(JSON.stringify({ error: "Method not allowed" }));
+  }
 
-  if (req.method === "OPTIONS") return res.status(204).end();
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  const { action } = req.query || {};
 
   try {
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    const action = url.searchParams.get("action"); // send | verify
-    const via = url.searchParams.get("via") || "sms"; // otp | sms (라벨만; 실제 동작은 동일)
-
+    // 1) 코드 발송 (stub 또는 실제 전송 연결)
     if (action === "send") {
       const { phone } = req.body || {};
-      if (!phone) return res.status(400).json({ error: "전화번호가 필요합니다." });
+      if (!phone) {
+        return res.status(400).end(JSON.stringify({ error: "phone required" }));
+      }
 
-      // 6자리 코드 생성
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const code = (Math.floor(Math.random() * 900000) + 100000).toString();
 
-      // DB 저장 (검증 시 5분 제한을 확인)
+      // DB 저장 (테스트/실사용 공통)
       const { error: insErr } = await supabase
         .from("otp_codes")
         .insert({ phone, code });
-      if (insErr) throw insErr;
+      if (insErr) {
+        console.error("[otp] insert error", insErr);
+        return res
+          .status(500)
+          .end(JSON.stringify({ error: "failed to store code" }));
+      }
 
-      // 실제 SMS/알림톡 연동 전: 서버 로그로 대체
-      console.log(`[OTP][${via}] send -> ${phone}, code=${code}`);
-
-      return res.status(200).json({ success: true });
+      // TODO: 실제 SMS 전송 연동 지점 (NCP SENS 등)
+      // 테스트 중에는 코드 반환(환경변수로 ON/OFF)
+      const debug = process.env.OTP_DEBUG === "true" ? { code } : {};
+      return res.status(200).end(JSON.stringify({ ok: true, ...debug }));
     }
 
+    // 2) 코드 검증 + 프로필 업데이트
     if (action === "verify") {
       const { phone, token, user_id } = req.body || {};
       if (!phone || !token || !user_id) {
-        return res.status(400).json({ error: "전화번호, 코드, 유저 ID가 필요합니다." });
+        return res
+          .status(400)
+          .end(JSON.stringify({ error: "missing fields" }));
       }
 
-      // 최근 5분 내 코드만 인정
       const since = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       const { data: otpRow, error: selErr } = await supabase
         .from("otp_codes")
@@ -59,10 +62,11 @@ export default async function handler(req, res) {
         .single();
 
       if (selErr || !otpRow) {
-        return res.status(400).json({ error: "인증 코드가 올바르지 않거나 만료되었습니다." });
+        return res
+          .status(400)
+          .end(JSON.stringify({ error: "invalid or expired code" }));
       }
 
-      // 전화번호/인증 상태 업데이트 (UNIQUE 제약 위반 → 중복 번호)
       const { error: updErr } = await supabase
         .from("profiles")
         .update({ phone, phone_verified: true })
@@ -70,17 +74,22 @@ export default async function handler(req, res) {
 
       if (updErr) {
         if (updErr.code === "23505") {
-          return res.status(400).json({ error: "이미 사용 중인 전화번호입니다." });
+          // unique(phone) 충돌
+          return res
+            .status(400)
+            .end(JSON.stringify({ error: "이미 사용 중인 전화번호입니다." }));
         }
-        throw updErr;
+        console.error("[otp] update error", updErr);
+        return res.status(500).end(JSON.stringify({ error: "update failed" }));
       }
 
-      return res.status(200).json({ success: true });
+      return res.status(200).end(JSON.stringify({ ok: true }));
     }
 
-    return res.status(400).json({ error: "Unknown action" });
-  } catch (err) {
-    console.error("[api/otp] error:", err);
-    return res.status(500).json({ error: "server error" });
+    // 알 수 없는 action
+    return res.status(404).end(JSON.stringify({ error: "unknown action" }));
+  } catch (e) {
+    console.error("[otp] server error", e);
+    return res.status(500).end(JSON.stringify({ error: "server error" }));
   }
-}
+};

@@ -812,7 +812,7 @@ function openPhoneOtpModal() {
     const phone = window.normalizePhoneKR(raw, "intl");
 
     try {
-      const res = await fetch("/api/send-otp", {
+      const res = await fetch("/api/otp?action=send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone }),
@@ -843,7 +843,7 @@ function openPhoneOtpModal() {
         return alert("로그인 후 인증 가능합니다.");
       }
 
-      const res = await fetch("/api/verify-otp", {
+      const res = await fetch("/api/otp?action=verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, token, user_id: user.id }),
@@ -3569,11 +3569,11 @@ document.getElementById("subscribeBtn").onclick = async () => {
 
   // ✅ 인증된 경우 → 결제 API 호출
   try {
-    const res = await fetch("/api/start-subscription", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: user.id }),
-    });
+const res = await fetch("/api/pay?action=start", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ user_id: user.id }),
+});
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "결제 준비 실패");
 
