@@ -131,6 +131,32 @@ import { renderSinsalTable,
 
 console.log("APP BUILD otpfix-2025-09-29-02"); // ← 최신 파일 확인용
 
+
+// ✅ 공통 POST JSON 헬퍼 (app.js 어딘가 전역에 추가)
+// JSON 안전 POST 헬퍼 (서버가 HTML 에러 돌려줘도 로그 보이게)
+async function postJSON(url, payload) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const raw = await res.text(); // 먼저 문자열로 받기 (HTML일 수도)
+  let data = null;
+  try { data = JSON.parse(raw); } catch {}
+
+  if (!res.ok) {
+    console.error(`[${url}] HTTP ${res.status}\n--- raw response ---\n${raw}`);
+    throw new Error((data && (data.error || data.message)) || `Request failed: ${res.status}`);
+  }
+  if (!data) {
+    console.error(`[${url}] JSON parse failed\n--- raw response ---\n${raw}`);
+    throw new Error("서버가 올바른 JSON을 반환하지 않았습니다.");
+  }
+  return data;
+}
+
+
 // ─── 전화번호 정규화 ───────────────────────────────────────────
 function normalizePhoneKR(raw, mode = "intl") {
   const digits = String(raw || "").replace(/\D/g, "");
@@ -806,62 +832,43 @@ function openPhoneOtpModal() {
   };
 
   // 📩 코드 받기
-  document.getElementById("otp-send").onclick = async () => {
-    const raw = document.getElementById("otp-phone").value.trim();
-    if (!raw) return alert("전화번호를 입력하세요.");
-    const phone = window.normalizePhoneKR(raw, "intl");
+document.getElementById("otp-send").onclick = async () => {
+  const raw = document.getElementById("otp-phone").value.trim();
+  if (!raw) return alert("전화번호를 입력하세요.");
+  const phone = window.normalizePhoneKR(raw, "intl");
 
-    try {
-      const res = await fetch("/api/otp?action=send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
-      });
+  try {
+    const data = await postJSON("/api/send-otp", { phone }); // ← 변경
+    alert("인증 코드가 발송되었습니다. (테스트 중이면 콘솔에서 확인)");
+  } catch (err) {
+    alert(err.message || "인증 코드를 보낼 수 없습니다.");
+  }
+};
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "OTP 발송 실패");
-
-      alert("인증 코드가 발송되었습니다. (테스트 중이면 콘솔에서 확인)");
-    } catch (err) {
-      console.error("[OTP send] error:", err);
-      alert(err.message || "인증 코드를 보낼 수 없습니다.");
-    }
-  };
 
 
 
   // ✅ 인증하기
-  document.getElementById("otp-verify").onclick = async () => {
-    const raw = document.getElementById("otp-phone").value.trim();
-    const token = document.getElementById("otp-code").value.trim();
-    if (!raw || !token) return alert("전화번호와 인증 코드를 입력하세요.");
-    const phone = window.normalizePhoneKR(raw, "intl");
+document.getElementById("otp-verify").onclick = async () => {
+  const raw = document.getElementById("otp-phone").value.trim();
+  const token = document.getElementById("otp-code").value.trim();
+  if (!raw || !token) return alert("전화번호와 인증 코드를 입력하세요.");
+  const phone = window.normalizePhoneKR(raw, "intl");
 
-    try {
-      const { data: { user } } = await window.supabaseClient.auth.getUser();
-      if (!user) {
-        return alert("로그인 후 인증 가능합니다.");
-      }
+  try {
+    const { data: { user } } = await window.supabaseClient.auth.getUser();
+    if (!user) return alert("로그인 후 인증 가능합니다.");
 
-      const res = await fetch("/api/otp?action=verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, token, user_id: user.id }),
-      });
+    const data = await postJSON("/api/verify-otp", { phone, token, user_id: user.id }); // ← 변경
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "인증 실패");
+    alert("전화번호 인증이 완료되었습니다!");
+    document.getElementById("phone-otp-modal").style.display = "none";
+    updateAuthUI({ user });
+  } catch (err) {
+    alert(err.message || "인증에 실패했습니다.");
+  }
+};
 
-      alert("전화번호 인증이 완료되었습니다!");
-      modal.style.display = "none";
-
-      // ✅ 세션을 새로 덮어쓰지 않고, 단순히 UI 갱신
-      updateAuthUI({ user });
-    } catch (err) {
-      console.error("[OTP verify] error:", err);
-      alert(err.message || "인증에 실패했습니다.");
-    }
-  };
 }
 
 
@@ -3568,20 +3575,24 @@ document.getElementById("subscribeBtn").onclick = async () => {
   }
 
   // ✅ 인증된 경우 → 결제 API 호출
+// ✅ 인증된 경우 → 결제 API 호출
+try {
+  // 우선 새 라우트 시도
+  let data;
   try {
-const res = await fetch("/api/pay?action=start", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ user_id: user.id }),
-});
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "결제 준비 실패");
-
-    // 카카오 결제창으로 이동
-    window.location.href = data.redirectUrl;
-  } catch (err) {
-    alert(err.message);
+    data = await postJSON("/api/pay?action=start", { user_id: user.id });
+  } catch (e1) {
+    console.warn("[pay] /api/pay?action=start 실패, 구 라우트로 재시도:", e1?.message);
+    // 구 라우트(이전 코드 호환). 필요 없으면 이 재시도 부분은 지워도 됩니다.
+    data = await postJSON("/api/start-subscription", { user_id: user.id });
   }
+
+  // 카카오 결제창 이동
+  window.location.href = data.redirectUrl;
+} catch (err) {
+  alert(err.message);
+}
+
 };
 
 
