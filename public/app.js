@@ -129,52 +129,50 @@ import { renderSinsalTable,
 // ===== app.js (안전망 포함, 전체 교체용) =====
 // 파일 상단 어딘가
 
-// ✅ 글로벌 보장(IIFE보다 먼저, 정말 맨 위에 두세요)
-if (typeof window !== "undefined" && typeof window.normalizePhoneKR !== "function") {
-  window.normalizePhoneKR = function (raw, mode = "intl") {
-    const digits = String(raw || "").replace(/\D/g, "");
-    if (digits.length === 11 && digits.startsWith("010")) {
-      return mode === "intl" ? "+82" + digits.slice(1) : digits.replace(/(\d{3})(\d{4})(\d{4})/, "$1-$2-$3");
-    }
-    if (digits.length === 10) {
-      return mode === "intl" ? "+82" + digits.slice(1) : digits.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
-    }
-    return raw;
-  };
-}
-// ✅ 모듈 스코프 별칭(이걸로 어디서든 그냥 normalizePhoneKR(...)로 호출 가능)
-const normalizePhoneKR = (...args) => window.normalizePhoneKR?.(...args);
-
-
+console.log("APP BUILD otpfix-2025-09-29-02"); // ← 최신 파일 확인용
 
 // ─── 전화번호 정규화 ───────────────────────────────────────────
-// --- GLOBAL: 전화번호 정규화 함수 보장 등록 ---
-(function ensureNormalizePhoneKR() {
-  if (typeof window === "undefined") return;
+function normalizePhoneKR(raw, mode = "intl") {
+  const digits = String(raw || "").replace(/\D/g, "");
 
-  if (typeof window.normalizePhoneKR !== "function") {
-    window.normalizePhoneKR = function (raw, mode = "intl") {
-      const digits = String(raw || "").replace(/\D/g, "");
-
-      // 010-xxxx-xxxx → +8210xxxxxxx
-      if (digits.length === 11 && digits.startsWith("010")) {
-        if (mode === "intl") return "+82" + digits.slice(1); // 010 → +8210
-        return digits.replace(/(\d{3})(\d{4})(\d{4})/, "$1-$2-$3");
-      }
-
-      // 지역번호(02 등) 포함 10자리
-      if (digits.length === 10) {
-        if (mode === "intl") return "+82" + digits.slice(1);
-        return digits.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
-      }
-
-      return raw;
-    };
-    console.log("[init] normalizePhoneKR ready");
+  // 010-xxxx-xxxx → +8210xxxxxxx (국제 포맷)
+  if (digits.length === 11 && digits.startsWith("010")) {
+    if (mode === "intl") {
+      return "+82" + digits.slice(1); // 010 → +8210
+    }
+    return digits.replace(/(\d{3})(\d{4})(\d{4})/, "$1-$2-$3");
   }
-})();
 
+  // 지역번호 포함 (예: 02-xxx-xxxx)
+  if (digits.length === 10) {
+    if (mode === "intl") {
+      if (digits.startsWith("0")) {
+        return "+82" + digits.slice(1);
+      }
+    }
+    return digits.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
+  }
 
+  // fallback: 그대로 반환
+  return raw;
+}
+
+// 전역 보장
+window.normalizePhoneKR = window.normalizePhoneKR || function (raw, mode = "intl") {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("010")) {
+    return mode === "intl" ? "+82" + digits.slice(1)
+                           : digits.replace(/(\d{3})(\d{4})(\d{4})/, "$1-$2-$3");
+  }
+  if (digits.length === 10) {
+    return mode === "intl" ? "+82" + digits.slice(1)
+                           : digits.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
+  }
+  return raw;
+};
+
+// ✅ 모듈 내부에서도 `normalizePhoneKR(...)`를 바로 쓸 수 있게 별칭 추가
+const normalizePhoneKR = (...args) => window.normalizePhoneKR(...args);
 
 // 부모 창 전역
 window.addEventListener('message', async (e) => {
@@ -187,6 +185,9 @@ window.addEventListener('message', async (e) => {
   } : null;
   e.source?.postMessage({ type: 'SUPABASE_SESSION', session: payload }, e.origin);
 });
+
+
+
 
 
 let __lastFormKey = null;
@@ -716,7 +717,7 @@ function openSignupModal() {
     const email = document.getElementById("su-email").value.trim();
     const password = document.getElementById("su-password").value;
     const phoneRaw = document.getElementById("su-phone").value.trim();
-    const phone = phoneRaw ? normalizePhoneKR(phoneRaw, "intl") : ""; // ✅ 전역 함수로 호출
+    const phone =  phoneRaw ? window.normalizePhoneKR(phoneRaw, "intl") : "";  
 
     if (!nickname) return alert("닉네임을 입력하세요.");
     if (!email) return alert("이메일을 입력하세요.");
@@ -809,7 +810,7 @@ function openPhoneOtpModal() {
   document.getElementById("otp-send").onclick = async () => {
     const raw = document.getElementById("otp-phone").value.trim();
     if (!raw) return alert("전화번호를 입력하세요.");
-    const phone = normalizePhoneKR(raw, "intl");
+    const phone = window.normalizePhoneKR(raw, "intl");
 
     try {
       const res = await fetch("/api/send-otp", {
@@ -835,7 +836,7 @@ function openPhoneOtpModal() {
     const raw = document.getElementById("otp-phone").value.trim();
     const token = document.getElementById("otp-code").value.trim();
     if (!raw || !token) return alert("전화번호와 인증 코드를 입력하세요.");
-    const phone = normalizePhoneKR(raw, "intl");
+    const phone = window.normalizePhoneKR(raw, "intl");
 
     try {
       const { data: { user } } = await window.supabaseClient.auth.getUser();
