@@ -133,24 +133,38 @@ import { renderSinsalTable,
 console.log("BUILD_TAG appjs-2025-09-29-04");
 
 // 공통 fetch 유틸 (반드시 상단에)
-async function postJSON(url, body) {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
+// 공통 fetch 헬퍼
+async function postJSON(url, data) {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data || {})
   });
-  const text = await res.text();
-  if (!res.ok) {
-    console.error(`[${url}] HTTP ${res.status}\n--- raw ---\n${text}`);
-    try { throw new Error(JSON.parse(text).error || "Request failed: " + res.status); }
-    catch { throw new Error("Request failed: " + res.status); }
-  }
-  try { return JSON.parse(text); }
-  catch {
-    console.error(`[${url}] not JSON:\n${text}`);
-    throw new Error("Invalid JSON response");
-  }
+  const text = await r.text();
+  try { return { status:r.status, json: JSON.parse(text) }; }
+  catch { return { status:r.status, text }; }
 }
+
+// 버튼 핸들러 연결
+const $phone  = document.getElementById('phone');
+const $code   = document.getElementById('code');
+const $send   = document.getElementById('btnSend');
+const $verify = document.getElementById('btnVerify');
+
+// 코드받기
+fetch('/api/otp?action=send', {
+  method:'POST',
+  headers:{'Content-Type':'application/json'},
+  body: JSON.stringify({ phone:'+821012345678' })
+});
+
+// 인증하기
+fetch('/api/otp?action=verify', {
+  method:'POST',
+  headers:{'Content-Type':'application/json'},
+  body: JSON.stringify({ phone:'+821012345678', code:'123456' })
+});
+
 
 
 if (!window.normalizePhoneKR) {
@@ -3594,7 +3608,7 @@ try {
     console.warn("[pay] /api/pay?action=start 실패, /api/start-subscription 재시도:", e1?.message);
     data = await postJSON("/api/start-subscription", { user_id: user.id });
   }
-  window.location.href = data.redirectUrl;
+  window.location.href ='/subscribe'; // 임시 결제창
 } catch (err) {
   alert(err.message);
 }

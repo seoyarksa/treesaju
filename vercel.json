@@ -1,9 +1,3 @@
 {
-  "functions": { "api/*.js": { "runtime": "nodejs20.x" } },
-  "rewrites": [
-    { "source": "/api/send-otp",   "destination": "/api/otp?action=send" },
-    { "source": "/api/verify-otp", "destination": "/api/otp?action=verify" },
-    { "source": "/api/diag-otp",   "destination": "/api/otp?action=diag-import" },
-    { "source": "/api/diag-db",    "destination": "/api/otp?action=diag-db" }
-  ]
+  "functions": { "api/*.js": { "runtime": "nodejs20.x" } }
 }
