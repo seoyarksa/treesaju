@@ -840,45 +840,51 @@ function openPhoneOtpModal() {
     modal.style.display = "none";
   };
 
-  // 📩 코드 받기
+// 📩 코드 받기
 document.getElementById("otp-send").onclick = async () => {
   const raw = document.getElementById("otp-phone").value.trim();
   if (!raw) return alert("전화번호를 입력하세요.");
   const phone = window.normalizePhoneKR(raw, "intl");
 
   try {
-    const data = await postJSON("/api/send-otp", { phone }); // ← 변경
+    // ✅ URL 수정: /api/otp?action=send
+    const data = await postJSON("/api/otp?action=send", { phone });
+    console.log("발급된 인증코드:", data.code); // 개발 중이면 콘솔에서 바로 확인
     alert("인증 코드가 발송되었습니다. (테스트 중이면 콘솔에서 확인)");
   } catch (err) {
     alert(err.message || "인증 코드를 보낼 수 없습니다.");
   }
 };
 
-
-
-
-  // ✅ 인증하기
+// ✅ 인증하기
 document.getElementById("otp-verify").onclick = async () => {
   const raw = document.getElementById("otp-phone").value.trim();
-  const token = document.getElementById("otp-code").value.trim();
-  if (!raw || !token) return alert("전화번호와 인증 코드를 입력하세요.");
+  const code = document.getElementById("otp-code").value.trim();
+  if (!raw || !code) return alert("전화번호와 인증 코드를 입력하세요.");
   const phone = window.normalizePhoneKR(raw, "intl");
 
   try {
     const { data: { user } } = await window.supabaseClient.auth.getUser();
     if (!user) return alert("로그인 후 인증 가능합니다.");
 
-    const data = await postJSON("/api/verify-otp", { phone, token, user_id: user.id }); // ← 변경
+    // ✅ URL 수정: /api/otp?action=verify
+    const data = await postJSON("/api/otp?action=verify", {
+      phone,
+      code,            // 서버는 code라는 필드를 기대함
+      user_id: user.id
+    });
 
-    alert("전화번호 인증이 완료되었습니다!");
-    document.getElementById("phone-otp-modal").style.display = "none";
-    updateAuthUI({ user });
+    if (data?.ok && data?.verified) {
+      alert("전화번호 인증이 완료되었습니다!");
+      document.getElementById("phone-otp-modal").style.display = "none";
+      updateAuthUI({ user });
+    } else {
+      alert("인증 실패: " + (data?.error || "알 수 없는 오류"));
+    }
   } catch (err) {
     alert(err.message || "인증에 실패했습니다.");
   }
 };
-
-}
 
 
 
