@@ -840,6 +840,8 @@ function openPhoneOtpModal() {
     modal.style.display = "none";
   };
 
+
+  
 // 📩 코드 받기
 document.getElementById("otp-send").onclick = async () => {
   const raw = document.getElementById("otp-phone").value.trim();
@@ -847,10 +849,13 @@ document.getElementById("otp-send").onclick = async () => {
   const phone = window.normalizePhoneKR(raw, "intl");
 
   try {
-    // ✅ URL 수정: /api/otp?action=send
     const data = await postJSON("/api/otp?action=send", { phone });
-    console.log("발급된 인증코드:", data.code); // 개발 중이면 콘솔에서 바로 확인
-    alert("인증 코드가 발송되었습니다. (테스트 중이면 콘솔에서 확인)");
+    if (data?.ok) {
+      if (data.code) console.log("개발용 인증코드:", data.code);
+      alert("인증 코드가 발송되었습니다.");
+    } else {
+      alert("코드 발송 실패: " + (data?.error || "알 수 없는 오류"));
+    }
   } catch (err) {
     alert(err.message || "인증 코드를 보낼 수 없습니다.");
   }
@@ -864,16 +869,18 @@ document.getElementById("otp-verify").onclick = async () => {
   const phone = window.normalizePhoneKR(raw, "intl");
 
   try {
+    // 1️⃣ 로그인된 사용자 확인
     const { data: { user } } = await window.supabaseClient.auth.getUser();
     if (!user) return alert("로그인 후 인증 가능합니다.");
 
-    // ✅ URL 수정: /api/otp?action=verify
+    // 2️⃣ 서버에 코드 검증 요청
     const data = await postJSON("/api/otp?action=verify", {
       phone,
-      code,            // 서버는 code라는 필드를 기대함
-      user_id: user.id
+      code,
+      user_id: user.id   // (현재 서버는 안 쓰지만 나중에 profiles 연계용)
     });
 
+    // 3️⃣ 결과 처리
     if (data?.ok && data?.verified) {
       alert("전화번호 인증이 완료되었습니다!");
       document.getElementById("phone-otp-modal").style.display = "none";
@@ -885,6 +892,7 @@ document.getElementById("otp-verify").onclick = async () => {
     alert(err.message || "인증에 실패했습니다.");
   }
 };
+
 
 
 
