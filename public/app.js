@@ -145,6 +145,8 @@ async function postJSON(url, data){
   return { status: r.status, json: j, text: t };
 }
 
+
+
 // === 인증 버튼 ===
 async function onVerify(){
   const phone = phoneInput.value.trim();
@@ -848,14 +850,15 @@ document.getElementById("otp-send").onclick = async () => {
 
   try {
     // ✅ URL 수정: /api/send-otp → /api/otp?action=send
-    const data = await postJSON("/api/otp?action=send", { phone });
+ const { status, json, text } = await postJSON("/api/otp?action=send", { phone });
 
-    if (data?.ok) {
-      if (data.code) console.log("개발용 인증코드:", data.code); // OTP_DEBUG=true일 때 응답에 포함됨
-      alert("인증 코드가 발송되었습니다. (테스트 중이면 콘솔에서 확인)");
-    } else {
-      alert("코드 발송 실패: " + (data?.error || "알 수 없는 오류"));
-    }
+if (status === 200 && json?.ok) {
+  if (json.code) console.log("개발용 인증코드:", json.code);
+  alert("인증 코드가 발송되었습니다.");
+} else {
+  alert("코드 발송 실패: " + (json?.error || text || `HTTP ${status}`));
+}
+
   } catch (err) {
     alert(err.message || "인증 코드를 보낼 수 없습니다.");
   }
