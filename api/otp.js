@@ -45,17 +45,54 @@ export default async function handler(req, res) {
     const supabase = await getSb();
     const body = await getBody(req);
 
-    if (action === 'send') {
-      const phone = (body?.phone || '').trim();
-      if (!phone) return json(400, { ok:false, error:'phone required' });
+ if (action === 'send') {
+  const phone = (body?.phone || '').trim();
+  if (!phone) return json(400, { ok:false, error:'phone required' });
 
-      const code = String(Math.floor(Math.random()*900000) + 100000);
-      const { error } = await supabase.from('otp_codes').insert({ phone, code, created_at: new Date().toISOString() });
-      if (error) return json(500, { ok:false, error:'DB insert failed', details: error.message });
+  // ✅ ENV 사전 점검(프로덕션/프리뷰 혼동 잡기)
+  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!sbUrl || !serviceKey) {
+    return json(500, {
+      ok: false,
+      where: 'env',
+      hasUrl: !!sbUrl,
+      hasKey: !!serviceKey,
+      hint: 'Vercel > Project > Settings > Environment Variables 에서 PRODUCTION에 설정 필요'
+    });
+  }
 
-     // return json(200, { ok:true, ...(OTP_DEBUG ? { code } : {}) });
-     return json(200, { ok:true, code });  // 항상 code 포함
+  try {
+    const supabase = await getSb();
+
+    // 임시: 항상 응답에 code 포함(개발 편의)
+    const code = String(Math.floor(Math.random()*900000) + 100000);
+
+    // ✅ DB insert 에러를 상세히 표출
+    const { error } = await supabase
+      .from('otp_codes')
+      .insert({ phone, code, created_at: new Date().toISOString() });
+
+    if (error) {
+      return json(500, {
+        ok: false,
+        where: 'db-insert',
+        details: error.message,
+        hint: '테이블/권한/컬럼타입 확인'
+      });
     }
+
+    return json(200, { ok:true, code });
+  } catch (e) {
+    return json(500, {
+      ok: false,
+      where: 'send-try',
+      details: String(e?.message || e),
+      hint: 'supabase-js import/런타임/바디파싱 확인'
+    });
+  }
+}
+
 
     if (action === 'verify') {
       const phone = (body?.phone || '').trim();
