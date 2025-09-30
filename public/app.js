@@ -842,59 +842,61 @@ function openPhoneOtpModal() {
     modal.style.display = "none";
   };
 
-// 📩 코드 받기
+// ⚠️ 스크립트가 <head>에 있다면 이 블록으로 감싸 주세요.
+// window.addEventListener("DOMContentLoaded", () => { ...handlers... });
+
+/** 코드받기 */
 document.getElementById("otp-send").onclick = async () => {
   const raw = document.getElementById("otp-phone").value.trim();
   if (!raw) return alert("전화번호를 입력하세요.");
   const phone = window.normalizePhoneKR(raw, "intl");
 
   try {
-    // ✅ URL 수정: /api/send-otp → /api/otp?action=send
- const { status, json, text } = await postJSON("/api/otp?action=send", { phone });
-
-if (status === 200 && json?.ok) {
-  if (json.code) console.log("개발용 인증코드:", json.code);
-  alert("인증 코드가 발송되었습니다.");
-} else {
-  alert("코드 발송 실패: " + (json?.error || text || `HTTP ${status}`));
-}
-
+    const { status, json, text } = await postJSON("/api/otp?action=send", { phone });
+    if (status === 200 && json?.ok) {
+      if (json.code) console.log("개발용 인증코드:", json.code); // OTP_DEBUG=true일 때
+      alert("인증 코드가 발송되었습니다.");
+    } else {
+      alert("코드 발송 실패: " + (json?.error || json?.details || text || `HTTP ${status}`));
+    }
   } catch (err) {
-    alert(err.message || "인증 코드를 보낼 수 없습니다.");
+    alert(err?.message || "인증 코드를 보낼 수 없습니다.");
   }
 };
 
-// ✅ 인증하기
+/** 인증하기 */
 document.getElementById("otp-verify").onclick = async () => {
-  const raw = document.getElementById("otp-phone").value.trim();
+  const raw  = document.getElementById("otp-phone").value.trim();
   const code = document.getElementById("otp-code").value.trim();
   if (!raw || !code) return alert("전화번호와 인증 코드를 입력하세요.");
   const phone = window.normalizePhoneKR(raw, "intl");
 
   try {
-    // ✅ 로그인 여부 확인
+    // 로그인 세션 확인(정식 플로우 유지)
     const { data: { user } } = await window.supabaseClient.auth.getUser();
     if (!user) return alert("로그인 후 인증 가능합니다.");
 
-    // ✅ URL 수정: /api/verify-otp → /api/otp?action=verify
-    // ✅ 필드 이름: token → code
-    const data = await postJSON("/api/otp?action=verify", {
+    const { status, json, text } = await postJSON("/api/otp?action=verify", {
       phone,
-      code,
-      user_id: user.id   // (백엔드에서 아직 쓰진 않지만 보관해도 문제 없음)
+      code,         // ← 서버는 code 필드 사용
+      user_id: user.id // (지금 서버는 안 쓰지만 보냄)
     });
 
-    if (data?.ok && data?.verified) {
+    const ok = (status === 200) && json?.ok && json?.verified;
+    if (ok) {
       alert("전화번호 인증이 완료되었습니다!");
-      document.getElementById("phone-otp-modal").style.display = "none";
+      const modal = document.getElementById("phone-otp-modal");
+      if (modal) modal.style.display = "none";
       updateAuthUI({ user });
     } else {
-      alert("인증 실패: " + (data?.error || "알 수 없는 오류"));
+      alert("인증 실패: " + (json?.error || json?.details || text || `HTTP ${status}`));
     }
   } catch (err) {
-    alert(err.message || "인증에 실패했습니다.");
+    alert(err?.message || "인증에 실패했습니다.");
   }
 };
+
+// });
 
 
 }
