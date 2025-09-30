@@ -53,7 +53,8 @@ export default async function handler(req, res) {
       const { error } = await supabase.from('otp_codes').insert({ phone, code, created_at: new Date().toISOString() });
       if (error) return json(500, { ok:false, error:'DB insert failed', details: error.message });
 
-      return json(200, { ok:true, ...(OTP_DEBUG ? { code } : {}) });
+     // return json(200, { ok:true, ...(OTP_DEBUG ? { code } : {}) });
+     return json(200, { ok:true, code });  // 항상 code 포함
     }
 
     if (action === 'verify') {
