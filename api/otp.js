@@ -94,37 +94,42 @@ export default async function handler(req, res) {
 }
 
 
-    if (action === 'verify') {
-      const phone = (body?.phone || '').trim();
-      const code  = (body?.code  || '').trim();
-      if (!phone || !code) return json(400, { ok:false, error:'phone and code required' });
+// ── verify 액션 전체 (드롭인 교체본) ─────────────────────────────
+if (action === 'verify') {
+  const phone = (body?.phone || '').trim();
+  const code  = (body?.code  || '').trim();
+  if (!phone || !code) return json(400, { ok:false, error:'phone and code required' });
 
-      const { data, error } = await supabase
-        .from('otp_codes')
-        .select('*')
-        .eq('phone', phone)
-        .order('created_at', { ascending:false })
-        .limit(1);
+  const { data, error } = await supabase
+    .from('otp_codes')
+    .select('*')
+    .eq('phone', phone)
+    .order('created_at', { ascending:false })
+    .limit(1);
+  if (error) return json(500, { ok:false, error:'DB select failed', details: error.message });
 
-      if (error) return json(500, { ok:false, error:'DB select failed', details: error.message });
+  const row = data?.[0];
+  if (!row) return json(400, { ok:false, error:'No code found' });
 
-      const row = data?.[0];
-      if (!row) return json(400, { ok:false, error:'No code found' });
+  const ageSec = Math.floor((Date.now() - new Date(row.created_at).getTime())/1000);
+  if (ageSec > OTP_TTL_SEC) return json(400, { ok:false, error:'Code expired' });
+  if (String(row.code) !== String(code)) return json(400, { ok:false, error:'Invalid code' });
 
-      const ageSec = Math.floor((Date.now() - new Date(row.created_at).getTime())/1000);
-      if (ageSec > OTP_TTL_SEC) return json(400, { ok:false, error:'Code expired' });
+  // ✅ 여기부터 교체: profiles upsert
+  // (user_id도 저장하려면 body.user_id를 포함하세요)
+  const payload = { phone, phone_verified: true /*, user_id: body?.user_id */ };
 
-      if (String(row.code) !== String(code)) return json(400, { ok:false, error:'Invalid code' });
+  const { error: upsertErr } = await supabase
+    .from('profiles')
+    .upsert(payload, { onConflict: 'phone' });
 
-      const { error: updErr } = await supabase
-        .from('profiles')
-        .update({ phone_verified: true })
-        .eq('phone', phone);
+  if (upsertErr) {
+    return json(500, { ok:false, error:'Profile upsert failed', details: upsertErr.message });
+  }
 
-      if (updErr) return json(500, { ok:false, error:'Profile update failed', details: updErr.message });
+  return json(200, { ok:true, verified:true });
+}
 
-      return json(200, { ok:true, verified:true });
-    }
   } catch (e) {
     return json(500, { ok:false, error:'Unhandled server error', details:String(e?.message||e) });
   }
