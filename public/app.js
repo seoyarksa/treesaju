@@ -3974,7 +3974,7 @@ window.addEventListener("beforeunload", () => {
     });
 
 
-  showIfAdmin('#admin-menu');   // 회원관리 메뉴
+if (typeof showIfAdmin === 'function') showIfAdmin('#admin-menu');  // 회원관리 메뉴
 
 
 
@@ -3983,7 +3983,11 @@ window.addEventListener("beforeunload", () => {
     // ✅ 사주 폼 바인딩
     const form = document.getElementById("saju-form");
     if (form) {
-      form.addEventListener("submit", handleSajuSubmit);
+       if (typeof handleSajuSubmit === 'function') {
+   form.addEventListener("submit", handleSajuSubmit);
+ } else {
+   console.warn('[init] handleSajuSubmit가 없어 기본 동작으로만 진행됩니다.');
+ }
       document.getElementById("sajuSubmit")?.addEventListener("click", () => {
         window.outputMode = "basic";
         form.requestSubmit();
@@ -3997,7 +4001,7 @@ window.addEventListener("beforeunload", () => {
     // ✅ 로그인 후 프로필/정기구독/로그아웃 UI 세팅
     renderUserProfile();
 
-wireProfileEditEvents();
+if (typeof wireProfileEditEvents === 'function') wireProfileEditEvents();
 
   } catch (err) {
     console.error("[init] fatal:", err);
