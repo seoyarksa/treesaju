@@ -855,15 +855,16 @@ async function requirePhoneVerificationIfNeeded() {
 
   try {
     // profiles에서 phone_verified 조회 (RLS는 본인 행만 허용되도록 설정되어 있음)
-    const { data, error } = await window.supabaseClient
-      .from("profiles")
-      .select("phone_verified")
-      .eq("user_id", session.user.id)
-      .single();
+ const { data, error } = await window.supabaseClient
+   .from("profiles")
+   .select("phone_verified")
+   .eq("user_id", session.user.id)
+   .maybeSingle();            // ← 행이 없어도 에러 안 던짐
 
-    if (error) throw error;
 
-    if (!data?.phone_verified) {
+    if (error) console.warn("[profiles maybeSingle] warn:", error);
+
+    if (!data || !data.phone_verified) {
       // ✅ 인증 안 되어 있으면 즉시 모달
       openPhoneOtpModal();
     }
@@ -1043,14 +1044,15 @@ async function handleSajuSubmit(e) {
     const userId = session.user.id;
 
     // ✅ 반드시 풀프로필 확보 (정책 필드 포함)
-    let { data: profile, error: pErr } = await window.supabaseClient
-      .from("profiles")
-      .select("role, created_at, daily_limit, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
-      .eq("user_id", userId)
-      .single();
+ let { data: profile, error: pErr } = await window.supabaseClient
+   .from("profiles")
+   .select("role, created_at, daily_limit, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
+   .eq("user_id", userId)
+   .maybeSingle();   // ← 행이 없으면 null을 주고, throw 안 함
 
-    if (pErr || !profile || !profile.role) {
-      console.warn("[handleSajuSubmit] profile 보정 발생:", pErr);
+ if (pErr) console.warn("[handleSajuSubmit] profiles maybeSingle warn:", pErr);
+ if (!profile || !profile.role) {
+   console.warn("[handleSajuSubmit] profile이 없어 기본값으로 보정");
       profile = {
         role: "normal",
         created_at: session.user.created_at || new Date().toISOString(),
