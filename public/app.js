@@ -2,16 +2,15 @@
 
 
 // git add .
-// git commit -m "전화인증"   
+// git commit -m "로그인횟수제한"   
 // git push origin main
 // git push
 //강제실행   vercel --prod --force
 
-//   vercel dev
 
 //로그 다시 실행
 //console.clear();  console.log("🔥 전체 다시 실행됨");  console.log("👉 현재 saju:", JSON.stringify(saju));
-//신규확인
+
 
 
 // 상수
@@ -128,129 +127,6 @@ import { renderSinsalTable,
  ************************************/
 // ===== app.js (안전망 포함, 전체 교체용) =====
 // 파일 상단 어딘가
-
-// app.js 맨 위
-console.log("BUILD_TAG appjs-2025-09-29-04");
-
-// 공통 fetch 유틸 (반드시 상단에)
-// 공통 fetch 헬퍼
-// 네 기존 호출부와 호환되지만, !res.ok면 Error를 던집니다.
-async function postJSON(url, data, opts = {}) {
-  const method = opts.method || 'POST';
-  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-
-  // 타임아웃(기본 15초)
-  const controller = new AbortController();
-  const timeoutMs = opts.timeoutMs ?? 15000;
-  const t = setTimeout(() => controller.abort('timeout'), timeoutMs);
-
-  let res, raw, json;
-  try {
-    if (opts.debug) {
-      console.log('[postJSON] →', method, url, { data, headers });
-      console.time(`[postJSON] ${url}`);
-    }
-
-    res = await fetch(url, {
-      method,
-      headers,
-      body: JSON.stringify(data ?? {}),
-      cache: 'no-store',
-      signal: controller.signal,
-      credentials: opts.credentials || 'same-origin', // 필요시 'include'
-    });
-
-    raw = await res.text();
-    try { json = JSON.parse(raw); } catch { /* raw 유지 */ }
-
-    if (opts.debug) {
-      console.timeEnd(`[postJSON] ${url}`);
-      console.log('[postJSON] ←', res.status, json ?? raw);
-    }
-  } finally {
-    clearTimeout(t);
-  }
-
-  // ❗여기서 실패를 던진다
-  if (!res.ok) {
-    const msg = (json?.error || json?.details || raw || res.statusText || 'Request failed');
-    const err = new Error(msg);
-    err.status = res.status;
-    err.responseText = raw;
-    err.responseJson = json;
-    err.url = url;
-    throw err;
-  }
-
-  // 성공이면 기존처럼 3종 반환
-  return { status: res.status, json, text: raw };
-}
-
-
-
-// === 인증 버튼 ===
-async function onVerify(){
-  const phone = phoneInput.value.trim();
-  const code  = codeInput.value.trim();
-
-  const { status, json, text } = await postJSON('/api/otp?action=verify', { phone, code });
-
-  // ✅ 성공 조건을 엄격히
-  const ok = (status === 200) && !!json?.ok && !!json?.verified;
-  if (!ok) {
-    // 실패 메시지에 서버의 사유를 보여주면 디버그가 쉬움
-    const reason = json?.error || text || `HTTP ${status}`;
-    alert(`인증 실패: ${reason}`);
-    return;
-  }
-  alert('인증 성공!');
-  location.href = '/subscribe'; // 임시 결제/다음 단계
-}
-
-
-
-// ─── 전화번호 정규화 ───────────────────────────────────────────
-function normalizePhoneKR(raw, mode = "intl") {
-  const digits = String(raw || "").replace(/\D/g, "");
-
-  // 010-xxxx-xxxx → +8210xxxxxxx (국제 포맷)
-  if (digits.length === 11 && digits.startsWith("010")) {
-    if (mode === "intl") {
-      return "+82" + digits.slice(1); // 010 → +8210
-    }
-    return digits.replace(/(\d{3})(\d{4})(\d{4})/, "$1-$2-$3");
-  }
-
-  // 지역번호 포함 (예: 02-xxx-xxxx)
-  if (digits.length === 10) {
-    if (mode === "intl") {
-      if (digits.startsWith("0")) {
-        return "+82" + digits.slice(1);
-      }
-    }
-    return digits.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
-  }
-
-  // fallback: 그대로 반환
-  return raw;
-}
-
-// 전역 보장
-window.normalizePhoneKR = window.normalizePhoneKR || function (raw, mode = "intl") {
-  const digits = String(raw || "").replace(/\D/g, "");
-  if (digits.length === 11 && digits.startsWith("010")) {
-    return mode === "intl" ? "+82" + digits.slice(1)
-                           : digits.replace(/(\d{3})(\d{4})(\d{4})/, "$1-$2-$3");
-  }
-  if (digits.length === 10) {
-    return mode === "intl" ? "+82" + digits.slice(1)
-                           : digits.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
-  }
-  return raw;
-};
-
-
-
 // 부모 창 전역
 window.addEventListener('message', async (e) => {
   if (e.origin !== location.origin) return;
@@ -264,12 +140,7 @@ window.addEventListener('message', async (e) => {
 });
 
 
-
-
-
 let __lastFormKey = null;
-
-
 
 // 입력을 안정적으로 키로 만드는 헬퍼
 function makeFormKey(fd) {
@@ -327,6 +198,9 @@ function getKSTDateKey() {
 
 // ✅ 비로그인 1일 3회(한국 날짜 기준) 제한
 // ✅ 출력횟수 표시 (회원 구분 없음)
+
+
+
 
 
 
@@ -530,7 +404,6 @@ async function buildGateFromDb(userId, profile) {
   }
   return gate;
 }
-
 
 
 
@@ -794,7 +667,7 @@ function openSignupModal() {
     const email = document.getElementById("su-email").value.trim();
     const password = document.getElementById("su-password").value;
     const phoneRaw = document.getElementById("su-phone").value.trim();
-    const phone =  phoneRaw ? window.normalizePhoneKR(phoneRaw, "intl") : "";  
+    const phone = phoneRaw ? normalizePhoneKR(phoneRaw, "intl") : ""; // ✅ 국제 포맷 적용
 
     if (!nickname) return alert("닉네임을 입력하세요.");
     if (!email) return alert("이메일을 입력하세요.");
@@ -883,68 +756,75 @@ function openPhoneOtpModal() {
     modal.style.display = "none";
   };
 
-// ⚠️ 스크립트가 <head>에 있다면 이 블록으로 감싸 주세요.
-// window.addEventListener("DOMContentLoaded", () => { ...handlers... });
-
-/** 코드받기 */
-document.getElementById("otp-send").onclick = async () => {
-  const raw = document.getElementById("otp-phone").value.trim();
-  if (!raw) return alert("전화번호를 입력하세요.");
-  const phone = window.normalizePhoneKR(raw, "intl");
-
-  try {
-    const { status, json, text } = await postJSON("/api/otp?action=send", { phone });
-    if (status === 200 && json?.ok) {
-      if (json.code) console.log("개발용 인증코드:", json.code); // OTP_DEBUG=true일 때
+  // 코드 받기
+  document.getElementById("otp-send").onclick = async () => {
+    const raw = document.getElementById("otp-phone").value.trim();
+    if (!raw) return alert("전화번호를 입력하세요.");
+    const phone = normalizePhoneKR(raw, "intl"); // ✅ 국제번호(+82) 변환
+    try {
+      const { error } = await window.supabaseClient.auth.signInWithOtp({ phone });
+      if (error) throw error;
       alert("인증 코드가 발송되었습니다.");
-    } else {
-      alert("코드 발송 실패: " + (json?.error || json?.details || text || `HTTP ${status}`));
+    } catch (err) {
+      console.error("[OTP send] error:", err);
+      alert(err.message || "인증 코드를 보낼 수 없습니다.");
     }
-  } catch (err) {
-    alert(err?.message || "인증 코드를 보낼 수 없습니다.");
-  }
-};
+  };
 
-/** 인증하기 */
-// ✅ 인증하기 (정식: 로그인 필요, postJSON = {status,json,text} 사용)
-document.getElementById("otp-verify").onclick = async () => {
-  const raw  = document.getElementById("otp-phone").value.trim();
-  const code = document.getElementById("otp-code").value.trim();
-  if (!raw || !code) return alert("전화번호와 인증 코드를 입력하세요.");
+  // 인증하기
+  document.getElementById("otp-verify").onclick = async () => {
+    const raw = document.getElementById("otp-phone").value.trim();
+    const token = document.getElementById("otp-code").value.trim();
+    if (!raw || !token) return alert("전화번호와 인증 코드를 입력하세요.");
+    const phone = normalizePhoneKR(raw, "intl"); // ✅ 국제번호(+82) 변환
+    try {
+      const { data, error } = await window.supabaseClient.auth.verifyOtp({
+        phone,
+        token,
+        type: "sms",
+      });
+      if (error) throw error;
 
-  const phone = window.normalizePhoneKR(raw, "intl");
-
-  try {
-    // 1) 로그인 세션 확인
-    const { data: { user } } = await window.supabaseClient.auth.getUser();
-    if (!user) return alert("로그인 후 인증 가능합니다.");
-
-    // 2) 서버 검증
-    const { status, json, text } = await postJSON("/api/otp?action=verify", {
-      phone,
-      code,              // 서버는 'code' 필드 기대
-      user_id: user.id   // profiles 매칭에 사용
-    });
-
-    const ok = (status === 200) && json?.ok && json?.verified;
-    if (ok) {
       alert("전화번호 인증이 완료되었습니다!");
-      const modal = document.getElementById("phone-otp-modal");
-      if (modal) modal.style.display = "none";
-      updateAuthUI({ user });
-    } else {
-      alert("인증 실패: " + (json?.error || json?.details || text || `HTTP ${status}`));
+      modal.style.display = "none";
+
+      // ✅ 인증 후 UI 갱신
+      const { data: { session } } = await window.supabaseClient.auth.getSession();
+      updateAuthUI(session);
+      
+    } catch (err) {
+      console.error("[OTP verify] error:", err);
+      alert(err.message || "인증에 실패했습니다.");
     }
-  } catch (err) {
-    alert(err?.message || "인증에 실패했습니다.");
-  }
-};
-
-
-
+  };
 }
 
 
+// ─── 로그인된 유저가 전화 인증 필요하면 모달을 띄우는 검사 ───
+async function requirePhoneVerificationIfNeeded() {
+  const { data: { session } } = await window.supabaseClient.auth.getSession();
+  if (!session) return;
+
+  try {
+    // profiles에서 phone_verified 조회 (RLS는 본인 행만 허용되도록 설정되어 있음)
+    const { data, error } = await window.supabaseClient
+      .from("profiles")
+      .select("phone_verified")
+      .eq("user_id", session.user.id)
+      .single();
+
+    if (error) throw error;
+
+    if (!data?.phone_verified) {
+      // ✅ 인증 안 되어 있으면 즉시 모달
+      openPhoneOtpModal();
+    }
+  } catch (e) {
+    console.warn("[requirePhoneVerificationIfNeeded] 조회 실패:", e);
+    // 조회 실패 시에도 UX상 바로 요구하고 싶다면 모달을 띄워도 됨:
+    // openPhoneOtpModal();
+  }
+}
 
 
 
@@ -3626,44 +3506,20 @@ async function renderUserProfile() {
   const { data: { user } } = await window.supabaseClient.auth.getUser();
   if (!user) return;
 
-
-}
-
-
   // 여기서는 이벤트 바인딩만!
-document.getElementById("subscribeBtn").onclick = async () => {
-  // 현재 로그인 사용자 가져오기
-  const { data: { user } } = await window.supabaseClient.auth.getUser();
-  if (!user) return alert("로그인 후 이용해 주세요.");
+  document.getElementById("subscribeBtn")?.addEventListener("click", () => {
+    openPhoneOtpModal({
+      onSuccess: () => {
+        document.getElementById("subscriptionModal").style.display = "block";
+      }
+    });
+  });
 
-  // phone_verified 확인
-  const { data: profile } = await window.supabaseClient
-    .from("profiles")
-    .select("phone_verified")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!profile?.phone_verified) {
-    return openPhoneOtpModal(); // 인증 먼저
-  }
-
-// 인증된 경우 → 결제 API 호출
-try {
-  let data;
-  try {
-    data = await postJSON("/api/pay?action=start", { user_id: user.id });
-  } catch (e1) {
-    console.warn("[pay] /api/pay?action=start 실패, /api/start-subscription 재시도:", e1?.message);
-    data = await postJSON("/api/start-subscription", { user_id: user.id });
-  }
-  window.location.href ='/subscribe'; // 임시 결제창
-} catch (err) {
-  alert(err.message);
+  document.getElementById("logoutBtn")?.addEventListener("click", async () => {
+    await window.supabaseClient.auth.signOut();
+    location.reload();
+  });
 }
-
-
-};
-
 
 
 
@@ -3956,16 +3812,14 @@ window.addEventListener("beforeunload", () => {
       e.preventDefault();
       await window.supabaseClient.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${location.origin}/auth/callback` }
-,
+        options: { redirectTo: `${location.origin}${location.pathname}` },
       });
     });
     document.getElementById("kakaoLogin")?.addEventListener("click", async (e) => {
       e.preventDefault();
       await window.supabaseClient.auth.signInWithOAuth({
         provider: "kakao",
-        options: { redirectTo: `${location.origin}/auth/callback` }
-,
+        options: { redirectTo: `${location.origin}${location.pathname}` },
       });
     });
     document.getElementById("logoutBtn")?.addEventListener("click", async () => {
@@ -3974,7 +3828,7 @@ window.addEventListener("beforeunload", () => {
     });
 
 
-if (typeof showIfAdmin === 'function') showIfAdmin('#admin-menu');  // 회원관리 메뉴
+  showIfAdmin('#admin-menu');   // 회원관리 메뉴
 
 
 
@@ -3983,11 +3837,7 @@ if (typeof showIfAdmin === 'function') showIfAdmin('#admin-menu');  // 회원관
     // ✅ 사주 폼 바인딩
     const form = document.getElementById("saju-form");
     if (form) {
-       if (typeof handleSajuSubmit === 'function') {
-   form.addEventListener("submit", handleSajuSubmit);
- } else {
-   console.warn('[init] handleSajuSubmit가 없어 기본 동작으로만 진행됩니다.');
- }
+      form.addEventListener("submit", handleSajuSubmit);
       document.getElementById("sajuSubmit")?.addEventListener("click", () => {
         window.outputMode = "basic";
         form.requestSubmit();
@@ -4001,7 +3851,7 @@ if (typeof showIfAdmin === 'function') showIfAdmin('#admin-menu');  // 회원관
     // ✅ 로그인 후 프로필/정기구독/로그아웃 UI 세팅
     renderUserProfile();
 
-if (typeof wireProfileEditEvents === 'function') wireProfileEditEvents();
+wireProfileEditEvents();
 
   } catch (err) {
     console.error("[init] fatal:", err);
