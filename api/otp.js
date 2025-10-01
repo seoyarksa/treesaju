@@ -82,7 +82,7 @@ export default async function handler(req, res) {
           });
         }
 
-        return json(200, { ok:true, code: OTP_DEBUG ? code : code }); // 필요시 OTP_DEBUG에 따라 노출 제어
+        return json(200, { ok:true, ...(OTP_DEBUG ? { code } : {}) });
       } catch (e) {
         return json(500, {
           ok: false,
