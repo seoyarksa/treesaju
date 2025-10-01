@@ -141,19 +141,14 @@ if (action === 'verify') {
     prof = profSel.error ? null : (profSel.data?.[0] || null);
   }
 
-if (!prof) {
-  // 🔧 프로필이 없으면 생성하고 통과 (핫픽스)
-  const { data: insRows, error: insErr } = await supabase
-    .from('profiles')
-    .insert({ user_id: userId, phone, phone_verified: true, created_at: nowIso, updated_at: nowIso })
-    .select('user_id, id, phone, phone_verified');
-
-  if (insErr) {
-    return json(500, { ok:false, error:'Profile insert failed', details: insErr.message, stage:'auto_insert_profile' });
+  if (!prof) {
+    // 절대 새로 만들지 않음: 운영 안전
+    return json(409, {
+      ok:false,
+      error:'Profile not found',
+      hint:'회원가입/온보딩에서 profiles 행을 먼저 생성하세요 (user_id 또는 id = auth.users.id).'
+    });
   }
-  return json(200, { ok:true, verified:true, via:'auto_insert_profile', profile: insRows?.[0] || null });
-}
-
 
   // 업데이트 페이로드: phone은 비어 있을 때만 채움
   const patch = { phone_verified: true, updated_at: nowIso };
