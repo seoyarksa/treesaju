@@ -1,6 +1,8 @@
-// api/otp.js — 단일 파일, send / verify / diag (최소 수정 안정판)
+// api/otp.js — 단일 파일, send / verify / diag
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
+
+  // POST만 허용
   if ((req.method || 'GET') !== 'POST') {
     return res.status(405).end(JSON.stringify({ ok:false, error:'POST only' }));
   }
@@ -15,13 +17,12 @@ export default async function handler(req, res) {
     try { return raw ? JSON.parse(raw) : {}; } catch { return {}; }
   }
 
-  // ✅ 백틱 복구 (크래시 원인)
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const action = (url.searchParams.get('action') || '').toLowerCase();
   const OTP_TTL_SEC = Number(process.env.OTP_TTL_SEC || 300);
   const OTP_DEBUG = String(process.env.OTP_DEBUG || '').toLowerCase() === 'true';
 
-  // ── 진단 ──
+  // 진단
   if (action === 'diag-import') {
     try { await import('@supabase/supabase-js'); return json(200, { ok:true, supabaseImport:true }); }
     catch (e) { return json(500, { ok:false, where:'import', details:String(e?.message||e) }); }
@@ -44,60 +45,86 @@ export default async function handler(req, res) {
     const supabase = await getSb();
     const body = await getBody(req);
 
-    // ── send ──
-    if (action === 'send') {
-      const phone = (body?.phone || '').trim();
-      if (!phone) return json(400, { ok:false, error:'phone required' });
+ if (action === 'send') {
+  const phone = (body?.phone || '').trim();
+  if (!phone) return json(400, { ok:false, error:'phone required' });
 
-      // 개발 중 프론트가 code를 기대하므로 항상 JSON+code 반환
-      const code = String(Math.floor(Math.random()*900000) + 100000);
-      const { error } = await supabase.from('otp_codes').insert({ phone, code, created_at:new Date().toISOString() });
-      if (error) return json(500, { ok:false, where:'db-insert', details: error.message });
-      return json(200, { ok:true, code }); // ← 안정
+  // ✅ ENV 사전 점검(프로덕션/프리뷰 혼동 잡기)
+  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!sbUrl || !serviceKey) {
+    return json(500, {
+      ok: false,
+      where: 'env',
+      hasUrl: !!sbUrl,
+      hasKey: !!serviceKey,
+      hint: 'Vercel > Project > Settings > Environment Variables 에서 PRODUCTION에 설정 필요'
+    });
+  }
+
+  try {
+    const supabase = await getSb();
+
+    // 임시: 항상 응답에 code 포함(개발 편의)
+    const code = String(Math.floor(Math.random()*900000) + 100000);
+
+    // ✅ DB insert 에러를 상세히 표출
+    const { error } = await supabase
+      .from('otp_codes')
+      .insert({ phone, code, created_at: new Date().toISOString() });
+
+    if (error) {
+      return json(500, {
+        ok: false,
+        where: 'db-insert',
+        details: error.message,
+        hint: '테이블/권한/컬럼타입 확인'
+      });
     }
 
-    // ── verify ── (프로필은 기존 행만 갱신, insert 금지, phone 건드리지 않음)
+    return json(200, { ok:true, code });
+  } catch (e) {
+    return json(500, {
+      ok: false,
+      where: 'send-try',
+      details: String(e?.message || e),
+      hint: 'supabase-js import/런타임/바디파싱 확인'
+    });
+  }
+}
+
+
     if (action === 'verify') {
-      const phone  = (body?.phone   || '').trim();
-      const code   = (body?.code    || '').trim();
-      const userId = (body?.user_id || '').trim();
-      if (!phone || !code)  return json(400, { ok:false, error:'phone and code required' });
-      if (!userId)          return json(400, { ok:false, error:'user_id required' });
+      const phone = (body?.phone || '').trim();
+      const code  = (body?.code  || '').trim();
+      if (!phone || !code) return json(400, { ok:false, error:'phone and code required' });
 
       const { data, error } = await supabase
         .from('otp_codes')
-        .select('*').eq('phone', phone)
-        .order('created_at', { ascending:false }).limit(1);
+        .select('*')
+        .eq('phone', phone)
+        .order('created_at', { ascending:false })
+        .limit(1);
+
       if (error) return json(500, { ok:false, error:'DB select failed', details: error.message });
 
       const row = data?.[0];
       if (!row) return json(400, { ok:false, error:'No code found' });
+
       const ageSec = Math.floor((Date.now() - new Date(row.created_at).getTime())/1000);
-      if (ageSec > OTP_TTL_SEC)             return json(400, { ok:false, error:'Code expired' });
+      if (ageSec > OTP_TTL_SEC) return json(400, { ok:false, error:'Code expired' });
+
       if (String(row.code) !== String(code)) return json(400, { ok:false, error:'Invalid code' });
 
-      const patch = { phone_verified: true, updated_at: new Date().toISOString() };
+      const { error: updErr } = await supabase
+        .from('profiles')
+        .update({ phone_verified: true })
+        .eq('phone', phone);
 
-      // 1) user_id로 업데이트
-      let upd = await supabase.from('profiles').update(patch).eq('user_id', userId)
-        .select('user_id, id, phone, phone_verified');
-      if (upd.error) return json(500, { ok:false, error:'Profile update failed', details: upd.error.message, stage:'update_by_user_id' });
-      if (Array.isArray(upd.data) && upd.data.length > 0) {
-        return json(200, { ok:true, verified:true, via:'update_by_user_id', profile: upd.data[0] });
-      }
+      if (updErr) return json(500, { ok:false, error:'Profile update failed', details: updErr.message });
 
-      // 2) (공식 스키마 호환) id로도 시도
-      upd = await supabase.from('profiles').update(patch).eq('id', userId)
-        .select('user_id, id, phone, phone_verified');
-      if (upd.error) return json(500, { ok:false, error:'Profile update failed', details: upd.error.message, stage:'update_by_id' });
-      if (Array.isArray(upd.data) && upd.data.length > 0) {
-        return json(200, { ok:true, verified:true, via:'update_by_id', profile: upd.data[0] });
-      }
-
-      // 3) 기존 행이 전혀 없으면 만들지 않음(로그인/UI 보존)
-      return json(409, { ok:false, error:'Profile not found', hint:'profiles 행을 먼저 생성하세요.' });
+      return json(200, { ok:true, verified:true });
     }
-
   } catch (e) {
     return json(500, { ok:false, error:'Unhandled server error', details:String(e?.message||e) });
   }
