@@ -883,7 +883,13 @@ document.getElementById("otp-verify").onclick = async () => {
 // ─── 로그인된 유저가 전화 인증 필요하면 모달을 띄우는 검사 ───
 async function requirePhoneVerificationIfNeeded() {
   const { data: { session } } = await window.supabaseClient.auth.getSession();
-  if (!session) return;
+if (session?.user) {
+  await supabaseClient.from('profiles').insert({
+    user_id: session.user.id,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }).eq('user_id', session.user.id).maybeSingle(); // RLS 허용 필요
+}
 
   try {
     // profiles에서 phone_verified 조회 (RLS는 본인 행만 허용되도록 설정되어 있음)
