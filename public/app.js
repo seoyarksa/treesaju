@@ -865,21 +865,24 @@ document.getElementById("otp-send").onclick = async () => {
 };
 
 /** 인증하기 */
+// ✅ 인증하기 (정식: 로그인 필요, postJSON = {status,json,text} 사용)
 document.getElementById("otp-verify").onclick = async () => {
   const raw  = document.getElementById("otp-phone").value.trim();
   const code = document.getElementById("otp-code").value.trim();
   if (!raw || !code) return alert("전화번호와 인증 코드를 입력하세요.");
+
   const phone = window.normalizePhoneKR(raw, "intl");
 
   try {
-    // 로그인 세션 확인(정식 플로우 유지)
+    // 1) 로그인 세션 확인
     const { data: { user } } = await window.supabaseClient.auth.getUser();
     if (!user) return alert("로그인 후 인증 가능합니다.");
 
+    // 2) 서버 검증
     const { status, json, text } = await postJSON("/api/otp?action=verify", {
       phone,
-      code,         // ← 서버는 code 필드 사용
-      user_id: user.id // (지금 서버는 안 쓰지만 보냄)
+      code,              // 서버는 'code' 필드 기대
+      user_id: user.id   // profiles 매칭에 사용
     });
 
     const ok = (status === 200) && json?.ok && json?.verified;
@@ -896,7 +899,6 @@ document.getElementById("otp-verify").onclick = async () => {
   }
 };
 
-// });
 
 
 }
