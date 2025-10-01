@@ -147,6 +147,44 @@ export default async function handler(req, res) {
       return json(200, { ok:true, verified:true, via:'insert_with_user_id' });
     }
 
+
+    // ✅ 코드/만료/불일치 검증을 모두 통과한 직후에 배치
+const userId = (body?.user_id || '').trim();
+if (!userId) {
+  return json(400, { ok:false, error:'user_id required for profile update' });
+}
+
+const nowIso = new Date().toISOString();
+// 👉 인증 완료시 phone 저장 + phone_verified true로 세팅
+const patch = { phone, phone_verified: true, updated_at: nowIso };
+
+/** 1) user_id 기준 업데이트 */
+const { data: updRows, error: updErr } = await supabase
+  .from('profiles')
+  .update(patch)
+  .eq('user_id', userId)
+  .select('user_id, phone, phone_verified');
+
+if (updErr) {
+  return json(500, { ok:false, error:'Profile update failed', details: updErr.message, stage:'update_by_user_id' });
+}
+if (Array.isArray(updRows) && updRows.length > 0) {
+  return json(200, { ok:true, verified:true, via:'update_by_user_id', profile: updRows[0] });
+}
+
+/** 2) 행이 없으면 새로 생성 */
+const { data: insRows, error: insErr } = await supabase
+  .from('profiles')
+  .insert({ user_id: userId, ...patch })
+  .select('user_id, phone, phone_verified');
+
+if (insErr) {
+  return json(500, { ok:false, error:'Profile insert failed', details: insErr.message, stage:'insert_with_user_id' });
+}
+
+return json(200, { ok:true, verified:true, via:'insert_with_user_id', profile: insRows?.[0] || null });
+
+
   } catch (e) {
     return json(500, { ok:false, error:'Unhandled server error', details:String(e?.message||e) });
   }
