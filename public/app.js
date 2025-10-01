@@ -3956,14 +3956,16 @@ window.addEventListener("beforeunload", () => {
       e.preventDefault();
       await window.supabaseClient.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${location.origin}${location.pathname}` },
+        options: { redirectTo: `${location.origin}/auth/callback` }
+,
       });
     });
     document.getElementById("kakaoLogin")?.addEventListener("click", async (e) => {
       e.preventDefault();
       await window.supabaseClient.auth.signInWithOAuth({
         provider: "kakao",
-        options: { redirectTo: `${location.origin}${location.pathname}` },
+        options: { redirectTo: `${location.origin}/auth/callback` }
+,
       });
     });
     document.getElementById("logoutBtn")?.addEventListener("click", async () => {
