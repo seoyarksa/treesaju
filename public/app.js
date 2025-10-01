@@ -140,6 +140,16 @@ window.addEventListener('message', async (e) => {
 });
 
 
+(async () => {
+  try {
+    if (location.hash.includes('access_token')) {
+      await supabaseClient.auth.getSession(); // 해시에서 세션 반영
+      history.replaceState({}, '', location.pathname + location.search); // 해시 제거
+    }
+  } catch (e) { console.error('[auth-callback]', e); }
+})();
+
+
 let __lastFormKey = null;
 
 // 입력을 안정적으로 키로 만드는 헬퍼
@@ -3507,7 +3517,7 @@ async function renderUserProfile() {
   if (!user) return;
 
   // 여기서는 이벤트 바인딩만!
-  document.getElementById("subscribeBtn")?.addEventListener("click", () => {
+  document.getElementById("subscribeBtn")?.addEventListener("click", async () => {
     openPhoneOtpModal({
       onSuccess: () => {
         document.getElementById("subscriptionModal").style.display = "block";
