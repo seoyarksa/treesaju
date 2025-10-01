@@ -686,7 +686,7 @@ function openSignupModal() {
     const email = document.getElementById("su-email").value.trim();
     const password = document.getElementById("su-password").value;
     const phoneRaw = document.getElementById("su-phone").value.trim();
-    const phone = phoneRaw ? normalizePhoneKR(phoneRaw, "intl") : ""; // ✅ 국제 포맷 적용
+    const phone = phoneRaw ? window.normalizePhoneKR(phoneRaw, "intl") : ""; // ✅ 국제 포맷 적용
 
     if (!nickname) return alert("닉네임을 입력하세요.");
     if (!email) return alert("이메일을 입력하세요.");
@@ -779,7 +779,7 @@ function openPhoneOtpModal() {
   document.getElementById("otp-send").onclick = async () => {
     const raw = document.getElementById("otp-phone").value.trim();
     if (!raw) return alert("전화번호를 입력하세요.");
-    const phone = normalizePhoneKR(raw, "intl"); // ✅ 국제번호(+82) 변환
+    const phone = window.normalizePhoneKR(raw, "intl"); // ✅ 국제번호(+82) 변환
     try {
       const { error } = await window.supabaseClient.auth.signInWithOtp({ phone });
       if (error) throw error;
@@ -795,7 +795,7 @@ function openPhoneOtpModal() {
     const raw = document.getElementById("otp-phone").value.trim();
     const token = document.getElementById("otp-code").value.trim();
     if (!raw || !token) return alert("전화번호와 인증 코드를 입력하세요.");
-    const phone = normalizePhoneKR(raw, "intl"); // ✅ 국제번호(+82) 변환
+    const phone = window.normalizePhoneKR(raw, "intl"); // ✅ 국제번호(+82) 변환
     try {
       const { data, error } = await window.supabaseClient.auth.verifyOtp({
         phone,
