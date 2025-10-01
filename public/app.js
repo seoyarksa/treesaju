@@ -781,9 +781,13 @@ function openPhoneOtpModal() {
     if (!raw) return alert("전화번호를 입력하세요.");
     const phone = window.normalizePhoneKR(raw, "intl"); // ✅ 국제번호(+82) 변환
     try {
-      const { error } = await window.supabaseClient.auth.signInWithOtp({ phone });
-      if (error) throw error;
-      alert("인증 코드가 발송되었습니다.");
+ const { status, json, text } = await postJSON("/api/otp?action=send", { phone });
+ if (status === 200 && json?.ok) {
+   if (json.code) console.log("[DEV] 인증코드:", json.code); // OTP_DEBUG=true면 표시
+  alert("인증 코드가 발송되었습니다.");
+ } else {
+   throw new Error(json?.error || json?.details || text || `HTTP ${status}`);
+ }
     } catch (err) {
       console.error("[OTP send] error:", err);
       alert(err.message || "인증 코드를 보낼 수 없습니다.");
@@ -797,12 +801,16 @@ function openPhoneOtpModal() {
     if (!raw || !token) return alert("전화번호와 인증 코드를 입력하세요.");
     const phone = window.normalizePhoneKR(raw, "intl"); // ✅ 국제번호(+82) 변환
     try {
-      const { data, error } = await window.supabaseClient.auth.verifyOtp({
-        phone,
-        token,
-        type: "sms",
-      });
-      if (error) throw error;
+ const { data: { user } } = await window.supabaseClient.auth.getUser();
+ if (!user) return alert("로그인 후 인증 가능합니다.");
+ const { status, json, text } = await postJSON("/api/otp?action=verify", {
+   phone,
+   code: token,      // 서버는 'code' 필드 기대
+   user_id: user.id  // profiles 업데이트용
+ });
+ if (!(status === 200 && json?.ok && json?.verified)) {
+   throw new Error(json?.error || json?.details || text || `HTTP ${status}`);
+ }
 
       alert("전화번호 인증이 완료되었습니다!");
       modal.style.display = "none";
