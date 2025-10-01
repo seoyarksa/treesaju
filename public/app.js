@@ -815,36 +815,56 @@ function openPhoneOtpModal() {
     }
   };
 
-  // 인증하기
-  document.getElementById("otp-verify").onclick = async () => {
-    const raw = document.getElementById("otp-phone").value.trim();
-    const token = document.getElementById("otp-code").value.trim();
-    if (!raw || !token) return alert("전화번호와 인증 코드를 입력하세요.");
-    const phone = window.normalizePhoneKR(raw, "intl"); // ✅ 국제번호(+82) 변환
-    try {
- const { data: { user } } = await window.supabaseClient.auth.getUser();
- if (!user) return alert("로그인 후 인증 가능합니다.");
- const { status, json, text } = await postJSON("/api/otp?action=verify", {
-   phone,
-   code: token,      // 서버는 'code' 필드 기대
-   user_id: user.id  // profiles 업데이트용
- });
- if (!(status === 200 && json?.ok && json?.verified)) {
-   throw new Error(json?.error || json?.details || text || `HTTP ${status}`);
- }
+// ✅ 인증하기 (드롭인 교체)
+document.getElementById("otp-verify").onclick = async () => {
+  const raw  = document.getElementById("otp-phone").value.trim();
+  const token = document.getElementById("otp-code").value.trim();
+  if (!raw || !token) return alert("전화번호와 인증 코드를 입력하세요.");
 
-      alert("전화번호 인증이 완료되었습니다!");
-      modal.style.display = "none";
+  // postJSON/normalizePhoneKR 존재 확인(없으면 바로 원인 파악)
+  if (typeof window.postJSON !== "function") {
+    console.error("[OTP verify] postJSON is not defined");
+    return alert("내부 오류: postJSON 미정의");
+  }
+  if (typeof window.normalizePhoneKR !== "function") {
+    console.error("[OTP verify] normalizePhoneKR is not defined");
+    return alert("내부 오류: 전화번호 정규화 함수 미정의");
+  }
 
-      // ✅ 인증 후 UI 갱신
-      const { data: { session } } = await window.supabaseClient.auth.getSession();
-      updateAuthUI(session);
-      
-    } catch (err) {
-      console.error("[OTP verify] error:", err);
-      alert(err.message || "인증에 실패했습니다.");
+  const phone = window.normalizePhoneKR(raw, "intl"); // +82 포맷
+
+  try {
+    // 1) 로그인 체크
+    const { data: { user } } = await window.supabaseClient.auth.getUser();
+    if (!user) return alert("로그인 후 인증 가능합니다.");
+
+    // 2) 서버 검증(커스텀 OTP)
+    const { status, json, text } = await postJSON("/api/otp?action=verify", {
+      phone,
+      code: token,      // 서버는 'code' 필드를 기대
+      user_id: user.id  // profiles 업데이트용
+    });
+
+    const ok = (status === 200) && json?.ok && json?.verified;
+    if (!ok) {
+      console.error("[OTP verify] fail:", { status, json, text });
+      return alert("인증 실패: " + (json?.error || json?.details || text || `HTTP ${status}`));
     }
-  };
+
+    // 3) 성공 처리
+    alert("전화번호 인증이 완료되었습니다!");
+    const modalEl = document.getElementById("phone-otp-modal"); // 지역변수 modal이 없을 수도 있어 안전하게 다시 조회
+    if (modalEl) modalEl.style.display = "none";
+
+    // 4) UI 갱신
+    const { data: { session } } = await window.supabaseClient.auth.getSession();
+    updateAuthUI(session);
+
+  } catch (err) {
+    console.error("[OTP verify] catch:", err);
+    alert(err?.message || "인증에 실패했습니다.");
+  }
+};
 }
 
 
@@ -3551,25 +3571,62 @@ requestAnimationFrame(() => {
 
 
 
-// renderUserProfile 정의는 그대로 유지
+// renderUserProfile 정의는 그대로 유지 (드롭인 교체)
 async function renderUserProfile() {
   const { data: { user } } = await window.supabaseClient.auth.getUser();
   if (!user) return;
 
-  // 여기서는 이벤트 바인딩만!
-  document.getElementById("subscribeBtn")?.addEventListener("click", () => {
-    openPhoneOtpModal({
-      onSuccess: () => {
-        document.getElementById("subscriptionModal").style.display = "block";
-      }
-    });
-  });
+  // ✅ 구독 버튼: 프로필 phone_verified 확인 → 미인증이면 OTP 모달, 인증이면 결제 모달
+  const subscribeBtn = document.getElementById("subscribeBtn");
+  if (subscribeBtn) {
+    // 중복 바인딩 방지
+    subscribeBtn._bound && subscribeBtn.removeEventListener("click", subscribeBtn._bound);
+    subscribeBtn._bound = async (e) => {
+      e.preventDefault();
+      try {
+        const { data: profile, error: profErr } = await window.supabaseClient
+          .from("profiles")
+          .select("phone_verified")
+          .eq("user_id", user.id)
+          .maybeSingle(); // ← 행이 없으면 null
 
-  document.getElementById("logoutBtn")?.addEventListener("click", async () => {
-    await window.supabaseClient.auth.signOut();
-    location.reload();
-  });
+        if (profErr) console.warn("[profiles maybeSingle] warn:", profErr);
+
+        if (!profile || !profile.phone_verified) {
+          // 전화 인증 먼저
+          openPhoneOtpModal();
+          return;
+        }
+
+        // ✅ 인증되어 있으면 결제 모달(임시) 오픈
+        const subModal = document.getElementById("subscriptionModal");
+        if (subModal) {
+          subModal.style.display = "block";
+        } else {
+          // 모달이 없으면 임시 이동 (필요 시 주석 해제)
+          // window.location.href = "/subscribe";
+          alert("전화 인증 확인됨. 결제 창을 연결해 주세요.");
+        }
+      } catch (err) {
+        console.error("[subscribeBtn] error:", err);
+        alert(err?.message || "처리 중 오류가 발생했습니다.");
+      }
+    };
+    subscribeBtn.addEventListener("click", subscribeBtn._bound);
+  }
+
+  // ✅ 로그아웃 버튼
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) {
+    logoutBtn._bound && logoutBtn.removeEventListener("click", logoutBtn._bound);
+    logoutBtn._bound = async () => {
+      await window.supabaseClient.auth.signOut();
+      location.reload();
+    };
+    logoutBtn.addEventListener("click", logoutBtn._bound);
+  }
 }
+
 
 
 
