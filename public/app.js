@@ -134,15 +134,56 @@ console.log("BUILD_TAG appjs-2025-09-29-04");
 
 // 공통 fetch 유틸 (반드시 상단에)
 // 공통 fetch 헬퍼
-async function postJSON(url, data){
-  const r = await fetch(url, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(data||{})
-  });
-  const t = await r.text();
-  let j = null; try { j = JSON.parse(t); } catch {}
-  return { status: r.status, json: j, text: t };
+// 네 기존 호출부와 호환되지만, !res.ok면 Error를 던집니다.
+async function postJSON(url, data, opts = {}) {
+  const method = opts.method || 'POST';
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+
+  // 타임아웃(기본 15초)
+  const controller = new AbortController();
+  const timeoutMs = opts.timeoutMs ?? 15000;
+  const t = setTimeout(() => controller.abort('timeout'), timeoutMs);
+
+  let res, raw, json;
+  try {
+    if (opts.debug) {
+      console.log('[postJSON] →', method, url, { data, headers });
+      console.time(`[postJSON] ${url}`);
+    }
+
+    res = await fetch(url, {
+      method,
+      headers,
+      body: JSON.stringify(data ?? {}),
+      cache: 'no-store',
+      signal: controller.signal,
+      credentials: opts.credentials || 'same-origin', // 필요시 'include'
+    });
+
+    raw = await res.text();
+    try { json = JSON.parse(raw); } catch { /* raw 유지 */ }
+
+    if (opts.debug) {
+      console.timeEnd(`[postJSON] ${url}`);
+      console.log('[postJSON] ←', res.status, json ?? raw);
+    }
+  } finally {
+    clearTimeout(t);
+  }
+
+  // ❗여기서 실패를 던진다
+  if (!res.ok) {
+    const msg = (json?.error || json?.details || raw || res.statusText || 'Request failed');
+    const err = new Error(msg);
+    err.status = res.status;
+    err.responseText = raw;
+    err.responseJson = json;
+    err.url = url;
+    throw err;
+  }
+
+  // 성공이면 기존처럼 3종 반환
+  return { status: res.status, json, text: raw };
 }
 
 
