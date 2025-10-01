@@ -135,19 +135,30 @@ if (action === 'verify') {
     return json(200, { ok:true, verified:true, via:'update_by_user_id', profile: updRows[0] });
   }
 
-  // 2-2) 행이 없으면 새로 생성
+// 2-2) 행이 없으면 insert 시도 → 단, 같은 user_id가 이미 있는지 재확인
+const { data: existing } = await supabase
+  .from('profiles')
+  .select('user_id')
+  .eq('user_id', userId)
+  .limit(1);
+
+if (!existing || existing.length === 0) {
   const { data: insRows, error: insErr } = await supabase
     .from('profiles')
     .insert({ user_id: userId, ...patch })
     .select('user_id, phone, phone_verified');
 
   if (insErr) {
-    return json(500, { ok:false, error:'Profile insert failed', details: insErr.message, stage:'insert_with_user_id' });
+    return json(500, { ok:false, error:'Profile insert failed', details: insErr.message });
   }
 
   return json(200, { ok:true, verified:true, via:'insert_with_user_id', profile: insRows?.[0] || null });
 }
 
+// 이미 있으면 insert 안 하고 오류 리턴
+return json(409, { ok:false, error:'Profile exists but update failed' });
+
+}
 
  } catch (e) {
     return json(500, { ok:false, error:'Unhandled server error', details:String(e?.message||e) });
