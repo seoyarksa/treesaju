@@ -159,6 +159,24 @@ function makeFormKey(fd) {
 }
 
 
+function normalizePhoneKR(raw, mode = 'intl') {
+  const digits = String(raw || '').replace(/\D/g, '');
+  // 010-xxxx-xxxx → +8210xxxxxxxx
+  if (digits.length === 11 && digits.startsWith('010')) {
+    return mode === 'intl' ? '+82' + digits.slice(1)
+                           : digits.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
+  }
+  // 02/0xx-xxx-xxxx → +82x...
+  if (digits.length === 10 && digits.startsWith('0')) {
+    return mode === 'intl' ? '+82' + digits.slice(1)
+                           : digits.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+  }
+  return raw; // 기타는 원본 유지
+}
+window.normalizePhoneKR ||= normalizePhoneKR;  // 전역 보강
+
+
+
 // 0) 안전 헬퍼
 const $ = (sel) => document.querySelector(sel);
 const on = (el, ev, fn) => el && el.addEventListener(ev, fn);
