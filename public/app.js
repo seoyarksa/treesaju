@@ -159,6 +159,27 @@ function makeFormKey(fd) {
 }
 
 
+// ✅ 공용 fetch 헬퍼 (전역 등록)
+async function postJSON(url, data) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data || {})
+  });
+  const text = await res.text();
+  let json = null; try { json = JSON.parse(text); } catch {}
+  if (!res.ok) {
+    const msg = json?.error || json?.details || text || `HTTP ${res.status}`;
+    const err = new Error(msg); err.status = res.status; err.responseText = text; err.responseJson = json;
+    throw err;
+  }
+  return { status: res.status, json, text };
+}
+// 전역 보강 (중복 정의 방지)
+window.postJSON ||= postJSON;
+
+
+
 function normalizePhoneKR(raw, mode = 'intl') {
   const digits = String(raw || '').replace(/\D/g, '');
   // 010-xxxx-xxxx → +8210xxxxxxxx
