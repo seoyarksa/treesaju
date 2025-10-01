@@ -111,18 +111,7 @@ import { renderSinsalTable,
       } from './sinsalUtils.js';
 
 
-// app.js 최상단에 추가
-(async () => {
-  try {
-    if (location.hash.includes('access_token')) {
-      console.log('[auth-callback] detected access_token');
-      await window.supabaseClient.auth.getSession(); // 해시값 → 세션 저장
-      history.replaceState({}, '', location.pathname + location.search); // 해시 제거
-    }
-  } catch (e) {
-    console.error('[auth-callback] error', e);
-  }
-})();
+
 
 // =========================================
 // 출력 제한 로직 (비로그인 사용자 하루 3회 제한)
