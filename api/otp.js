@@ -94,98 +94,62 @@ export default async function handler(req, res) {
     }
 
     // ── verify (수정된 핵심) ─────────────────────────────────────────────
-    if (action === 'verify') {
-      const phone  = (body?.phone   || '').trim();
-      const code   = (body?.code    || '').trim();
-      const userId = (body?.user_id || '').trim(); // 로그인 유저 id (profiles.user_id uuid 기준)
-      if (!phone || !code)  return json(400, { ok:false, error:'phone and code required' });
-      if (!userId)          return json(400, { ok:false, error:'user_id required for profile update' });
+if (action === 'verify') {
+  const phone  = (body?.phone   || '').trim();
+  const code   = (body?.code    || '').trim();
+  const userId = (body?.user_id || '').trim(); // 로그인 유저 id (profiles.user_id uuid 기준)
+  if (!phone || !code)  return json(400, { ok:false, error:'phone and code required' });
+  if (!userId)          return json(400, { ok:false, error:'user_id required for profile update' });
 
-      // 1) 최근 OTP 조회
-      const { data, error } = await supabase
-        .from('otp_codes')
-        .select('*')
-        .eq('phone', phone)
-        .order('created_at', { ascending:false })
-        .limit(1);
-      if (error) return json(500, { ok:false, error:'DB select failed', details: error.message });
+  // 1) 최근 OTP 조회
+  const { data, error } = await supabase
+    .from('otp_codes')
+    .select('*')
+    .eq('phone', phone)
+    .order('created_at', { ascending:false })
+    .limit(1);
+  if (error) return json(500, { ok:false, error:'DB select failed', details: error.message });
 
-      const row = data?.[0];
-      if (!row) return json(400, { ok:false, error:'No code found' });
+  const row = data?.[0];
+  if (!row) return json(400, { ok:false, error:'No code found' });
 
-      const ageSec = Math.floor((Date.now() - new Date(row.created_at).getTime())/1000);
-      if (ageSec > OTP_TTL_SEC)            return json(400, { ok:false, error:'Code expired' });
-      if (String(row.code) !== String(code))return json(400, { ok:false, error:'Invalid code' });
+  const ageSec = Math.floor((Date.now() - new Date(row.created_at).getTime())/1000);
+  if (ageSec > OTP_TTL_SEC)            return json(400, { ok:false, error:'Code expired' });
+  if (String(row.code) !== String(code))return json(400, { ok:false, error:'Invalid code' });
 
-      // 2) profiles 반영 — 스키마 변경 없이: user_id 기준 update → 없으면 insert
-      const nowIso = new Date().toISOString();
-      const patch  = { phone, phone_verified: true, updated_at: nowIso };
+  // 2) profiles 반영 — user_id 기준 update → 없으면 insert
+  const nowIso = new Date().toISOString();
+  const patch  = { phone, phone_verified: true, updated_at: nowIso };
 
-      // 2-1) user_id 기준 업데이트
-      const { data: updRows, error: updErr } = await supabase
-        .from('profiles')
-        .update(patch)
-        .eq('user_id', userId)
-        .select('user_id');
+  // 2-1) user_id 기준 업데이트
+  const { data: updRows, error: updErr } = await supabase
+    .from('profiles')
+    .update(patch)
+    .eq('user_id', userId)
+    .select('user_id, phone, phone_verified');
 
-      if (updErr) {
-        return json(500, { ok:false, error:'Profile update failed', details: updErr.message, stage:'update_by_user_id' });
-      }
-      if (updRows && updRows.length > 0) {
-        return json(200, { ok:true, verified:true, via:'update_by_user_id' });
-      }
+  if (updErr) {
+    return json(500, { ok:false, error:'Profile update failed', details: updErr.message, stage:'update_by_user_id' });
+  }
+  if (Array.isArray(updRows) && updRows.length > 0) {
+    return json(200, { ok:true, verified:true, via:'update_by_user_id', profile: updRows[0] });
+  }
 
-      // 2-2) 행이 없으면 insert (user_id 포함)
-      const { error: insErr } = await supabase
-        .from('profiles')
-        .insert({ user_id: userId, phone, phone_verified: true, updated_at: nowIso });
+  // 2-2) 행이 없으면 새로 생성
+  const { data: insRows, error: insErr } = await supabase
+    .from('profiles')
+    .insert({ user_id: userId, ...patch })
+    .select('user_id, phone, phone_verified');
 
-      if (insErr) {
-        return json(500, { ok:false, error:'Profile insert failed', details: insErr.message, stage:'insert_with_user_id' });
-      }
+  if (insErr) {
+    return json(500, { ok:false, error:'Profile insert failed', details: insErr.message, stage:'insert_with_user_id' });
+  }
 
-      return json(200, { ok:true, verified:true, via:'insert_with_user_id' });
-    }
-
-
-    // ✅ 코드/만료/불일치 검증을 모두 통과한 직후에 배치
-const userId = (body?.user_id || '').trim();
-if (!userId) {
-  return json(400, { ok:false, error:'user_id required for profile update' });
+  return json(200, { ok:true, verified:true, via:'insert_with_user_id', profile: insRows?.[0] || null });
 }
 
-const nowIso = new Date().toISOString();
-// 👉 인증 완료시 phone 저장 + phone_verified true로 세팅
-const patch = { phone, phone_verified: true, updated_at: nowIso };
 
-/** 1) user_id 기준 업데이트 */
-const { data: updRows, error: updErr } = await supabase
-  .from('profiles')
-  .update(patch)
-  .eq('user_id', userId)
-  .select('user_id, phone, phone_verified');
-
-if (updErr) {
-  return json(500, { ok:false, error:'Profile update failed', details: updErr.message, stage:'update_by_user_id' });
-}
-if (Array.isArray(updRows) && updRows.length > 0) {
-  return json(200, { ok:true, verified:true, via:'update_by_user_id', profile: updRows[0] });
-}
-
-/** 2) 행이 없으면 새로 생성 */
-const { data: insRows, error: insErr } = await supabase
-  .from('profiles')
-  .insert({ user_id: userId, ...patch })
-  .select('user_id, phone, phone_verified');
-
-if (insErr) {
-  return json(500, { ok:false, error:'Profile insert failed', details: insErr.message, stage:'insert_with_user_id' });
-}
-
-return json(200, { ok:true, verified:true, via:'insert_with_user_id', profile: insRows?.[0] || null });
-
-
-  } catch (e) {
+ } catch (e) {
     return json(500, { ok:false, error:'Unhandled server error', details:String(e?.message||e) });
   }
 
