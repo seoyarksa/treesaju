@@ -112,6 +112,7 @@ import { renderSinsalTable,
 
 
 
+
 // =========================================
 // 출력 제한 로직 (비로그인 사용자 하루 3회 제한)
 // =========================================
@@ -127,6 +128,19 @@ import { renderSinsalTable,
  ************************************/
 // ===== app.js (안전망 포함, 전체 교체용) =====
 // 파일 상단 어딘가
+// 부모 창 전역
+window.addEventListener('message', async (e) => {
+  if (e.origin !== location.origin) return;
+  if (e.data?.type !== 'REQUEST_SUPABASE_SESSION') return;
+  const { data: { session } } = await window.supabaseClient.auth.getSession();
+  const payload = session ? {
+    access_token: session.access_token,
+    refresh_token: session.refresh_token
+  } : null;
+  e.source?.postMessage({ type: 'SUPABASE_SESSION', session: payload }, e.origin);
+});
+
+
 let __lastFormKey = null;
 
 // 입력을 안정적으로 키로 만드는 헬퍼
@@ -143,6 +157,45 @@ function makeFormKey(fd) {
   };
   return JSON.stringify(norm);
 }
+
+
+// ✅ 공용 fetch 헬퍼 (전역 등록)
+async function postJSON(url, data) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data || {})
+  });
+  const text = await res.text();
+  let json = null; try { json = JSON.parse(text); } catch {}
+  if (!res.ok) {
+    const msg = json?.error || json?.details || text || `HTTP ${res.status}`;
+    const err = new Error(msg); err.status = res.status; err.responseText = text; err.responseJson = json;
+    throw err;
+  }
+  return { status: res.status, json, text };
+}
+// 전역 보강 (중복 정의 방지)
+window.postJSON ||= postJSON;
+
+
+
+function normalizePhoneKR(raw, mode = 'intl') {
+  const digits = String(raw || '').replace(/\D/g, '');
+  // 010-xxxx-xxxx → +8210xxxxxxxx
+  if (digits.length === 11 && digits.startsWith('010')) {
+    return mode === 'intl' ? '+82' + digits.slice(1)
+                           : digits.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
+  }
+  // 02/0xx-xxx-xxxx → +82x...
+  if (digits.length === 10 && digits.startsWith('0')) {
+    return mode === 'intl' ? '+82' + digits.slice(1)
+                           : digits.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+  }
+  return raw; // 기타는 원본 유지
+}
+window.normalizePhoneKR ||= normalizePhoneKR;  // 전역 보강
+
 
 
 // 0) 안전 헬퍼
@@ -196,16 +249,6 @@ function getKSTDateKey() {
 
 // === 2) 로그인 UI 토글
 
-// util: 쿠키 set/remove
-function setCookie(name, value, maxAgeSec) {
-  // 프로덕션은 반드시 https에서 Secure 유지
-  document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSec}; SameSite=Lax; Secure`;
-}
-function removeCookie(name) {
-  document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax; Secure`;
-}
-
-
 async function updateAuthUI(session) {
   const authSection =
     document.getElementById("auth-section") ||
@@ -216,34 +259,40 @@ async function updateAuthUI(session) {
   const historySection = document.getElementById("saju-history-section");
 
   if (session && session.user) {
-      const user = session.user;
-  console.log("로그인 성공, UID:", user.id); // 👈 로그인한 사용자 UID 로그
+    // ✅ 여기서 토큰 저장 처리
     const token = session.access_token;
-
-    // ⬇ 기존 로컬/세션 스토리지 유지
     const userAgent = navigator.userAgent || navigator.vendor || window.opera;
     const isMobile = /android|iphone|ipad|ipod/i.test(userAgent);
-    localStorage.setItem("authToken", token);
-    // ✅ 서버 게이트웨이가 읽을 수 있게 쿠키에도 저장 (예: 1시간)
-    setCookie("auth", token, 60 * 60);
+
+    if (isMobile) {
+      localStorage.setItem("authToken", token);
+    } else {
+      sessionStorage.setItem("authToken", token);
+    }
 
     if (authSection) authSection.style.display = "none";
     if (profileSection) profileSection.style.display = "block";
 
+    const user = session.user;
 
-
-    // 프로필/권한 처리 (그대로)
+    // ✅ 프로필 role 불러오기
     const { data: profile } = await window.supabaseClient
       .from("profiles")
       .select("role, created_at, daily_limit")
       .eq("user_id", user.id)
       .single();
 
-    const role = profile?.role || "normal";
-    localStorage.setItem("userRole", role);
+const role = profile?.role || "normal";
+localStorage.setItem("userRole", role);
 
-    const adminMenu = document.getElementById("admin-menu");
-    if (adminMenu) adminMenu.style.display = role === "admin" ? "inline" : "none";
+
+  // ✅ 여기 추가
+  wireProfileEditEvents();
+// ✅ 회원관리 메뉴 표시/숨김
+const adminMenu = document.getElementById("admin-menu");
+if (adminMenu) {
+  adminMenu.style.display = role === "admin" ? "inline" : "none";
+}
 
     let roleLabel = "";
     switch (profile?.role) {
@@ -257,7 +306,9 @@ async function updateAuthUI(session) {
       user.user_metadata?.nickname ||
       user.user_metadata?.name ||
       user.user_metadata?.full_name ||
-      user.nickname || user.name || user.displayName ||
+      user.nickname ||
+      user.name ||
+      user.displayName ||
       (user.email ? user.email.split("@")[0] : null) ||
       "사용자";
 
@@ -266,21 +317,22 @@ async function updateAuthUI(session) {
     if (historySection) historySection.style.display = "block";
     loadSajuHistory(user.id);
     renderUserProfile();
-  } else {
-    // ✅ 로그아웃 시 정리
-    localStorage.removeItem("authToken");
-    sessionStorage.removeItem("authToken");
-    localStorage.removeItem("userRole");
-    removeCookie("auth"); // ← 추가
+} else {
+  // ✅ 로그아웃 시 스토리지 정리
+  localStorage.removeItem("authToken");
+  sessionStorage.removeItem("authToken");
+  localStorage.removeItem("userRole");   // ← 이 줄 추가
 
-    const adminMenu = document.getElementById("admin-menu");
-    if (adminMenu) adminMenu.style.display = "none";
+  // ✅ 로그아웃 시 회원관리 숨김
+  const adminMenu = document.getElementById("admin-menu");
+  if (adminMenu) adminMenu.style.display = "none";
 
-    if (authSection) authSection.style.display = "block";
-    if (profileSection) profileSection.style.display = "none";
-    if (nicknameEl) nicknameEl.textContent = "";
-    if (historySection) historySection.style.display = "none";
-  }
+  if (authSection) authSection.style.display = "block";
+  if (profileSection) profileSection.style.display = "none";
+  if (nicknameEl) nicknameEl.textContent = "";
+  if (historySection) historySection.style.display = "none";
+}
+
 }
 
 //첫한달간 회원별 제한 횟수 계산
@@ -655,7 +707,7 @@ function openSignupModal() {
     const email = document.getElementById("su-email").value.trim();
     const password = document.getElementById("su-password").value;
     const phoneRaw = document.getElementById("su-phone").value.trim();
-    const phone = phoneRaw ? normalizePhoneKR(phoneRaw, "intl") : ""; // ✅ 국제 포맷 적용
+    const phone = phoneRaw ? window.normalizePhoneKR(phoneRaw, "intl") : ""; // ✅ 국제 포맷 적용
 
     if (!nickname) return alert("닉네임을 입력하세요.");
     if (!email) return alert("이메일을 입력하세요.");
@@ -748,43 +800,71 @@ function openPhoneOtpModal() {
   document.getElementById("otp-send").onclick = async () => {
     const raw = document.getElementById("otp-phone").value.trim();
     if (!raw) return alert("전화번호를 입력하세요.");
-    const phone = normalizePhoneKR(raw, "intl"); // ✅ 국제번호(+82) 변환
+    const phone = window.normalizePhoneKR(raw, "intl"); // ✅ 국제번호(+82) 변환
     try {
-      const { error } = await window.supabaseClient.auth.signInWithOtp({ phone });
-      if (error) throw error;
-      alert("인증 코드가 발송되었습니다.");
+ const { status, json, text } = await postJSON("/api/otp?action=send", { phone });
+ if (status === 200 && json?.ok) {
+   if (json.code) console.log("[DEV] 인증코드:", json.code); // OTP_DEBUG=true면 표시
+  alert("인증 코드가 발송되었습니다.");
+ } else {
+   throw new Error(json?.error || json?.details || text || `HTTP ${status}`);
+ }
     } catch (err) {
       console.error("[OTP send] error:", err);
       alert(err.message || "인증 코드를 보낼 수 없습니다.");
     }
   };
 
-  // 인증하기
-  document.getElementById("otp-verify").onclick = async () => {
-    const raw = document.getElementById("otp-phone").value.trim();
-    const token = document.getElementById("otp-code").value.trim();
-    if (!raw || !token) return alert("전화번호와 인증 코드를 입력하세요.");
-    const phone = normalizePhoneKR(raw, "intl"); // ✅ 국제번호(+82) 변환
-    try {
-      const { data, error } = await window.supabaseClient.auth.verifyOtp({
-        phone,
-        token,
-        type: "sms",
-      });
-      if (error) throw error;
+// ✅ 인증하기 (드롭인 교체)
+document.getElementById("otp-verify").onclick = async () => {
+  const raw  = document.getElementById("otp-phone").value.trim();
+  const token = document.getElementById("otp-code").value.trim();
+  if (!raw || !token) return alert("전화번호와 인증 코드를 입력하세요.");
 
-      alert("전화번호 인증이 완료되었습니다!");
-      modal.style.display = "none";
+  // postJSON/normalizePhoneKR 존재 확인(없으면 바로 원인 파악)
+  if (typeof window.postJSON !== "function") {
+    console.error("[OTP verify] postJSON is not defined");
+    return alert("내부 오류: postJSON 미정의");
+  }
+  if (typeof window.normalizePhoneKR !== "function") {
+    console.error("[OTP verify] normalizePhoneKR is not defined");
+    return alert("내부 오류: 전화번호 정규화 함수 미정의");
+  }
 
-      // ✅ 인증 후 UI 갱신
-      const { data: { session } } = await window.supabaseClient.auth.getSession();
-      updateAuthUI(session);
-      
-    } catch (err) {
-      console.error("[OTP verify] error:", err);
-      alert(err.message || "인증에 실패했습니다.");
+  const phone = window.normalizePhoneKR(raw, "intl"); // +82 포맷
+
+  try {
+    // 1) 로그인 체크
+    const { data: { user } } = await window.supabaseClient.auth.getUser();
+    if (!user) return alert("로그인 후 인증 가능합니다.");
+
+    // 2) 서버 검증(커스텀 OTP)
+    const { status, json, text } = await postJSON("/api/otp?action=verify", {
+      phone,
+      code: token,      // 서버는 'code' 필드를 기대
+      user_id: user.id  // profiles 업데이트용
+    });
+
+    const ok = (status === 200) && json?.ok && json?.verified;
+    if (!ok) {
+      console.error("[OTP verify] fail:", { status, json, text });
+      return alert("인증 실패: " + (json?.error || json?.details || text || `HTTP ${status}`));
     }
-  };
+
+    // 3) 성공 처리
+    alert("전화번호 인증이 완료되었습니다!");
+    const modalEl = document.getElementById("phone-otp-modal"); // 지역변수 modal이 없을 수도 있어 안전하게 다시 조회
+    if (modalEl) modalEl.style.display = "none";
+
+    // 4) UI 갱신
+    const { data: { session } } = await window.supabaseClient.auth.getSession();
+    updateAuthUI(session);
+
+  } catch (err) {
+    console.error("[OTP verify] catch:", err);
+    alert(err?.message || "인증에 실패했습니다.");
+  }
+};
 }
 
 
@@ -795,15 +875,16 @@ async function requirePhoneVerificationIfNeeded() {
 
   try {
     // profiles에서 phone_verified 조회 (RLS는 본인 행만 허용되도록 설정되어 있음)
-    const { data, error } = await window.supabaseClient
-      .from("profiles")
-      .select("phone_verified")
-      .eq("user_id", session.user.id)
-      .single();
+ const { data, error } = await window.supabaseClient
+   .from("profiles")
+   .select("phone_verified")
+   .eq("user_id", session.user.id)
+   .maybeSingle();            // ← 행이 없어도 에러 안 던짐
 
-    if (error) throw error;
 
-    if (!data?.phone_verified) {
+    if (error) console.warn("[profiles maybeSingle] warn:", error);
+
+    if (!data || !data.phone_verified) {
       // ✅ 인증 안 되어 있으면 즉시 모달
       openPhoneOtpModal();
     }
@@ -983,14 +1064,15 @@ async function handleSajuSubmit(e) {
     const userId = session.user.id;
 
     // ✅ 반드시 풀프로필 확보 (정책 필드 포함)
-    let { data: profile, error: pErr } = await window.supabaseClient
-      .from("profiles")
-      .select("role, created_at, daily_limit, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
-      .eq("user_id", userId)
-      .single();
+ let { data: profile, error: pErr } = await window.supabaseClient
+   .from("profiles")
+   .select("role, created_at, daily_limit, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
+   .eq("user_id", userId)
+   .maybeSingle();   // ← 행이 없으면 null을 주고, throw 안 함
 
-    if (pErr || !profile || !profile.role) {
-      console.warn("[handleSajuSubmit] profile 보정 발생:", pErr);
+ if (pErr) console.warn("[handleSajuSubmit] profiles maybeSingle warn:", pErr);
+ if (!profile || !profile.role) {
+   console.warn("[handleSajuSubmit] profile이 없어 기본값으로 보정");
       profile = {
         role: "normal",
         created_at: session.user.created_at || new Date().toISOString(),
@@ -3489,29 +3571,66 @@ requestAnimationFrame(() => {
 
 
 
-// renderUserProfile 정의는 그대로 유지
+// renderUserProfile 정의는 그대로 유지 (드롭인 교체)
 async function renderUserProfile() {
   const { data: { user } } = await window.supabaseClient.auth.getUser();
   if (!user) return;
 
-  // 여기서는 이벤트 바인딩만!
-  document.getElementById("subscribeBtn")?.addEventListener("click", () => {
-    openPhoneOtpModal({
-      onSuccess: () => {
-        document.getElementById("subscriptionModal").style.display = "block";
-      }
-    });
-  });
+  // ✅ 구독 버튼: 프로필 phone_verified 확인 → 미인증이면 OTP 모달, 인증이면 결제 모달
+  const subscribeBtn = document.getElementById("subscribeBtn");
+  if (subscribeBtn) {
+    // 중복 바인딩 방지
+    subscribeBtn._bound && subscribeBtn.removeEventListener("click", subscribeBtn._bound);
+    subscribeBtn._bound = async (e) => {
+      e.preventDefault();
+      try {
+        const { data: profile, error: profErr } = await window.supabaseClient
+          .from("profiles")
+          .select("phone_verified")
+          .eq("user_id", user.id)
+          .maybeSingle(); // ← 행이 없으면 null
 
-  document.getElementById("logoutBtn")?.addEventListener("click", async () => {
-    await window.supabaseClient.auth.signOut();
-    location.reload();
-  });
+        if (profErr) console.warn("[profiles maybeSingle] warn:", profErr);
+
+        if (!profile || !profile.phone_verified) {
+          // 전화 인증 먼저
+          openPhoneOtpModal();
+          return;
+        }
+
+        // ✅ 인증되어 있으면 결제 모달(임시) 오픈
+        const subModal = document.getElementById("subscriptionModal");
+        if (subModal) {
+          subModal.style.display = "block";
+        } else {
+          // 모달이 없으면 임시 이동 (필요 시 주석 해제)
+          // window.location.href = "/subscribe";
+          alert("전화 인증 확인됨. 결제 창을 연결해 주세요.");
+        }
+      } catch (err) {
+        console.error("[subscribeBtn] error:", err);
+        alert(err?.message || "처리 중 오류가 발생했습니다.");
+      }
+    };
+    subscribeBtn.addEventListener("click", subscribeBtn._bound);
+  }
+
+  // ✅ 로그아웃 버튼
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) {
+    logoutBtn._bound && logoutBtn.removeEventListener("click", logoutBtn._bound);
+    logoutBtn._bound = async () => {
+      await window.supabaseClient.auth.signOut();
+      location.reload();
+    };
+    logoutBtn.addEventListener("click", logoutBtn._bound);
+  }
 }
 
 
 
 
+ 
 
 // === 초기화 (하나로 통합)
 document.addEventListener("DOMContentLoaded", async () => {
@@ -3818,6 +3937,10 @@ window.addEventListener("beforeunload", () => {
 
   showIfAdmin('#admin-menu');   // 회원관리 메뉴
 
+
+
+ 
+
     // ✅ 사주 폼 바인딩
     const form = document.getElementById("saju-form");
     if (form) {
@@ -3834,6 +3957,8 @@ window.addEventListener("beforeunload", () => {
 
     // ✅ 로그인 후 프로필/정기구독/로그아웃 UI 세팅
     renderUserProfile();
+
+wireProfileEditEvents();
 
   } catch (err) {
     console.error("[init] fatal:", err);

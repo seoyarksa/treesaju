@@ -847,9 +847,11 @@ document.getElementById("otp-verify").onclick = async () => {
 
     const ok = (status === 200) && json?.ok && json?.verified;
     if (!ok) {
-      console.error("[OTP verify] fail:", { status, json, text });
-      return alert("인증 실패: " + (json?.error || json?.details || text || `HTTP ${status}`));
+     console.error("[OTP verify] fail:", { status, json, text });
+     alert("인증 실패: " + (json?.error || json?.details || text || `HTTP ${status}`));
+      return;
     }
+
 
     // 3) 성공 처리
     alert("전화번호 인증이 완료되었습니다!");
@@ -861,8 +863,8 @@ document.getElementById("otp-verify").onclick = async () => {
     updateAuthUI(session);
 
   } catch (err) {
-    console.error("[OTP verify] catch:", err);
-    alert(err?.message || "인증에 실패했습니다.");
+   console.error("[OTP verify] catch:", err);
+   alert(err?.message || "인증에 실패했습니다.");
   }
 };
 }

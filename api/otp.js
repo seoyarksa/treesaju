@@ -94,83 +94,85 @@ export default async function handler(req, res) {
     }
 
     // ── verify (update-only 안정판) ──────────────────────────────────────
-    if (action === 'verify') {
-      const phone  = (body?.phone   || '').trim();
-      const code   = (body?.code    || '').trim();
-      const userId = (body?.user_id || '').trim(); // 로그인 유저 id
-      if (!phone || !code)  return json(400, { ok:false, error:'phone and code required' });
-      if (!userId)          return json(400, { ok:false, error:'user_id required for profile update' });
+ // ── verify (update-only 안정판) ──────────────────────────────────────
+if (action === 'verify') {
+  const phone  = (body?.phone   || '').trim();
+  const code   = (body?.code    || '').trim();
+  const userId = (body?.user_id || '').trim(); // 로그인 유저 id
+  if (!phone || !code)  return json(400, { ok:false, error:'phone and code required' });
+  if (!userId)          return json(400, { ok:false, error:'user_id required for profile update' });
 
-      // 1) 최근 OTP 조회
-      const { data, error } = await supabase
-        .from('otp_codes')
-        .select('*')
-        .eq('phone', phone)
-        .order('created_at', { ascending:false })
-        .limit(1);
-      if (error) return json(500, { ok:false, error:'DB select failed', details: error.message });
+  // 1) 최근 OTP 조회
+  const { data, error } = await supabase
+    .from('otp_codes')
+    .select('*')
+    .eq('phone', phone)
+    .order('created_at', { ascending:false })
+    .limit(1);
+  if (error) return json(500, { ok:false, error:'DB select failed', details: error.message });
 
-      const row = data?.[0];
-      if (!row) return json(400, { ok:false, error:'No code found' });
+  const row = data?.[0];
+  if (!row) return json(400, { ok:false, error:'No code found' });
 
-      const ageSec = Math.floor((Date.now() - new Date(row.created_at).getTime())/1000);
-      if (ageSec > OTP_TTL_SEC)             return json(400, { ok:false, error:'Code expired' });
-      if (String(row.code) !== String(code)) return json(400, { ok:false, error:'Invalid code' });
+  const ageSec = Math.floor((Date.now() - new Date(row.created_at).getTime())/1000);
+  if (ageSec > OTP_TTL_SEC)             return json(400, { ok:false, error:'Code expired' });
+  if (String(row.code) !== String(code)) return json(400, { ok:false, error:'Invalid code' });
 
-      // 2) profiles — 기존 행만 갱신 (없으면 409), phone은 비어 있을 때만 채움
-      const nowIso = new Date().toISOString();
+  // 2) profiles — 기존 행만 갱신 (없으면 409), phone은 비어 있을 때만 채움
+  const nowIso = new Date().toISOString();
 
-      // 2-0) 우선 user_id로 조회
-      let profSel = await supabase
-        .from('profiles')
-        .select('user_id, id, phone, phone_verified')
-        .eq('user_id', userId)
-        .limit(1);
+  // 2-0) 우선 user_id로 조회
+  let profSel = await supabase
+    .from('profiles')
+    .select('user_id, id, phone, phone_verified')
+    .eq('user_id', userId)
+    .limit(1);
 
-      let prof = profSel.error ? null : (profSel.data?.[0] || null);
+  let prof = profSel.error ? null : (profSel.data?.[0] || null);
 
-      // user_id가 없으면 id로도 시도(공식 템플릿 대비)
-      if (!prof) {
-        profSel = await supabase
-          .from('profiles')
-          .select('user_id, id, phone, phone_verified')
-          .eq('id', userId)
-          .limit(1);
-        prof = profSel.error ? null : (profSel.data?.[0] || null);
-      }
+  // user_id가 없으면 id로도 시도(공식 템플릿 대비)
+  if (!prof) {
+    profSel = await supabase
+      .from('profiles')
+      .select('user_id, id, phone, phone_verified')
+      .eq('id', userId)
+      .limit(1);
+    prof = profSel.error ? null : (profSel.data?.[0] || null);
+  }
 
-      if (!prof) {
-        // 절대 새로 만들지 않음: 운영 안전
-        return json(409, {
-          ok:false,
-          error:'Profile not found',
-          hint:'회원가입/온보딩에서 profiles 행을 먼저 생성하세요 (user_id 또는 id = auth.users.id).'
-        });
-      }
+  if (!prof) {
+    // 절대 새로 만들지 않음: 운영 안전
+    return json(409, {
+      ok:false,
+      error:'Profile not found',
+      hint:'회원가입/온보딩에서 profiles 행을 먼저 생성하세요 (user_id 또는 id = auth.users.id).'
+    });
+  }
 
-      // 업데이트 페이로드: phone은 비어 있을 때만 채움
-      const patch = { phone_verified: true, updated_at: nowIso };
-      const hasPhone = typeof prof.phone === 'string' && prof.phone.trim() !== '';
-      if (!hasPhone) patch.phone = phone;
+  // 업데이트 페이로드: phone은 비어 있을 때만 채움
+  const patch = { phone_verified: true, updated_at: nowIso };
+  const hasPhone = typeof prof.phone === 'string' && prof.phone.trim() !== '';
+  if (!hasPhone) patch.phone = phone;
 
-      // 어떤 키로 매칭되었는지에 따라 업데이트
-      const keyCol = prof.user_id ? 'user_id' : 'id';
-      const { data: updRows, error: updErr } = await supabase
-        .from('profiles')
-        .update(patch)
-        .eq(keyCol, userId)
-        .select('user_id, id, phone, phone_verified');
+  // 어떤 키로 매칭되었는지에 따라 업데이트
+  const keyCol = prof.user_id ? 'user_id' : 'id';
+  const { data: updRows, error: updErr } = await supabase
+    .from('profiles')
+    .update(patch)
+    .eq(keyCol, userId)
+    .select('user_id, id, phone, phone_verified');
 
-      if (updErr) {
-        return json(500, { ok:false, error:'Profile update failed', details: updErr.message, stage:`update_by_${keyCol}` });
-      }
-      if (Array.isArray(updRows) && updRows.length > 0) {
-        return json(200, { ok:true, verified:true, via:`update_by_${keyCol}`, profile: updRows[0] });
-      }
+  if (updErr) {
+    return json(500, { ok:false, error:'Profile update failed', details: updErr.message, stage:`update_by_${keyCol}` });
+  }
+  if (Array.isArray(updRows) && updRows.length > 0) {
+    return json(200, { ok:true, verified:true, via:`update_by_${keyCol}`, profile: updRows[0] });
+  }
 
-      // 이 경우는 거의 없음(0건 업데이트) — 명확히 안내
-      return json(409, { ok:false, error:'Profile exists but not updated', stage:`update_by_${keyCol}` });
-    }
+  // 이 경우는 거의 없음(0건 업데이트) — 명확히 안내
+  return json(409, { ok:false, error:'Profile exists but not updated', stage:`update_by_${keyCol}` });
+}
+
 
   } catch (e) {
     return json(500, { ok:false, error:'Unhandled server error', details:String(e?.message||e) });
