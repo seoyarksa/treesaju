@@ -66,7 +66,7 @@ export default async function handler(req, res) {
       try {
         const supabase = await getSb();
 
-        // 개발 편의: 응답에 code 포함
+        // 개발 편의: 응답에 code 포함(OTP_DEBUG=true일 때만 노출)
         const code = String(Math.floor(Math.random()*900000) + 100000);
 
         const { error } = await supabase
@@ -82,7 +82,7 @@ export default async function handler(req, res) {
           });
         }
 
-        return json(200, { ok:true, code: OTP_DEBUG ? code : code }); // 필요시 OTP_DEBUG에 따라 노출 제어
+        return json(200, { ok:true, ...(OTP_DEBUG ? { code } : {}) });
       } catch (e) {
         return json(500, {
           ok: false,
@@ -93,7 +93,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // ── verify (수정된 핵심) ─────────────────────────────────────────────
+    // ── verify ───────────────────────────────────────────────────────────
     if (action === 'verify') {
       const phone  = (body?.phone   || '').trim();
       const code   = (body?.code    || '').trim();
@@ -117,7 +117,7 @@ export default async function handler(req, res) {
       if (ageSec > OTP_TTL_SEC)            return json(400, { ok:false, error:'Code expired' });
       if (String(row.code) !== String(code))return json(400, { ok:false, error:'Invalid code' });
 
-      // 2) profiles 반영 — 스키마 변경 없이: user_id 기준 update → 없으면 insert
+      // 2) profiles 반영 — user_id 기준 update → 없으면 insert (중복 방지 재확인)
       const nowIso = new Date().toISOString();
       const patch  = { phone, phone_verified: true, updated_at: nowIso };
 
@@ -126,29 +126,38 @@ export default async function handler(req, res) {
         .from('profiles')
         .update(patch)
         .eq('user_id', userId)
-        .select('user_id');
+        .select('user_id, phone, phone_verified');
 
       if (updErr) {
         return json(500, { ok:false, error:'Profile update failed', details: updErr.message, stage:'update_by_user_id' });
       }
-      if (updRows && updRows.length > 0) {
-        return json(200, { ok:true, verified:true, via:'update_by_user_id' });
+      if (Array.isArray(updRows) && updRows.length > 0) {
+        return json(200, { ok:true, verified:true, via:'update_by_user_id', profile: updRows[0] });
       }
 
-      // 2-2) 행이 없으면 insert (user_id 포함)
-      const { error: insErr } = await supabase
+      // 2-2) 행이 없으면 insert 시도 → 단, 같은 user_id가 이미 있는지 재확인
+      const { data: existing } = await supabase
         .from('profiles')
-        .insert({ user_id: userId, phone, phone_verified: true, updated_at: nowIso });
+        .select('user_id')
+        .eq('user_id', userId)
+        .limit(1);
 
-      if (insErr) {
-        return json(500, { ok:false, error:'Profile insert failed', details: insErr.message, stage:'insert_with_user_id' });
+      if (!existing || existing.length === 0) {
+        const { data: insRows, error: insErr } = await supabase
+          .from('profiles')
+          .insert({ user_id: userId, ...patch })
+          .select('user_id, phone, phone_verified');
+
+        if (insErr) {
+          return json(500, { ok:false, error:'Profile insert failed', details: insErr.message });
+        }
+
+        return json(200, { ok:true, verified:true, via:'insert_with_user_id', profile: insRows?.[0] || null });
       }
 
-      return json(200, { ok:true, verified:true, via:'insert_with_user_id' });
+      // 이미 있으면 insert 안 하고 명시적으로 반환
+      return json(409, { ok:false, error:'Profile exists but update failed' });
     }
-
-
-    
 
   } catch (e) {
     return json(500, { ok:false, error:'Unhandled server error', details:String(e?.message||e) });
