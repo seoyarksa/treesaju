@@ -82,7 +82,8 @@ export default async function handler(req, res) {
         }
 
         // 개발 중에만 code 노출
-        return json(200, { ok:true, ...(OTP_DEBUG ? { code } : {}) });
+return json(200, { ok:true, code });   // ← 임시로 항상 코드 반환
+
       } catch (e) {
         return json(500, {
           ok: false,
