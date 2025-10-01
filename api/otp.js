@@ -45,107 +45,90 @@ export default async function handler(req, res) {
     const supabase = await getSb();
     const body = await getBody(req);
 
-    // ── send ─────────────────────────────────────────────────────────────
-    if (action === 'send') {
-      const phone = (body?.phone || '').trim();
-      if (!phone) return json(400, { ok:false, error:'phone required' });
+ if (action === 'send') {
+  const phone = (body?.phone || '').trim();
+  if (!phone) return json(400, { ok:false, error:'phone required' });
 
-      // ENV 사전 점검
-      const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      if (!sbUrl || !serviceKey) {
-        return json(500, {
-          ok: false,
-          where: 'env',
-          hasUrl: !!sbUrl,
-          hasKey: !!serviceKey,
-          hint: 'Vercel > Project > Settings > Environment Variables 에서 PRODUCTION에 설정 필요'
-        });
-      }
+  // ✅ ENV 사전 점검(프로덕션/프리뷰 혼동 잡기)
+  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!sbUrl || !serviceKey) {
+    return json(500, {
+      ok: false,
+      where: 'env',
+      hasUrl: !!sbUrl,
+      hasKey: !!serviceKey,
+      hint: 'Vercel > Project > Settings > Environment Variables 에서 PRODUCTION에 설정 필요'
+    });
+  }
 
-      try {
-        const supabase = await getSb();
+  try {
+    const supabase = await getSb();
 
-        // 개발 편의: 응답에 code 포함
-        const code = String(Math.floor(Math.random()*900000) + 100000);
+    // 임시: 항상 응답에 code 포함(개발 편의)
+    const code = String(Math.floor(Math.random()*900000) + 100000);
 
-        const { error } = await supabase
-          .from('otp_codes')
-          .insert({ phone, code, created_at: new Date().toISOString() });
+    // ✅ DB insert 에러를 상세히 표출
+    const { error } = await supabase
+      .from('otp_codes')
+      .insert({ phone, code, created_at: new Date().toISOString() });
 
-        if (error) {
-          return json(500, {
-            ok: false,
-            where: 'db-insert',
-            details: error.message,
-            hint: '테이블/권한/컬럼타입 확인'
-          });
-        }
-
-        return json(200, { ok:true, code: OTP_DEBUG ? code : code }); // 필요시 OTP_DEBUG에 따라 노출 제어
-      } catch (e) {
-        return json(500, {
-          ok: false,
-          where: 'send-try',
-          details: String(e?.message || e),
-          hint: 'supabase-js import/런타임/바디파싱 확인'
-        });
-      }
+    if (error) {
+      return json(500, {
+        ok: false,
+        where: 'db-insert',
+        details: error.message,
+        hint: '테이블/권한/컬럼타입 확인'
+      });
     }
 
-    // ── verify (수정된 핵심) ─────────────────────────────────────────────
-    if (action === 'verify') {
-      const phone  = (body?.phone   || '').trim();
-      const code   = (body?.code    || '').trim();
-      const userId = (body?.user_id || '').trim(); // 로그인 유저 id (profiles.user_id uuid 기준)
-      if (!phone || !code)  return json(400, { ok:false, error:'phone and code required' });
-      if (!userId)          return json(400, { ok:false, error:'user_id required for profile update' });
+    return json(200, { ok:true, code });
+  } catch (e) {
+    return json(500, {
+      ok: false,
+      where: 'send-try',
+      details: String(e?.message || e),
+      hint: 'supabase-js import/런타임/바디파싱 확인'
+    });
+  }
+}
 
-      // 1) 최근 OTP 조회
-      const { data, error } = await supabase
-        .from('otp_codes')
-        .select('*')
-        .eq('phone', phone)
-        .order('created_at', { ascending:false })
-        .limit(1);
-      if (error) return json(500, { ok:false, error:'DB select failed', details: error.message });
 
-      const row = data?.[0];
-      if (!row) return json(400, { ok:false, error:'No code found' });
+// ── verify 액션 전체 (드롭인 교체본) ─────────────────────────────
+if (action === 'verify') {
+  const phone = (body?.phone || '').trim();
+  const code  = (body?.code  || '').trim();
+  if (!phone || !code) return json(400, { ok:false, error:'phone and code required' });
 
-      const ageSec = Math.floor((Date.now() - new Date(row.created_at).getTime())/1000);
-      if (ageSec > OTP_TTL_SEC)            return json(400, { ok:false, error:'Code expired' });
-      if (String(row.code) !== String(code))return json(400, { ok:false, error:'Invalid code' });
+  const { data, error } = await supabase
+    .from('otp_codes')
+    .select('*')
+    .eq('phone', phone)
+    .order('created_at', { ascending:false })
+    .limit(1);
+  if (error) return json(500, { ok:false, error:'DB select failed', details: error.message });
 
-      // 2) profiles 반영 — 스키마 변경 없이: user_id 기준 update → 없으면 insert
-      const nowIso = new Date().toISOString();
-      const patch  = { phone, phone_verified: true, updated_at: nowIso };
+  const row = data?.[0];
+  if (!row) return json(400, { ok:false, error:'No code found' });
 
-      // 2-1) user_id 기준 업데이트
-      const { data: updRows, error: updErr } = await supabase
-        .from('profiles')
-        .update(patch)
-        .eq('user_id', userId)
-        .select('user_id');
+  const ageSec = Math.floor((Date.now() - new Date(row.created_at).getTime())/1000);
+  if (ageSec > OTP_TTL_SEC) return json(400, { ok:false, error:'Code expired' });
+  if (String(row.code) !== String(code)) return json(400, { ok:false, error:'Invalid code' });
 
-      if (updErr) {
-        return json(500, { ok:false, error:'Profile update failed', details: updErr.message, stage:'update_by_user_id' });
-      }
-      if (updRows && updRows.length > 0) {
-        return json(200, { ok:true, verified:true, via:'update_by_user_id' });
-      }
+  // ✅ 여기부터 교체: profiles upsert
+  // (user_id도 저장하려면 body.user_id를 포함하세요)
+  const payload = { phone, phone_verified: true /*, user_id: body?.user_id */ };
 
-      // 2-2) 행이 없으면 insert (user_id 포함)
-      const { error: insErr } = await supabase
-        .from('profiles')
-        .insert({ user_id: userId, phone, phone_verified: true, updated_at: nowIso });
+  const { error: upsertErr } = await supabase
+    .from('profiles')
+    .upsert(payload, { onConflict: 'phone' });
 
-      if (insErr) {
-        return json(500, { ok:false, error:'Profile insert failed', details: insErr.message, stage:'insert_with_user_id' });
-      }
+  if (upsertErr) {
+    return json(500, { ok:false, error:'Profile upsert failed', details: upsertErr.message });
+  }
 
-      return json(200, { ok:true, verified:true, via:'insert_with_user_id' });
-    }
+  return json(200, { ok:true, verified:true });
+}
 
   } catch (e) {
     return json(500, { ok:false, error:'Unhandled server error', details:String(e?.message||e) });
