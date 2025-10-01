@@ -797,23 +797,33 @@ function openPhoneOtpModal() {
   };
 
   // 코드 받기
-  document.getElementById("otp-send").onclick = async () => {
-    const raw = document.getElementById("otp-phone").value.trim();
-    if (!raw) return alert("전화번호를 입력하세요.");
-    const phone = window.normalizePhoneKR(raw, "intl"); // ✅ 국제번호(+82) 변환
-    try {
- const { status, json, text } = await postJSON("/api/otp?action=send", { phone });
- if (status === 200 && json?.ok) {
-   if (json.code) console.log("[DEV] 인증코드:", json.code); // OTP_DEBUG=true면 표시
-  alert("인증 코드가 발송되었습니다.");
- } else {
-   throw new Error(json?.error || json?.details || text || `HTTP ${status}`);
- }
-    } catch (err) {
-      console.error("[OTP send] error:", err);
-      alert(err.message || "인증 코드를 보낼 수 없습니다.");
+// 코드 받기 ✅ 우리 API로 저장 → otp_codes에 insert됨
+document.getElementById("otp-send").onclick = async () => {
+  const raw = document.getElementById("otp-phone").value.trim();
+  if (!raw) return alert("전화번호를 입력하세요.");
+  const phone = window.normalizePhoneKR(raw, "intl"); // +82 국제포맷
+
+  try {
+    const res = await fetch("/api/otp?action=send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone })
+    });
+    const txt = await res.text();
+    let data = null; try { data = JSON.parse(txt); } catch {}
+    if (!res.ok || !data?.ok) {
+      throw new Error(data?.error || data?.details || txt || `HTTP ${res.status}`);
     }
-  };
+
+    // OTP_DEBUG=true면 code가 함께 옵니다(서버 설정에 따라 다름)
+    if (data.code) console.log("[DEV] 인증 코드:", data.code);
+    alert("인증 코드가 발송되었습니다. (개발중이면 콘솔에서 코드 확인)");
+  } catch (err) {
+    console.error("[OTP send] error:", err);
+    alert(err.message || "인증 코드를 보낼 수 없습니다.");
+  }
+};
+
 
 // ✅ 인증하기 (드롭인 교체)
 document.getElementById("otp-verify").onclick = async () => {
