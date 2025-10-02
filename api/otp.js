@@ -1,4 +1,61 @@
 // api/otp.js — 단일 파일, send / verify / diag (안전판: update-only)
+import crypto from 'crypto';
+
+async function sendAlimtalk(rawPhone, code) {
+  // NCP는 숫자만 받음 (+82/- 제거)
+  const to = String(rawPhone).replace(/\D/g, '');
+
+  const serviceId    = process.env.NCP_SENS_SERVICE_ID;
+  const accessKey    = process.env.NCP_ACCESS_KEY;
+  const secretKey    = process.env.NCP_SECRET_KEY;
+  const plusFriendId = process.env.NCP_PLUS_FRIEND_ID;   // 예: @트리만세력
+  const templateCode = process.env.NCP_TEMPLATE_CODE;    // 예: VERIFYCODE
+
+  if (!serviceId || !accessKey || !secretKey || !plusFriendId || !templateCode) {
+    throw new Error('Missing NCP envs');
+  }
+
+  const host = 'https://sens.apigw.ntruss.com';
+  const path = `/alimtalk/v2/services/${serviceId}/messages`;
+  const ts = Date.now().toString();
+
+  const sigMsg = `POST ${path}\n${ts}\n${accessKey}`;
+  const sig = crypto.createHmac('sha256', secretKey).update(sigMsg).digest('base64');
+
+  const body = {
+    plusFriendId,
+    templateCode,
+    messages: [
+      {
+        to,
+        variables: { code },   // 템플릿에 #{code} (또는 {{code}})가 있어야 함
+        // content: '템플릿이 자유문구면 여기에 내용',
+      },
+    ],
+  };
+
+  const res = await fetch(`${host}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'x-ncp-apigw-timestamp': ts,
+      'x-ncp-iam-access-key': accessKey,
+      'x-ncp-apigw-signature-v2': sig,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+}
+
+
+
+
+
+
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
@@ -47,52 +104,62 @@ export default async function handler(req, res) {
     const body = await getBody(req);
 
     // ── send ─────────────────────────────────────────────────────────────
-    if (action === 'send') {
-      const phone = (body?.phone || '').trim();
-      if (!phone) return json(400, { ok:false, error:'phone required' });
+if (action === 'send') {
+  const phone = (body?.phone || '').trim();
+  if (!phone) return json(400, { ok:false, error:'phone required' });
 
-      // ENV 사전 점검
-      const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      if (!sbUrl || !serviceKey) {
-        return json(500, {
-          ok: false,
-          where: 'env',
-          hasUrl: !!sbUrl,
-          hasKey: !!serviceKey,
-          hint: 'Vercel > Project > Settings > Environment Variables (Production) 확인'
-        });
-      }
+  // ENV 사전 점검
+  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!sbUrl || !serviceKey) {
+    return json(500, {
+      ok: false,
+      where: 'env',
+      hasUrl: !!sbUrl,
+      hasKey: !!serviceKey,
+      hint: 'Vercel > Project > Settings > Environment Variables (Production) 확인'
+    });
+  }
 
-      try {
-        const supabase = await getSb();
-        const code = String(Math.floor(Math.random()*900000) + 100000);
+  try {
+    const supabase = await getSb();
+    const code = String(Math.floor(Math.random()*900000) + 100000);
 
-        const { error } = await supabase
-          .from('otp_codes')
-          .insert({ phone, code, created_at: new Date().toISOString() });
+    const { error } = await supabase
+      .from('otp_codes')
+      .insert({ phone, code, created_at: new Date().toISOString() });
 
-        if (error) {
-          return json(500, {
-            ok: false,
-            where: 'db-insert',
-            details: error.message,
-            hint: '테이블/권한/컬럼타입 확인'
-          });
-        }
-
-        // 개발 중에만 code 노출
-return json(200, { ok:true, code });   // ← 임시로 항상 코드 반환
-
-      } catch (e) {
-        return json(500, {
-          ok: false,
-          where: 'send-try',
-          details: String(e?.message || e),
-          hint: 'supabase-js import/런타임/바디파싱 확인'
-        });
-      }
+    if (error) {
+      return json(500, {
+        ok: false,
+        where: 'db-insert',
+        details: error.message,
+        hint: '테이블/권한/컬럼타입 확인'
+      });
     }
+
+    // 🔔 운영에서만 알림톡 발송(실패해도 흐름은 계속)
+    try {
+      if (process.env.NODE_ENV === 'production') {
+        await sendAlimtalk(phone, code);
+      }
+    } catch (e) {
+      console.warn('[alimtalk] send fail:', e?.message || e);
+    }
+
+    // 개발 중에만 code 노출 → 지금은 임시로 항상 반환
+    return json(200, { ok:true, code });
+
+  } catch (e) {
+    return json(500, {
+      ok: false,
+      where: 'send-try',
+      details: String(e?.message || e),
+      hint: 'supabase-js import/런타임/바디파싱 확인'
+    });
+  }
+}
+
 
     // ── verify (update-only 안정판) ──────────────────────────────────────
  // ── verify (update-only 안정판) ──────────────────────────────────────

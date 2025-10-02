@@ -96,10 +96,11 @@ return json(200, { ok:true, code });   // ← 임시로 항상 코드 반환
 
     // ── verify (update-only 안정판) ──────────────────────────────────────
  // ── verify (update-only 안정판) ──────────────────────────────────────
+// ── verify (update-or-insert, user_id 전용) ──────────────────────────
 if (action === 'verify') {
   const phone  = (body?.phone   || '').trim();
   const code   = (body?.code    || '').trim();
-  const userId = (body?.user_id || '').trim(); // 로그인 유저 id
+  const userId = (body?.user_id || '').trim(); // auth.users.id
   if (!phone || !code)  return json(400, { ok:false, error:'phone and code required' });
   if (!userId)          return json(400, { ok:false, error:'user_id required for profile update' });
 
@@ -119,59 +120,50 @@ if (action === 'verify') {
   if (ageSec > OTP_TTL_SEC)             return json(400, { ok:false, error:'Code expired' });
   if (String(row.code) !== String(code)) return json(400, { ok:false, error:'Invalid code' });
 
-  // 2) profiles — 기존 행만 갱신 (없으면 409), phone은 비어 있을 때만 채움
+  // 2) profiles — user_id 전용
   const nowIso = new Date().toISOString();
 
-  // 2-0) 우선 user_id로 조회
-  let profSel = await supabase
+  // 2-0) 현행 프로필 조회 (user_id만 사용)
+  const profSel = await supabase
     .from('profiles')
-    .select('user_id, id, phone, phone_verified')
+    .select('user_id, phone, phone_verified')
     .eq('user_id', userId)
     .limit(1);
 
-  let prof = profSel.error ? null : (profSel.data?.[0] || null);
+  const prof = profSel.error ? null : (profSel.data?.[0] || null);
 
-  // user_id가 없으면 id로도 시도(공식 템플릿 대비)
+  // 2-1) 없으면 생성 (핫픽스: 최초 인증 시 자동 생성)
   if (!prof) {
-    profSel = await supabase
+    const { data: insRows, error: insErr } = await supabase
       .from('profiles')
-      .select('user_id, id, phone, phone_verified')
-      .eq('id', userId)
-      .limit(1);
-    prof = profSel.error ? null : (profSel.data?.[0] || null);
+      .insert({ user_id: userId, phone, phone_verified: true, created_at: nowIso, updated_at: nowIso })
+      .select('user_id, phone, phone_verified');
+
+    if (insErr) {
+      return json(500, { ok:false, error:'Profile insert failed', details: insErr.message, stage:'auto_insert_profile' });
+    }
+    return json(200, { ok:true, verified:true, via:'auto_insert_profile', profile: insRows?.[0] || null });
   }
 
-  if (!prof) {
-    // 절대 새로 만들지 않음: 운영 안전
-    return json(409, {
-      ok:false,
-      error:'Profile not found',
-      hint:'회원가입/온보딩에서 profiles 행을 먼저 생성하세요 (user_id 또는 id = auth.users.id).'
-    });
-  }
-
-  // 업데이트 페이로드: phone은 비어 있을 때만 채움
+  // 2-2) 있으면 업데이트 (전화번호 비면 채움)
   const patch = { phone_verified: true, updated_at: nowIso };
   const hasPhone = typeof prof.phone === 'string' && prof.phone.trim() !== '';
   if (!hasPhone) patch.phone = phone;
 
-  // 어떤 키로 매칭되었는지에 따라 업데이트
-  const keyCol = prof.user_id ? 'user_id' : 'id';
   const { data: updRows, error: updErr } = await supabase
     .from('profiles')
     .update(patch)
-    .eq(keyCol, userId)
-    .select('user_id, id, phone, phone_verified');
+    .eq('user_id', userId)
+    .select('user_id, phone, phone_verified');
 
   if (updErr) {
-    return json(500, { ok:false, error:'Profile update failed', details: updErr.message, stage:`update_by_${keyCol}` });
+    return json(500, { ok:false, error:'Profile update failed', details: updErr.message, stage:'update_by_user_id' });
   }
   if (Array.isArray(updRows) && updRows.length > 0) {
-    return json(200, { ok:true, verified:true, via:`update_by_${keyCol}`, profile: updRows[0] });
+    return json(200, { ok:true, verified:true, via:'update_by_user_id', profile: updRows[0] });
   }
 
-  // 이 경우는 거의 없음(0건 업데이트) — 명확히 안내
-  return json(409, { ok:false, error:'Profile exists but not updated', stage:`update_by_${keyCol}` });
+  return json(409, { ok:false, error:'Profile exists but not updated', stage:'update_by_user_id' });
 }
 
 
