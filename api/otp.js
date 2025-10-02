@@ -1,40 +1,47 @@
 // api/otp.js — 단일 파일, send / verify / diag (안전판: update-only)
 import crypto from 'crypto';
 
+// --- Kakao 알림톡 전송(네이버 클라우드 SENS) ---
 async function sendAlimtalk(rawPhone, code) {
-  // NCP는 숫자만 받음 (+82/- 제거)
-  const to = String(rawPhone).replace(/\D/g, '');
+  // 1) NCP는 숫자만 허용 (하이픈/문자 제거)
+  const to = String(rawPhone || '').replace(/\D/g, '');
+  if (!to) throw new Error('invalid phone');
 
-  const serviceId    = process.env.NCP_SENS_SERVICE_ID;
+  // 2) 환경변수 필수
+  const serviceId    = process.env.NCP_SENS_SERVICE_ID; // 예: ncp:kkobizmsg:kr:123456789012:myservice
   const accessKey    = process.env.NCP_ACCESS_KEY;
   const secretKey    = process.env.NCP_SECRET_KEY;
-  const plusFriendId = process.env.NCP_PLUS_FRIEND_ID;   // 예: @트리만세력
-  const templateCode = process.env.NCP_TEMPLATE_CODE;    // 예: VERIFYCODE
+  const plusFriendId = process.env.NCP_PLUS_FRIEND_ID;  // 예: @트리만세력  (활성 상태)
+  const templateCode = process.env.NCP_TEMPLATE_CODE;   // 예: VERIFYCODE  (승인된 템플릿)
 
   if (!serviceId || !accessKey || !secretKey || !plusFriendId || !templateCode) {
     throw new Error('Missing NCP envs');
   }
 
+  // 3) 서명 준비
+  const { createHmac } = await import('node:crypto');
   const host = 'https://sens.apigw.ntruss.com';
   const path = `/alimtalk/v2/services/${serviceId}/messages`;
-  const ts = Date.now().toString();
+  const ts   = Date.now().toString();
 
   const sigMsg = `POST ${path}\n${ts}\n${accessKey}`;
-  const sig = crypto.createHmac('sha256', secretKey).update(sigMsg).digest('base64');
+  const sig    = createHmac('sha256', secretKey).update(sigMsg).digest('base64');
+
+  // 4) ✅ 템플릿과 "문자 하나까지" 동일한 content 구성
+  //    승인 문구: "인증 번호는 #{code} 입니다."
+  //    → 전송 문구: "인증 번호는 123456 입니다."
+  const content = `인증 번호는 ${code} 입니다.`; // 공백/마침표 위치 주의!
 
   const body = {
     plusFriendId,
     templateCode,
     messages: [
-      {
-        to,
-        variables: { code },   // 템플릿에 #{code} (또는 {{code}})가 있어야 함
-        // content: '템플릿이 자유문구면 여기에 내용',
-      },
+      { to, content } // variables/templateParameter 사용하지 않음
     ],
   };
 
-  const res = await fetch(`${host}${path}`, {
+  // 5) 호출
+  const res  = await fetch(`${host}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
@@ -45,10 +52,9 @@ async function sendAlimtalk(rawPhone, code) {
     body: JSON.stringify(body),
   });
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `HTTP ${res.status}`);
-  }
+  const text = await res.text();
+  if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
+  return true;
 }
 
 
