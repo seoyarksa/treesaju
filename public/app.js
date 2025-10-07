@@ -3244,6 +3244,15 @@ function getCurrentRunContext() {
 
 
 const ilgan = saju.dayGan;
+// ✅ 전역 등록 (기존 구조 유지, 덮어쓰기 최소화)
+if (typeof window !== 'undefined') {
+  window.ilgan = ilgan;                 // 편의 전역
+  window.saju = window.saju || {};      // saju가 없으면 생성
+  if (!window.saju.ilgan) {             // 기존 값이 없을 때만 설정
+    window.saju.ilgan = ilgan;          // 표준 경로: window.saju.ilgan
+  }
+  console.log('▶ 전역 일간 등록:', window.saju.ilgan);
+}
 const sajuGanArr = [saju.hourGan,  saju.dayGan,  saju.monthGan,  saju.yearGan];
 const samhapKey = getSamhapKeyByJiji(saju.yearBranch);
 const sajuJijiArr = [saju.hourBranch,  saju.dayBranch,  saju.monthBranch,  saju.yearBranch];

@@ -94,8 +94,9 @@ export function renderBasicDaeyunTable({
   birthYear,
   birthMonth,
   birthDay,
-  wolju = { stem: null, branch: null },
-  direction    // 1=순행, -1=역행
+  wolju = { stem: null, branch: null }, // 기존 유지
+  direction,        // 1=순행, -1=역행
+  dayStem = null    // 일간 천간 (옵션)
 }) {
   const container = document.getElementById('basic-daeyun-table');
   if (!container) return;
@@ -111,59 +112,67 @@ export function renderBasicDaeyunTable({
   console.log("▶ renderBasicDaeyunTable 대운방향:", direction, "→", isForward ? "순행" : "역행");
 
   // ✅ 간지 배열: direction 반영
-const ganjiSeries = generateDaeyunGanjiSeries(wolju, 10, isForward);
+  const ganjiSeries = generateDaeyunGanjiSeries(wolju, 10, isForward);
+  const ganjiReversed = ganjiSeries.slice().reverse();
 
-// ✅ 출력은 무조건 역순
-const ganjiReversed = ganjiSeries.slice().reverse();
+  console.log("▶ 생성된 대운 간지 (계산):", ganjiSeries.map(x => x.stem + x.branch).join(","));
+  console.log("▶ 출력용 대운 간지 (역순):", ganjiReversed.map(x => x.stem + x.branch).join(","));
 
-console.log("▶ 생성된 대운 간지 (계산):", ganjiSeries.map(x => x.stem + x.branch).join(","));
-console.log("▶ 출력용 대운 간지 (역순):", ganjiReversed.map(x => x.stem + x.branch).join(","));
-
-  // ② 세운 간지 10개 (예: 대운 시작 기준으로)
-  // 세운 시작년도 (예: 출생년도+startAge부터 역순으로 10개)
+  // ② 세운 간지 10개
   const baseYear = birthYear + startAge;
   const yearlyGanjiSeries = generateYearlyGanjiSeriesFixed(baseYear);
   const sewoonReversed = yearlyGanjiSeries.slice().reverse();
 
+  // ✅ 십성 기준: 일간 (dayStem → window.saju.ilgan → window.ilgan)
+  let tenGodBaseStem = dayStem 
+                    ?? window?.saju?.ilgan?.stem 
+                    ?? window?.saju?.ilgan 
+                    ?? window?.ilgan?.stem 
+                    ?? window?.ilgan 
+                    ?? null;
 
+  // 객체 형태일 경우 stem 추출
+  if (tenGodBaseStem && typeof tenGodBaseStem === "object" && "stem" in tenGodBaseStem) {
+    tenGodBaseStem = tenGodBaseStem.stem;
+  }
 
-container.innerHTML = `
-  <table class="basic-daeyun-table">
-    <thead>
-      <tr>
-        <th colspan="10">대운수: ${daeyunAge.toFixed(2)}</th>
-       <th colspan="10">세운시작년도: ${window.sewonYear}</th>
-      </tr>
-      <tr>
-        ${ages.map(age => `<th>${age}</th>`).join('')}
-        ${sewoonReversed.map(({ year }) => `<th>${year}</th>`).join('')}
-      </tr>
-    </thead>
-    <tbody>
-      <tr class="daeyun-row">
-        ${ganjiReversed.map(({ stem, branch }, idx) => {
-          const tenGod = wolju.stem ? getTenGod(wolju.stem, stem) : '';
-          return `
-            <td onclick="handleBasicDaeyunClick(${idx}, '${stem}', '${branch}')" 
-                class="daeyun-cell">
-              <div>${colorize(stem)}</div>
-              ${tenGod ? `<div style="font-size:0.75rem; color:#999;">(${tenGod})</div>` : ""}
-              <div>${colorize(branch)}</div>
-            </td>
-          `;
-        }).join('')}
-        <!-- 세운 칸은 처음엔 비워둠 -->
-      </tr>
-    </tbody>
-  </table>
-  
-`;
+  if (!tenGodBaseStem) {
+    console.warn("⚠️ 일간(dayStem)을 찾을 수 없습니다. (window.saju.ilgan 또는 window.ilgan 확인 필요)");
+  } else {
+    console.log("✔ 십성 기준 일간:", tenGodBaseStem);
+  }
 
-
-
-
-
+  container.innerHTML = `
+    <table class="basic-daeyun-table">
+      <thead>
+        <tr>
+          <th colspan="10">대운수: ${daeyunAge.toFixed(2)}</th>
+          <th colspan="10">세운시작년도: ${window.sewonYear}</th>
+        </tr>
+        <tr>
+          ${ages.map(age => `<th>${age}</th>`).join('')}
+          ${sewoonReversed.map(({ year }) => `<th>${year}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="daeyun-row">
+          ${ganjiReversed.map(({ stem, branch }, idx) => {
+            const tenGod = tenGodBaseStem ? getTenGod(tenGodBaseStem, stem) : "";
+            return `
+              <td onclick="handleBasicDaeyunClick(${idx}, '${stem}', '${branch}')" 
+                  class="daeyun-cell">
+                <div>${colorize(stem)}</div>
+                ${tenGod ? `<div style="font-size:0.75rem; color:#999;">(${tenGod})</div>` : ""}
+                <div>${colorize(branch)}</div>
+              </td>
+            `;
+          }).join('')}
+        </tr>
+      </tbody>
+    </table>
+  `;
 }
+
 
 
 
@@ -290,11 +299,28 @@ function updateBasicSewoonCells(sewoonReversed) {
     daeyunRow.removeChild(daeyunRow.lastChild);
   }
 
+  // ✅ 일간 기준 십성 기준값 탐색
+  let tenGodBaseStem =
+    window?.saju?.ilgan?.stem ??
+    window?.saju?.ilgan ??
+    window?.ilgan?.stem ??
+    window?.ilgan ??
+    null;
+
+  if (tenGodBaseStem && typeof tenGodBaseStem === "object" && "stem" in tenGodBaseStem) {
+    tenGodBaseStem = tenGodBaseStem.stem;
+  }
+
+  if (!tenGodBaseStem) {
+    console.warn("⚠️ updateBasicSewoonCells: 일간(tenGodBaseStem)을 찾을 수 없습니다. 십성 표시 생략.");
+  } else {
+    console.log("✔ updateBasicSewoonCells: 십성 기준 일간 =", tenGodBaseStem);
+  }
+
   // 새로운 세운 셀 추가
   sewoonReversed.forEach(({ stem, branch, year }) => {
-    const tenGod = (window.saju && window.saju.monthGan)
-      ? getTenGod(window.saju.monthGan, stem)
-      : '';
+    // ✅ 월간 기준 → 일간 기준으로 변경
+    const tenGod = tenGodBaseStem ? getTenGod(tenGodBaseStem, stem) : "";
 
     const td = document.createElement("td");
     td.classList.add("sewoon-cell");
@@ -314,21 +340,22 @@ function updateBasicSewoonCells(sewoonReversed) {
     daeyunRow.appendChild(td);
   });
 
-document.querySelector("#dangryeong-cell").innerHTML =
-  makeSajuInfoTable();
-renderDangryeongHeesinGisin();
+  // 나머지 UI 갱신 부분은 그대로 유지
+  document.querySelector("#dangryeong-cell").innerHTML = makeSajuInfoTable();
+  renderDangryeongHeesinGisin();
 
-document.querySelector("#johuyongsin-cell").innerHTML = renderJohuCell();
+  document.querySelector("#johuyongsin-cell").innerHTML = renderJohuCell();
+  document.querySelector("#hapshin-box").innerHTML = renderhapshinTable();
 
-document.querySelector("#hapshin-box").innerHTML = renderhapshinTable();
-// ✅ 여기서 바로 selectedSewoon 초기화 보정
-if (!window.selectedSewoon && window.sewoonList?.length > 0) {
-  window.selectedSewoon = window.sewoonList[0];
-}
+  // ✅ selectedSewoon 초기화
+  if (!window.selectedSewoon && window.sewoonList?.length > 0) {
+    window.selectedSewoon = window.sewoonList[0];
+  }
 
-// simpleTable 렌더링
+  // simpleTable 렌더링
   updateSimpleTable();
 }
+
 
 
 
