@@ -1259,10 +1259,13 @@ window.addEventListener('load', async () => {
     if (typeof renderSaju === 'function') {
       await renderSaju(todayForm);
 
-      // ✅ '자동 출력' 입력값을 lastOutputData에 저장 → 동일 입력 시 카운트 제외
+
+
+// 🔹 자동 출력 데이터를 handleSajuSubmit() 비교 기준에 맞게 저장
 if (typeof lastOutputData !== 'undefined') {
-  lastOutputData = JSON.stringify(todayForm);
-  console.log('🔹 자동 로딩된 사주를 lastOutputData에 저장 → 중복 출력 시 카운트 제외');
+  const normalized = JSON.stringify(normalizeForm(todayForm));
+  lastOutputData = normalized;
+  console.log('[AUTO] 자동 로딩된 사주를 정규화 후 lastOutputData에 저장');
 }
 
     } else {
@@ -1274,6 +1277,27 @@ if (typeof lastOutputData !== 'undefined') {
 });
 
 
+function normalizeForm(form) {
+  if (!form) return {};
+  const f = { ...form };
+
+  // 날짜 형식 통일 (2025-10-08 → 20251008)
+  if (f.birthDate) f.birthDate = f.birthDate.replace(/-/g, '');
+
+  // AM/PM 대문자로
+  if (f.ampm) f.ampm = f.ampm.toUpperCase();
+
+  // 숫자 문자열 통일
+  if (f.hour) f.hour = String(parseInt(f.hour, 10));
+  if (f.minute) f.minute = String(parseInt(f.minute, 10));
+
+  // 기본값 보정
+  f.calendarType = f.calendarType || 'solar';
+  f.gender = f.gender || 'male';
+  f.name = f.name || '';
+
+  return f;
+}
 
 
 
