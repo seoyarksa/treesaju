@@ -896,16 +896,15 @@ if (subModal) subModal.style.display = "block";
 }
 
 
+window.startGoogleSubscription = function() {
+  console.log("Google 정기구독 결제 클릭됨");
+  window.location.href = "https://play.google.com/store/account/subscriptions";
+};
 
-function startGoogleSubscription() {
-  // 실제 구글 구독 결제 링크 또는 결제 API로 이동
-  window.location.href = "https://play.google.com/store/account/subscriptions"; 
-}
-
-function startKakaoSubscription() {
-  // 실제 카카오페이 구독 결제 페이지로 이동
-  window.location.href = "https://billing-web.kakao.com/pay"; 
-}
+window.startKakaoSubscription = function() {
+  console.log("Kakao 정기구독 결제 클릭됨");
+  window.location.href = "https://billing-web.kakao.com/pay";
+};
 
 
 
