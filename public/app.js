@@ -1007,7 +1007,7 @@ function checkGuestMonthlyLimit() {
 
 // === 4) 사주 제출 (완전한 한 개만 사용!)
 // === 4) 사주 제출 (완전한 한 개만 사용!)
-let lastOutputData = null;
+window.lastOutputData = null;   // ✅ 전역 변수로 선언
 
 async function handleSajuSubmit(e) {
   e.preventDefault();
@@ -1064,7 +1064,7 @@ async function handleSajuSubmit(e) {
       }
 
       // ✅ 직전과 동일할 때만 '카운트 없이' 출력 허용
-      if (lastOutputData === formKey) {
+      if (window.lastOutputData === formKey) {
         console.log("⚠️ 동일 입력(직전과 동일, 게스트) → 카운트 증가 없이 출력만");
         renderSaju(formData);
         return;
@@ -1096,7 +1096,7 @@ if (formDate === todayKey) {
 
       // 출력 실행 + 직전키 갱신
       renderSaju(formData);
-      lastOutputData = formKey;
+      window.lastOutputData = formKey;
 
       // 화면 갱신(선택): 방금 증가한 값으로 다시 표시
       const usage2 = JSON.parse(localStorage.getItem("sajuUsage") || "{}");
@@ -1137,7 +1137,7 @@ if (formDate === todayKey) {
     }
 
     // ✅ 직전과 동일할 때만 '카운트 없이' 출력 허용
-    if (lastOutputData === formKey) {
+    if (window.lastOutputData === formKey) {
       console.log("⚠️ 동일 입력(직전과 동일, 로그인) → 카운트 증가 없이 출력만");
       renderSaju(formData);
       return;
@@ -1168,7 +1168,7 @@ if (formDate === todayKey) {
 
     // 3) 출력 실행 + 직전키 갱신
     renderSaju(formData);
-    lastOutputData = formKey;
+    window.lastOutputData = formKey;
 
     // 4) 로그인 사용자 → 이름이 있으면 기록 저장 (중복키 에러는 무시)
     if (session?.user) {
@@ -1303,7 +1303,7 @@ window.addEventListener('load', async () => {
       minute: String(minute),
     });
 
-    window.lastOutputData = normalized;
+    lastOutputData = normalized;
     localStorage.setItem('lastSajuForm', normalized);
     console.log('[AUTO] lastOutputData 저장 완료 (hour/minute 포함):', normalized);
 
@@ -1312,7 +1312,7 @@ window.addEventListener('load', async () => {
   }, 300);
 
 
-  
+
       // === 버튼 상태도 '신살보기'로 세팅 ===
       const sinsalBtn = document.getElementById('sinsalBtn');
       const sajuBtn = document.getElementById('sajuSubmit');
