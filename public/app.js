@@ -1061,6 +1061,26 @@ async function handleSajuSubmit(e) {
         return;
       }
 
+
+      // === 오늘 날짜 예외 처리 ===
+const now = new Date();
+const todayKey = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+
+// 입력이 오늘 날짜라면 시까지만 비교
+const formDate = (formData.birthDate || '').replace(/-/g,'');
+if (formDate === todayKey) {
+  const last = (() => {
+    try { return JSON.parse(lastOutputData); } catch(e) { return null; }
+  })();
+  if (last && last.birthDate === formDate && last.hour === formData.hour) {
+    console.log("⚠️ 오늘 날짜 & 같은 시각대 → 카운트 증가 없이 출력만");
+    renderSaju(formData);
+    return;
+  }
+}
+
+
+
       // 실제 증가 수행
       const ok = await checkRenderAllowed(); // 이 함수가 localStorage 증가/월간 제한까지 처리
       if (!ok) return;
