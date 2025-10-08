@@ -4,13 +4,44 @@
   <meta charset="UTF-8">
   <title>공지 상세</title>
   <style>
-    body { font-family: sans-serif; max-width: 700px; margin: 30px auto; line-height: 1.6; }
-    #notice-detail { margin-bottom: 40px; }
-    #notice-list { border-top: 2px solid #333; padding-top: 15px; }
-    .notice-item { cursor: pointer; padding: 6px 0; border-bottom: 1px solid #eee; }
-    .notice-item:hover { background: #f9f9f9; }
-    .pagination { text-align: center; margin-top: 10px; }
-    .pagination button { margin: 0 3px; padding: 4px 8px; }
+    body {
+      font-family: sans-serif;
+      max-width: 700px;
+      margin: 30px auto;
+      line-height: 1.6;
+    }
+    #notice-detail {
+      margin-bottom: 40px;
+    }
+    #notice-list {
+      border-top: 2px solid #333;
+      padding-top: 15px;
+    }
+    .notice-item {
+      cursor: pointer;
+      padding: 6px 0;
+      border-bottom: 1px solid #eee;
+    }
+    .notice-item:hover {
+      background: #f9f9f9;
+    }
+
+    /* ✅ 클릭된 아래쪽 목록 제목 색상 강조 */
+    .notice-item.active {
+      color: #0b57d0;
+      font-weight: 600;
+      text-decoration: underline;
+      background: #f0f6ff;
+    }
+
+    .pagination {
+      text-align: center;
+      margin-top: 10px;
+    }
+    .pagination button {
+      margin: 0 3px;
+      padding: 4px 8px;
+    }
   </style>
 </head>
 <body>
@@ -23,20 +54,21 @@
 
   <script>
     const params = new URLSearchParams(window.location.search);
-    const id = params.get('id');
+    let currentId = Number(params.get('id')) || null;
+
     const detailContainer = document.getElementById('notice-detail');
     const listContainer = document.getElementById('notice-list');
     const paginationContainer = document.getElementById('pagination');
 
     // 🔹 공지 상세 불러오기
     async function loadNoticeDetail() {
-      if (!id) {
+      if (!currentId) {
         detailContainer.textContent = '공지 내용을 선택하세요.';
         return;
       }
 
       try {
-        const res = await fetch(`/api/notice/${id}`);
+        const res = await fetch(`/api/notice/${currentId}`);
         const notice = await res.json();
 
         if (!notice || !notice.id) {
@@ -58,11 +90,12 @@
     // 🔹 목록 불러오기 (5개씩 페이지 처리)
     let currentPage = 1;
     const perPage = 5;
+    let allData = [];
 
     async function loadList(page = 1) {
       try {
-        const res = await fetch('/api/notice'); // 👈 index.html 과 동일한 API
-        const allData = await res.json();
+        const res = await fetch('/api/notice');
+        allData = await res.json();
 
         if (!Array.isArray(allData) || allData.length === 0) {
           listContainer.innerHTML = '<p>공지 목록이 없습니다.</p>';
@@ -84,7 +117,8 @@
     function renderList(notices) {
       listContainer.innerHTML = notices
         .map(n => `
-          <div class="notice-item" onclick="viewNotice(${n.id})">
+          <div class="notice-item ${n.id === currentId ? 'active' : ''}"
+               onclick="viewNotice(${n.id}, this)">
             ${n.title}
             <small style="float:right;">${new Date(n.created_at).toLocaleDateString()}</small>
           </div>
@@ -104,9 +138,19 @@
       paginationContainer.innerHTML = html;
     }
 
-    function viewNotice(id) {
-      // 같은 팝업 안에서 새 공지로 이동
-      window.location.href = `?id=${id}`;
+    // 🔹 클릭 시 색상 유지 + 상세 갱신
+    function viewNotice(id, el) {
+      currentId = id;
+
+      // 강조표시 갱신
+      document.querySelectorAll('.notice-item').forEach(div => div.classList.remove('active'));
+      el.classList.add('active');
+
+      // 상세 내용 갱신
+      loadNoticeDetail();
+
+      // 주소창 갱신 (뒤로가기 대응)
+      history.replaceState(null, '', `?id=${id}`);
     }
 
     // 🔹 초기 실행
