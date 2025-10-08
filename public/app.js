@@ -1291,14 +1291,28 @@ window.addEventListener('load', async () => {
       await renderSaju(todayForm);
 
       
-      // ✅ 바로 여기에 추가하세요!!
-      setTimeout(() => {
-        const normalized = JSON.stringify(normalizeForm(todayForm));
-        window.lastOutputData = normalized;
-        localStorage.setItem('lastSajuForm', normalized);
-        console.log('[AUTO] lastOutputData 저장 완료:', normalized);
-      }, 30);
-      
+   // 0.3초 후 lastOutputData 저장
+  setTimeout(() => {
+    const normalized = JSON.stringify({
+      name: '오늘 기준',
+      birthDate: `${yyyy}${mm}${dd}`,
+      calendarType: 'solar',
+      gender: 'male',
+      ampm,
+      hour: String(hour12),
+      minute: String(minute),
+    });
+
+    window.lastOutputData = normalized;
+    localStorage.setItem('lastSajuForm', normalized);
+    console.log('[AUTO] lastOutputData 저장 완료 (hour/minute 포함):', normalized);
+
+    // 저장 완료 후 버튼 다시 활성화
+    sajuBtn.disabled = false;
+  }, 300);
+
+
+  
       // === 버튼 상태도 '신살보기'로 세팅 ===
       const sinsalBtn = document.getElementById('sinsalBtn');
       const sajuBtn = document.getElementById('sajuSubmit');
