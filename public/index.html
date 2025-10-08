@@ -408,6 +408,13 @@
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
 
+  /* 공지 클릭 시 파란색 강조 */
+#notice-list li a.active {
+  color: #0b57d0;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
 /* 접힌 상태 (완전 숨김) */
 #profile-edit-panel{
   max-height: 0;
@@ -915,13 +922,22 @@
   }
 
   // 팝업으로 공지 상세 열기
-  function openNotice(id) {
-    window.open(
-      `/notice.html?id=${id}`,
-      'noticePopup',
-      'width=600,height=400,resizable=yes,scrollbars=yes'
-    );
-  }
+function openNotice(id) {
+  // 모든 항목의 active 제거
+  document.querySelectorAll('#notice-list li a').forEach(a => a.classList.remove('active'));
+
+  // 클릭된 항목에 active 추가
+  const clicked = document.querySelector(`#notice-list li a[onclick="openNotice(${id})"]`);
+  if (clicked) clicked.classList.add('active');
+
+  // 팝업 열기
+  window.open(
+    `/notice.html?id=${id}`,
+    'noticePopup',
+    'width=600,height=400,resizable=yes,scrollbars=yes'
+  );
+}
+
 
   // 공지 추가 (제목+내용)
   document.getElementById('add-btn')?.addEventListener('click', async () => {
@@ -1017,6 +1033,9 @@
 
     renderNotices();
   }
+
+
+
 
   // 로그인 UI 업데이트 (role 저장/삭제 및 버튼 상태 반영)
   async function updateAuthUI(session) {
