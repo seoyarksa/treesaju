@@ -4,8 +4,7 @@
   <meta charset="UTF-8">
   <title>공지 상세</title>
   <style>
-    body { font-family: sans-serif; max-width: 800px; margin: 30px auto; line-height: 1.6; }
-    h2 { margin-bottom: 10px; }
+    body { font-family: sans-serif; max-width: 700px; margin: 30px auto; line-height: 1.6; }
     #notice-detail { margin-bottom: 40px; }
     #notice-list { border-top: 2px solid #333; padding-top: 15px; }
     .notice-item { cursor: pointer; padding: 6px 0; border-bottom: 1px solid #eee; }
@@ -15,10 +14,10 @@
   </style>
 </head>
 <body>
-  <!-- 상단: 클릭된 공지 내용 -->
+  <!-- 상단: 공지 내용 -->
   <div id="notice-detail">불러오는 중...</div>
 
-  <!-- 하단: 목록 -->
+  <!-- 하단: 공지 목록 -->
   <div id="notice-list">불러오는 중...</div>
   <div class="pagination" id="pagination"></div>
 
@@ -30,51 +29,67 @@
     const paginationContainer = document.getElementById('pagination');
 
     // 🔹 공지 상세 불러오기
-    if (id) {
-      fetch(`/api/notice/${id}`)
-        .then(res => res.json())
-        .then(notice => {
-          detailContainer.innerHTML = `
-            <h2>${notice.title}</h2>
-            <div>${notice.content}</div>
-            <small>작성일: ${new Date(notice.created_at).toLocaleString()} | 조회수: ${notice.views}</small>
-          `;
-        });
-    } else {
-      detailContainer.textContent = '공지 내용을 선택하세요.';
-    }
-
-    // 🔹 목록 & 페이지 처리
-    let currentPage = 1;
-    const perPage = 5;
-
-function loadList(page = 1) {
-  fetch(`/api/notices?page=${page}&limit=${perPage}`)
-    .then(res => res.json())
-    .then(data => {
-      const notices = Array.isArray(data) ? data : data.notices;
-      renderList(notices);
-      renderPagination(data.totalPages || 1, page);
-    })
-    .catch(err => {
-      listContainer.innerHTML = '<p>목록을 불러오지 못했습니다.</p>';
-      console.error(err);
-    });
-}
-
-
-    function renderList(notices) {
-      if (!notices || notices.length === 0) {
-        listContainer.innerHTML = '<p>공지 목록이 없습니다.</p>';
+    async function loadNoticeDetail() {
+      if (!id) {
+        detailContainer.textContent = '공지 내용을 선택하세요.';
         return;
       }
 
-      listContainer.innerHTML = notices.map(n => `
-        <div class="notice-item" onclick="viewNotice(${n.id})">
-          ${n.title}
-          <small style="float:right;">${new Date(n.created_at).toLocaleDateString()}</small>
-        </div>
-      `).join('');
+      try {
+        const res = await fetch(`/api/notice/${id}`);
+        const notice = await res.json();
+
+        if (!notice || !notice.id) {
+          detailContainer.textContent = '공지 정보를 불러오지 못했습니다.';
+          return;
+        }
+
+        detailContainer.innerHTML = `
+          <h2>${notice.title}</h2>
+          <div>${notice.content.replace(/\n/g, '<br>')}</div>
+          <small>작성일: ${new Date(notice.created_at).toLocaleString()} | 조회수: ${notice.views}</small>
+        `;
+      } catch (err) {
+        console.error(err);
+        detailContainer.textContent = '공지 불러오기 오류';
+      }
+    }
+
+    // 🔹 목록 불러오기 (5개씩 페이지 처리)
+    let currentPage = 1;
+    const perPage = 5;
+
+    async function loadList(page = 1) {
+      try {
+        const res = await fetch('/api/notice'); // 👈 index.html 과 동일한 API
+        const allData = await res.json();
+
+        if (!Array.isArray(allData) || allData.length === 0) {
+          listContainer.innerHTML = '<p>공지 목록이 없습니다.</p>';
+          return;
+        }
+
+        const totalPages = Math.ceil(allData.length / perPage);
+        const start = (page - 1) * perPage;
+        const paged = allData.slice(start, start + perPage);
+
+        renderList(paged);
+        renderPagination(totalPages, page);
+      } catch (err) {
+        console.error(err);
+        listContainer.innerHTML = '<p>목록 불러오기 오류</p>';
+      }
+    }
+
+    function renderList(notices) {
+      listContainer.innerHTML = notices
+        .map(n => `
+          <div class="notice-item" onclick="viewNotice(${n.id})">
+            ${n.title}
+            <small style="float:right;">${new Date(n.created_at).toLocaleDateString()}</small>
+          </div>
+        `)
+        .join('');
     }
 
     function renderPagination(totalPages, current) {
@@ -90,12 +105,13 @@ function loadList(page = 1) {
     }
 
     function viewNotice(id) {
+      // 같은 팝업 안에서 새 공지로 이동
       window.location.href = `?id=${id}`;
     }
 
-    // 초기 목록 불러오기
+    // 🔹 초기 실행
+    loadNoticeDetail();
     loadList();
   </script>
 </body>
 </html>
-
