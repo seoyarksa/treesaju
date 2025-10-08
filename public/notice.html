@@ -48,14 +48,20 @@
     let currentPage = 1;
     const perPage = 5;
 
-    function loadList(page = 1) {
-      fetch(`/api/notices?page=${page}&limit=${perPage}`)
-        .then(res => res.json())
-        .then(data => {
-          renderList(data.notices);
-          renderPagination(data.totalPages, page);
-        });
-    }
+function loadList(page = 1) {
+  fetch(`/api/notices?page=${page}&limit=${perPage}`)
+    .then(res => res.json())
+    .then(data => {
+      const notices = Array.isArray(data) ? data : data.notices;
+      renderList(notices);
+      renderPagination(data.totalPages || 1, page);
+    })
+    .catch(err => {
+      listContainer.innerHTML = '<p>목록을 불러오지 못했습니다.</p>';
+      console.error(err);
+    });
+}
+
 
     function renderList(notices) {
       if (!notices || notices.length === 0) {
