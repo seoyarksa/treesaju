@@ -1029,7 +1029,7 @@ async function handleSajuSubmit(e) {
       return;
     }
 
-    const formKey = JSON.stringify(formData);
+    const formKey = JSON.stringify(normalizeForm(formData));
 
     // 2) 로그인 여부 확인
     const { data: { session } } = await window.supabaseClient.auth.getSession();
@@ -1298,15 +1298,15 @@ function normalizeForm(form) {
   if (!form) return {};
   const f = { ...form };
 
-  // 날짜 형식 통일 (2025-10-08 → 20251008)
+  // 날짜 형식 통일 (YYYYMMDD)
   if (f.birthDate) f.birthDate = f.birthDate.replace(/-/g, '');
 
-  // AM/PM 대문자로
+  // AM/PM 통일
   if (f.ampm) f.ampm = f.ampm.toUpperCase();
 
-  // 숫자 문자열 통일
-  if (f.hour) f.hour = String(parseInt(f.hour, 10));
-  if (f.minute) f.minute = String(parseInt(f.minute, 10));
+  // 시간, 분은 카운트 비교에서 제외
+  delete f.hour;
+  delete f.minute;
 
   // 기본값 보정
   f.calendarType = f.calendarType || 'solar';
