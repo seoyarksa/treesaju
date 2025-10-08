@@ -10,24 +10,51 @@
   <button id="payBtn">결제하기</button>
 
   <script>
+    // ✅ 1. 아임포트 객체 초기화
     const IMP = window.IMP;
-    IMP.init("impXXXXXXXXX"); // 본인 아임포트 식별코드
+    IMP.init("impXXXXXXXXX"); // 👉 본인 아임포트 가맹점 식별코드로 교체
 
+    // ✅ 2. 결제 버튼 클릭 시 실행
     document.getElementById("payBtn").addEventListener("click", function() {
       IMP.request_pay({
-        pg: "kakaopay.TC0ONETIME", // 테스트용 카카오페이
-        pay_method: "card",
-        merchant_uid: "order_" + new Date().getTime(),
+        pg: "kakaopay.TC0ONETIME",  // 테스트용 카카오페이 PG사
+        pay_method: "card",         // 결제수단
+        merchant_uid: "order_" + new Date().getTime(), // 주문 고유번호
         name: "Kakao 정기구독 (월간)",
-        amount: 9900,
+        amount: 9900,               // 결제금액
         buyer_email: "user@example.com",
         buyer_name: "홍길동",
         buyer_tel: "01012345678"
-      }, function (rsp) {
+      }, async function (rsp) {
+        // ✅ 3. 결제 완료 후 콜백
         if (rsp.success) {
           alert("결제 성공 🎉\n결제번호: " + rsp.imp_uid);
-          // ✅ 정기결제용 빌링키 발급 → 서버로 전송
-          // fetch('/api/payment/register-billing', { method:'POST', body: JSON.stringify(rsp) })
+
+          try {
+            // ✅ 4. 서버로 빌링 등록 요청
+            const res = await fetch("/api/payment/register-billing", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                imp_uid: rsp.imp_uid,            // 결제 고유번호
+                customer_uid: rsp.customer_uid || "cust_" + new Date().getTime() // 고객 식별용 UID
+              }),
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+              console.log("✅ 서버 응답:", data);
+              alert("서버에 빌링 등록 완료 ✅");
+            } else {
+              console.error("❌ 서버 오류:", data);
+              alert("빌링 등록 실패 ❌: " + (data.error || "서버 오류"));
+            }
+          } catch (err) {
+            console.error("[register-billing fetch error]", err);
+            alert("서버 전송 실패 ❌: " + err.message);
+          }
+
         } else {
           alert("결제 실패 ❌\n" + rsp.error_msg);
         }

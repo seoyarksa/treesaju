@@ -403,3 +403,48 @@ app.get('/api/jeolip', (req, res) => {
     res.status(400).json({ error: error.message });
   }
 });
+
+
+// ✅ 아임포트 빌링 등록 API
+app.post("/api/payment/register-billing", async (req, res) => {
+  const { imp_uid, customer_uid } = req.body;
+
+  try {
+    // 1️⃣ 아임포트 액세스 토큰 발급
+    const tokenRes = await fetch("https://api.iamport.kr/users/getToken", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imp_key: process.env.IAMPORT_API_KEY,       // .env에 추가
+        imp_secret: process.env.IAMPORT_API_SECRET, // .env에 추가
+      }),
+    });
+    const tokenJson = await tokenRes.json();
+    const access_token = tokenJson?.response?.access_token;
+    if (!access_token) throw new Error("IAMPORT 토큰 발급 실패");
+
+    // 2️⃣ 고객 빌링키 등록
+    const billingRes = await fetch(
+      `https://api.iamport.kr/subscribe/customers/${customer_uid}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: access_token,
+        },
+        body: JSON.stringify({
+          card_number: "1234-1234-1234-1234", // 실제 카드정보는 클라이언트 입력값
+          expiry: "2027-12",
+          birth: "880101",
+          pwd_2digit: "12",
+        }),
+      }
+    );
+
+    const billingJson = await billingRes.json();
+    res.status(200).json(billingJson);
+  } catch (err) {
+    console.error("[register-billing error]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
