@@ -1012,7 +1012,6 @@ let lastOutputData = null;
 async function handleSajuSubmit(e) {
   e.preventDefault();
   console.log("[DEBUG] handleSajuSubmit 실행됨");
-  
 
   try {
     // 1) 입력 데이터 수집
@@ -1063,22 +1062,7 @@ async function handleSajuSubmit(e) {
       }
 
 
-      // === 오늘 날짜 예외 처리 ===
-const now = new Date();
-const todayKey = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
-
-// 입력이 오늘 날짜라면 시까지만 비교
-const formDate = (formData.birthDate || '').replace(/-/g,'');
-if (formDate === todayKey) {
-  const last = (() => {
-    try { return JSON.parse(lastOutputData); } catch(e) { return null; }
-  })();
-  if (last && last.birthDate === formDate && last.hour === formData.hour) {
-    console.log("⚠️ 오늘 날짜 & 같은 시각대 → 카운트 증가 없이 출력만");
-    renderSaju(formData);
-    return;
-  }
-}
+      
 
 
 
