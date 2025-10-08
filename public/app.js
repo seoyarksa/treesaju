@@ -1012,6 +1012,8 @@ let lastOutputData = null;
 async function handleSajuSubmit(e) {
   e.preventDefault();
   console.log("[DEBUG] handleSajuSubmit 실행됨");
+  console.log("입력 formData:", formData);
+console.log("저장된 lastOutputData:", lastOutputData);
 
   try {
     // 1) 입력 데이터 수집
@@ -1030,7 +1032,7 @@ async function handleSajuSubmit(e) {
     }
 
     const formKey = JSON.stringify(normalizeForm(formData));
-
+console.log("비교용 formKey:", formKey);
     // 2) 로그인 여부 확인
     const { data: { session } } = await window.supabaseClient.auth.getSession();
 
@@ -1060,7 +1062,7 @@ async function handleSajuSubmit(e) {
         renderSaju(formData);
         return;
       }
-
+console.log("❌ 동일 입력 아님 → 카운트 증가 로직으로 진입");
 
       // === 오늘 날짜 예외 처리 ===
 const now = new Date();
