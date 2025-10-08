@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Kakao 정기구독 결제</title>
+  <script src="https://cdn.iamport.kr/js/iamport.payment-1.2.0.js"></script>
+</head>
+<body>
+  <h3>Kakao 정기구독 결제</h3>
+  <button id="payBtn">결제하기</button>
+
+  <script>
+    const IMP = window.IMP;
+    IMP.init("impXXXXXXXXX"); // 본인 아임포트 식별코드
+
+    document.getElementById("payBtn").addEventListener("click", function() {
+      IMP.request_pay({
+        pg: "kakaopay.TC0ONETIME", // 테스트용 카카오페이
+        pay_method: "card",
+        merchant_uid: "order_" + new Date().getTime(),
+        name: "Kakao 정기구독 (월간)",
+        amount: 9900,
+        buyer_email: "user@example.com",
+        buyer_name: "홍길동",
+        buyer_tel: "01012345678"
+      }, function (rsp) {
+        if (rsp.success) {
+          alert("결제 성공 🎉\n결제번호: " + rsp.imp_uid);
+          // ✅ 정기결제용 빌링키 발급 → 서버로 전송
+          // fetch('/api/payment/register-billing', { method:'POST', body: JSON.stringify(rsp) })
+        } else {
+          alert("결제 실패 ❌\n" + rsp.error_msg);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

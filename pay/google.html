@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Google 정기구독 결제</title>
+  <script src="https://cdn.iamport.kr/js/iamport.payment-1.2.0.js"></script>
+</head>
+<body>
+  <h3>Google 정기구독 결제 (PG 테스트)</h3>
+  <button id="payBtn">결제하기</button>
+
+  <script>
+    // 아임포트 객체 초기화
+    const IMP = window.IMP;
+    IMP.init("impXXXXXXXXX"); // 👉 여기엔 본인 아임포트 가맹점 식별코드 입력
+
+    document.getElementById("payBtn").addEventListener("click", function() {
+      IMP.request_pay({
+        pg: "html5_inicis",   // 테스트용: 이니시스 PG
+        pay_method: "card",   // 결제 수단: card, kakaopay 등
+        merchant_uid: "order_" + new Date().getTime(), // 주문 고유번호
+        name: "Google 정기구독 (월간)",
+        amount: 9900,         // 결제 금액
+        buyer_email: "user@example.com",
+        buyer_name: "홍길동",
+        buyer_tel: "01012345678",
+        buyer_addr: "서울특별시 강남구",
+        buyer_postcode: "123-456"
+      }, function (rsp) {
+        if (rsp.success) {
+          alert("결제 성공 🎉\n고유 ID: " + rsp.imp_uid);
+          // ✅ 결제 성공 후 서버에 결제내역 저장 요청
+          // fetch('/api/payment/success', { method:'POST', body: JSON.stringify(rsp) })
+        } else {
+          alert("결제 실패 ❌\n" + rsp.error_msg);
+        }
+      });
+    });
+  </script>
+</body>
+</html>
