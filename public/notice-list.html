@@ -6,23 +6,58 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root { --border:#e6e6e6; --muted:#666; }
-    body{ font-family: system-ui, Arial, sans-serif; margin:0; }
-    header{ display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--border); }
+    body{ font-family: system-ui, Arial, sans-serif; margin:0; background:#fafafa; }
+    header{ display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--border); background:#fff; }
     header h1{ margin:0; font-size:16px; }
     header .spacer{ flex:1 1 auto; }
     header button{ padding:6px 10px; font-size:13px; }
-    .wrap{ display:flex; min-height: calc(100vh - 48px); }
-    .list{ width: 36%; min-width:280px; border-right:1px solid var(--border); }
-    .list ul{ list-style:none; padding:0; margin:0; }
-    .list li{ border-bottom:1px solid var(--border); }
-    .list a{ display:block; padding:10px 12px; text-decoration:none; color:#1976d2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .list .meta{ padding:0 12px 10px; color:var(--muted); font-size:12px; }
-    .detail{ flex:1 1 auto; min-width:0; padding:16px; }
-    .detail h2{ margin:0 0 6px; font-size:18px; }
-    .detail .meta{ color:var(--muted); font-size:12px; margin-bottom:12px; }
-    .detail .content{ white-space:pre-wrap; line-height:1.6; font-size:14px; }
-    .actions{ margin-top:14px; display:flex; gap:8px; }
-    .empty{ padding:24px; color:#999; }
+
+    main {
+      max-width: 800px;
+      margin: 20px auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 6px rgba(0,0,0,0.1);
+    }
+
+    #notice-detail h2 { margin-top: 0; }
+    #notice-detail .meta {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+    #notice-detail .content {
+      white-space: pre-wrap;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+    #notice-list {
+      margin-top: 40px;
+      border-top: 2px solid var(--border);
+      padding-top: 10px;
+    }
+    .notice-item {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .notice-item:hover {
+      background-color: #f9f9f9;
+    }
+    .notice-item small {
+      color: var(--muted);
+      float: right;
+      font-size: 12px;
+    }
+    .pagination {
+      text-align: center;
+      margin-top: 12px;
+    }
+    .pagination button {
+      margin: 0 3px;
+      padding: 4px 8px;
+    }
   </style>
 </head>
 <body>
@@ -32,137 +67,86 @@
     <button id="add-btn" style="display:none;">+ 추가</button>
   </header>
 
-  <div class="wrap">
-    <aside class="list">
-      <ul id="notice-list">
-        <li class="empty">목록을 불러오는 중...</li>
-      </ul>
-    </aside>
-
-    <main class="detail">
-      <h2 id="title">항목을 선택하세요</h2>
+  <main>
+    <!-- 상단: 공지 내용 -->
+    <section id="notice-detail">
+      <h2 id="title">공지 내용을 선택하세요</h2>
       <div class="meta" id="meta"></div>
       <div class="content" id="content"></div>
-      <div class="actions" id="admin-actions" style="display:none;">
-        <button id="edit-btn">수정</button>
-        <button id="del-btn">삭제</button>
-      </div>
-    </main>
-  </div>
+    </section>
+
+    <!-- 하단: 목록 -->
+    <section id="notice-list">불러오는 중...</section>
+    <div class="pagination" id="pagination"></div>
+  </main>
 
   <script>
     const role = (localStorage.getItem('userRole') || 'normal').toLowerCase();
-    const $list = document.getElementById('notice-list');
-    const $title = document.getElementById('title');
-    const $meta  = document.getElementById('meta');
-    const $content = document.getElementById('content');
-    const $actions = document.getElementById('admin-actions');
     const $addBtn = document.getElementById('add-btn');
-    const $editBtn = document.getElementById('edit-btn');
-    const $delBtn = document.getElementById('del-btn');
+    const $title = document.getElementById('title');
+    const $meta = document.getElementById('meta');
+    const $content = document.getElementById('content');
+    const $list = document.getElementById('notice-list');
+    const $pagination = document.getElementById('pagination');
 
-    // 관리자 버튼 노출
-    if (role === 'admin') {
-      $addBtn.style.display = 'inline-block';
-      $actions.style.display = 'flex';
-    }
-
-    // 쿼리 파라미터
-    function qs(name){
-      const p = new URLSearchParams(location.search);
-      return p.get(name);
-    }
+    if (role === 'admin') $addBtn.style.display = 'inline-block';
 
     let notices = [];
-    let currentId = parseInt(qs('id') || '0', 10) || null;
+    let currentId = null;
+    const perPage = 5;
+    let currentPage = 1;
 
+    // 공지 목록 불러오기
     async function loadList() {
-      $list.innerHTML = '<li class="empty">목록을 불러오는 중...</li>';
+      $list.textContent = '불러오는 중...';
       try {
         const res = await fetch('/api/notice');
         const data = await res.json();
         notices = Array.isArray(data) ? data : [];
         renderList();
-        // 처음 들어왔고 id 없으면 첫 항목 자동 선택
-        if (!currentId && notices.length) {
-          select(notices[0].id);
-        } else if (currentId) {
-          select(currentId);
-        }
+        if (!currentId && notices.length) select(notices[0].id);
       } catch (e) {
         console.error(e);
-        $list.innerHTML = '<li class="empty">목록을 불러오지 못했습니다.</li>';
+        $list.textContent = '공지 목록을 불러오지 못했습니다.';
       }
     }
 
-    function renderList() {
-      if (notices.length === 0) {
-        $list.innerHTML = '<li class="empty">등록된 공지가 없습니다.</li>';
+    function renderList(page = 1) {
+      $list.innerHTML = '';
+      const totalPages = Math.ceil(notices.length / perPage);
+      const start = (page - 1) * perPage;
+      const items = notices.slice(start, start + perPage);
+
+      if (!items.length) {
+        $list.textContent = '등록된 공지가 없습니다.';
         return;
       }
-      $list.innerHTML = '';
-      for (const n of notices) {
-        const li = document.createElement('li');
-        const a = document.createElement('a');
-        a.textContent = n.title;
-        a.href = 'javascript:void(0)';
-        a.onclick = () => select(n.id);
-        li.appendChild(a);
 
-        const meta = document.createElement('div');
-        meta.className = 'meta';
-        meta.textContent = `${new Date(n.created_at).toLocaleDateString()} · 조회 ${n.views}`;
-        li.appendChild(meta);
+      items.forEach(n => {
+        const div = document.createElement('div');
+        div.className = 'notice-item';
+        div.innerHTML = `
+          ${n.title}
+          <small>${new Date(n.created_at).toLocaleDateString()}</small>
+        `;
+        div.onclick = () => select(n.id);
+        $list.appendChild(div);
+      });
 
-        $list.appendChild(li);
-      }
+      $pagination.innerHTML = Array.from({length: totalPages})
+        .map((_, i) => `<button ${i+1===page?'disabled':''} onclick="renderList(${i+1})">${i+1}</button>`)
+        .join('');
     }
 
     async function select(id) {
       currentId = id;
-      history.replaceState(null, '', `?id=${id}`);
       try {
         const res = await fetch(`/api/notice/${id}`);
-        if (!res.ok) throw new Error('상세 읽기 실패');
+        if (!res.ok) throw new Error('읽기 실패');
         const n = await res.json();
         $title.textContent = n.title;
-        $meta.textContent = new Date(n.created_at).toLocaleString() + ` · 조회 ${n.views}`;
+        $meta.textContent = `${new Date(n.created_at).toLocaleString()} · 조회 ${n.views}`;
         $content.textContent = n.content ?? '';
-
-        // 버튼 동작 갱신
-        if (role === 'admin') {
-          $editBtn.onclick = async () => {
-            const curTitle = prompt('새 제목:', n.title);
-            if (curTitle === null) return;
-            const curContent = prompt('새 내용:', n.content ?? '');
-            if (curContent === null) return;
-
-            const resp = await fetch(`/api/notice/${id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ title: curTitle.trim(), content: (curContent ?? '').trim() })
-            });
-            if (!resp.ok) { alert('수정 실패'); return; }
-            await loadList();        // 목록/상세 모두 갱신
-            select(id);
-            alert('수정되었습니다.');
-          };
-
-          $delBtn.onclick = async () => {
-            if (!confirm('정말 삭제하시겠습니까?')) return;
-            const resp = await fetch(`/api/notice/${id}`, { method: 'DELETE' });
-            if (!resp.ok) { alert('삭제 실패'); return; }
-            await loadList();
-            // 삭제 후 첫 항목 선택
-            if (notices.length) select(notices[0].id);
-            else {
-              $title.textContent = '항목을 선택하세요';
-              $meta.textContent = '';
-              $content.textContent = '';
-              history.replaceState(null, '', location.pathname);
-            }
-          };
-        }
       } catch (e) {
         console.error(e);
         $title.textContent = '읽기 실패';
@@ -171,22 +155,24 @@
       }
     }
 
-    // 추가 버튼
-    $addBtn?.addEventListener('click', async () => {
-      const title = prompt('새 공지의 제목을 입력하세요:');
-      if (title === null) return;
-      const content = prompt('내용을 입력하세요:');
+    // 공지 추가
+    $addBtn.addEventListener('click', async () => {
+      const title = prompt('새 공지 제목:');
+      if (!title) return;
+      const content = prompt('내용:');
       if (content === null) return;
 
+      const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
       const resp = await fetch('/api/notice', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ title: title.trim(), content: (content ?? '').trim() })
       });
-      if (!resp.ok) { alert('등록 실패'); return; }
+      if (!resp.ok) return alert('등록 실패');
       await loadList();
-      // 방금 추가한 최신을 선택
-      if (notices.length) select(notices[0].id);
     });
 
     loadList();
