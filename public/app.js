@@ -1258,6 +1258,13 @@ window.addEventListener('load', async () => {
     // 출력 실행 (카운트 제외)
     if (typeof renderSaju === 'function') {
       await renderSaju(todayForm);
+
+      // ✅ '자동 출력' 입력값을 lastOutputData에 저장 → 동일 입력 시 카운트 제외
+if (typeof lastOutputData !== 'undefined') {
+  lastOutputData = JSON.stringify(todayForm);
+  console.log('🔹 자동 로딩된 사주를 lastOutputData에 저장 → 중복 출력 시 카운트 제외');
+}
+
     } else {
       console.warn('⚠️ renderSaju 함수가 아직 정의되지 않았습니다.');
     }
