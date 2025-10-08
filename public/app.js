@@ -1024,12 +1024,21 @@ async function handleSajuSubmit(e) {
       hour: document.getElementById("hour-select")?.value,
       minute: document.getElementById("minute-select")?.value,
     };
+
+    console.log("🧩 [LOG1] formData (입력된 값):", formData);
+    console.log("🧩 [LOG2] lastOutputData (이전 출력 데이터):", lastOutputData);
+
     if (!formData.gender) {
       alert("성별을 선택해야 합니다.");
       return;
     }
 
     const formKey = JSON.stringify(normalizeForm(formData));
+        // 🟡 여기서 비교용 로그 추가
+    console.log("🧩 [LOG3] normalizeForm(formData):", normalizeForm(formData));
+    console.log("🧩 [LOG4] formKey (JSON):", formKey);
+    console.log("🧩 [LOG5] lastOutputData (JSON 문자열):", lastOutputData);
+
 
     // 2) 로그인 여부 확인
     const { data: { session } } = await window.supabaseClient.auth.getSession();
@@ -1062,7 +1071,22 @@ async function handleSajuSubmit(e) {
       }
 
 
-      
+      // === 오늘 날짜 예외 처리 ===
+const now = new Date();
+const todayKey = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+
+// 입력이 오늘 날짜라면 시까지만 비교
+const formDate = (formData.birthDate || '').replace(/-/g,'');
+if (formDate === todayKey) {
+  const last = (() => {
+    try { return JSON.parse(lastOutputData); } catch(e) { return null; }
+  })();
+  if (last && last.birthDate === formDate && last.hour === formData.hour) {
+    console.log("⚠️ 오늘 날짜 & 같은 시각대 → 카운트 증가 없이 출력만");
+    renderSaju(formData);
+    return;
+  }
+}
 
 
 
