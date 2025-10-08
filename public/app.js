@@ -1194,7 +1194,6 @@ async function handleSajuSubmit(e) {
 }
 
 
-// === 첫 로딩 시 오늘 날짜 자동 사주 출력 ===
 // === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
 window.addEventListener('DOMContentLoaded', async () => {
   try {
@@ -1205,46 +1204,43 @@ window.addEventListener('DOMContentLoaded', async () => {
     const hour24 = now.getHours();
     const min = String(now.getMinutes()).padStart(2, '0');
 
-    // 🕒 오전/오후 판정
+    // 🕒 오전/오후 판정 (대문자)
     const ampm = hour24 < 12 ? 'AM' : 'PM';
+    // 12시간제로 변환 (0시는 12로)
+    const hh12 = String(hour24 % 12 === 0 ? 12 : hour24 % 12);
 
-    // 12시간제 변환
-    const hh12 = String(hour24 % 12 === 0 ? 12 : hour24 % 12).padStart(2, '0');
-
-    // 🧩 입력폼 자동 세팅 (있을 경우)
+    // === 폼 값 자동 세팅 ===
     const birthInput = document.getElementById('birth-date');
-    if (birthInput) birthInput.value = `${yyyy}-${mm}-${dd}`;
+    if (birthInput) birthInput.value = `${yyyy}${mm}${dd}`; // ← YYYYMMDD 형식에 맞춤
 
     const calendarSel = document.getElementById('calendar-type');
-    if (calendarSel) calendarSel.value = 'solar'; // 양력 고정
+    if (calendarSel) calendarSel.value = 'solar'; // 양력 자동 선택
 
     const genderSel = document.getElementById('gender');
-    if (genderSel) genderSel.value = 'male'; // 남자 고정
+    if (genderSel) genderSel.value = 'male'; // 남자 자동 선택
+
+    const ampmInput = document.querySelector(`input[name='ampm'][value='${ampm}']`);
+    if (ampmInput) ampmInput.checked = true; // 오전/오후 자동 체크
 
     const hourSel = document.getElementById('hour-select');
-    if (hourSel) hourSel.value = hh12;
+    if (hourSel) hourSel.value = String(hh12); // 시 선택 반영
 
     const minSel = document.getElementById('minute-select');
-    if (minSel) minSel.value = min;
+    if (minSel) minSel.value = String(parseInt(min)); // 분 선택 반영
 
+    // === formData 구성 ===
+    const todayForm = {
+      name: '오늘 기준',
+      birthDate: `${yyyy}${mm}${dd}`,
+      calendarType: 'solar',
+      gender: 'male',
+      ampm,
+      hour: String(hh12),
+      minute: String(parseInt(min)),
+    };
 
-// 실제 오전/오후 버튼 체크
-const ampmInput = document.querySelector(`input[name='ampm'][value='${ampm}']`);
-if (ampmInput) ampmInput.checked = true;
-
-// formData 구성
-const todayForm = {
-  name: '오늘 기준',
-  birthDate: `${yyyy}-${mm}-${dd}`,
-  calendarType: 'solar',
-  gender: 'male',
-  ampm, // AM / PM
-  hour: hh12,
-  minute: min,
-};
-
-    console.log(`[AUTO] 첫 로딩: ${yyyy}-${mm}-${dd} ${ampm.toUpperCase()} ${hh12}:${min} (양력/남자 기준)`);
-    await renderSaju(todayForm); // 카운트 제외
+    console.log(`[AUTO] ${yyyy}-${mm}-${dd} ${ampm} ${hh12}:${min} (양력/남자 기준)`);
+    await renderSaju(todayForm); // ✅ 카운트 제외
   } catch (err) {
     console.error('자동 사주 로딩 실패:', err);
   }
