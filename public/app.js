@@ -898,13 +898,22 @@ if (subModal) subModal.style.display = "block";
 
 window.startGoogleSubscription = function() {
   console.log("Google 정기구독 결제 클릭됨");
-  window.location.href = "https://play.google.com/store/account/subscriptions";
+  window.open(
+    "https://play.google.com/store/account/subscriptions",
+    "_blank", // 새창 또는 새탭
+    "width=480,height=720,noopener,noreferrer"
+  );
 };
 
 window.startKakaoSubscription = function() {
   console.log("Kakao 정기구독 결제 클릭됨");
-  window.location.href = "https://billing-web.kakao.com/pay";
+  window.open(
+    "https://billing-web.kakao.com/pay",
+    "_blank",
+    "width=480,height=720,noopener,noreferrer"
+  );
 };
+
 
 
 
