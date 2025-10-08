@@ -879,6 +879,11 @@ await window.supabaseClient
   .eq("user_id", user.id);
 
 
+// ✅ index.html의 결제 모달 표시
+const subModal = document.getElementById("subscriptionModal");
+if (subModal) subModal.style.display = "block";
+
+
     // 4) UI 갱신
     const { data: { session } } = await window.supabaseClient.auth.getSession();
     updateAuthUI(session);
