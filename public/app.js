@@ -1261,11 +1261,22 @@ window.addEventListener('load', async () => {
 
 
 
-// 🔹 자동 출력 데이터를 handleSajuSubmit() 비교 기준에 맞게 저장
+// === 버튼 상태도 '신살보기'로 세팅 ===
+const sinsalBtn = document.getElementById('sinsalBtn');
+const sajuBtn = document.getElementById('sajuSubmit');
+
+// 버튼 색/활성 클래스 초기화
+sajuBtn?.classList.remove('active');
+sinsalBtn?.classList.add('active');
+
+// 내부 모드 변수도 신살보기로 통일 (존재할 경우)
+window.currentMode = 'sinsal'; // 또는 app.js에서 사용하는 실제 전역변수명
+
+// 🔹 자동 로딩 입력값 정규화 후 저장
 if (typeof lastOutputData !== 'undefined') {
   const normalized = JSON.stringify(normalizeForm(todayForm));
   lastOutputData = normalized;
-  console.log('[AUTO] 자동 로딩된 사주를 정규화 후 lastOutputData에 저장');
+  console.log('[AUTO] 신살보기 모드로 자동 출력 후 상태 동기화 완료');
 }
 
     } else {
