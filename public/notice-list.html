@@ -58,6 +58,13 @@
       margin: 0 3px;
       padding: 4px 8px;
     }
+
+    .notice-item.active {
+  background-color: #e8f0fe; /* 밝은 파랑 배경 */
+  color: #0b57d0;           /* 파란 글자색 */
+  font-weight: 600;
+}
+
   </style>
 </head>
 <body>
@@ -138,22 +145,30 @@
         .join('');
     }
 
-    async function select(id) {
-      currentId = id;
-      try {
-        const res = await fetch(`/api/notice/${id}`);
-        if (!res.ok) throw new Error('읽기 실패');
-        const n = await res.json();
-        $title.textContent = n.title;
-        $meta.textContent = `${new Date(n.created_at).toLocaleString()} · 조회 ${n.views}`;
-        $content.textContent = n.content ?? '';
-      } catch (e) {
-        console.error(e);
-        $title.textContent = '읽기 실패';
-        $meta.textContent = '';
-        $content.textContent = '';
-      }
-    }
+ async function select(id) {
+  currentId = id;
+  try {
+    const res = await fetch(`/api/notice/${id}`);
+    if (!res.ok) throw new Error('읽기 실패');
+    const n = await res.json();
+
+    $title.textContent = n.title;
+    $meta.textContent = `${new Date(n.created_at).toLocaleString()} · 조회 ${n.views}`;
+    $content.textContent = n.content ?? '';
+
+    // ✅ 선택 항목 스타일 업데이트
+    document.querySelectorAll('.notice-item').forEach(el => el.classList.remove('active'));
+    const selected = Array.from(document.querySelectorAll('.notice-item'))
+      .find(el => el.textContent.trim().startsWith(n.title));
+    if (selected) selected.classList.add('active');
+
+  } catch (e) {
+    console.error(e);
+    $title.textContent = '읽기 실패';
+    $meta.textContent = '';
+    $content.textContent = '';
+  }
+}
 
     // 공지 추가
     $addBtn.addEventListener('click', async () => {
