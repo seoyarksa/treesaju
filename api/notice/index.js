@@ -1,7 +1,7 @@
-// api/notice/index.js
 import pool from '../../db.js';
 
 export default async function handler(req, res) {
+  // 🔹 공지 목록 조회 (GET)
   if (req.method === 'GET') {
     try {
       const result = await pool.query(
@@ -14,11 +14,12 @@ export default async function handler(req, res) {
     }
   }
 
+  // 🔹 공지 추가 (POST)
   if (req.method === 'POST') {
     try {
-      // 🔹 body를 직접 파싱 (Vercel 환경에서는 이게 필요)
+      // Vercel 환경에서는 req.body가 문자열일 수 있음 → 수동 파싱
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-      const { title, content } = body;
+      const { title, content } = body || {};
 
       if (!title || !content) {
         return res.status(400).json({ error: '제목과 내용을 모두 입력하세요.' });
@@ -38,5 +39,6 @@ export default async function handler(req, res) {
     }
   }
 
+  // 그 외 메서드
   return res.status(405).json({ error: 'Method Not Allowed' });
 }
