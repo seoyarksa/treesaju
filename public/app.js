@@ -1194,6 +1194,7 @@ async function handleSajuSubmit(e) {
 }
 
 
+// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
 window.addEventListener('load', async () => {
   try {
     const now = new Date();
@@ -1203,25 +1204,26 @@ window.addEventListener('load', async () => {
     const hour24 = now.getHours();
     const minute = now.getMinutes();
 
-    // 오전/오후 판정
+    // 🕒 오전/오후 판정
     const ampm = hour24 < 12 ? 'AM' : 'PM';
-    const hour12 = hour24 % 12; // 0~11
+    const hour12 = hour24 % 12; // 0~11 범위
 
-    // 요소가 모두 로드될 때까지 대기 (혹시 비동기 렌더일 때 대비)
-    const waitFor = (sel) => new Promise((resolve) => {
-      const el = document.querySelector(sel);
-      if (el) return resolve(el);
-      const obs = new MutationObserver(() => {
-        const e = document.querySelector(sel);
-        if (e) {
-          obs.disconnect();
-          resolve(e);
-        }
+    // 요소가 모두 렌더될 때까지 대기 (SPA 대비)
+    const waitFor = (sel) =>
+      new Promise((resolve) => {
+        const el = document.querySelector(sel);
+        if (el) return resolve(el);
+        const obs = new MutationObserver(() => {
+          const e = document.querySelector(sel);
+          if (e) {
+            obs.disconnect();
+            resolve(e);
+          }
+        });
+        obs.observe(document.body, { childList: true, subtree: true });
       });
-      obs.observe(document.body, { childList: true, subtree: true });
-    });
 
-    await waitFor('#saju-form'); // 폼이 렌더된 뒤 실행
+    await waitFor('#saju-form'); // 폼이 준비된 후 실행
 
     // === 입력값 자동 세팅 ===
     const birthInput = document.getElementById('birth-date');
@@ -1237,12 +1239,12 @@ window.addEventListener('load', async () => {
     if (ampmRadio) ampmRadio.checked = true;
 
     const hourSel = document.getElementById('hour-select');
-    if (hourSel) hourSel.value = String(hour12); // 문자열로 세팅해야 option 매칭
+    if (hourSel) hourSel.value = String(hour12); // 반드시 문자열로 세팅
 
     const minSel = document.getElementById('minute-select');
-    if (minSel) minSel.value = String(minute); // 문자열 변환 후 세팅
+    if (minSel) minSel.value = String(minute);
 
-    // === formData ===
+    // === formData 구성 ===
     const todayForm = {
       name: '오늘 기준',
       birthDate: `${yyyy}${mm}${dd}`,
@@ -1255,30 +1257,33 @@ window.addEventListener('load', async () => {
 
     console.log(`[AUTO] ${yyyy}-${mm}-${dd} ${ampm} ${hour12}:${minute} (양력/남자 기준)`);
 
-    // 출력 실행 (카운트 제외)
+    // === 출력 실행 (카운트 제외) ===
     if (typeof renderSaju === 'function') {
       await renderSaju(todayForm);
 
+      // === 버튼 상태도 '신살보기'로 세팅 ===
+      const sinsalBtn = document.getElementById('sinsalBtn');
+      const sajuBtn = document.getElementById('sajuSubmit');
+      sajuBtn?.classList.remove('active');
+      sinsalBtn?.classList.add('active');
 
+      // 내부 모드 변수 동기화 (있을 경우)
+      window.currentMode = 'sinsal';
 
-// === 버튼 상태도 '신살보기'로 세팅 ===
-const sinsalBtn = document.getElementById('sinsalBtn');
-const sajuBtn = document.getElementById('sajuSubmit');
+      // === 자동 로딩 입력값 정규화 후 저장 ===
+      if (typeof normalizeForm === 'function') {
+        const normalized = JSON.stringify(normalizeForm(todayForm));
+        window.lastOutputData = normalized;
+        localStorage.setItem('lastSajuForm', normalized);
+        console.log('[AUTO] 신살보기 모드 자동 출력 후 상태 동기화 완료');
+      } else {
+        console.warn('⚠️ normalizeForm 함수가 정의되어 있지 않습니다.');
+      }
 
-// 버튼 색/활성 클래스 초기화
-sajuBtn?.classList.remove('active');
-sinsalBtn?.classList.add('active');
-
-// 내부 모드 변수도 신살보기로 통일 (존재할 경우)
-window.currentMode = 'sinsal'; // 또는 app.js에서 사용하는 실제 전역변수명
-
-// 🔹 자동 로딩 입력값 정규화 후 저장
-if (typeof lastOutputData !== 'undefined') {
-  const normalized = JSON.stringify(normalizeForm(todayForm));
-  lastOutputData = normalized;
-  console.log('[AUTO] 신살보기 모드로 자동 출력 후 상태 동기화 완료');
-}
-
+      // 세운 자동 선택 처리
+      if (typeof selectCurrentSeun === 'function') {
+        selectCurrentSeun();
+      }
     } else {
       console.warn('⚠️ renderSaju 함수가 아직 정의되지 않았습니다.');
     }
@@ -1286,6 +1291,7 @@ if (typeof lastOutputData !== 'undefined') {
     console.error('자동 사주 로딩 실패:', err);
   }
 });
+
 
 
 function normalizeForm(form) {
