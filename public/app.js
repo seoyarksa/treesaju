@@ -1206,27 +1206,24 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     // 🕒 오전/오후 판정 (대문자)
     const ampm = hour24 < 12 ? 'AM' : 'PM';
-    // 12시간제로 변환 (0시는 12로)
-    const hh12 = String(hour24 % 12 === 0 ? 12 : hour24 % 12);
+    // 0~11 시로 변환 (오전/오후로 나뉘므로)
+    const hour12 = hour24 % 12;
 
     // === 폼 값 자동 세팅 ===
-    const birthInput = document.getElementById('birth-date');
-    if (birthInput) birthInput.value = `${yyyy}${mm}${dd}`; // ← YYYYMMDD 형식에 맞춤
+    document.getElementById('birth-date')?.setAttribute('value', `${yyyy}${mm}${dd}`);
+    document.getElementById('calendar-type')?.value = 'solar'; // 양력
+    document.getElementById('gender')?.value = 'male'; // 남자
 
-    const calendarSel = document.getElementById('calendar-type');
-    if (calendarSel) calendarSel.value = 'solar'; // 양력 자동 선택
-
-    const genderSel = document.getElementById('gender');
-    if (genderSel) genderSel.value = 'male'; // 남자 자동 선택
-
+    // 오전/오후 선택
     const ampmInput = document.querySelector(`input[name='ampm'][value='${ampm}']`);
-    if (ampmInput) ampmInput.checked = true; // 오전/오후 자동 체크
+    if (ampmInput) ampmInput.checked = true;
 
+    // 시 / 분 자동 선택
     const hourSel = document.getElementById('hour-select');
-    if (hourSel) hourSel.value = String(hh12); // 시 선택 반영
+    if (hourSel) hourSel.value = String(hour12); // ✅ 0~11 범위로 맞춤
 
     const minSel = document.getElementById('minute-select');
-    if (minSel) minSel.value = String(parseInt(min)); // 분 선택 반영
+    if (minSel) minSel.value = String(parseInt(min));
 
     // === formData 구성 ===
     const todayForm = {
@@ -1235,16 +1232,17 @@ window.addEventListener('DOMContentLoaded', async () => {
       calendarType: 'solar',
       gender: 'male',
       ampm,
-      hour: String(hh12),
+      hour: String(hour12),
       minute: String(parseInt(min)),
     };
 
-    console.log(`[AUTO] ${yyyy}-${mm}-${dd} ${ampm} ${hh12}:${min} (양력/남자 기준)`);
-    await renderSaju(todayForm); // ✅ 카운트 제외
+    console.log(`[AUTO] ${yyyy}-${mm}-${dd} ${ampm} ${hour12}시 ${min}분 (양력/남자 기준)`);
+    await renderSaju(todayForm); // 카운트 제외
   } catch (err) {
     console.error('자동 사주 로딩 실패:', err);
   }
 });
+
 
 
 
