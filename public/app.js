@@ -1290,6 +1290,15 @@ window.addEventListener('load', async () => {
     if (typeof renderSaju === 'function') {
       await renderSaju(todayForm);
 
+      
+      // ✅ 바로 여기에 추가하세요!!
+      setTimeout(() => {
+        const normalized = JSON.stringify(normalizeForm(todayForm));
+        window.lastOutputData = normalized;
+        localStorage.setItem('lastSajuForm', normalized);
+        console.log('[AUTO] lastOutputData 저장 완료:', normalized);
+      }, 30);
+      
       // === 버튼 상태도 '신살보기'로 세팅 ===
       const sinsalBtn = document.getElementById('sinsalBtn');
       const sajuBtn = document.getElementById('sajuSubmit');
@@ -1309,10 +1318,7 @@ window.addEventListener('load', async () => {
         console.warn('⚠️ normalizeForm 함수가 정의되어 있지 않습니다.');
       }
 
-      // 세운 자동 선택 처리
-      if (typeof selectCurrentSeun === 'function') {
-        selectCurrentSeun();
-      }
+
     } else {
       console.warn('⚠️ renderSaju 함수가 아직 정의되지 않았습니다.');
     }
