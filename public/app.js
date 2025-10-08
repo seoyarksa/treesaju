@@ -1206,7 +1206,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const min = String(now.getMinutes()).padStart(2, '0');
 
     // 🕒 오전/오후 판정
-    const ampm = hour24 < 12 ? 'am' : 'pm';
+    const ampm = hour24 < 12 ? 'AM' : 'PM';
 
     // 12시간제 변환
     const hh12 = String(hour24 % 12 === 0 ? 12 : hour24 % 12).padStart(2, '0');
@@ -1227,19 +1227,21 @@ window.addEventListener('DOMContentLoaded', async () => {
     const minSel = document.getElementById('minute-select');
     if (minSel) minSel.value = min;
 
-    const ampmInput = document.querySelector(`input[name='ampm'][value='${ampm}']`);
-    if (ampmInput) ampmInput.checked = true;
 
-    // 📦 자동 formData 생성
-    const todayForm = {
-      name: '오늘 기준',
-      birthDate: `${yyyy}-${mm}-${dd}`,
-      calendarType: 'solar',
-      gender: 'male',
-      ampm,
-      hour: hh12,
-      minute: min,
-    };
+// 실제 오전/오후 버튼 체크
+const ampmInput = document.querySelector(`input[name='ampm'][value='${ampm}']`);
+if (ampmInput) ampmInput.checked = true;
+
+// formData 구성
+const todayForm = {
+  name: '오늘 기준',
+  birthDate: `${yyyy}-${mm}-${dd}`,
+  calendarType: 'solar',
+  gender: 'male',
+  ampm, // AM / PM
+  hour: hh12,
+  minute: min,
+};
 
     console.log(`[AUTO] 첫 로딩: ${yyyy}-${mm}-${dd} ${ampm.toUpperCase()} ${hh12}:${min} (양력/남자 기준)`);
     await renderSaju(todayForm); // 카운트 제외
