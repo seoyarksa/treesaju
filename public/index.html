@@ -928,14 +928,23 @@ function openNotice(id) {
 
   // 클릭된 항목에 active 추가
   const clicked = document.querySelector(`#notice-list li a[onclick="openNotice(${id})"]`);
-  if (clicked) clicked.classList.add('active');
-
-  // 팝업 열기
-  window.open(
-    `/notice.html?id=${id}`,
-    'noticePopup',
-    'width=600,height=400,resizable=yes,scrollbars=yes'
-  );
+  if (clicked) {
+    clicked.classList.add('active');
+    // 💡 DOM이 실제로 그려질 시간을 확보 (팝업을 바로 열면 브라우저가 렌더 생략함)
+    requestAnimationFrame(() => {
+      window.open(
+        `/notice.html?id=${id}`,
+        'noticePopup',
+        'width=600,height=400,resizable=yes,scrollbars=yes'
+      );
+    });
+  } else {
+    window.open(
+      `/notice.html?id=${id}`,
+      'noticePopup',
+      'width=600,height=400,resizable=yes,scrollbars=yes'
+    );
+  }
 }
 
 
