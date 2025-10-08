@@ -1194,38 +1194,55 @@ async function handleSajuSubmit(e) {
 }
 
 
-// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
-window.addEventListener('DOMContentLoaded', async () => {
+window.addEventListener('load', async () => {
   try {
     const now = new Date();
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, '0');
     const dd = String(now.getDate()).padStart(2, '0');
     const hour24 = now.getHours();
-    const min = String(now.getMinutes()).padStart(2, '0');
+    const minute = now.getMinutes();
 
-    // 🕒 오전/오후 판정 (대문자)
+    // 오전/오후 판정
     const ampm = hour24 < 12 ? 'AM' : 'PM';
-    // 0~11 시로 변환 (오전/오후로 나뉘므로)
-    const hour12 = hour24 % 12;
+    const hour12 = hour24 % 12; // 0~11
 
-    // === 폼 값 자동 세팅 ===
-    document.getElementById('birth-date')?.setAttribute('value', `${yyyy}${mm}${dd}`);
-    document.getElementById('calendar-type')?.value = 'solar'; // 양력
-    document.getElementById('gender')?.value = 'male'; // 남자
+    // 요소가 모두 로드될 때까지 대기 (혹시 비동기 렌더일 때 대비)
+    const waitFor = (sel) => new Promise((resolve) => {
+      const el = document.querySelector(sel);
+      if (el) return resolve(el);
+      const obs = new MutationObserver(() => {
+        const e = document.querySelector(sel);
+        if (e) {
+          obs.disconnect();
+          resolve(e);
+        }
+      });
+      obs.observe(document.body, { childList: true, subtree: true });
+    });
 
-    // 오전/오후 선택
-    const ampmInput = document.querySelector(`input[name='ampm'][value='${ampm}']`);
-    if (ampmInput) ampmInput.checked = true;
+    await waitFor('#saju-form'); // 폼이 렌더된 뒤 실행
 
-    // 시 / 분 자동 선택
+    // === 입력값 자동 세팅 ===
+    const birthInput = document.getElementById('birth-date');
+    if (birthInput) birthInput.value = `${yyyy}${mm}${dd}`;
+
+    const calendarSel = document.getElementById('calendar-type');
+    if (calendarSel) calendarSel.value = 'solar';
+
+    const genderSel = document.getElementById('gender');
+    if (genderSel) genderSel.value = 'male';
+
+    const ampmRadio = document.querySelector(`input[name='ampm'][value='${ampm}']`);
+    if (ampmRadio) ampmRadio.checked = true;
+
     const hourSel = document.getElementById('hour-select');
-    if (hourSel) hourSel.value = String(hour12); // ✅ 0~11 범위로 맞춤
+    if (hourSel) hourSel.value = String(hour12); // 문자열로 세팅해야 option 매칭
 
     const minSel = document.getElementById('minute-select');
-    if (minSel) minSel.value = String(parseInt(min));
+    if (minSel) minSel.value = String(minute); // 문자열 변환 후 세팅
 
-    // === formData 구성 ===
+    // === formData ===
     const todayForm = {
       name: '오늘 기준',
       birthDate: `${yyyy}${mm}${dd}`,
@@ -1233,15 +1250,22 @@ window.addEventListener('DOMContentLoaded', async () => {
       gender: 'male',
       ampm,
       hour: String(hour12),
-      minute: String(parseInt(min)),
+      minute: String(minute),
     };
 
-    console.log(`[AUTO] ${yyyy}-${mm}-${dd} ${ampm} ${hour12}시 ${min}분 (양력/남자 기준)`);
-    await renderSaju(todayForm); // 카운트 제외
+    console.log(`[AUTO] ${yyyy}-${mm}-${dd} ${ampm} ${hour12}:${minute} (양력/남자 기준)`);
+
+    // 출력 실행 (카운트 제외)
+    if (typeof renderSaju === 'function') {
+      await renderSaju(todayForm);
+    } else {
+      console.warn('⚠️ renderSaju 함수가 아직 정의되지 않았습니다.');
+    }
   } catch (err) {
     console.error('자동 사주 로딩 실패:', err);
   }
 });
+
 
 
 
