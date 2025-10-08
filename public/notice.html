@@ -5,27 +5,29 @@
   <title>공지 상세</title>
   <style>
     body { font-family: sans-serif; max-width: 800px; margin: 30px auto; line-height: 1.6; }
-    #notice-detail { margin-bottom: 50px; }
-    #notice-list { border-top: 2px solid #333; padding-top: 20px; }
-    .notice-item { cursor: pointer; padding: 8px 0; border-bottom: 1px solid #eee; }
+    h2 { margin-bottom: 10px; }
+    #notice-detail { margin-bottom: 40px; }
+    #notice-list { border-top: 2px solid #333; padding-top: 15px; }
+    .notice-item { cursor: pointer; padding: 6px 0; border-bottom: 1px solid #eee; }
     .notice-item:hover { background: #f9f9f9; }
-    .pagination { text-align: center; margin-top: 15px; }
-    .pagination button { margin: 0 3px; padding: 5px 10px; }
+    .pagination { text-align: center; margin-top: 10px; }
+    .pagination button { margin: 0 3px; padding: 4px 8px; }
   </style>
 </head>
 <body>
+  <!-- 상단: 클릭된 공지 내용 -->
   <div id="notice-detail">불러오는 중...</div>
 
-  <h3>📋 최신 공지</h3>
+  <!-- 하단: 목록 -->
   <div id="notice-list">불러오는 중...</div>
   <div class="pagination" id="pagination"></div>
 
   <script>
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
+    const detailContainer = document.getElementById('notice-detail');
     const listContainer = document.getElementById('notice-list');
     const paginationContainer = document.getElementById('pagination');
-    const detailContainer = document.getElementById('notice-detail');
 
     // 🔹 공지 상세 불러오기
     if (id) {
@@ -34,56 +36,60 @@
         .then(notice => {
           detailContainer.innerHTML = `
             <h2>${notice.title}</h2>
-            <p>${notice.content}</p>
+            <div>${notice.content}</div>
             <small>작성일: ${new Date(notice.created_at).toLocaleString()} | 조회수: ${notice.views}</small>
           `;
         });
     } else {
-      detailContainer.textContent = '공지사항을 선택하세요.';
+      detailContainer.textContent = '공지 내용을 선택하세요.';
     }
 
-    // 🔹 목록 & 페이지네이션 불러오기
+    // 🔹 목록 & 페이지 처리
     let currentPage = 1;
     const perPage = 5;
 
-    function loadNotices(page = 1) {
+    function loadList(page = 1) {
       fetch(`/api/notices?page=${page}&limit=${perPage}`)
         .then(res => res.json())
         .then(data => {
-          renderNoticeList(data.notices);
+          renderList(data.notices);
           renderPagination(data.totalPages, page);
         });
     }
 
-    function renderNoticeList(notices) {
+    function renderList(notices) {
       if (!notices || notices.length === 0) {
-        listContainer.innerHTML = '<p>공지사항이 없습니다.</p>';
+        listContainer.innerHTML = '<p>공지 목록이 없습니다.</p>';
         return;
       }
 
       listContainer.innerHTML = notices.map(n => `
         <div class="notice-item" onclick="viewNotice(${n.id})">
-          <strong>${n.title}</strong>
+          ${n.title}
           <small style="float:right;">${new Date(n.created_at).toLocaleDateString()}</small>
         </div>
       `).join('');
     }
 
     function renderPagination(totalPages, current) {
+      if (totalPages <= 1) {
+        paginationContainer.innerHTML = '';
+        return;
+      }
       let html = '';
       for (let i = 1; i <= totalPages; i++) {
-        html += `<button ${i === current ? 'disabled' : ''} onclick="loadNotices(${i})">${i}</button>`;
+        html += `<button ${i === current ? 'disabled' : ''} onclick="loadList(${i})">${i}</button>`;
       }
       paginationContainer.innerHTML = html;
     }
 
-    // 🔹 클릭 시 상세페이지로 이동
     function viewNotice(id) {
       window.location.href = `?id=${id}`;
     }
 
-    // 최초 목록 로드
-    loadNotices();
+    // 초기 목록 불러오기
+    loadList();
   </script>
 </body>
 </html>
+
