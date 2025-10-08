@@ -896,6 +896,19 @@ if (subModal) subModal.style.display = "block";
 }
 
 
+
+function startGoogleSubscription() {
+  // 실제 구글 구독 결제 링크 또는 결제 API로 이동
+  window.location.href = "https://play.google.com/store/account/subscriptions"; 
+}
+
+function startKakaoSubscription() {
+  // 실제 카카오페이 구독 결제 페이지로 이동
+  window.location.href = "https://billing-web.kakao.com/pay"; 
+}
+
+
+
 // ─── 로그인된 유저가 전화 인증 필요하면 모달을 띄우는 검사 ───
 async function requirePhoneVerificationIfNeeded() {
   const { data: { session } } = await window.supabaseClient.auth.getSession();
