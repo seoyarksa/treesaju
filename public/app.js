@@ -864,9 +864,20 @@ document.getElementById("otp-verify").onclick = async () => {
 
 
     // 3) 성공 처리
-    alert("전화번호 인증이 완료되었습니다!");
-    const modalEl = document.getElementById("phone-otp-modal"); // 지역변수 modal이 없을 수도 있어 안전하게 다시 조회
-    if (modalEl) modalEl.style.display = "none";
+// 3) 성공 처리
+alert("전화번호 인증이 완료되었습니다!");
+const modalEl = document.getElementById("phone-otp-modal");
+if (modalEl) modalEl.style.display = "none";
+
+// ✅ 인증 성공 시 시각 저장
+await window.supabaseClient
+  .from("profiles")
+  .update({
+    phone_verified: true,
+    phone_verified_at: new Date().toISOString(),
+  })
+  .eq("user_id", user.id);
+
 
     // 4) UI 갱신
     const { data: { session } } = await window.supabaseClient.auth.getSession();
@@ -883,33 +894,39 @@ document.getElementById("otp-verify").onclick = async () => {
 // ─── 로그인된 유저가 전화 인증 필요하면 모달을 띄우는 검사 ───
 async function requirePhoneVerificationIfNeeded() {
   const { data: { session } } = await window.supabaseClient.auth.getSession();
-if (session?.user) {
-  await supabaseClient.from('profiles').insert({
-    user_id: session.user.id,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  }).eq('user_id', session.user.id).maybeSingle(); // RLS 허용 필요
-}
+  if (!session?.user) return alert("로그인 후 이용 가능합니다.");
 
   try {
-    // profiles에서 phone_verified 조회 (RLS는 본인 행만 허용되도록 설정되어 있음)
- const { data, error } = await window.supabaseClient
-   .from("profiles")
-   .select("phone_verified")
-   .eq("user_id", session.user.id)
-   .maybeSingle();            // ← 행이 없어도 에러 안 던짐
-
+    const { data, error } = await window.supabaseClient
+      .from("profiles")
+      .select("phone_verified, phone_verified_at")
+      .eq("user_id", session.user.id)
+      .maybeSingle();
 
     if (error) console.warn("[profiles maybeSingle] warn:", error);
 
-    if (!data || !data.phone_verified) {
-      // ✅ 인증 안 되어 있으면 즉시 모달
+    // 인증 기록 없으면 바로 인증 요구
+    if (!data?.phone_verified_at) {
       openPhoneOtpModal();
+      return;
     }
+
+    // 3일 유효기간 계산
+    const lastVerified = new Date(data.phone_verified_at);
+    const now = new Date();
+    const diffDays = (now - lastVerified) / (1000 * 60 * 60 * 24);
+
+    if (diffDays > 3) {
+      console.log("[requirePhoneVerificationIfNeeded] 인증 만료:", diffDays, "일 경과");
+      openPhoneOtpModal(); // 3일 초과 → 다시 인증
+      return;
+    }
+
+    // 유효기간 이내면 통과
+    console.log("[requirePhoneVerificationIfNeeded] 인증 유효:", diffDays, "일 경과");
   } catch (e) {
     console.warn("[requirePhoneVerificationIfNeeded] 조회 실패:", e);
-    // 조회 실패 시에도 UX상 바로 요구하고 싶다면 모달을 띄워도 됨:
-    // openPhoneOtpModal();
+    openPhoneOtpModal(); // 조회 실패 시 안전하게 인증 요구
   }
 }
 

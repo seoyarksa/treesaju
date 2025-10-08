@@ -1007,7 +1007,7 @@ function checkGuestMonthlyLimit() {
 
 // === 4) 사주 제출 (완전한 한 개만 사용!)
 // === 4) 사주 제출 (완전한 한 개만 사용!)
-let lastOutputData = null;
+window.lastOutputData = null;   // ✅ 전역 변수로 선언
 
 async function handleSajuSubmit(e) {
   e.preventDefault();
@@ -1024,12 +1024,21 @@ async function handleSajuSubmit(e) {
       hour: document.getElementById("hour-select")?.value,
       minute: document.getElementById("minute-select")?.value,
     };
+
+    console.log("🧩 [LOG1] formData (입력된 값):", formData);
+    console.log("🧩 [LOG2] lastOutputData (이전 출력 데이터):", lastOutputData);
+
     if (!formData.gender) {
       alert("성별을 선택해야 합니다.");
       return;
     }
 
-    const formKey = JSON.stringify(formData);
+    const formKey = JSON.stringify(normalizeForm(formData));
+        // 🟡 여기서 비교용 로그 추가
+    console.log("🧩 [LOG3] normalizeForm(formData):", normalizeForm(formData));
+    console.log("🧩 [LOG4] formKey (JSON):", formKey);
+    console.log("🧩 [LOG5] lastOutputData (JSON 문자열):", lastOutputData);
+
 
     // 2) 로그인 여부 확인
     const { data: { session } } = await window.supabaseClient.auth.getSession();
@@ -1055,11 +1064,38 @@ async function handleSajuSubmit(e) {
       }
 
       // ✅ 직전과 동일할 때만 '카운트 없이' 출력 허용
-      if (lastOutputData === formKey) {
+      if (window.lastOutputData === formKey) {
         console.log("⚠️ 동일 입력(직전과 동일, 게스트) → 카운트 증가 없이 출력만");
         renderSaju(formData);
         return;
       }
+
+
+// === 오늘 날짜 예외 처리 (년월일시까지만 비교) ===
+const now = new Date();
+const todayKey = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+const formDate = (formData.birthDate || '').replace(/-/g, '');
+
+if (formDate === todayKey && window.lastOutputData) {
+  try {
+    const last = JSON.parse(window.lastOutputData);
+    const lastDate = (last.birthDate || '').replace(/-/g, '');
+    const sameDay = lastDate === formDate;
+    const sameHour = String(last.hour || '') === String(formData.hour || '');
+    const sameAmpm = String(last.ampm || '').toUpperCase() === String(formData.ampm || '').toUpperCase();
+
+    if (sameDay && sameHour && sameAmpm) {
+      console.log('✅ [LOG★] 오늘 날짜 & 같은 시각 → 카운트 제외');
+      renderSaju(formData);
+      return;
+    }
+  } catch (e) {
+    console.warn('⚠️ 오늘날짜 예외 처리 중 JSON 파싱 실패:', e);
+  }
+}
+
+
+
 
       // 실제 증가 수행
       const ok = await checkRenderAllowed(); // 이 함수가 localStorage 증가/월간 제한까지 처리
@@ -1067,7 +1103,7 @@ async function handleSajuSubmit(e) {
 
       // 출력 실행 + 직전키 갱신
       renderSaju(formData);
-      lastOutputData = formKey;
+      window.lastOutputData = formKey;
 
       // 화면 갱신(선택): 방금 증가한 값으로 다시 표시
       const usage2 = JSON.parse(localStorage.getItem("sajuUsage") || "{}");
@@ -1108,11 +1144,35 @@ async function handleSajuSubmit(e) {
     }
 
     // ✅ 직전과 동일할 때만 '카운트 없이' 출력 허용
-    if (lastOutputData === formKey) {
+    if (window.lastOutputData === formKey) {
       console.log("⚠️ 동일 입력(직전과 동일, 로그인) → 카운트 증가 없이 출력만");
       renderSaju(formData);
       return;
     }
+
+    // === 오늘 날짜 예외 처리 (년월일시까지만 비교) ===
+const now = new Date();
+const todayKey = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+const formDate = (formData.birthDate || '').replace(/-/g, '');
+
+if (formDate === todayKey && window.lastOutputData) {
+  try {
+    const last = JSON.parse(window.lastOutputData);
+    const lastDate = (last.birthDate || '').replace(/-/g, '');
+    const sameDay = lastDate === formDate;
+    const sameHour = String(last.hour || '') === String(formData.hour || '');
+    const sameAmpm = String(last.ampm || '').toUpperCase() === String(formData.ampm || '').toUpperCase();
+
+    if (sameDay && sameHour && sameAmpm) {
+      console.log('✅ [LOG★] 오늘 날짜 & 같은 시각 → 카운트 제외');
+      renderSaju(formData);
+      return;
+    }
+  } catch (e) {
+    console.warn('⚠️ 오늘날짜 예외 처리 중 JSON 파싱 실패:', e);
+  }
+}
+
 
     if (profile.role !== "admin") {
       // 2-2) 서버에서 제한/증가 처리
@@ -1139,7 +1199,7 @@ async function handleSajuSubmit(e) {
 
     // 3) 출력 실행 + 직전키 갱신
     renderSaju(formData);
-    lastOutputData = formKey;
+    window.lastOutputData = formKey;
 
     // 4) 로그인 사용자 → 이름이 있으면 기록 저장 (중복키 에러는 무시)
     if (session?.user) {
@@ -1191,6 +1251,149 @@ async function handleSajuSubmit(e) {
     console.error("❌ handleSajuSubmit error:", err);
     alert("요청 처리 중 오류가 발생했습니다.");
   }
+}
+
+
+// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
+window.addEventListener('load', async () => {
+  try {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const hour24 = now.getHours();
+    const minute = now.getMinutes();
+
+    // 🕒 오전/오후 판정
+    const ampm = hour24 < 12 ? 'AM' : 'PM';
+    const hour12 = hour24 % 12; // 0~11 범위
+
+    // 요소가 모두 렌더될 때까지 대기 (SPA 대비)
+    const waitFor = (sel) =>
+      new Promise((resolve) => {
+        const el = document.querySelector(sel);
+        if (el) return resolve(el);
+        const obs = new MutationObserver(() => {
+          const e = document.querySelector(sel);
+          if (e) {
+            obs.disconnect();
+            resolve(e);
+          }
+        });
+        obs.observe(document.body, { childList: true, subtree: true });
+      });
+
+    await waitFor('#saju-form'); // 폼이 준비된 후 실행
+
+    // === 입력값 자동 세팅 ===
+    const birthInput = document.getElementById('birth-date');
+    if (birthInput) birthInput.value = `${yyyy}${mm}${dd}`;
+
+    const calendarSel = document.getElementById('calendar-type');
+    if (calendarSel) calendarSel.value = 'solar';
+
+    const genderSel = document.getElementById('gender');
+    if (genderSel) genderSel.value = 'male';
+
+    const ampmRadio = document.querySelector(`input[name='ampm'][value='${ampm}']`);
+    if (ampmRadio) ampmRadio.checked = true;
+
+    const hourSel = document.getElementById('hour-select');
+    if (hourSel) hourSel.value = String(hour12); // 반드시 문자열로 세팅
+
+    const minSel = document.getElementById('minute-select');
+    if (minSel) minSel.value = String(minute);
+
+    // === formData 구성 ===
+    const todayForm = {
+      name: '오늘 기준',
+      birthDate: `${yyyy}${mm}${dd}`,
+      calendarType: 'solar',
+      gender: 'male',
+      ampm,
+      hour: String(hour12),
+      minute: String(minute),
+    };
+
+    console.log(`[AUTO] ${yyyy}-${mm}-${dd} ${ampm} ${hour12}:${minute} (양력/남자 기준)`);
+
+    // === 출력 실행 (카운트 제외) ===
+    if (typeof renderSaju === 'function') {
+      await renderSaju(todayForm);
+
+      
+   // 0.3초 후 lastOutputData 저장
+  setTimeout(() => {
+    const normalized = JSON.stringify({
+      name: '오늘 기준',
+      birthDate: `${yyyy}${mm}${dd}`,
+      calendarType: 'solar',
+      gender: 'male',
+      ampm,
+      hour: String(hour12),
+      minute: String(minute),
+    });
+
+    lastOutputData = normalized;
+    localStorage.setItem('lastSajuForm', normalized);
+    console.log('[AUTO] lastOutputData 저장 완료 (hour/minute 포함):', normalized);
+
+    // 저장 완료 후 버튼 다시 활성화
+    sajuBtn.disabled = false;
+  }, 300);
+
+
+
+      // === 버튼 상태도 '신살보기'로 세팅 ===
+      const sinsalBtn = document.getElementById('sinsalBtn');
+      const sajuBtn = document.getElementById('sajuSubmit');
+      sajuBtn?.classList.remove('active');
+      sinsalBtn?.classList.add('active');
+
+      // 내부 모드 변수 동기화 (있을 경우)
+      window.currentMode = 'sinsal';
+
+      // === 자동 로딩 입력값 정규화 후 저장 ===
+      if (typeof normalizeForm === 'function') {
+        const normalized = JSON.stringify(normalizeForm(todayForm));
+        window.lastOutputData = normalized;
+        localStorage.setItem('lastSajuForm', normalized);
+        console.log('[AUTO] 신살보기 모드 자동 출력 후 상태 동기화 완료');
+      } else {
+        console.warn('⚠️ normalizeForm 함수가 정의되어 있지 않습니다.');
+      }
+
+
+    } else {
+      console.warn('⚠️ renderSaju 함수가 아직 정의되지 않았습니다.');
+    }
+  } catch (err) {
+    console.error('자동 사주 로딩 실패:', err);
+  }
+});
+
+
+
+function normalizeForm(form) {
+  if (!form) return {};
+  const f = { ...form };
+
+  // 날짜 형식 통일 (YYYYMMDD)
+  if (f.birthDate) f.birthDate = f.birthDate.replace(/-/g, '');
+
+  // AM/PM 통일
+  if (f.ampm) f.ampm = f.ampm.toUpperCase();
+
+  // 시간, 분은 카운트 비교에서 제외
+  delete f.hour;
+  delete f.minute;
+
+  // 기본값 보정
+  f.calendarType = f.calendarType || 'solar';
+  f.gender = f.gender || 'male';
+  f.name = f.name || '';
+
+  return f;
 }
 
 
