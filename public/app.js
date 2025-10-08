@@ -1202,30 +1202,47 @@ window.addEventListener('DOMContentLoaded', async () => {
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, '0');
     const dd = String(now.getDate()).padStart(2, '0');
-    const hh = String(now.getHours()).padStart(2, '0');
+    const hour24 = now.getHours();
     const min = String(now.getMinutes()).padStart(2, '0');
 
-    // 폼 입력창이 존재하면 자동 채우기
-    document.getElementById('birth-date')?.setAttribute('value', `${yyyy}-${mm}-${dd}`);
-    document.getElementById('calendar-type')?.setAttribute('value', 'solar');
-    document.getElementById('gender')?.setAttribute('value', 'male');
-    document.querySelector("input[name='ampm'][value='am']")?.setAttribute('checked', 'checked');
-    document.getElementById('hour-select')?.setAttribute('value', hh);
-    document.getElementById('minute-select')?.setAttribute('value', min);
+    // 🕒 오전/오후 판정
+    const ampm = hour24 < 12 ? 'am' : 'pm';
 
-    // formData 형태 구성
+    // 12시간제 변환
+    const hh12 = String(hour24 % 12 === 0 ? 12 : hour24 % 12).padStart(2, '0');
+
+    // 🧩 입력폼 자동 세팅 (있을 경우)
+    const birthInput = document.getElementById('birth-date');
+    if (birthInput) birthInput.value = `${yyyy}-${mm}-${dd}`;
+
+    const calendarSel = document.getElementById('calendar-type');
+    if (calendarSel) calendarSel.value = 'solar'; // 양력 고정
+
+    const genderSel = document.getElementById('gender');
+    if (genderSel) genderSel.value = 'male'; // 남자 고정
+
+    const hourSel = document.getElementById('hour-select');
+    if (hourSel) hourSel.value = hh12;
+
+    const minSel = document.getElementById('minute-select');
+    if (minSel) minSel.value = min;
+
+    const ampmInput = document.querySelector(`input[name='ampm'][value='${ampm}']`);
+    if (ampmInput) ampmInput.checked = true;
+
+    // 📦 자동 formData 생성
     const todayForm = {
       name: '오늘 기준',
       birthDate: `${yyyy}-${mm}-${dd}`,
       calendarType: 'solar',
       gender: 'male',
-      ampm: 'am',
-      hour: hh,
+      ampm,
+      hour: hh12,
       minute: min,
     };
 
-    console.log('[AUTO] 첫 로딩 시 오늘 기준 사주 출력 (카운트 제외)');
-    await renderSaju(todayForm); // ✅ 직접 호출 → 카운트 로직 우회
+    console.log(`[AUTO] 첫 로딩: ${yyyy}-${mm}-${dd} ${ampm.toUpperCase()} ${hh12}:${min} (양력/남자 기준)`);
+    await renderSaju(todayForm); // 카운트 제외
   } catch (err) {
     console.error('자동 사주 로딩 실패:', err);
   }
