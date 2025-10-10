@@ -7,11 +7,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-console.log("[ENV CHECK] IAMPORT_API_KEY:", process.env.IAMPORT_API_KEY);
-console.log("[ENV CHECK] IAMPORT_API_SECRET:", process.env.IAMPORT_API_SECRET ? "✅ Loaded" : "❌ Missing");
-console.log("[ENV CHECK] SUPABASE_SERVICE_ROLE_KEY:", process.env.SUPABASE_SERVICE_ROLE_KEY ? "✅ Loaded" : "❌ Missing");
-
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method Not Allowed" });
@@ -26,7 +21,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. 토큰 발급
+    // 1️⃣ 아임포트 토큰 발급
     const tokenRes = await fetch("https://api.iamport.kr/users/getToken", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -36,33 +31,49 @@ export default async function handler(req, res) {
       }),
     });
     const tokenJson = await tokenRes.json();
-    console.log("[register-billing] tokenJson:", tokenJson);
     const access_token = tokenJson?.response?.access_token;
-    if (!access_token) {
-      throw new Error("Failed to get access_token");
-    }
+    if (!access_token) throw new Error("Failed to get access_token");
 
-    // 2. 결제 정보 검증
+    // 2️⃣ 결제 검증
     const verifyRes = await fetch(`https://api.iamport.kr/payments/${imp_uid}`, {
-      headers: { Authorization: access_token }
+      headers: { Authorization: access_token },
     });
     const verifyJson = await verifyRes.json();
-    console.log("[register-billing] verifyJson:", verifyJson);
     const payment = verifyJson?.response;
     if (!payment) throw new Error("No payment response");
-    if (payment.status !== "paid") {
-      throw new Error("Payment not completed");
-    }
+    if (payment.status !== "paid") throw new Error("Payment not completed");
 
-    // 3. memberships 업데이트
+    // 3️⃣ memberships에 등록 또는 갱신
     const now = new Date();
     const nextMonth = new Date();
     nextMonth.setMonth(now.getMonth() + 1);
 
-    const { data, error } = await supabase
+    const { data: existing } = await supabase
       .from("memberships")
-      .upsert(
-        {
+      .select("*")
+      .eq("user_id", user_id)
+      .maybeSingle();
+
+    let data, error;
+    if (existing) {
+      ({ data, error } = await supabase
+        .from("memberships")
+        .update({
+          plan: "premium",
+          status: "active",
+          provider: "kakao",
+          metadata: { customer_uid },
+          current_period_end: nextMonth.toISOString(),
+          cancel_at_period_end: false,
+          updated_at: now.toISOString(),
+        })
+        .eq("user_id", user_id)
+        .select()
+        .single());
+    } else {
+      ({ data, error } = await supabase
+        .from("memberships")
+        .insert({
           user_id,
           plan: "premium",
           status: "active",
@@ -70,33 +81,42 @@ export default async function handler(req, res) {
           metadata: { customer_uid },
           current_period_end: nextMonth.toISOString(),
           cancel_at_period_end: false,
-          updated_at: now.toISOString()
-        },
-        { onConflict: "user_id" }
-      )
-      .select()
-      .single();
-
-    if (error) {
-      console.error("[register-billing] supabase upsert error:", error);
-      throw error;
+          created_at: now.toISOString(),
+          updated_at: now.toISOString(),
+        })
+        .select()
+        .single());
     }
 
-    console.log("[register-billing] membership data:", data);
+    if (error) throw error;
+    console.log("[register-billing] membership updated:", data);
 
+    // 4️⃣ profiles에 프리미엄 등급 반영
+    const { error: profileErr } = await supabase
+      .from("profiles")
+      .update({
+        role: "premium",
+        premium_assigned_at: now.toISOString(),
+      })
+      .eq("user_id", user_id);
+
+    if (profileErr) {
+      console.warn("[register-billing] ⚠️ profile update failed:", profileErr);
+    } else {
+      console.log("[register-billing] ✅ profile upgraded to premium");
+    }
+
+    // 5️⃣ 응답
     return res.status(200).json({
       ok: true,
-      message: "정기결제 등록 완료",
+      message: "정기결제 등록 및 프리미엄 전환 완료 ✅",
       membership: data,
     });
   } catch (err) {
-  console.error("[register-billing] error caught:", err);
-
-  // ✅ 명시적으로 JSON 반환 (HTML 안 나오게)
-  res.status(500).json({
-    ok: false,
-    error: err.message || "Unknown server error",
-  });
-}
-
+    console.error("[register-billing] error caught:", err);
+    return res.status(500).json({
+      ok: false,
+      error: err.message || "Unknown server error",
+    });
+  }
 }
