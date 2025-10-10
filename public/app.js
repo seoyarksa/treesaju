@@ -904,7 +904,7 @@ window.startGoogleSubscription = function() {
     window.AndroidApp.startGoogleSubscription(); // 앱 내부 결제 호출
     return;
   }
-  window.open("/pay/google?plan=monthly", "_blank", "width=480,height=720");
+  window.open("pay/google?plan=monthly", "_blank", "width=480,height=720");
 };
 
 window.startKakaoSubscription = function() {
@@ -912,7 +912,7 @@ window.startKakaoSubscription = function() {
     window.AndroidApp.startKakaoSubscription(); // 앱 내부 결제 호출
     return;
   }
-  window.open("/pay/kakao?plan=monthly", "_blank", "width=480,height=720");
+  window.open("pay/kakao?plan=monthly", "_blank", "width=480,height=720");
 };
 
 
