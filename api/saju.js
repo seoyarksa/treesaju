@@ -175,11 +175,29 @@ console.log("🕒 Intl resolved timezone:", Intl.DateTimeFormat().resolvedOption
       return res.status(400).json({ error: '입력값이 유효하지 않습니다.' });
     }
 
-    if (calendarType === 'lunar') {
-      const converted = solarlunar.lunar2solar(year, month, day, false);
-      if (!converted?.cYear) return res.status(400).json({ error: '음력 → 양력 변환 실패' });
-      year = converted.cYear; month = converted.cMonth; day = converted.cDay;
+if (calendarType === 'lunar') {
+  try {
+    const converted = solarlunar.lunar2solar(year, month, day, false);
+
+    if (!converted?.cYear) {
+      // 변환 결과가 비정상 (예: 존재하지 않는 날짜)
+      return res.status(400).json({
+        error: '입력하신 음력 날짜는 실제로 존재하지 않습니다.',
+      });
     }
+
+    year = converted.cYear;
+    month = converted.cMonth;
+    day = converted.cDay;
+  } catch (error) {
+    console.error('음력 → 양력 변환 중 오류 발생:', error);
+    // 예외 발생 시도 중 내부 오류 처리
+    return res.status(500).json({
+      error: '서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+    });
+  }
+}
+
 
     if (isDSTKorea(year, month, day)) {
       hour -= 1;
