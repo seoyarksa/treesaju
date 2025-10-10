@@ -899,20 +899,80 @@ if (subModal) subModal.style.display = "block";
 
 
 
-window.startGoogleSubscription = function() {
-  if (window.AndroidApp) {
-    window.AndroidApp.startGoogleSubscription(); // 앱 내부 결제 호출
-    return;
-  }
-  window.open("pay/google?plan=monthly", "_blank", "width=480,height=720");
+window.startGoogleSubscription = async function() {
+  const { data: { user } } = await window.supabaseClient.auth.getUser();
+  if (!user) return alert("로그인이 필요합니다.");
+
+  const IMP = window.IMP;
+  IMP.init("store-0d3b8b48-ae3c-4bd3-bcaf-56ffb3fece6f");
+
+  IMP.request_pay({
+    pg: "html5_inicis",  // 테스트용
+    pay_method: "card",
+    merchant_uid: "order_" + new Date().getTime(),
+    name: "Google 정기구독 (월간)",
+    amount: 11000,
+    buyer_email: user.email || "user@example.com",
+    buyer_name: "홍길동",
+    buyer_tel: "01012345678"
+  }, function (rsp) {
+    if (rsp.success) {
+      alert("결제 성공 🎉\n결제번호: " + rsp.imp_uid);
+    } else {
+      alert("결제 실패 ❌\n" + rsp.error_msg);
+    }
+  });
 };
 
-window.startKakaoSubscription = function() {
-  if (window.AndroidApp) {
-    window.AndroidApp.startKakaoSubscription(); // 앱 내부 결제 호출
-    return;
-  }
-  window.open("pay/kakao?plan=monthly", "_blank", "width=480,height=720");
+
+
+window.startKakaoSubscription = async function() {
+  // ✅ Supabase 로그인 확인
+  const { data: { user } } = await window.supabaseClient.auth.getUser();
+  if (!user) return alert("로그인이 필요합니다.");
+
+  const IMP = window.IMP;
+  IMP.init("store-0d3b8b48-ae3c-4bd3-bcaf-56ffb3fece6f"); // 아임포트 가맹점코드
+
+  const userId = user.id;
+  const customerUid = "kakao_" + userId;
+
+  IMP.request_pay({
+    pg: "kakaopay.TC0ONETIME",
+    pay_method: "card",
+    merchant_uid: "order_" + new Date().getTime(),
+    name: "Kakao 정기구독 (월간)",
+    amount: 11000,
+    customer_uid: customerUid,
+    buyer_email: user.email || "user@example.com",
+    buyer_name: "홍길동",
+    buyer_tel: "01012345678"
+  }, async function (rsp) {
+    if (rsp.success) {
+      alert("결제 성공 🎉\n결제번호: " + rsp.imp_uid);
+      try {
+        const res = await fetch("/api/payment/register-billing", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imp_uid: rsp.imp_uid,
+            customer_uid: rsp.customer_uid || customerUid,
+            user_id: userId
+          }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          alert("정기결제 등록 완료 ✅");
+        } else {
+          alert("서버 등록 실패 ❌: " + (data.error || "서버 오류"));
+        }
+      } catch (err) {
+        alert("서버 통신 오류 ❌: " + err.message);
+      }
+    } else {
+      alert("결제 실패 ❌\n" + rsp.error_msg);
+    }
+  });
 };
 
 
