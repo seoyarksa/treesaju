@@ -909,31 +909,33 @@ window.startGoogleSubscription = function() {
 
 
 
-//카카오결제창 연동
+// ✅ 카카오 정기결제창 (V1 기준)
 window.startKakaoSubscription = async function() {
   // ✅ Supabase 로그인 확인
   const { data: { user } } = await window.supabaseClient.auth.getUser();
   if (!user) return alert("로그인이 필요합니다.");
 
   const IMP = window.IMP;
-  IMP.init("store-0d3b8b48-ae3c-4bd3-bcaf-56ffb3fece6f"); // 아임포트 가맹점코드
+  IMP.init("imp81444885"); // ✅ 아임포트 V1 고객사 식별코드
 
   const userId = user.id;
-  const customerUid = "kakao_" + userId;
+  const customerUid = "kakao_" + userId; // 고객별 고유 빌링 UID
 
+  // ✅ 결제창 호출
   IMP.request_pay({
-    pg: "channel-key-98e164a7-412e-45d3-a20b-7bc8c32cb5f8",
+    pg: "kakaopay.TC0ONETIME",  // ✅ 테스트용 카카오페이 PG
     pay_method: "card",
     merchant_uid: "order_" + new Date().getTime(),
     name: "Kakao 정기구독 (월간)",
     amount: 11000,
-    customer_uid: customerUid,
+    customer_uid: customerUid,  // ✅ 정기결제용 UID
     buyer_email: user.email || "user@example.com",
     buyer_name: "홍길동",
     buyer_tel: "01012345678"
   }, async function (rsp) {
     if (rsp.success) {
       alert("결제 성공 🎉\n결제번호: " + rsp.imp_uid);
+
       try {
         const res = await fetch("/api/payment/register-billing", {
           method: "POST",
@@ -944,7 +946,9 @@ window.startKakaoSubscription = async function() {
             user_id: userId
           }),
         });
+
         const data = await res.json();
+
         if (res.ok) {
           alert("정기결제 등록 완료 ✅");
         } else {
@@ -953,6 +957,7 @@ window.startKakaoSubscription = async function() {
       } catch (err) {
         alert("서버 통신 오류 ❌: " + err.message);
       }
+
     } else {
       alert("결제 실패 ❌\n" + rsp.error_msg);
     }
