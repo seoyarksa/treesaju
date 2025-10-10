@@ -10,5 +10,11 @@
       "path": "/api/payment/charge-billing",
       "schedule": "0 9 * * *"  
     }
+  ], 
+    "crons": [
+    {
+      "path": "/api/payment/manage-subscription?action=autoCancel",
+      "schedule": "0 9 * * *"
+    }
   ]
 }

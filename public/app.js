@@ -897,7 +897,7 @@ if (subModal) subModal.style.display = "block";
 
 
 
-
+//구글정기결제창
 
 window.startGoogleSubscription = function() {
   if (window.AndroidApp) {
@@ -909,62 +909,127 @@ window.startGoogleSubscription = function() {
 
 
 
-// ✅ 카카오 정기결제창 (V1 기준)
+// ✅ 카카오 정기결제창 (V1 기준, 통합 API 버전)
 window.startKakaoSubscription = async function() {
-  // ✅ Supabase 로그인 확인
-  const { data: { user } } = await window.supabaseClient.auth.getUser();
-  if (!user) return alert("로그인이 필요합니다.");
+  try {
+    // 1️⃣ Supabase 로그인 확인
+    const { data: { user } } = await window.supabaseClient.auth.getUser();
+    if (!user) return alert("로그인이 필요합니다.");
 
-  const IMP = window.IMP;
-  IMP.init("imp81444885"); // ✅ 아임포트 V1 고객사 식별코드
+    const IMP = window.IMP;
+    IMP.init("imp81444885"); // ✅ 아임포트 V1 고객사 식별코드
 
-  const userId = user.id;
-  const customerUid = "kakao_" + userId; // 고객별 고유 빌링 UID
+    const userId = user.id;
+    const customerUid = "kakao_" + userId; // 고객별 고유 빌링 UID
 
-  // ✅ 결제창 호출
-  IMP.request_pay({
-    pg: "kakaopay.TCSUBSCRIP",  // ✅ 테스트용 카카오페이 PG
-    pay_method: "card",
-    merchant_uid: "order_" + new Date().getTime(),
-    name: "Kakao 정기구독 (월간)",
-    amount: 11000,
-    customer_uid: customerUid,  // ✅ 정기결제용 UID
-    buyer_email: user.email || "user@example.com",
-    buyer_name: "홍길동",
-    buyer_tel: "01012345678"
-  }, async function (rsp) {
-    if (rsp.success) {
-      alert("결제 성공 🎉\n결제번호: " + rsp.imp_uid);
+    // 2️⃣ 결제창 호출
+    IMP.request_pay({
+      pg: "kakaopay.TCSUBSCRIP",  // ✅ 테스트용 카카오페이 PG상점 ID
+      pay_method: "card",
+      merchant_uid: "order_" + new Date().getTime(),
+      name: "Kakao 정기구독 (월간)",
+      amount: 11000,
+      customer_uid: customerUid,
+      buyer_email: user.email || "user@example.com",
+      buyer_name: "홍길동",
+      buyer_tel: "01012345678"
+    }, async function (rsp) {
+      if (rsp.success) {
+        alert("결제 성공 🎉\n결제번호: " + rsp.imp_uid);
 
-      try {
-        const res = await fetch("/api/payment/register-billing", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            imp_uid: rsp.imp_uid,
-            customer_uid: rsp.customer_uid || customerUid,
-            user_id: userId
-          }),
-        });
+        try {
+          // 3️⃣ 서버로 정기결제 등록 요청
+          const res = await fetch("/api/payment/manage-subscription?action=register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              imp_uid: rsp.imp_uid,
+              customer_uid: rsp.customer_uid || customerUid,
+              user_id: userId
+            }),
+          });
 
-        const data = await res.json();
-
-        if (res.ok) {
-          alert("정기결제 등록 완료 ✅");
-        } else {
-          alert("서버 등록 실패 ❌: " + (data.error || "서버 오류"));
+          const data = await res.json();
+          if (res.ok) {
+            alert("✅ 정기결제 등록 및 프리미엄 등급 적용 완료");
+          } else {
+            alert("❌ 서버 등록 실패: " + (data.error || "서버 오류"));
+          }
+        } catch (err) {
+          console.error("[fetch error]", err);
+          alert("❌ 서버 통신 오류: " + err.message);
         }
-      } catch (err) {
-        alert("서버 통신 오류 ❌: " + err.message);
-      }
 
-    } else {
-      alert("결제 실패 ❌\n" + rsp.error_msg);
-    }
-  });
+      } else {
+        // 결제 실패
+        console.warn("[결제 실패]", rsp);
+        alert("❌ 결제 실패: " + rsp.error_msg);
+      }
+    });
+  } catch (err) {
+    console.error("[startKakaoSubscription error]", err);
+    alert("내부 오류: " + err.message);
+  }
 };
 
 
+
+// ✅ 정기구독 버튼 클릭 시
+window.openSubscriptionModal = async function() {
+  const { data: { user } } = await window.supabaseClient.auth.getUser();
+  if (!user) return alert("로그인이 필요합니다.");
+
+  // 서버에서 구독 상태 조회
+  const { data, error } = await window.supabaseClient
+    .from("memberships")
+    .select("*")
+    .eq("user_id", user.id)
+    .single();
+
+  const modal = document.getElementById("subscriptionModal");
+  modal.style.display = "block";
+
+  // 기존 내용 초기화
+  modal.innerHTML = "";
+
+  if (error || !data || data.status === "inactive") {
+    // ✅ 구독이 없는 경우 → 결제창 안내
+    modal.innerHTML = `
+      <h3>정기구독 결제</h3>
+      <p>전화번호 인증이 완료되었습니다. 결제 방법을 선택하세요.</p>
+      <button onclick="startGoogleSubscription()">Google 정기구독 결제</button>
+      <button onclick="startKakaoSubscription()">Kakao 정기구독 결제</button>
+    `;
+  } else {
+    // ✅ 이미 구독 중인 경우 → 결제 정보 + 해지 버튼
+    const nextDate = new Date(data.current_period_end).toLocaleDateString("ko-KR");
+    modal.innerHTML = `
+      <h3>정기구독 정보</h3>
+      <p><strong>플랜:</strong> ${data.plan}</p>
+      <p><strong>상태:</strong> ${data.status}</p>
+      <p><strong>다음 결제일:</strong> ${nextDate}</p>
+      <button id="cancelSubBtn">정기결제 해지 신청</button>
+    `;
+
+    document.getElementById("cancelSubBtn").addEventListener("click", async () => {
+      if (!confirm("이번 달 말일에 해지됩니다. 진행할까요?")) return;
+
+      const res = await fetch("/api/payment/manage-subscription?action=cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user.id }),
+      });
+
+      const result = await res.json();
+      if (res.ok) {
+        alert("✅ " + result.message);
+        modal.style.display = "none";
+      } else {
+        alert("❌ " + result.error);
+      }
+    });
+  }
+};
 
 
 
@@ -3901,37 +3966,32 @@ async function renderUserProfile() {
   const { data: { user } } = await window.supabaseClient.auth.getUser();
   if (!user) return;
 
-  // ✅ 구독 버튼: 프로필 phone_verified 확인 → 미인증이면 OTP 모달, 인증이면 결제 모달
+  // ✅ 정기구독 버튼
   const subscribeBtn = document.getElementById("subscribeBtn");
   if (subscribeBtn) {
-    // 중복 바인딩 방지
+    // 중복 이벤트 방지
     subscribeBtn._bound && subscribeBtn.removeEventListener("click", subscribeBtn._bound);
     subscribeBtn._bound = async (e) => {
       e.preventDefault();
       try {
+        // ✅ profiles 테이블에서 전화 인증 여부 확인
         const { data: profile, error: profErr } = await window.supabaseClient
           .from("profiles")
           .select("phone_verified")
           .eq("user_id", user.id)
-          .maybeSingle(); // ← 행이 없으면 null
+          .maybeSingle();
 
         if (profErr) console.warn("[profiles maybeSingle] warn:", profErr);
 
+        // ✅ 전화 인증 안 되어 있으면 OTP 모달 오픈
         if (!profile || !profile.phone_verified) {
-          // 전화 인증 먼저
           openPhoneOtpModal();
           return;
         }
 
-        // ✅ 인증되어 있으면 결제 모달(임시) 오픈
-        const subModal = document.getElementById("subscriptionModal");
-        if (subModal) {
-          subModal.style.display = "block";
-        } else {
-          // 모달이 없으면 임시 이동 (필요 시 주석 해제)
-          // window.location.href = "/subscribe";
-          alert("전화 인증 확인됨. 결제 창을 연결해 주세요.");
-        }
+        // ✅ 인증 완료 → 구독 상태에 따라 결제창 or 결제정보 표시
+        await openSubscriptionModal(); // <-- 🔥 새로 만든 함수 실행
+
       } catch (err) {
         console.error("[subscribeBtn] error:", err);
         alert(err?.message || "처리 중 오류가 발생했습니다.");
@@ -3951,6 +4011,7 @@ async function renderUserProfile() {
     logoutBtn.addEventListener("click", logoutBtn._bound);
   }
 }
+
 
 
 
