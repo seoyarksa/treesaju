@@ -909,7 +909,7 @@ window.startGoogleSubscription = function() {
 
 
 
-
+//카카오결제창 연동
 window.startKakaoSubscription = async function() {
   // ✅ Supabase 로그인 확인
   const { data: { user } } = await window.supabaseClient.auth.getUser();
@@ -922,7 +922,7 @@ window.startKakaoSubscription = async function() {
   const customerUid = "kakao_" + userId;
 
   IMP.request_pay({
-    pg: "kakaopay.TC0ONETIME",
+    pg: "channel-key-98e164a7-412e-45d3-a20b-7bc8c32cb5f8",
     pay_method: "card",
     merchant_uid: "order_" + new Date().getTime(),
     name: "Kakao 정기구독 (월간)",
