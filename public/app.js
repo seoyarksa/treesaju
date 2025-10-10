@@ -899,30 +899,14 @@ if (subModal) subModal.style.display = "block";
 
 
 
-window.startGoogleSubscription = async function() {
-  const { data: { user } } = await window.supabaseClient.auth.getUser();
-  if (!user) return alert("로그인이 필요합니다.");
-
-  const IMP = window.IMP;
-  IMP.init("store-0d3b8b48-ae3c-4bd3-bcaf-56ffb3fece6f");
-
-  IMP.request_pay({
-    pg: "html5_inicis",  // 테스트용
-    pay_method: "card",
-    merchant_uid: "order_" + new Date().getTime(),
-    name: "Google 정기구독 (월간)",
-    amount: 11000,
-    buyer_email: user.email || "user@example.com",
-    buyer_name: "홍길동",
-    buyer_tel: "01012345678"
-  }, function (rsp) {
-    if (rsp.success) {
-      alert("결제 성공 🎉\n결제번호: " + rsp.imp_uid);
-    } else {
-      alert("결제 실패 ❌\n" + rsp.error_msg);
-    }
-  });
+window.startGoogleSubscription = function() {
+  if (window.AndroidApp) {
+    window.AndroidApp.startGoogleSubscription(); // 앱 내부 결제 호출
+    return;
+  }
+  window.open("pay/google?plan=monthly", "_blank", "width=480,height=720");
 };
+
 
 
 
