@@ -10,56 +10,71 @@
   <button id="payBtn">결제하기</button>
 
   <script>
-    // ✅ 1. 아임포트 객체 초기화
-    const IMP = window.IMP;
-    IMP.init("impXXXXXXXXX"); // 👉 본인 아임포트 가맹점 식별코드로 교체
+  // ✅ 1. 아임포트 객체 초기화
+  const IMP = window.IMP;
+  IMP.init("store-0d3b8b48-ae3c-4bd3-bcaf-56ffb3fece6f"); // 👉 본인 아임포트 가맹점 식별코드로 교체
 
-    // ✅ 2. 결제 버튼 클릭 시 실행
-    document.getElementById("payBtn").addEventListener("click", function() {
+  // ✅ 2. 결제 버튼 클릭 시 실행
+  document.getElementById("payBtn").addEventListener("click", async function() {
+    try {
+      // Supabase 로그인된 사용자 확인 (user_id 필요)
+      const { data: { user } } = await window.supabaseClient.auth.getUser();
+      if (!user) return alert("로그인이 필요합니다.");
+
+      const userId = user.id; // Supabase user_id
+      const customerUid = "kakao_" + userId; // 각 사용자 고유 빌링 UID
+
+      // ✅ 3. 결제 요청
       IMP.request_pay({
-        pg: "kakaopay.TC0ONETIME",  // 테스트용 카카오페이 PG사
-        pay_method: "card",         // 결제수단
+        pg: "kakaopay.TC0ONETIME",  // 테스트용 PG
+        pay_method: "card",
         merchant_uid: "order_" + new Date().getTime(), // 주문 고유번호
         name: "Kakao 정기구독 (월간)",
-        amount: 9900,               // 결제금액
-        buyer_email: "user@example.com",
+        amount: 11000,
+        customer_uid: customerUid, // ✅ 사용자 고유 식별자
+        buyer_email: user.email || "user@example.com",
         buyer_name: "홍길동",
         buyer_tel: "01012345678"
       }, async function (rsp) {
-        // ✅ 3. 결제 완료 후 콜백
+        // ✅ 4. 결제 콜백 처리
         if (rsp.success) {
           alert("결제 성공 🎉\n결제번호: " + rsp.imp_uid);
 
           try {
-            // ✅ 4. 서버로 빌링 등록 요청
+            // ✅ 5. 서버에 빌링 정보 등록
             const res = await fetch("/api/payment/register-billing", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                imp_uid: rsp.imp_uid,            // 결제 고유번호
-                customer_uid: rsp.customer_uid || "cust_" + new Date().getTime() // 고객 식별용 UID
+                imp_uid: rsp.imp_uid,
+                customer_uid: rsp.customer_uid, // 아임포트가 전달한 UID
+                user_id: userId
               }),
             });
 
             const data = await res.json();
-
             if (res.ok) {
               console.log("✅ 서버 응답:", data);
-              alert("서버에 빌링 등록 완료 ✅");
+              alert("정기결제 등록 완료 ✅");
             } else {
               console.error("❌ 서버 오류:", data);
-              alert("빌링 등록 실패 ❌: " + (data.error || "서버 오류"));
+              alert("서버 등록 실패 ❌: " + (data.error || "서버 오류"));
             }
           } catch (err) {
             console.error("[register-billing fetch error]", err);
-            alert("서버 전송 실패 ❌: " + err.message);
+            alert("서버 통신 오류 ❌: " + err.message);
           }
 
         } else {
           alert("결제 실패 ❌\n" + rsp.error_msg);
         }
       });
-    });
-  </script>
+    } catch (e) {
+      console.error("[Kakao Pay Error]", e);
+      alert("내부 오류: " + e.message);
+    }
+  });
+</script>
+
 </body>
 </html>

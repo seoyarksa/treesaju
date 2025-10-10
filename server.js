@@ -448,3 +448,46 @@ app.post("/api/payment/register-billing", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ✅ 매달 자동 과금 (빌링키 기반)
+app.post("/api/payment/charge-billing", async (req, res) => {
+  const { customer_uid, amount = 9900, name = "월간 정기구독" } = req.body;
+
+  try {
+    // 1️⃣ 아임포트 액세스 토큰 발급
+    const tokenRes = await fetch("https://api.iamport.kr/users/getToken", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imp_key: process.env.IAMPORT_API_KEY,
+        imp_secret: process.env.IAMPORT_API_SECRET,
+      }),
+    });
+    const tokenJson = await tokenRes.json();
+    const access_token = tokenJson?.response?.access_token;
+    if (!access_token) throw new Error("IAMPORT 토큰 발급 실패");
+
+    // 2️⃣ 등록된 빌링키로 결제 재시도 (자동결제)
+    const payRes = await fetch("https://api.iamport.kr/subscribe/payments/again", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": access_token,
+      },
+      body: JSON.stringify({
+        customer_uid,                   // 빌링 등록 시 사용한 고객 UID
+        merchant_uid: "again_" + new Date().getTime(), // 고유 주문번호
+        amount,
+        name,
+      }),
+    });
+
+    const payJson = await payRes.json();
+    res.status(200).json(payJson);
+  } catch (err) {
+    console.error("[charge-billing error]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
