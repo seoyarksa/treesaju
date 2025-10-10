@@ -4,6 +4,11 @@ dotenv.config();
 import { createClient } from '@supabase/supabase-js';
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE);
 
+console.log("[ENV CHECK] IAMPORT_API_KEY:", process.env.IAMPORT_API_KEY);
+console.log("[ENV CHECK] IAMPORT_API_SECRET:", process.env.IAMPORT_API_SECRET ? "✅ Loaded" : "❌ Missing");
+console.log("[ENV CHECK] SUPABASE_SERVICE_ROLE:", process.env.SUPABASE_SERVICE_ROLE ? "✅ Loaded" : "❌ Missing");
+
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method Not Allowed" });
@@ -82,7 +87,13 @@ export default async function handler(req, res) {
       membership: data,
     });
   } catch (err) {
-    console.error("[register-billing] error caught:", err);
-    return res.status(500).json({ error: err.message });
-  }
+  console.error("[register-billing] error caught:", err);
+
+  // ✅ 명시적으로 JSON 반환 (HTML 안 나오게)
+  res.status(500).json({
+    ok: false,
+    error: err.message || "Unknown server error",
+  });
+}
+
 }

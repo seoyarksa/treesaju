@@ -2,7 +2,7 @@
 
 
 // git add .
-// git commit -m "로그인횟수제한"   
+// git commit -m "정기결제연동"   
 // git push origin main
 // git push
 //강제실행   vercel --prod --force
