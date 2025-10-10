@@ -2,7 +2,10 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { createClient } from '@supabase/supabase-js';
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE);
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE
+);
 
 console.log("[ENV CHECK] IAMPORT_API_KEY:", process.env.IAMPORT_API_KEY);
 console.log("[ENV CHECK] IAMPORT_API_SECRET:", process.env.IAMPORT_API_SECRET ? "✅ Loaded" : "❌ Missing");
