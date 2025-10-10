@@ -923,7 +923,7 @@ window.startKakaoSubscription = async function() {
 
   // ✅ 결제창 호출
   IMP.request_pay({
-    pg: "html5_inicis",  // ✅ 테스트용 카카오페이 PG
+    pg: "kakaopay.TCSUBSCRIP",  // ✅ 테스트용 카카오페이 PG
     pay_method: "card",
     merchant_uid: "order_" + new Date().getTime(),
     name: "Kakao 정기구독 (월간)",
