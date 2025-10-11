@@ -107,20 +107,22 @@ async function registerBilling(req, res) {
 
     if (error) throw error;
 
-    // ✅ 4. profiles.grade 변경 (role 아님)
-    const { error: profileErr } = await supabase
-      .from("profiles")
-      .update({
-        grade: "premium", // ✅ 프리미엄 등급으로 변경
-        premium_assigned_at: now.toISOString(),
-        premium_first_assigned_at: now.toISOString(),
-        has_ever_premium: true,
-        updated_at: now.toISOString(),
-      })
-      .eq("user_id", user_id);
+// ✅ 4. profiles.grade 변경 (role 아님)
+const { error: profileErr } = await supabase
+  .from("profiles")
+  .update({
+    grade: "premium",                      // ✅ 프리미엄 등급
+    premium_assigned_at: now.toISOString(),
+    premium_first_assigned_at: now.toISOString(),
+    has_ever_premium: true,
+    updated_at: now.toISOString(),
+  })
+  .eq("user_id", user_id);
 
-    if (profileErr) throw new Error("프로필 등급 변경 실패");
-
+if (profileErr) {
+  console.error("[registerBilling] profile update error:", profileErr);
+  throw new Error("프로필 등급 변경 실패");
+}
     return res.status(200).json({
       ok: true,
       message: "정기결제 등록 및 프리미엄 등급 전환 완료 ✅",
