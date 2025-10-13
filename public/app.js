@@ -751,6 +751,29 @@ function openSignupModal() {
 }
 
 
+function mapOtpVerifyError({ status, json, text }) {
+  const raw = `${json?.error || ''} ${json?.details || ''} ${json?.hint || ''} ${text || ''}`;
+
+  // 중복(고유 제약) 탐지: 409(Conflict) 또는 PG 23505/duplicate 키워드
+  const isUnique =
+    status === 409 ||
+    /23505|duplicate key|unique constraint|profiles_phone_key|uniq_profiles_phone_verified|already exists|conflict/i.test(raw);
+
+  if (isUnique) return '이미 존재하는 번호입니다.\n다른 번호를 입력하거나, 해당 번호로 가입된 계정으로 로그인해 주세요.';
+
+  // 자주 나오는 케이스들도 보기 좋게
+  if (/invalid code|wrong code|mismatch|인증.*코드.*오류/i.test(raw)) {
+    return '인증 코드가 올바르지 않습니다. 다시 확인해 주세요.';
+  }
+  if (/expired|만료/i.test(raw)) {
+    return '인증 코드가 만료되었습니다. 코드를 다시 받으세요.';
+  }
+
+  // 그 외 일반 실패
+  return `인증 실패: ${json?.error || text || `HTTP ${status}`}`;
+}
+
+
 // ─── 전화 인증 모달 ───────────────────────────────────────────
 function openPhoneOtpModal() {
   if (document.getElementById("phone-otp-modal")) {
@@ -835,7 +858,6 @@ document.getElementById("otp-verify").onclick = async () => {
   const token = document.getElementById("otp-code").value.trim();
   if (!raw || !token) return alert("전화번호와 인증 코드를 입력하세요.");
 
-  // postJSON/normalizePhoneKR 존재 확인(없으면 바로 원인 파악)
   if (typeof window.postJSON !== "function") {
     console.error("[OTP verify] postJSON is not defined");
     return alert("내부 오류: postJSON 미정의");
@@ -848,56 +870,50 @@ document.getElementById("otp-verify").onclick = async () => {
   const phone = window.normalizePhoneKR(raw, "intl"); // +82 포맷
 
   try {
-    // 1) 로그인 체크
     const { data: { user } } = await window.supabaseClient.auth.getUser();
     if (!user) return alert("로그인 후 인증 가능합니다.");
 
     // 2) 서버 검증(커스텀 OTP)
     const { status, json, text } = await postJSON("/api/otp?action=verify", {
       phone,
-      code: token,      // 서버는 'code' 필드를 기대
-      user_id: user.id  // profiles 업데이트용
+      code: token,
+      user_id: user.id
     });
 
     const ok = (status === 200) && json?.ok && json?.verified;
     if (!ok) {
-     console.error("[OTP verify] fail:", { status, json, text });
-     alert("인증 실패: " + (json?.error || json?.details || text || `HTTP ${status}`));
+      console.error("[OTP verify] fail:", { status, json, text });
+      // 🔧 여기만 교체!
+      alert(mapOtpVerifyError({ status, json, text }));
       return;
     }
 
-
     // 3) 성공 처리
-// 3) 성공 처리
-alert("전화번호 인증이 완료되었습니다!");
-const modalEl = document.getElementById("phone-otp-modal");
-if (modalEl) modalEl.style.display = "none";
+    alert("전화번호 인증이 완료되었습니다!");
+    const modalEl = document.getElementById("phone-otp-modal");
+    if (modalEl) modalEl.style.display = "none";
 
-// ✅ 인증 성공 시 시각 저장
-await window.supabaseClient
-  .from("profiles")
-  .update({
-    phone_verified: true,
-    phone_verified_at: new Date().toISOString(),
-  })
-  .eq("user_id", user.id);
+    await window.supabaseClient
+      .from("profiles")
+      .update({
+        phone_verified: true,
+        phone_verified_at: new Date().toISOString(),
+      })
+      .eq("user_id", user.id);
 
-
-// ✅ index.html의 결제 모달 표시
-const subModal = document.getElementById("subscriptionModal");
-if (subModal) subModal.style.display = "block";
-
+    const subModal = document.getElementById("subscriptionModal");
+    if (subModal) subModal.style.display = "block";
 
     // 4) UI 갱신
     const { data: { session } } = await window.supabaseClient.auth.getSession();
     updateAuthUI(session);
 
   } catch (err) {
-   console.error("[OTP verify] catch:", err);
-   alert(err?.message || "인증에 실패했습니다.");
+    console.error("[OTP verify] catch:", err);
+    alert(err?.message || "인증에 실패했습니다.");
   }
 };
-}
+
 
 
 
