@@ -257,53 +257,53 @@ async function updateAuthUI(session) {
     document.querySelector(".login-form");
   const profileSection = document.getElementById("profile-section");
   const nicknameEl = document.getElementById("user-nickname");
+  const badgeEl = document.getElementById("user-badge");   // ✅ 추가: 뱃지 span
   const historySection = document.getElementById("saju-history-section");
 
   if (session && session.user) {
-    // ✅ 여기서 토큰 저장 처리
+    // 토큰 저장
     const token = session.access_token;
     const userAgent = navigator.userAgent || navigator.vendor || window.opera;
     const isMobile = /android|iphone|ipad|ipod/i.test(userAgent);
-
-    if (isMobile) {
-      localStorage.setItem("authToken", token);
-    } else {
-      sessionStorage.setItem("authToken", token);
-    }
+    if (isMobile) localStorage.setItem("authToken", token);
+    else sessionStorage.setItem("authToken", token);
 
     if (authSection) authSection.style.display = "none";
     if (profileSection) profileSection.style.display = "block";
 
     const user = session.user;
 
-    // ✅ 프로필 role 불러오기
+    // ✅ 프로필에서 role과 grade를 함께 가져온다 (라벨은 grade 기준!)
     const { data: profile } = await window.supabaseClient
       .from("profiles")
-      .select("role, created_at, daily_limit")
+      .select("role, grade, nickname, created_at, daily_limit")
       .eq("user_id", user.id)
       .single();
 
-const role = profile?.role || "normal";
-localStorage.setItem("userRole", role);
+    // role은 관리자 메뉴 표시용으로만 저장
+    const role = (profile?.role || "normal").toLowerCase();
+    localStorage.setItem("userRole", role);
 
+    // 프로필 편집 이벤트 보강
+    wireProfileEditEvents();
 
-  // ✅ 여기 추가
-  wireProfileEditEvents();
-// ✅ 회원관리 메뉴 표시/숨김
-const adminMenu = document.getElementById("admin-menu");
-if (adminMenu) {
-  adminMenu.style.display = role === "admin" ? "inline" : "none";
-}
+    // 관리자 메뉴 표시/숨김
+    const adminMenu = document.getElementById("admin-menu");
+    if (adminMenu) adminMenu.style.display = role === "admin" ? "inline" : "none";
 
+    // ✅ grade → 라벨 매핑 (요청하신 스위치 그대로)
+    const grade = (profile?.grade || "basic").toLowerCase();
     let roleLabel = "";
-    switch (profile?.role) {
-      case "admin": roleLabel = "[관리자] "; break;
+    switch (grade) {
+      case "admin":   roleLabel = "[관리자] ";   break;
       case "premium": roleLabel = "[정기회원] "; break;
       case "special": roleLabel = "[특별회원] "; break;
-      default: roleLabel = "[일반회원] "; break;
+      default:        roleLabel = "[일반회원] "; break;
     }
 
+    // 표시 이름
     const nickname =
+      profile?.nickname ||
       user.user_metadata?.nickname ||
       user.user_metadata?.name ||
       user.user_metadata?.full_name ||
@@ -313,28 +313,31 @@ if (adminMenu) {
       (user.email ? user.email.split("@")[0] : null) ||
       "사용자";
 
-    if (nicknameEl) nicknameEl.textContent = roleLabel + nickname;
+    // ✅ 뱃지 + 닉네임 각각 채우기
+    if (badgeEl)    badgeEl.textContent = roleLabel;
+    if (nicknameEl) nicknameEl.textContent = nickname;
 
+    // 히스토리 섹션/데이터 로드
     if (historySection) historySection.style.display = "block";
     loadSajuHistory(user.id);
     renderUserProfile();
-} else {
-  // ✅ 로그아웃 시 스토리지 정리
-  localStorage.removeItem("authToken");
-  sessionStorage.removeItem("authToken");
-  localStorage.removeItem("userRole");   // ← 이 줄 추가
+  } else {
+    // 로그아웃 시 정리
+    localStorage.removeItem("authToken");
+    sessionStorage.removeItem("authToken");
+    localStorage.removeItem("userRole");
 
-  // ✅ 로그아웃 시 회원관리 숨김
-  const adminMenu = document.getElementById("admin-menu");
-  if (adminMenu) adminMenu.style.display = "none";
+    const adminMenu = document.getElementById("admin-menu");
+    if (adminMenu) adminMenu.style.display = "none";
 
-  if (authSection) authSection.style.display = "block";
-  if (profileSection) profileSection.style.display = "none";
-  if (nicknameEl) nicknameEl.textContent = "";
-  if (historySection) historySection.style.display = "none";
+    if (authSection) authSection.style.display = "block";
+    if (profileSection) profileSection.style.display = "none";
+    if (badgeEl) badgeEl.textContent = "";         // ✅ 뱃지도 비우기
+    if (nicknameEl) nicknameEl.textContent = "";
+    if (historySection) historySection.style.display = "none";
+  }
 }
 
-}
 
 //첫한달간 회원별 제한 횟수 계산
 function getDailyLimit(profile = {}) {
@@ -4492,4 +4495,5 @@ wireProfileEditEvents();
     console.error("[init] fatal:", err);
   }
 });
+
 

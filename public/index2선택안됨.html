@@ -599,6 +599,7 @@
 
 <!-- 로그인 후 표시 -->
 <div id="profile-section" style="display:none; margin-top:8px;">
+    <span id="user-badge" style="margin-right:6px; font-weight:700;"></span>
   <span id="user-nickname" style="font-weight:600; color: blue;"></span> 님 환영합니다
  
   <button id="logoutBtn" type="button" style="margin-left:8px; background-color:#fab7b7; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">로그아웃</button>
@@ -875,7 +876,58 @@
 </script>
 
 
+<script>
+function gradeToLabel(grade) {
+  const g = (grade || 'basic').toLowerCase();
+  let roleLabel;
+  switch (g) {
+    case 'admin':   roleLabel = '[관리자] ';   break;
+    case 'premium': roleLabel = '[정기회원] '; break;
+    case 'special': roleLabel = '[특별회원] '; break;
+    default:        roleLabel = '[일반회원] '; break; // basic 또는 기타
+  }
+  return roleLabel;
+}
 
+
+async function renderProfileHeader(){
+  const sb = window.supabaseClient;
+  if (!sb) return;
+
+  const sec   = document.getElementById('profile-section');
+  const badge = document.getElementById('user-badge');     // ← span 있어야 해요
+  const nick  = document.getElementById('user-nickname');
+
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) { if (sec) sec.style.display='none'; return; }
+
+  const { data: prof, error } = await sb
+    .from('profiles')
+    .select('grade, nickname')
+    .eq('user_id', user.id)
+    .single();
+  if (error) return;
+
+  if (badge) badge.textContent = gradeToLabel(prof?.grade);
+  if (nick)  nick.textContent  = prof?.nickname || (user.email || '');
+  if (sec && sec.style.display==='none') sec.style.display='block';
+}
+
+
+// (선택) 실시간 갱신: profiles.grade 바뀌면 즉시 반영
+async function watchProfileGradeRealtime(){
+  const sb = window.supabaseClient;
+  const { data:{ user } } = await sb.auth.getUser();
+  if(!user) return;
+  if(window.__profileCh) sb.removeChannel(window.__profileCh);
+  window.__profileCh = sb
+    .channel(`profile-${user.id}`)
+    .on('postgres_changes',{
+      event:'UPDATE', schema:'public', table:'profiles', filter:`user_id=eq.${user.id}`
+    }, () => { renderProfileHeader(); })
+    .subscribe();
+}
+</script>
 
 
 <!-- 공지사항 게시판 -->
@@ -1104,17 +1156,26 @@ function openNotice(id) {
 
   // 초기/변경 동일 흐름으로 갱신
   (async function init() {
+    const sb = window.supabaseClient;
+
     // 초기엔 버튼 숨김(깜빡임 방지)
     const addBtn = document.getElementById('add-btn');
     if (addBtn) addBtn.style.display = 'none';
 
-    const { data: { session } } = await supabase.auth.getSession();
-    await updateAuthUI(session);   // role 저장/버튼 상태 갱신
-    await renderNotices();         // role 반영 후 목록 렌더
+    // 세션 읽고 UI 반영
+    const { data: { session } } = await sb.auth.getSession();
+    await updateAuthUI(session);         // role 저장/버튼 상태 갱신
+    await renderProfileHeader();         // ✅ grade 라벨 그리기
+    watchProfileGradeRealtime();         // ✅ (선택) 실시간 반영
 
-    supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      await updateAuthUI(newSession); // 로그인/로그아웃마다 role 갱신
-      await renderNotices();          // 그리고 목록 다시 렌더
+    await renderNotices();               // role 반영 후 공지 렌더
+
+    // 로그인/로그아웃/세션변경 시
+    sb.auth.onAuthStateChange(async (_event, newSession) => {
+      await updateAuthUI(newSession);
+      await renderProfileHeader();       // ✅ 라벨 재그리기
+      watchProfileGradeRealtime();       // ✅ 구독 다시 걸기
+      await renderNotices();
     });
   })();
 </script>
