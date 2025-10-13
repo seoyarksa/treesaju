@@ -2,7 +2,7 @@
 
 
 // git add .
-// git commit -m "로그인횟수제한"   
+// git commit -m "정기결제연동"   
 // git push origin main
 // git push
 //강제실행   vercel --prod --force
@@ -112,6 +112,7 @@ import { renderSinsalTable,
 
 
 
+console.log('🔥 app.js loaded');
 
 // =========================================
 // 출력 제한 로직 (비로그인 사용자 하루 3회 제한)
@@ -722,7 +723,7 @@ function openSignupModal() {
         email, password,
         options: {
           data: { nickname, phone }, // user_metadata
-          emailRedirectTo: `${location.origin}${location.pathname}`,
+          emailRedirectTo: "https://treesaju.vercel.app",
         },
       });
       if (error) throw error;
@@ -864,9 +865,25 @@ document.getElementById("otp-verify").onclick = async () => {
 
 
     // 3) 성공 처리
-    alert("전화번호 인증이 완료되었습니다!");
-    const modalEl = document.getElementById("phone-otp-modal"); // 지역변수 modal이 없을 수도 있어 안전하게 다시 조회
-    if (modalEl) modalEl.style.display = "none";
+// 3) 성공 처리
+alert("전화번호 인증이 완료되었습니다!");
+const modalEl = document.getElementById("phone-otp-modal");
+if (modalEl) modalEl.style.display = "none";
+
+// ✅ 인증 성공 시 시각 저장
+await window.supabaseClient
+  .from("profiles")
+  .update({
+    phone_verified: true,
+    phone_verified_at: new Date().toISOString(),
+  })
+  .eq("user_id", user.id);
+
+
+// ✅ index.html의 결제 모달 표시
+const subModal = document.getElementById("subscriptionModal");
+if (subModal) subModal.style.display = "block";
+
 
     // 4) UI 갱신
     const { data: { session } } = await window.supabaseClient.auth.getSession();
@@ -880,36 +897,180 @@ document.getElementById("otp-verify").onclick = async () => {
 }
 
 
+
+//구글정기결제창
+
+window.startGoogleSubscription = function() {
+  if (window.AndroidApp) {
+    window.AndroidApp.startGoogleSubscription(); // 앱 내부 결제 호출
+    return;
+  }
+  window.open("pay/google?plan=monthly", "_blank", "width=480,height=720");
+};
+
+
+
+// ✅ 카카오 정기결제창 (V1 기준, 통합 API 버전)
+window.startKakaoSubscription = async function() {
+  try {
+    // 1️⃣ Supabase 로그인 확인
+    const { data: { user } } = await window.supabaseClient.auth.getUser();
+    if (!user) return alert("로그인이 필요합니다.");
+
+    const IMP = window.IMP;
+    IMP.init("imp81444885"); // ✅ 아임포트 V1 고객사 식별코드
+
+    const userId = user.id;
+    const customerUid = "kakao_" + userId; // 고객별 고유 빌링 UID
+
+    // 2️⃣ 결제창 호출
+    IMP.request_pay({
+      pg: "kakaopay.TCSUBSCRIP",  // ✅ 테스트용 카카오페이 PG상점 ID
+      pay_method: "card",
+      merchant_uid: "order_" + new Date().getTime(),
+      name: "Kakao 정기구독 (월간)",
+      amount: 11000,
+      customer_uid: customerUid,
+      buyer_email: user.email || "user@example.com",
+      buyer_name: "홍길동",
+      buyer_tel: "01012345678"
+    }, async function (rsp) {
+      if (rsp.success) {
+        alert("결제 성공 🎉\n결제번호: " + rsp.imp_uid);
+
+        try {
+          // 3️⃣ 서버로 정기결제 등록 요청
+          const res = await fetch("/api/payment/manage-subscription?action=register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              imp_uid: rsp.imp_uid,
+              customer_uid: rsp.customer_uid || customerUid,
+              user_id: userId
+            }),
+          });
+
+          const data = await res.json();
+          if (res.ok) {
+            alert("✅ 정기결제 등록 및 프리미엄 등급 적용 완료");
+          } else {
+            alert("❌ 서버 등록 실패: " + (data.error || "서버 오류"));
+          }
+        } catch (err) {
+          console.error("[fetch error]", err);
+          alert("❌ 서버 통신 오류: " + err.message);
+        }
+
+      } else {
+        // 결제 실패
+        console.warn("[결제 실패]", rsp);
+        alert("❌ 결제 실패: " + rsp.error_msg);
+      }
+    });
+  } catch (err) {
+    console.error("[startKakaoSubscription error]", err);
+    alert("내부 오류: " + err.message);
+  }
+};
+
+
+
+// ✅ 정기구독 버튼 클릭 시
+window.openSubscriptionModal = async function() {
+  const { data: { user } } = await window.supabaseClient.auth.getUser();
+  if (!user) return alert("로그인이 필요합니다.");
+
+  // 서버에서 구독 상태 조회
+  const { data, error } = await window.supabaseClient
+    .from("memberships")
+    .select("*")
+    .eq("user_id", user.id)
+    .single();
+
+  const modal = document.getElementById("subscriptionModal");
+  modal.style.display = "block";
+
+  // 기존 내용 초기화
+  modal.innerHTML = "";
+
+  if (error || !data || data.status === "inactive") {
+    // ✅ 구독이 없는 경우 → 결제창 안내
+    modal.innerHTML = `
+      <h3>정기구독 결제</h3>
+      <p>전화번호 인증이 완료되었습니다. 결제 방법을 선택하세요.</p>
+      <button onclick="startGoogleSubscription()">Google 정기구독 결제</button>
+      <button onclick="startKakaoSubscription()">Kakao 정기구독 결제</button>
+    `;
+  } else {
+    // ✅ 이미 구독 중인 경우 → 결제 정보 + 해지 버튼
+    const nextDate = new Date(data.current_period_end).toLocaleDateString("ko-KR");
+    modal.innerHTML = `
+      <h3>정기구독 정보</h3>
+      <p><strong>플랜:</strong> ${data.plan}</p>
+      <p><strong>상태:</strong> ${data.status}</p>
+      <p><strong>다음 결제일:</strong> ${nextDate}</p>
+      <button id="cancelSubBtn">정기결제 해지 신청</button>
+    `;
+
+    document.getElementById("cancelSubBtn").addEventListener("click", async () => {
+      if (!confirm("이번 달 말일에 해지됩니다. 진행할까요?")) return;
+
+      const res = await fetch("/api/payment/manage-subscription?action=cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user.id }),
+      });
+
+      const result = await res.json();
+      if (res.ok) {
+        alert("✅ " + result.message);
+        modal.style.display = "none";
+      } else {
+        alert("❌ " + result.error);
+      }
+    });
+  }
+};
+
+
+
+
 // ─── 로그인된 유저가 전화 인증 필요하면 모달을 띄우는 검사 ───
 async function requirePhoneVerificationIfNeeded() {
   const { data: { session } } = await window.supabaseClient.auth.getSession();
-if (session?.user) {
-  await supabaseClient.from('profiles').insert({
-    user_id: session.user.id,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  }).eq('user_id', session.user.id).maybeSingle(); // RLS 허용 필요
-}
+  if (!session?.user) return alert("로그인 후 이용 가능합니다.");
 
   try {
-    // profiles에서 phone_verified 조회 (RLS는 본인 행만 허용되도록 설정되어 있음)
- const { data, error } = await window.supabaseClient
-   .from("profiles")
-   .select("phone_verified")
-   .eq("user_id", session.user.id)
-   .maybeSingle();            // ← 행이 없어도 에러 안 던짐
-
+    const { data, error } = await window.supabaseClient
+      .from("profiles")
+      .select("phone_verified, phone_verified_at")
+      .eq("user_id", session.user.id)
+      .maybeSingle();
 
     if (error) console.warn("[profiles maybeSingle] warn:", error);
 
-    if (!data || !data.phone_verified) {
-      // ✅ 인증 안 되어 있으면 즉시 모달
+    // 인증 기록 없으면 바로 인증 요구
+    if (!data?.phone_verified_at) {
       openPhoneOtpModal();
+      return;
     }
+
+    // 3일 유효기간 계산
+    const lastVerified = new Date(data.phone_verified_at);
+    const now = new Date();
+    const diffDays = (now - lastVerified) / (1000 * 60 * 60 * 24);
+
+    if (diffDays > 3) {
+      console.log("[requirePhoneVerificationIfNeeded] 인증 만료:", diffDays, "일 경과");
+      openPhoneOtpModal(); // 3일 초과 → 다시 인증
+      return;
+    }
+
+    // 유효기간 이내면 통과
+    console.log("[requirePhoneVerificationIfNeeded] 인증 유효:", diffDays, "일 경과");
   } catch (e) {
     console.warn("[requirePhoneVerificationIfNeeded] 조회 실패:", e);
-    // 조회 실패 시에도 UX상 바로 요구하고 싶다면 모달을 띄워도 됨:
-    // openPhoneOtpModal();
+    openPhoneOtpModal(); // 조회 실패 시 안전하게 인증 요구
   }
 }
 
@@ -2807,6 +2968,23 @@ window.handleDaeyunClick = handleDaeyunClick;
   overflow-wrap: break-word; /* 화면 줄어들면 자동 줄바꿈 */
 }
 
+.note-box .note-links {
+  display: inline-block;
+  white-space: normal; /* pre-line 영향 제거 */
+  word-break: keep-all; /* 단어 단위로 줄바꿈 */
+}
+
+.note-box .note-links a {
+  color: #333;
+  text-decoration: none;
+  margin: 0 4px;
+}
+
+.note-box .note-links a:hover {
+  text-decoration: underline;
+}
+
+
      /* 지장간 전용 스타일 */
         .hidden-stem-wrapper {
           display: flex;
@@ -3806,37 +3984,32 @@ async function renderUserProfile() {
   const { data: { user } } = await window.supabaseClient.auth.getUser();
   if (!user) return;
 
-  // ✅ 구독 버튼: 프로필 phone_verified 확인 → 미인증이면 OTP 모달, 인증이면 결제 모달
+  // ✅ 정기구독 버튼
   const subscribeBtn = document.getElementById("subscribeBtn");
   if (subscribeBtn) {
-    // 중복 바인딩 방지
+    // 중복 이벤트 방지
     subscribeBtn._bound && subscribeBtn.removeEventListener("click", subscribeBtn._bound);
     subscribeBtn._bound = async (e) => {
       e.preventDefault();
       try {
+        // ✅ profiles 테이블에서 전화 인증 여부 확인
         const { data: profile, error: profErr } = await window.supabaseClient
           .from("profiles")
           .select("phone_verified")
           .eq("user_id", user.id)
-          .maybeSingle(); // ← 행이 없으면 null
+          .maybeSingle();
 
         if (profErr) console.warn("[profiles maybeSingle] warn:", profErr);
 
+        // ✅ 전화 인증 안 되어 있으면 OTP 모달 오픈
         if (!profile || !profile.phone_verified) {
-          // 전화 인증 먼저
           openPhoneOtpModal();
           return;
         }
 
-        // ✅ 인증되어 있으면 결제 모달(임시) 오픈
-        const subModal = document.getElementById("subscriptionModal");
-        if (subModal) {
-          subModal.style.display = "block";
-        } else {
-          // 모달이 없으면 임시 이동 (필요 시 주석 해제)
-          // window.location.href = "/subscribe";
-          alert("전화 인증 확인됨. 결제 창을 연결해 주세요.");
-        }
+        // ✅ 인증 완료 → 구독 상태에 따라 결제창 or 결제정보 표시
+        await openSubscriptionModal(); // <-- 🔥 새로 만든 함수 실행
+
       } catch (err) {
         console.error("[subscribeBtn] error:", err);
         alert(err?.message || "처리 중 오류가 발생했습니다.");
@@ -3856,6 +4029,7 @@ async function renderUserProfile() {
     logoutBtn.addEventListener("click", logoutBtn._bound);
   }
 }
+
 
 
 
@@ -4130,43 +4304,167 @@ window.addEventListener("beforeunload", () => {
     });
 
     // ✅ 로그인/회원가입/소셜 로그인/로그아웃 바인딩
-    document.getElementById("loginBtn")?.addEventListener("click", async (e) => {
-      e.preventDefault();
-      const email = document.getElementById("email")?.value?.trim();
-      const password = document.getElementById("password")?.value ?? "";
-      if (!email || !password) return alert("이메일과 비밀번호를 입력하세요.");
-      try {
-        const { data, error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        updateAuthUI(data?.session ?? null);
-      } catch (err) {
-        console.error(err);
-        alert(err.message || "로그인에 실패했습니다.");
+/***** 🔧 전역 플래그 (수동 로그아웃 구분용) *****/
+let __MANUAL_LOGOUT__ = false;
+let __AUTH_LISTENER_SET__ = false;
+let __REALTIME_SET__ = false;
+
+/***** 🔧 공통 POST 호출 헬퍼 *****/
+async function postJSON(url, body) {
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    let msg = "request failed";
+    try { msg = (await r.json()).error || msg; } catch {}
+    throw new Error(msg);
+  }
+  return r.json();
+}
+
+/***** ✅ 버튼: 로그인 시도만 수행 *****/
+document.getElementById("loginBtn")?.addEventListener("click", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("email")?.value?.trim();
+  const password = document.getElementById("password")?.value ?? "";
+  if (!email || !password) return alert("이메일과 비밀번호를 입력하세요.");
+
+  try {
+    const { error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    // 후처리는 onAuthStateChange에서 일괄 처리
+  } catch (err) {
+    console.error(err);
+    alert(err.message || "로그인에 실패했습니다.");
+  }
+});
+
+document.getElementById("signupBtn")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  openSignupModal();
+});
+
+document.getElementById("googleLogin")?.addEventListener("click", async (e) => {
+  e.preventDefault();
+  await window.supabaseClient.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: "https://treesaju.vercel.app" },
+  });
+});
+
+document.getElementById("kakaoLogin")?.addEventListener("click", async (e) => {
+  e.preventDefault();
+  await window.supabaseClient.auth.signInWithOAuth({
+    provider: "kakao",
+    options: { redirectTo: "https://treesaju.vercel.app" },
+  });
+});
+
+/***** ✅ 로그아웃(수동) — 메시지 구분을 위해 플래그 사용 *****/
+document.getElementById("logoutBtn")?.addEventListener("click", async () => {
+  __MANUAL_LOGOUT__ = true;
+  await window.supabaseClient.auth.signOut();
+  updateAuthUI(null);
+  __MANUAL_LOGOUT__ = false;
+});
+
+/***** ✅ 관리자 메뉴 표시 *****/
+showIfAdmin("#admin-menu");
+
+/***** ✅ 로그인/로그아웃 공통 파이프라인 — “한 계정 1세션” 강제 *****/
+function bindAuthPipelines() {
+  if (__AUTH_LISTENER_SET__) return;
+  __AUTH_LISTENER_SET__ = true;
+
+  window.supabaseClient.auth.onAuthStateChange(async (event, session) => {
+    try {
+      if (event === "SIGNED_IN" && session?.user?.id) {
+        const userId = session.user.id;
+        const sessionId = session.access_token;
+
+        // 1) 기존 로그인 세션 전부 종료 (다른 기기 즉시 무효화 상태로)
+        await postJSON("/api/terminate-other-sessions", { user_id: userId });
+
+        // 2) 현재 세션을 active_sessions에 기록 (Realtime 트리거 포인트)
+        await postJSON("/api/update-session", { user_id: userId, session_id: sessionId });
+
+        // 3) 실시간 감시 시작 (한 번만 구독)
+        await initRealtimeWatcher();
+
+        // 4) UI 반영
+        updateAuthUI(session);
       }
+
+      if (event === "SIGNED_OUT") {
+        if (!__MANUAL_LOGOUT__) {
+          alert("다른 기기에서 로그인되어 로그아웃되었습니다.");
+        }
+        updateAuthUI(null);
+      }
+    } catch (e) {
+      console.error("[auth pipeline error]", e);
+    }
+  });
+}
+
+/***** ✅ 실시간 세션 변경 감시 (다른 기기 로그인 시 자동 로그아웃) *****/
+async function initRealtimeWatcher() {
+  if (__REALTIME_SET__) return;
+  const { data: u } = await window.supabaseClient.auth.getUser();
+  const user = u?.user;
+  if (!user) return;
+
+  __REALTIME_SET__ = true;
+
+  window.supabaseClient
+    .channel("realtime:active_sessions")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "active_sessions" }, // INSERT/UPDATE 모두 감시
+      async (payload) => {
+        if (payload?.new?.user_id !== user.id) return;
+
+        const { data: s } = await window.supabaseClient.auth.getSession();
+        const current = s?.session?.access_token;
+        const latest  = payload?.new?.session_id;
+
+        if (current && latest && current !== latest) {
+          alert("다른 기기에서 로그인되어 자동 로그아웃됩니다.");
+          await window.supabaseClient.auth.signOut();
+          updateAuthUI(null);
+        }
+      }
+    )
+    .subscribe((status) => {
+      console.log("[realtime] active_sessions:", status);
     });
-    document.getElementById("signupBtn")?.addEventListener("click", (e) => { e.preventDefault(); openSignupModal(); });
-    document.getElementById("googleLogin")?.addEventListener("click", async (e) => {
-      e.preventDefault();
-      await window.supabaseClient.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: `${location.origin}${location.pathname}` },
+}
+
+// ✅ 최초 로드 시: 이미 로그인된 상태여도 즉시 구독 + 세션 기록 (중요!)
+(async function bootstrapRealtime() {
+  bindAuthPipelines();
+
+  const { data: s } = await window.supabaseClient.auth.getSession();
+  const session = s?.session;
+  if (session?.user?.id) {
+    // 이미 로그인된 탭도 즉시 구독 시작
+    await initRealtimeWatcher();
+
+    // 내 현재 세션을 DB에 기록해 둔다 (다른 기기가 비교하도록)
+    try {
+      await postJSON("/api/update-session", {
+        user_id: session.user.id,
+        session_id: session.access_token,
       });
-    });
-    document.getElementById("kakaoLogin")?.addEventListener("click", async (e) => {
-      e.preventDefault();
-      await window.supabaseClient.auth.signInWithOAuth({
-        provider: "kakao",
-        options: { redirectTo: `${location.origin}${location.pathname}` },
-      });
-    });
-    document.getElementById("logoutBtn")?.addEventListener("click", async () => {
-      await window.supabaseClient.auth.signOut();
-      updateAuthUI(null);
-    });
+    } catch (e) {
+      console.warn("[bootstrap] update-session skip:", e?.message);
+    }
 
-
-  showIfAdmin('#admin-menu');   // 회원관리 메뉴
-
+    updateAuthUI(session);
+  }
+})();
 
 
  

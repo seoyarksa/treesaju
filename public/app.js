@@ -257,53 +257,53 @@ async function updateAuthUI(session) {
     document.querySelector(".login-form");
   const profileSection = document.getElementById("profile-section");
   const nicknameEl = document.getElementById("user-nickname");
+  const badgeEl = document.getElementById("user-badge");   // ✅ 추가: 뱃지 span
   const historySection = document.getElementById("saju-history-section");
 
   if (session && session.user) {
-    // ✅ 여기서 토큰 저장 처리
+    // 토큰 저장
     const token = session.access_token;
     const userAgent = navigator.userAgent || navigator.vendor || window.opera;
     const isMobile = /android|iphone|ipad|ipod/i.test(userAgent);
-
-    if (isMobile) {
-      localStorage.setItem("authToken", token);
-    } else {
-      sessionStorage.setItem("authToken", token);
-    }
+    if (isMobile) localStorage.setItem("authToken", token);
+    else sessionStorage.setItem("authToken", token);
 
     if (authSection) authSection.style.display = "none";
     if (profileSection) profileSection.style.display = "block";
 
     const user = session.user;
 
-    // ✅ 프로필 role 불러오기
+    // ✅ 프로필에서 role과 grade를 함께 가져온다 (라벨은 grade 기준!)
     const { data: profile } = await window.supabaseClient
       .from("profiles")
-      .select("role, created_at, daily_limit")
+      .select("role, grade, nickname, created_at, daily_limit")
       .eq("user_id", user.id)
       .single();
 
-const role = profile?.role || "normal";
-localStorage.setItem("userRole", role);
+    // role은 관리자 메뉴 표시용으로만 저장
+    const role = (profile?.role || "normal").toLowerCase();
+    localStorage.setItem("userRole", role);
 
+    // 프로필 편집 이벤트 보강
+    wireProfileEditEvents();
 
-  // ✅ 여기 추가
-  wireProfileEditEvents();
-// ✅ 회원관리 메뉴 표시/숨김
-const adminMenu = document.getElementById("admin-menu");
-if (adminMenu) {
-  adminMenu.style.display = role === "admin" ? "inline" : "none";
-}
+    // 관리자 메뉴 표시/숨김
+    const adminMenu = document.getElementById("admin-menu");
+    if (adminMenu) adminMenu.style.display = role === "admin" ? "inline" : "none";
 
+    // ✅ grade → 라벨 매핑 (요청하신 스위치 그대로)
+    const grade = (profile?.grade || "basic").toLowerCase();
     let roleLabel = "";
-    switch (profile?.role) {
-      case "admin": roleLabel = "[관리자] "; break;
+    switch (grade) {
+      case "admin":   roleLabel = "[관리자] ";   break;
       case "premium": roleLabel = "[정기회원] "; break;
       case "special": roleLabel = "[특별회원] "; break;
-      default: roleLabel = "[일반회원] "; break;
+      default:        roleLabel = "[일반회원] "; break;
     }
 
+    // 표시 이름
     const nickname =
+      profile?.nickname ||
       user.user_metadata?.nickname ||
       user.user_metadata?.name ||
       user.user_metadata?.full_name ||
@@ -313,28 +313,31 @@ if (adminMenu) {
       (user.email ? user.email.split("@")[0] : null) ||
       "사용자";
 
-    if (nicknameEl) nicknameEl.textContent = roleLabel + nickname;
+    // ✅ 뱃지 + 닉네임 각각 채우기
+    if (badgeEl)    badgeEl.textContent = roleLabel;
+    if (nicknameEl) nicknameEl.textContent = nickname;
 
+    // 히스토리 섹션/데이터 로드
     if (historySection) historySection.style.display = "block";
     loadSajuHistory(user.id);
     renderUserProfile();
-} else {
-  // ✅ 로그아웃 시 스토리지 정리
-  localStorage.removeItem("authToken");
-  sessionStorage.removeItem("authToken");
-  localStorage.removeItem("userRole");   // ← 이 줄 추가
+  } else {
+    // 로그아웃 시 정리
+    localStorage.removeItem("authToken");
+    sessionStorage.removeItem("authToken");
+    localStorage.removeItem("userRole");
 
-  // ✅ 로그아웃 시 회원관리 숨김
-  const adminMenu = document.getElementById("admin-menu");
-  if (adminMenu) adminMenu.style.display = "none";
+    const adminMenu = document.getElementById("admin-menu");
+    if (adminMenu) adminMenu.style.display = "none";
 
-  if (authSection) authSection.style.display = "block";
-  if (profileSection) profileSection.style.display = "none";
-  if (nicknameEl) nicknameEl.textContent = "";
-  if (historySection) historySection.style.display = "none";
+    if (authSection) authSection.style.display = "block";
+    if (profileSection) profileSection.style.display = "none";
+    if (badgeEl) badgeEl.textContent = "";         // ✅ 뱃지도 비우기
+    if (nicknameEl) nicknameEl.textContent = "";
+    if (historySection) historySection.style.display = "none";
+  }
 }
 
-}
 
 //첫한달간 회원별 제한 횟수 계산
 function getDailyLimit(profile = {}) {
@@ -4493,3 +4496,55 @@ wireProfileEditEvents();
   }
 });
 
+// 결제 버튼 클릭 → 아임포트 결제 → 서버 API 호출 → UI 갱신
+(function attachSubscribeHandler() {
+  const btn = document.getElementById('subscribeBtn');
+  if (!btn) return;
+
+  btn.addEventListener('click', async () => {
+    const sb = window.supabaseClient;
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) { alert('로그인이 필요합니다.'); return; }
+
+    const IMP = window.IMP;
+    if (!IMP) { alert('결제 SDK 로드 실패'); return; }
+    IMP.init('YOUR_MERCHANT_CODE'); // ← 본인 가맹점 코드
+
+    const merchantUid = `sub_${user.id}_${Date.now()}`;
+    IMP.request_pay({
+      pg: 'html5_inicis',           // 실제 PG로 변경
+      pay_method: 'card',
+      merchant_uid: merchantUid,
+      name: '월간 프리미엄 구독',
+      amount: 11000,
+      buyer_email: user.email || '',
+      buyer_name: user.user_metadata?.nickname || user.user_metadata?.name || ''
+    }, async (rsp) => {
+      if (rsp.success) {
+        // 1) 서버에 등록 (지금 있는 서버 라우트)
+        const resp = await fetch('/api/payment/manage-subscription?action=register', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json' },
+          body: JSON.stringify({
+            imp_uid: rsp.imp_uid,
+            customer_uid: rsp.customer_uid || rsp.merchant_uid,
+            user_id: user.id
+          })
+        });
+
+        if (!resp.ok) {
+          const err = await resp.json().catch(()=>({}));
+          alert('결제 등록 실패: ' + (err.error || '서버 오류'));
+          return;
+        }
+
+        // 2) UI 즉시 갱신 (등급 라벨)
+        await updateAuthUI((await sb.auth.getSession()).data.session);
+        await renderProfileHeader();
+        alert('정기구독 등록 완료!');
+      } else {
+        alert('결제가 실패/취소되었습니다: ' + (rsp.error_msg || ''));
+      }
+    });
+  });
+})();
