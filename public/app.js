@@ -892,19 +892,37 @@ if (subModal) subModal.style.display = "block";
     const { data: { session } } = await window.supabaseClient.auth.getSession();
     updateAuthUI(session);
 
-  } catch (err) {
-    console.error("[OTP verify] catch:", err);
-    const raw = `${err?.message || ''} ${err?.text || ''} ${err?.json?.error || ''} ${err?.json?.details || ''}`;
-    const isUnique =
-      err?.status === 409 ||
-      /23505|duplicate key|unique constraint|profiles_phone_key|uniq_profiles_phone_verified|already exists|conflict/i.test(raw);
+} catch (err) {
+  console.error("[OTP verify] catch:", err);
 
-    alert(
-      isUnique
-        ? '이미 존재하는 번호입니다.\n다른 번호를 입력하거나, 해당 번호로 가입된 계정으로 로그인해 주세요.'
-        : `인증 실패: ${raw.trim() || '서버 오류'}`
-    );
+  // 1) 서버가 상세 코드를 안줘도, 프로필에 같은 번호가 있는지 직접 확인하여 사용자 메시지 보정
+  try {
+    const phoneRaw = document.getElementById("otp-phone")?.value?.trim() || "";
+    const phoneIntl = window.normalizePhoneKR ? window.normalizePhoneKR(phoneRaw, "intl") : phoneRaw;
+
+    const { data: me } = await window.supabaseClient.auth.getUser();
+    const myId = me?.user?.id || null;
+
+    const { data: dup } = await window.supabaseClient
+      .from("profiles")
+      .select("user_id")
+      .eq("phone", phoneIntl)
+      .neq("user_id", myId)
+      .maybeSingle();
+
+    if (dup) {
+      alert("이미 존재하는 번호입니다.\n다른 번호를 입력하거나, 해당 번호로 가입된 계정으로 로그인해 주세요.");
+      return;
+    }
+  } catch (probeErr) {
+    console.warn("[OTP verify] duplicate probe failed:", probeErr);
   }
+
+  // 2) 위 보정이 안 되면, 서버가 준 정보를 최대한 합쳐서 안내
+  const raw = `${err?.message || ''} ${err?.text || ''} ${err?.json?.error || ''} ${err?.json?.details || ''}`.trim();
+  alert(`인증 실패: ${raw || '서버 오류'}`);
+}
+
 }; // ← 여기서 onclick 핸들러를 세미콜론으로 닫아야 함
 }   
 
