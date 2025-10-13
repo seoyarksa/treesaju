@@ -4321,14 +4321,15 @@ document.getElementById("loginBtn")?.addEventListener("click", async (e) => {
     if (error) throw error;
 
     // 🔹 로그인 성공 후 서버에 전체 세션 해제 요청
-    if (data?.session?.user?.id) {
-      await fetch("/api/logout-all", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: data.session.user.id }),
-      });
-    }
-
+if (data?.session?.user?.id) {
+  setTimeout(() => {
+    fetch("/api/logout-all", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: data.session.user.id }),
+    });
+  }, 3000);
+}
     updateAuthUI(data?.session ?? null);
   } catch (err) {
     console.error(err);
