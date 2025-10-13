@@ -4324,7 +4324,7 @@ async function postJSON(url, body) {
   return r.json();
 }
 
-/***** ✅ 이메일 로그인 (시도만 수행) *****/
+/***** ✅ 버튼: 로그인 시도만 수행 *****/
 document.getElementById("loginBtn")?.addEventListener("click", async (e) => {
   e.preventDefault();
   const email = document.getElementById("email")?.value?.trim();
@@ -4341,13 +4341,11 @@ document.getElementById("loginBtn")?.addEventListener("click", async (e) => {
   }
 });
 
-/***** ✅ 회원가입 버튼 *****/
 document.getElementById("signupBtn")?.addEventListener("click", (e) => {
   e.preventDefault();
   openSignupModal();
 });
 
-/***** ✅ 구글/카카오 로그인 (시도만) *****/
 document.getElementById("googleLogin")?.addEventListener("click", async (e) => {
   e.preventDefault();
   await window.supabaseClient.auth.signInWithOAuth({
@@ -4382,27 +4380,23 @@ function bindAuthPipelines() {
 
   window.supabaseClient.auth.onAuthStateChange(async (event, session) => {
     try {
-      // 🔹 로그인 성공: 여기서만 후처리
       if (event === "SIGNED_IN" && session?.user?.id) {
         const userId = session.user.id;
         const sessionId = session.access_token;
 
-        // 1) 기존 로그인 세션 전부 종료 (다른 기기 즉시 무효화)
+        // 1) 기존 로그인 세션 전부 종료 (다른 기기 즉시 무효화 상태로)
         await postJSON("/api/terminate-other-sessions", { user_id: userId });
 
         // 2) 현재 세션을 active_sessions에 기록 (Realtime 트리거 포인트)
         await postJSON("/api/update-session", { user_id: userId, session_id: sessionId });
 
         // 3) 실시간 감시 시작 (한 번만 구독)
-        initRealtimeWatcher();
+        await initRealtimeWatcher();
 
         // 4) UI 반영
         updateAuthUI(session);
-        // 필요하면 안내
-        // alert("로그인되었습니다. (기존 로그인은 모두 해제되었습니다.)");
       }
 
-      // 🔹 로그아웃 이벤트: 원인 구분하여 메시지
       if (event === "SIGNED_OUT") {
         if (!__MANUAL_LOGOUT__) {
           alert("다른 기기에서 로그인되어 로그아웃되었습니다.");
@@ -4418,17 +4412,17 @@ function bindAuthPipelines() {
 /***** ✅ 실시간 세션 변경 감시 (다른 기기 로그인 시 자동 로그아웃) *****/
 async function initRealtimeWatcher() {
   if (__REALTIME_SET__) return;
-  __REALTIME_SET__ = true;
-
   const { data: u } = await window.supabaseClient.auth.getUser();
   const user = u?.user;
-  if (!user) { __REALTIME_SET__ = false; return; }
+  if (!user) return;
+
+  __REALTIME_SET__ = true;
 
   window.supabaseClient
     .channel("realtime:active_sessions")
     .on(
       "postgres_changes",
-      { event: "*", schema: "public", table: "active_sessions" }, // INSERT/UPDATE 모두
+      { event: "*", schema: "public", table: "active_sessions" }, // INSERT/UPDATE 모두 감시
       async (payload) => {
         if (payload?.new?.user_id !== user.id) return;
 
@@ -4448,8 +4442,29 @@ async function initRealtimeWatcher() {
     });
 }
 
-// 최초 로드 시 파이프라인 연결 (한 번만)
-bindAuthPipelines();
+// ✅ 최초 로드 시: 이미 로그인된 상태여도 즉시 구독 + 세션 기록 (중요!)
+(async function bootstrapRealtime() {
+  bindAuthPipelines();
+
+  const { data: s } = await window.supabaseClient.auth.getSession();
+  const session = s?.session;
+  if (session?.user?.id) {
+    // 이미 로그인된 탭도 즉시 구독 시작
+    await initRealtimeWatcher();
+
+    // 내 현재 세션을 DB에 기록해 둔다 (다른 기기가 비교하도록)
+    try {
+      await postJSON("/api/update-session", {
+        user_id: session.user.id,
+        session_id: session.access_token,
+      });
+    } catch (e) {
+      console.warn("[bootstrap] update-session skip:", e?.message);
+    }
+
+    updateAuthUI(session);
+  }
+})();
 
 
  
