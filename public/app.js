@@ -4321,12 +4321,23 @@ document.getElementById("loginBtn")?.addEventListener("click", async (e) => {
 
     const user = data?.user || data?.session?.user;
     if (user?.id) {
-      // ✅ 현재 로그인만 유지, 기존 로그인 모두 무효화
-      await fetch("/api/terminate-other-sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id }),
-      });
+// ✅ 현재 로그인만 유지, 기존 로그인 모두 무효화
+await fetch("/api/terminate-other-sessions", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ user_id: user.id }),
+});
+
+// ✅ active_sessions 테이블에 현재 세션 저장
+await fetch("/api/update-session", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    user_id: user.id,
+    session_id: data.session.access_token, // 현재 세션 토큰 저장
+  }),
+});
+
     }
 
     updateAuthUI(data?.session ?? null);
