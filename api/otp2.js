@@ -1,4 +1,67 @@
 // api/otp.js — 단일 파일, send / verify / diag (안전판: update-only)
+import crypto from 'crypto';
+
+// --- Kakao 알림톡 전송(네이버 클라우드 SENS) ---
+async function sendAlimtalk(rawPhone, code) {
+  // 1) NCP는 숫자만 허용 (하이픈/문자 제거)
+  const to = String(rawPhone || '').replace(/\D/g, '');
+  if (!to) throw new Error('invalid phone');
+
+  // 2) 환경변수 필수
+  const serviceId    = process.env.NCP_SENS_SERVICE_ID; // 예: ncp:kkobizmsg:kr:123456789012:myservice
+  const accessKey    = process.env.NCP_ACCESS_KEY;
+  const secretKey    = process.env.NCP_SECRET_KEY;
+  const plusFriendId = process.env.NCP_PLUS_FRIEND_ID;  // 예: @트리만세력  (활성 상태)
+  const templateCode = process.env.NCP_TEMPLATE_CODE;   // 예: VERIFYCODE  (승인된 템플릿)
+
+  if (!serviceId || !accessKey || !secretKey || !plusFriendId || !templateCode) {
+    throw new Error('Missing NCP envs');
+  }
+
+  // 3) 서명 준비
+  const { createHmac } = await import('node:crypto');
+  const host = 'https://sens.apigw.ntruss.com';
+  const path = `/alimtalk/v2/services/${serviceId}/messages`;
+  const ts   = Date.now().toString();
+
+  const sigMsg = `POST ${path}\n${ts}\n${accessKey}`;
+  const sig    = createHmac('sha256', secretKey).update(sigMsg).digest('base64');
+
+  // 4) ✅ 템플릿과 "문자 하나까지" 동일한 content 구성
+  //    승인 문구: "인증 번호는 #{code} 입니다."
+  //    → 전송 문구: "인증 번호는 123456 입니다."
+  const content = `인증 번호는 ${code} 입니다.`; // 공백/마침표 위치 주의!
+
+  const body = {
+    plusFriendId,
+    templateCode,
+    messages: [
+      { to, content } // variables/templateParameter 사용하지 않음
+    ],
+  };
+
+  // 5) 호출
+  const res  = await fetch(`${host}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'x-ncp-apigw-timestamp': ts,
+      'x-ncp-iam-access-key': accessKey,
+      'x-ncp-apigw-signature-v2': sig,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const text = await res.text();
+  if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
+  return true;
+}
+
+
+
+
+
+
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
@@ -47,52 +110,62 @@ export default async function handler(req, res) {
     const body = await getBody(req);
 
     // ── send ─────────────────────────────────────────────────────────────
-    if (action === 'send') {
-      const phone = (body?.phone || '').trim();
-      if (!phone) return json(400, { ok:false, error:'phone required' });
+if (action === 'send') {
+  const phone = (body?.phone || '').trim();
+  if (!phone) return json(400, { ok:false, error:'phone required' });
 
-      // ENV 사전 점검
-      const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      if (!sbUrl || !serviceKey) {
-        return json(500, {
-          ok: false,
-          where: 'env',
-          hasUrl: !!sbUrl,
-          hasKey: !!serviceKey,
-          hint: 'Vercel > Project > Settings > Environment Variables (Production) 확인'
-        });
-      }
+  // ENV 사전 점검
+  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!sbUrl || !serviceKey) {
+    return json(500, {
+      ok: false,
+      where: 'env',
+      hasUrl: !!sbUrl,
+      hasKey: !!serviceKey,
+      hint: 'Vercel > Project > Settings > Environment Variables (Production) 확인'
+    });
+  }
 
-      try {
-        const supabase = await getSb();
-        const code = String(Math.floor(Math.random()*900000) + 100000);
+  try {
+    const supabase = await getSb();
+    const code = String(Math.floor(Math.random()*900000) + 100000);
 
-        const { error } = await supabase
-          .from('otp_codes')
-          .insert({ phone, code, created_at: new Date().toISOString() });
+    const { error } = await supabase
+      .from('otp_codes')
+      .insert({ phone, code, created_at: new Date().toISOString() });
 
-        if (error) {
-          return json(500, {
-            ok: false,
-            where: 'db-insert',
-            details: error.message,
-            hint: '테이블/권한/컬럼타입 확인'
-          });
-        }
-
-        // 개발 중에만 code 노출
-return json(200, { ok:true, code });   // ← 임시로 항상 코드 반환
-
-      } catch (e) {
-        return json(500, {
-          ok: false,
-          where: 'send-try',
-          details: String(e?.message || e),
-          hint: 'supabase-js import/런타임/바디파싱 확인'
-        });
-      }
+    if (error) {
+      return json(500, {
+        ok: false,
+        where: 'db-insert',
+        details: error.message,
+        hint: '테이블/권한/컬럼타입 확인'
+      });
     }
+
+    // 🔔 운영에서만 알림톡 발송(실패해도 흐름은 계속)
+    try {
+      if (process.env.NODE_ENV === 'production') {
+        await sendAlimtalk(phone, code);
+      }
+    } catch (e) {
+      console.warn('[alimtalk] send fail:', e?.message || e);
+    }
+
+    // 개발 중에만 code 노출 → 지금은 임시로 항상 반환
+    return json(200, { ok:true, code });
+
+  } catch (e) {
+    return json(500, {
+      ok: false,
+      where: 'send-try',
+      details: String(e?.message || e),
+      hint: 'supabase-js import/런타임/바디파싱 확인'
+    });
+  }
+}
+
 
     // ── verify (update-only 안정판) ──────────────────────────────────────
  // ── verify (update-only 안정판) ──────────────────────────────────────
@@ -156,9 +229,27 @@ if (action === 'verify') {
     .eq('user_id', userId)
     .select('user_id, phone, phone_verified');
 
-  if (updErr) {
-    return json(500, { ok:false, error:'Profile update failed', details: updErr.message, stage:'update_by_user_id' });
+if (updErr) {
+  const raw = `${updErr?.code||''} ${updErr?.message||''} ${updErr?.details||''} ${updErr?.hint||''}`.toLowerCase();
+  const isUnique =
+    updErr?.code === '23505' ||
+    /duplicate key|unique constraint|profiles_phone_key|uniq_profiles_phone_verified/.test(raw);
+
+  if (isUnique) {
+    // 이미 등록된 전화번호
+    return json(409, { ok:false, error:'이미 존재하는 번호입니다.', code:'PHONE_CONFLICT' });
   }
+
+  // 그 외 일반 오류는 400으로
+  return json(400, {
+    ok:false,
+    error: updErr?.message || '요청 처리 실패',
+    code: updErr?.code || 'UPDATE_FAILED',
+    details: updErr?.details,
+    stage:'update_by_user_id'
+  });
+}
+
   if (Array.isArray(updRows) && updRows.length > 0) {
     return json(200, { ok:true, verified:true, via:'update_by_user_id', profile: updRows[0] });
   }

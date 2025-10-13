@@ -339,54 +339,61 @@ async function updateAuthUI(session) {
 }
 
 
-//첫한달간 회원별 제한 횟수 계산
+// 첫한달간(정책 반영) 회원별 제한 횟수 계산 - grade 기반
 function getDailyLimit(profile = {}) {
-  // role 정규화
-  const role = String(profile.role || "normal").toLowerCase();
+  // grade 정규화 (role 백워드 호환)
+  const grade = String(profile.grade || profile.role || "basic").toLowerCase();
 
   // admin은 고정
-  if (role === "admin") return 1000;
+  if (grade === "admin") return 1000;
 
-  // special: 등급지정일로부터 6개월 200/일, 이후 0
-  if (role === "special") {
+  // special: 등급지정일로부터 6개월 100/일, 이후 0
+  if (grade === "special") {
     const addMonths = (d, m) => { const x = new Date(d); x.setMonth(x.getMonth() + m); return x; };
     const createdAt = profile.created_at ? new Date(profile.created_at) : new Date();
-    const basis = profile.special_assigned_at || profile.role_assigned_at || profile.created_at;
+    // 가능한 기준 필드들 중 가장 그럴싸한 걸 사용 (백워드 호환)
+    const basis =
+      profile.special_assigned_at ||
+      profile.grade_assigned_at ||
+      profile.role_assigned_at ||
+      profile.created_at;
     const assignedAt = basis ? new Date(basis) : createdAt;
-    return Date.now() <= addMonths(assignedAt, 6).getTime() ? 200 : 0;
+    return Date.now() <= addMonths(assignedAt, 6).getTime() ? 100 : 0;
   }
 
   // 개별 daily_limit(숫자)은 admin/special 외 등급에서만 허용
   const dl = Number(profile.daily_limit);
-  if (Number.isFinite(dl)) return dl;
+  if (Number.isFinite(dl) && grade !== "admin" && grade !== "special") return dl;
 
   const createdAt = profile.created_at ? new Date(profile.created_at) : new Date();
   const daysSinceJoin = Math.max(0, Math.floor((Date.now() - createdAt.getTime()) / 86400000));
 
-  switch (role) {
-    case "guest":
-      return daysSinceJoin > 60 ? 0 : 3;
-
-    case "normal":
-      // ✅ 과거 프리미엄 이력이 있으면 normal은 0(재가입 유도)
+  switch (grade) {
+    case "basic": {
+      // 과거 프리미엄 이력 있으면 0
       if (profile.has_ever_premium) return 0;
-      // 기존 신규 normal 정책(가입 30일 20회)
-      return daysSinceJoin >= 30 ? 0 : 20;
+      // 가입 후 10일 동안 20, 이후 0  (SQL의 else 20 분기와 동일)
+      return daysSinceJoin >= 10 ? 0 : 20;
+    }
 
     case "premium": {
-      // ✅ 프리미엄: 최초 프리미엄 부여의 첫 30일만 100, 그 외는 60
+      // 프리미엄: 최초 부여 후 10일 동안 100, 그 외 60
       const firstAt = profile.premium_first_assigned_at ? new Date(profile.premium_first_assigned_at) : null;
       const currAt  = profile.premium_assigned_at ? new Date(profile.premium_assigned_at) : null;
 
-      // 정보가 없으면 보수적으로 혜택 미적용(=60)
+      // 정보 부족 시 기본 60
       if (!firstAt || !currAt) return 60;
 
-      const firstWindow = firstAt.getTime() + (30 * 86400000); // 최초 부여 +30일
-      const isFirstWindow = Date.now() <= firstWindow && firstAt.getTime() === currAt.getTime();
+      const tenDaysMs = 10 * 86400000;
+      const isFirstWindow =
+        firstAt.getTime() === currAt.getTime() &&
+        Date.now() <= (firstAt.getTime() + tenDaysMs);
+
       return isFirstWindow ? 100 : 60;
     }
 
     default:
+      // 인지하지 못한 등급은 보수적으로 0
       return 0;
   }
 }
