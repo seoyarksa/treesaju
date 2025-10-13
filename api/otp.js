@@ -229,9 +229,27 @@ if (action === 'verify') {
     .eq('user_id', userId)
     .select('user_id, phone, phone_verified');
 
-  if (updErr) {
-    return json(500, { ok:false, error:'Profile update failed', details: updErr.message, stage:'update_by_user_id' });
+if (updErr) {
+  const raw = `${updErr?.code||''} ${updErr?.message||''} ${updErr?.details||''} ${updErr?.hint||''}`.toLowerCase();
+  const isUnique =
+    updErr?.code === '23505' ||
+    /duplicate key|unique constraint|profiles_phone_key|uniq_profiles_phone_verified/.test(raw);
+
+  if (isUnique) {
+    // 이미 등록된 전화번호
+    return json(409, { ok:false, error:'이미 존재하는 번호입니다.', code:'PHONE_CONFLICT' });
   }
+
+  // 그 외 일반 오류는 400으로
+  return json(400, {
+    ok:false,
+    error: updErr?.message || '요청 처리 실패',
+    code: updErr?.code || 'UPDATE_FAILED',
+    details: updErr?.details,
+    stage:'update_by_user_id'
+  });
+}
+
   if (Array.isArray(updRows) && updRows.length > 0) {
     return json(200, { ok:true, verified:true, via:'update_by_user_id', profile: updRows[0] });
   }
