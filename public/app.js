@@ -723,7 +723,7 @@ function openSignupModal() {
         email, password,
         options: {
           data: { nickname, phone }, // user_metadata
-          emailRedirectTo: `${location.origin}${location.pathname}`,
+          emailRedirectTo: "https://treesaju.vercel.app",
         },
       });
       if (error) throw error;
@@ -4351,7 +4351,7 @@ document.getElementById("googleLogin")?.addEventListener("click", async (e) => {
 
   await window.supabaseClient.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: `${location.origin}${location.pathname}` },
+    options: { redirectTo: "https://treesaju.vercel.app" },
   });
 });
 
@@ -4363,7 +4363,7 @@ document.getElementById("kakaoLogin")?.addEventListener("click", async (e) => {
 
   await window.supabaseClient.auth.signInWithOAuth({
     provider: "kakao",
-    options: { redirectTo: `${location.origin}${location.pathname}` },
+    options: { redirectTo: "https://treesaju.vercel.app"  },
   });
 });
 
