@@ -893,12 +893,20 @@ if (subModal) subModal.style.display = "block";
     updateAuthUI(session);
 
   } catch (err) {
-   console.error("[OTP verify] catch:", err);
-   alert(err?.message || "인증에 실패했습니다.");
-  }
-};
-}
+    console.error("[OTP verify] catch:", err);
+    const raw = `${err?.message || ''} ${err?.text || ''} ${err?.json?.error || ''} ${err?.json?.details || ''}`;
+    const isUnique =
+      err?.status === 409 ||
+      /23505|duplicate key|unique constraint|profiles_phone_key|uniq_profiles_phone_verified|already exists|conflict/i.test(raw);
 
+    alert(
+      isUnique
+        ? '이미 존재하는 번호입니다.\n다른 번호를 입력하거나, 해당 번호로 가입된 계정으로 로그인해 주세요.'
+        : `인증 실패: ${raw.trim() || '서버 오류'}`
+    );
+  }
+}; // ← 여기서 onclick 핸들러를 세미콜론으로 닫아야 함
+}   
 
 
 //구글정기결제창
