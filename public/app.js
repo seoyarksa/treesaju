@@ -4304,6 +4304,7 @@ window.addEventListener("beforeunload", () => {
     });
 
     // ✅ 로그인/회원가입/소셜 로그인/로그아웃 바인딩
+// ✅ 이메일 로그인
 document.getElementById("loginBtn")?.addEventListener("click", async (e) => {
   e.preventDefault();
   const email = document.getElementById("email")?.value?.trim();
@@ -4311,9 +4312,6 @@ document.getElementById("loginBtn")?.addEventListener("click", async (e) => {
   if (!email || !password) return alert("이메일과 비밀번호를 입력하세요.");
 
   try {
-    // 🔹 기존 세션 강제 해제 (다른 기기 포함)
-    await window.supabaseClient.auth.signOut();
-
     // 🔹 새 로그인 시도
     const { data, error } = await window.supabaseClient.auth.signInWithPassword({
       email,
@@ -4321,52 +4319,49 @@ document.getElementById("loginBtn")?.addEventListener("click", async (e) => {
     });
     if (error) throw error;
 
-    // 🔹 로그인 성공 후 서버에 전체 세션 해제 요청
-if (data?.session?.user?.id) {
-  setTimeout(() => {
-    fetch("/api/logout-all", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: data.session.user.id }),
-    });
-  }, 3000);
-}
+    const user = data?.user || data?.session?.user;
+    if (user?.id) {
+      // ✅ 현재 로그인만 유지, 기존 로그인 모두 무효화
+      await fetch("/api/terminate-other-sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user.id }),
+      });
+    }
+
     updateAuthUI(data?.session ?? null);
+    alert("로그인되었습니다. (기존 로그인은 모두 해제되었습니다.)");
   } catch (err) {
     console.error(err);
     alert(err.message || "로그인에 실패했습니다.");
   }
 });
 
+// ✅ 회원가입 버튼
 document.getElementById("signupBtn")?.addEventListener("click", (e) => {
   e.preventDefault();
   openSignupModal();
 });
 
+// ✅ 구글 로그인
 document.getElementById("googleLogin")?.addEventListener("click", async (e) => {
   e.preventDefault();
-
-  // ✅ 기존 세션 해제
-  await window.supabaseClient.auth.signOut();
-
   await window.supabaseClient.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo: "https://treesaju.vercel.app" },
   });
 });
 
+// ✅ 카카오 로그인
 document.getElementById("kakaoLogin")?.addEventListener("click", async (e) => {
   e.preventDefault();
-
-  // ✅ 기존 세션 해제
-  await window.supabaseClient.auth.signOut();
-
   await window.supabaseClient.auth.signInWithOAuth({
     provider: "kakao",
-    options: { redirectTo: "https://treesaju.vercel.app"  },
+    options: { redirectTo: "https://treesaju.vercel.app" },
   });
 });
 
+// ✅ 로그아웃
 document.getElementById("logoutBtn")?.addEventListener("click", async () => {
   await window.supabaseClient.auth.signOut();
   updateAuthUI(null);
@@ -4375,14 +4370,13 @@ document.getElementById("logoutBtn")?.addEventListener("click", async () => {
 // ✅ 관리자 메뉴 표시
 showIfAdmin("#admin-menu");
 
-// ✅ 자동 로그아웃 감지 (다른 기기 로그인 시)
+// ✅ 자동 로그아웃 감지 (다른 기기에서 로그인된 경우)
 window.supabaseClient.auth.onAuthStateChange((event) => {
   if (event === "SIGNED_OUT") {
     alert("다른 기기에서 로그인되어 로그아웃되었습니다.");
     updateAuthUI(null);
   }
 });
-
 
  
 
