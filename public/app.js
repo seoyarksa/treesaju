@@ -2967,6 +2967,21 @@ window.handleDaeyunClick = handleDaeyunClick;
   overflow-wrap: break-word; /* 화면 줄어들면 자동 줄바꿈 */
 }
 
+.note-box .note-links {
+  display: inline-block;
+  white-space: normal; /* pre-line 영향 제거 */
+  word-break: keep-all; /* 단어 단위로 줄바꿈 */
+}
+
+.note-box .note-links a {
+  color: #333;
+  text-decoration: none;
+  margin: 0 4px;
+}
+
+.note-box .note-links a:hover {
+  text-decoration: underline;
+}
 
 
      /* 지장간 전용 스타일 */
@@ -4288,43 +4303,83 @@ window.addEventListener("beforeunload", () => {
     });
 
     // ✅ 로그인/회원가입/소셜 로그인/로그아웃 바인딩
-    document.getElementById("loginBtn")?.addEventListener("click", async (e) => {
-      e.preventDefault();
-      const email = document.getElementById("email")?.value?.trim();
-      const password = document.getElementById("password")?.value ?? "";
-      if (!email || !password) return alert("이메일과 비밀번호를 입력하세요.");
-      try {
-        const { data, error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        updateAuthUI(data?.session ?? null);
-      } catch (err) {
-        console.error(err);
-        alert(err.message || "로그인에 실패했습니다.");
-      }
+document.getElementById("loginBtn")?.addEventListener("click", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("email")?.value?.trim();
+  const password = document.getElementById("password")?.value ?? "";
+  if (!email || !password) return alert("이메일과 비밀번호를 입력하세요.");
+
+  try {
+    // 🔹 기존 세션 강제 해제 (다른 기기 포함)
+    await window.supabaseClient.auth.signOut();
+
+    // 🔹 새 로그인 시도
+    const { data, error } = await window.supabaseClient.auth.signInWithPassword({
+      email,
+      password,
     });
-    document.getElementById("signupBtn")?.addEventListener("click", (e) => { e.preventDefault(); openSignupModal(); });
-    document.getElementById("googleLogin")?.addEventListener("click", async (e) => {
-      e.preventDefault();
-      await window.supabaseClient.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: `${location.origin}${location.pathname}` },
+    if (error) throw error;
+
+    // 🔹 로그인 성공 후 서버에 전체 세션 해제 요청
+    if (data?.session?.user?.id) {
+      await fetch("/api/logout-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: data.session.user.id }),
       });
-    });
-    document.getElementById("kakaoLogin")?.addEventListener("click", async (e) => {
-      e.preventDefault();
-      await window.supabaseClient.auth.signInWithOAuth({
-        provider: "kakao",
-        options: { redirectTo: `${location.origin}${location.pathname}` },
-      });
-    });
-    document.getElementById("logoutBtn")?.addEventListener("click", async () => {
-      await window.supabaseClient.auth.signOut();
-      updateAuthUI(null);
-    });
+    }
 
+    updateAuthUI(data?.session ?? null);
+  } catch (err) {
+    console.error(err);
+    alert(err.message || "로그인에 실패했습니다.");
+  }
+});
 
-  showIfAdmin('#admin-menu');   // 회원관리 메뉴
+document.getElementById("signupBtn")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  openSignupModal();
+});
 
+document.getElementById("googleLogin")?.addEventListener("click", async (e) => {
+  e.preventDefault();
+
+  // ✅ 기존 세션 해제
+  await window.supabaseClient.auth.signOut();
+
+  await window.supabaseClient.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: `${location.origin}${location.pathname}` },
+  });
+});
+
+document.getElementById("kakaoLogin")?.addEventListener("click", async (e) => {
+  e.preventDefault();
+
+  // ✅ 기존 세션 해제
+  await window.supabaseClient.auth.signOut();
+
+  await window.supabaseClient.auth.signInWithOAuth({
+    provider: "kakao",
+    options: { redirectTo: `${location.origin}${location.pathname}` },
+  });
+});
+
+document.getElementById("logoutBtn")?.addEventListener("click", async () => {
+  await window.supabaseClient.auth.signOut();
+  updateAuthUI(null);
+});
+
+// ✅ 관리자 메뉴 표시
+showIfAdmin("#admin-menu");
+
+// ✅ 자동 로그아웃 감지 (다른 기기 로그인 시)
+window.supabaseClient.auth.onAuthStateChange((event) => {
+  if (event === "SIGNED_OUT") {
+    alert("다른 기기에서 로그인되어 로그아웃되었습니다.");
+    updateAuthUI(null);
+  }
+});
 
 
  
