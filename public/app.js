@@ -4378,6 +4378,40 @@ window.supabaseClient.auth.onAuthStateChange((event) => {
   }
 });
 
+// ✅ 실시간 세션 변경 감시 (다른 기기 로그인 시 자동 로그아웃)
+async function initRealtimeSessionWatcher() {
+  const { data } = await window.supabaseClient.auth.getUser();
+  const user = data?.user;
+  if (!user) return;
+
+  // Realtime 채널 구독
+  const channel = window.supabaseClient
+    .channel("realtime:active_sessions")
+    .on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "active_sessions" },
+      async (payload) => {
+        // 현재 로그인한 유저와 같은 user_id의 세션이 바뀌었는지 확인
+        if (payload.new.user_id === user.id) {
+          // 현재 세션과 비교
+          const { data: sessionData } = await window.supabaseClient.auth.getSession();
+          const currentSession = sessionData?.session;
+          if (currentSession && currentSession.access_token !== payload.new.session_id) {
+            alert("다른 기기에서 로그인되어 자동 로그아웃됩니다.");
+            await window.supabaseClient.auth.signOut();
+            updateAuthUI(null);
+          }
+        }
+      }
+    )
+    .subscribe((status) => {
+      console.log("Realtime session watcher:", status);
+    });
+}
+
+initRealtimeSessionWatcher();
+
+
  
 
     // ✅ 사주 폼 바인딩
