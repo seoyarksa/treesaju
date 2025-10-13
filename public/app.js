@@ -4373,7 +4373,7 @@ showIfAdmin("#admin-menu");
 // ✅ 자동 로그아웃 감지 (다른 기기에서 로그인된 경우)
 window.supabaseClient.auth.onAuthStateChange((event) => {
   if (event === "SIGNED_OUT") {
-    alert("다른 기기에서 로그인되어 로그아웃되었습니다.");
+    alert("로그아웃되었습니다.");
     updateAuthUI(null);
   }
 });
