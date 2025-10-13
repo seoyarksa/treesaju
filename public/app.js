@@ -4304,7 +4304,27 @@ window.addEventListener("beforeunload", () => {
     });
 
     // ✅ 로그인/회원가입/소셜 로그인/로그아웃 바인딩
-// ✅ 이메일 로그인
+/***** 🔧 전역 플래그 (수동 로그아웃 구분용) *****/
+let __MANUAL_LOGOUT__ = false;
+let __AUTH_LISTENER_SET__ = false;
+let __REALTIME_SET__ = false;
+
+/***** 🔧 공통 POST 호출 헬퍼 *****/
+async function postJSON(url, body) {
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    let msg = "request failed";
+    try { msg = (await r.json()).error || msg; } catch {}
+    throw new Error(msg);
+  }
+  return r.json();
+}
+
+/***** ✅ 이메일 로그인 (시도만 수행) *****/
 document.getElementById("loginBtn")?.addEventListener("click", async (e) => {
   e.preventDefault();
   const email = document.getElementById("email")?.value?.trim();
@@ -4312,49 +4332,22 @@ document.getElementById("loginBtn")?.addEventListener("click", async (e) => {
   if (!email || !password) return alert("이메일과 비밀번호를 입력하세요.");
 
   try {
-    // 🔹 새 로그인 시도
-    const { data, error } = await window.supabaseClient.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
     if (error) throw error;
-
-    const user = data?.user || data?.session?.user;
-    if (user?.id) {
-// ✅ 현재 로그인만 유지, 기존 로그인 모두 무효화
-await fetch("/api/terminate-other-sessions", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ user_id: user.id }),
-});
-
-// ✅ active_sessions 테이블에 현재 세션 저장
-await fetch("/api/update-session", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    user_id: user.id,
-    session_id: data.session.access_token, // 현재 세션 토큰 저장
-  }),
-});
-
-    }
-
-    updateAuthUI(data?.session ?? null);
-    alert("로그인되었습니다. (기존 로그인은 모두 해제되었습니다.)");
+    // 후처리는 onAuthStateChange에서 일괄 처리
   } catch (err) {
     console.error(err);
     alert(err.message || "로그인에 실패했습니다.");
   }
 });
 
-// ✅ 회원가입 버튼
+/***** ✅ 회원가입 버튼 *****/
 document.getElementById("signupBtn")?.addEventListener("click", (e) => {
   e.preventDefault();
   openSignupModal();
 });
 
-// ✅ 구글 로그인
+/***** ✅ 구글/카카오 로그인 (시도만) *****/
 document.getElementById("googleLogin")?.addEventListener("click", async (e) => {
   e.preventDefault();
   await window.supabaseClient.auth.signInWithOAuth({
@@ -4363,7 +4356,6 @@ document.getElementById("googleLogin")?.addEventListener("click", async (e) => {
   });
 });
 
-// ✅ 카카오 로그인
 document.getElementById("kakaoLogin")?.addEventListener("click", async (e) => {
   e.preventDefault();
   await window.supabaseClient.auth.signInWithOAuth({
@@ -4372,123 +4364,92 @@ document.getElementById("kakaoLogin")?.addEventListener("click", async (e) => {
   });
 });
 
-// ✅ 로그아웃
+/***** ✅ 로그아웃(수동) — 메시지 구분을 위해 플래그 사용 *****/
 document.getElementById("logoutBtn")?.addEventListener("click", async () => {
+  __MANUAL_LOGOUT__ = true;
   await window.supabaseClient.auth.signOut();
   updateAuthUI(null);
+  __MANUAL_LOGOUT__ = false;
 });
 
-// ✅ 관리자 메뉴 표시
+/***** ✅ 관리자 메뉴 표시 *****/
 showIfAdmin("#admin-menu");
 
-// ✅ 자동 로그아웃 감지 (다른 기기에서 로그인된 경우)
-window.supabaseClient.auth.onAuthStateChange((event) => {
-  if (event === "SIGNED_OUT") {
-    alert("로그아웃되었습니다.");
-    updateAuthUI(null);
-  }
-});
-
-// ✅ 실시간 세션 변경 감시 (다른 기기 로그인 시 자동 로그아웃)
-// ======= 실시간 강제 로그아웃 & 기존 세션 종료 자동화 세트 =======
-let __AUTH_LISTENER_SET__ = false;
-let __REALTIME_SET__ = false;
-let __MANUAL_LOGOUT__ = false;
-
-async function postJSON(url, body) {
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(body),
-  });
-  if (!r.ok) throw new Error((await r.json()).error || 'request failed');
-  return r.json();
-}
-
-async function bindAuthPipelines() {
+/***** ✅ 로그인/로그아웃 공통 파이프라인 — “한 계정 1세션” 강제 *****/
+function bindAuthPipelines() {
   if (__AUTH_LISTENER_SET__) return;
   __AUTH_LISTENER_SET__ = true;
 
-  // A) 모든 로그인/리디렉션 완료 지점: 여기서 단 한 번에 처리
   window.supabaseClient.auth.onAuthStateChange(async (event, session) => {
-    console.log('[auth]', event, session?.user?.id);
+    try {
+      // 🔹 로그인 성공: 여기서만 후처리
+      if (event === "SIGNED_IN" && session?.user?.id) {
+        const userId = session.user.id;
+        const sessionId = session.access_token;
 
-    if (event === 'SIGNED_IN' && session?.user?.id) {
-      const userId = session.user.id;
-      const sessionId = session.access_token;
+        // 1) 기존 로그인 세션 전부 종료 (다른 기기 즉시 무효화)
+        await postJSON("/api/terminate-other-sessions", { user_id: userId });
 
-      try {
-        // 1) 이전 모든 세션 종료 (= 기존 기기 즉시 로그아웃 상태가 됨)
-        await postJSON('/api/terminate-other-sessions', { user_id: userId });
-
-        // 2) 현재 세션 토큰을 DB에 기록 (Realtime 트리거 포인트)
-        await postJSON('/api/update-session', { user_id: userId, session_id: sessionId });
+        // 2) 현재 세션을 active_sessions에 기록 (Realtime 트리거 포인트)
+        await postJSON("/api/update-session", { user_id: userId, session_id: sessionId });
 
         // 3) 실시간 감시 시작 (한 번만 구독)
         initRealtimeWatcher();
 
         // 4) UI 반영
         updateAuthUI(session);
-      } catch (e) {
-        console.error('post-login pipeline error:', e);
+        // 필요하면 안내
+        // alert("로그인되었습니다. (기존 로그인은 모두 해제되었습니다.)");
       }
-    }
 
-    if (event === 'SIGNED_OUT') {
-      // 내가 직접 로그아웃이면 조용히 처리
-      if (!__MANUAL_LOGOUT__) {
-        alert('다른 기기에서 로그인되어 로그아웃되었습니다.');
+      // 🔹 로그아웃 이벤트: 원인 구분하여 메시지
+      if (event === "SIGNED_OUT") {
+        if (!__MANUAL_LOGOUT__) {
+          alert("다른 기기에서 로그인되어 로그아웃되었습니다.");
+        }
+        updateAuthUI(null);
       }
-      updateAuthUI(null);
+    } catch (e) {
+      console.error("[auth pipeline error]", e);
     }
   });
 }
 
+/***** ✅ 실시간 세션 변경 감시 (다른 기기 로그인 시 자동 로그아웃) *****/
 async function initRealtimeWatcher() {
   if (__REALTIME_SET__) return;
   __REALTIME_SET__ = true;
 
-  // 현재 로그인 사용자 확인
   const { data: u } = await window.supabaseClient.auth.getUser();
   const user = u?.user;
   if (!user) { __REALTIME_SET__ = false; return; }
 
   window.supabaseClient
-    .channel('realtime:active_sessions')
+    .channel("realtime:active_sessions")
     .on(
-      'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'active_sessions' },
+      "postgres_changes",
+      { event: "*", schema: "public", table: "active_sessions" }, // INSERT/UPDATE 모두
       async (payload) => {
-        // 내 user_id 이외의 이벤트는 무시
         if (payload?.new?.user_id !== user.id) return;
 
-        // 내 현재 세션과 DB에 기록된 세션이 다르면 => 다른 기기에서 새 로그인
         const { data: s } = await window.supabaseClient.auth.getSession();
         const current = s?.session?.access_token;
-        const latest = payload?.new?.session_id;
+        const latest  = payload?.new?.session_id;
 
         if (current && latest && current !== latest) {
-          alert('다른 기기에서 로그인되어 자동 로그아웃됩니다.');
+          alert("다른 기기에서 로그인되어 자동 로그아웃됩니다.");
           await window.supabaseClient.auth.signOut();
           updateAuthUI(null);
         }
       }
     )
     .subscribe((status) => {
-      console.log('[realtime] active_sessions:', status);
+      console.log("[realtime] active_sessions:", status);
     });
 }
 
 // 최초 로드 시 파이프라인 연결 (한 번만)
 bindAuthPipelines();
-
-// 로그아웃 버튼: 수동 로그아웃 플래그로 메시지 구분
-document.getElementById('logoutBtn')?.addEventListener('click', async () => {
-  __MANUAL_LOGOUT__ = true;
-  await window.supabaseClient.auth.signOut();
-  updateAuthUI(null);
-  __MANUAL_LOGOUT__ = false;
-});
 
 
  
