@@ -4313,18 +4313,35 @@ let __AUTH_LISTENER_SET__ = false;
 let __REALTIME_SET__ = false;
 
 /***** 🔧 공통 POST 호출 헬퍼 *****/
-async function postJSON(url, body) {
-  const r = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+// ✅ 기존 postJSON 교체본
+async function postJSON(url, body, init = {}) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(init.headers || {}) },
     body: JSON.stringify(body),
+    ...init,
   });
-  if (!r.ok) {
-    let msg = "request failed";
-    try { msg = (await r.json()).error || msg; } catch {}
-    throw new Error(msg);
+
+  // 본문 파싱 (JSON 우선)
+  const ct = res.headers.get('content-type') || '';
+  let json = null, text = '';
+  try {
+    if (ct.includes('application/json')) json = await res.json();
+    else text = await res.text();
+  } catch (_) {
+    /* ignore parse error */
   }
-  return r.json();
+
+  if (!res.ok) {
+    // ❗️핵심: 에러에 status/json/text를 실어 던진다
+    const err = new Error(json?.error || json?.message || text || `HTTP ${res.status}`);
+    err.status = res.status;
+    err.json = json;
+    err.text = text;
+    throw err;
+  }
+
+  return { status: res.status, json, text };
 }
 
 /***** ✅ 버튼: 로그인 시도만 수행 *****/
