@@ -2967,21 +2967,6 @@ window.handleDaeyunClick = handleDaeyunClick;
   overflow-wrap: break-word; /* 화면 줄어들면 자동 줄바꿈 */
 }
 
-.note-box .note-links {
-  display: inline-block;
-  white-space: normal; /* pre-line 영향 제거 */
-  word-break: keep-all; /* 단어 단위로 줄바꿈 */
-}
-
-.note-box .note-links a {
-  color: #333;
-  text-decoration: none;
-  margin: 0 4px;
-}
-
-.note-box .note-links a:hover {
-  text-decoration: underline;
-}
 
 
      /* 지장간 전용 스타일 */
