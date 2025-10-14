@@ -1317,7 +1317,7 @@ if (formDate === todayKey && window.lastOutputData) {
     // ✅ 반드시 풀프로필 확보 (정책 필드 포함)
  let { data: profile, error: pErr } = await window.supabaseClient
    .from("profiles")
-   .select("role, created_at, daily_limit, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
+   .select("grade, created_at, daily_limit, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
    .eq("user_id", userId)
    .maybeSingle();   // ← 행이 없으면 null을 주고, throw 안 함
 
