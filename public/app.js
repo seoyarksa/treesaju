@@ -597,6 +597,7 @@ async function loadSajuHistory(userId, page = 1, search = "") {
       <thead>
         <tr>
           <th>이름</th>
+          <th>달력</th>   <!-- ← 추가: 음력/양력 -->
           <th>생년월일</th>
           <th>성별</th>
           <th>등록일</th>
@@ -622,6 +623,7 @@ async function loadSajuHistory(userId, page = 1, search = "") {
 
 
       </td>
+      <td>${(record.calendar_type || '').toLowerCase() === 'lunar' ? '음력' : '양력'}</td>
       <td>${record.birth_date}</td>
       <td>${record.gender}</td>
       <td>${new Date(record.created_at).toLocaleDateString()}</td>
