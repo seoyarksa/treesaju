@@ -1250,7 +1250,7 @@ async function handleSajuSubmit(e) {
       const remainingPreview = (limitGuest === Infinity) ? Infinity : Math.max(limitGuest - todayCount, 0);
 
       if (limitGuest !== Infinity && remainingPreview <= 0) {
-        alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다.");
+        alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다.[내일 시도하시거나 회원가입 또는 구독 결제가 필요합니다]");
         updateCountDisplayFromGate({
           limit: limitGuest,
           remaining: 0,
