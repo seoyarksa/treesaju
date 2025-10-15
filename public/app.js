@@ -1337,7 +1337,7 @@ if (formDate === todayKey && window.lastOutputData) {
     const preGate = await buildGateFromDb(userId, profile);
     if (preGate.limit !== Infinity && preGate.remaining <= 0) {
       // 등급별 메시지 커스터마이즈 가능
-      alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다.");
+      alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다. 정기구독을 신청하세요");
       updateCountDisplayFromGate(preGate);
       return; // ✅ 출력 차단
     }
