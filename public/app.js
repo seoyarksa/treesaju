@@ -549,7 +549,7 @@ async function increaseTodayCount(userId, profile) {
 
   // 6) 단일 소스(gate)로 로그/화면 동기화
   const gate = { limit, remaining, todayCount, totalCount };
-  console.log(`[limit] 오늘 남은 횟수: ${gate.remaining}/${gate.limit}`);
+  //console.log(`[limit] 오늘 남은 횟수: ${gate.remaining}/${gate.limit}`);
   updateCountDisplayFromGate(gate);
 }
 
@@ -1391,7 +1391,7 @@ if (formDate === todayKey && window.lastOutputData) {
 
     // 2-3) 사후 동기화(최신 DB 기준 표시)
     const gateDb = await buildGateFromDb(userId, profile);
-    console.log(`[limit] 오늘 남은 횟수: ${gateDb.remaining}/${gateDb.limit}`);
+   // console.log(`[limit] 오늘 남은 횟수: ${gateDb.remaining}/${gateDb.limit}`);
     updateCountDisplayFromGate(gateDb);
 
     // 3) 출력 실행 + 직전키 갱신
@@ -4090,37 +4090,49 @@ document.addEventListener("DOMContentLoaded", async () => {
         .eq("user_id", session.user.id)
         .single();
 
-      if (!profErr && profile) {
-        // ✅ KST 기준 날짜
-        const today = getKSTDateKey();
+if (!profErr && profile) {
+  // ✅ KST 기준 날짜
+  const today = getKSTDateKey();
 
-        // 오늘 카운트
-        const { data: countRow } = await window.supabaseClient
-          .from("saju_counts")
-          .select("count")
-          .eq("user_id", session.user.id)
-          .eq("count_date", today)
-          .maybeSingle();
-        const todayCount = Number(countRow?.count || 0);
+  // ✅ 오늘 카운트: profiles를 최우선으로 사용 (수동 한도 변경 시 0으로 리셋된 값을 신뢰)
+  const profDateKey = String(profile?.daily_usage_date || '').slice(0, 10);
+  let todayCount;
 
-        // 누적 합
-        let totalCount = 0;
-        const { data: allRows } = await window.supabaseClient
-          .from("saju_counts")
-          .select("count")
-          .eq("user_id", session.user.id);
-        if (Array.isArray(allRows)) {
-          totalCount = allRows.reduce((s, r) => s + (Number(r.count) || 0), 0);
-        }
+  if (profDateKey === today) {
+    // 프로필이 오늘 기준으로 갱신되어 있으면 그 값을 사용
+    todayCount = Number(profile?.daily_usage_count) || 0;
+  } else {
+    // (백업 경로) 프로필 날짜가 오늘이 아니면 saju_counts에서 조회
+    const { data: countRow } = await window.supabaseClient
+      .from("saju_counts")
+      .select("count")
+      .eq("user_id", session.user.id)
+      .eq("count_date", today)
+      .maybeSingle();
+    todayCount = Number(countRow?.count || 0);
+  }
 
-        // 회원별 일일 제한 (프로필 daily_limit 우선, 없으면 getDailyLimit)
-        const configured = Number(profile.daily_limit ?? NaN);
-        const limit = Number.isFinite(configured) ? configured : Number(getDailyLimit(profile));
-        const remaining = !Number.isFinite(limit) ? Infinity : Math.max(limit - todayCount, 0);
+  // 누적 합
+  let totalCount = 0;
+  const { data: allRows } = await window.supabaseClient
+    .from("saju_counts")
+    .select("count")
+    .eq("user_id", session.user.id);
+  if (Array.isArray(allRows)) {
+    totalCount = allRows.reduce((s, r) => s + (Number(r.count) || 0), 0);
+  }
 
-        // ✅ 단일 소스 gate로 화면 출력
-        updateCountDisplayFromGate({ limit, remaining, todayCount, totalCount });
-      }
+  // 회원별 일일 제한 (프로필 daily_limit 우선, 없으면 getDailyLimit)
+  const configured = Number(profile.daily_limit ?? NaN);
+  const limit = Number.isFinite(configured) ? configured : Number(getDailyLimit(profile));
+
+  // ✅ 남은 횟수는 limit - 오늘(profile 기준)로 계산
+  const remaining = !Number.isFinite(limit) ? Infinity : Math.max(limit - todayCount, 0);
+
+  // ✅ 단일 소스 gate로 화면 출력
+  updateCountDisplayFromGate({ limit, remaining, todayCount, totalCount });
+}
+
     } else {
       // ✅ 출력횟수 초기화 (세션 없음 = 비로그인)
       const todayKST = getKSTDateKey();
