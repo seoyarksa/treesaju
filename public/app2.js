@@ -549,7 +549,7 @@ async function increaseTodayCount(userId, profile) {
 
   // 6) 단일 소스(gate)로 로그/화면 동기화
   const gate = { limit, remaining, todayCount, totalCount };
-  console.log(`[limit] 오늘 남은 횟수: ${gate.remaining}/${gate.limit}`);
+  //console.log(`[limit] 오늘 남은 횟수: ${gate.remaining}/${gate.limit}`);
   updateCountDisplayFromGate(gate);
 }
 
@@ -891,8 +891,14 @@ await window.supabaseClient
 
 
 // ✅ index.html의 결제 모달 표시
-const subModal = document.getElementById("subscriptionModal");
-if (subModal) subModal.style.display = "block";
+// ✅ 정기구독 모달을 즉시 렌더링(빈칸 방지)
+if (typeof window.openSubscriptionModal === "function") {
+  window.openSubscriptionModal();
+} else {
+  // (혹시 함수가 아직 로드 전이면 최소한 열어두기)
+  const subModal = document.getElementById("subscriptionModal");
+  if (subModal) subModal.style.display = "block";
+}
 
 
     // 4) UI 갱신
@@ -989,6 +995,8 @@ window.startKakaoSubscription = async function() {
           const data = await res.json();
           if (res.ok) {
             alert("✅ 정기결제 등록 및 프리미엄 등급 적용 완료");
+                        // ✅ 결제/등록 성공 후 메인 창 새로고침
+            setTimeout(() => { window.location.reload(); }, 300);
           } else {
             alert("❌ 서버 등록 실패: " + (data.error || "서버 오류"));
           }
@@ -1007,66 +1015,152 @@ window.startKakaoSubscription = async function() {
     console.error("[startKakaoSubscription error]", err);
     alert("내부 오류: " + err.message);
   }
+
 };
 
 
 
 // ✅ 정기구독 버튼 클릭 시
+// 전역: 자동 닫힘 타이머(있으면 유지)
+window.__subModalTimer = window.__subModalTimer || null;
+
 window.openSubscriptionModal = async function() {
   const { data: { user } } = await window.supabaseClient.auth.getUser();
   if (!user) return alert("로그인이 필요합니다.");
 
-  // 서버에서 구독 상태 조회
-  const { data, error } = await window.supabaseClient
-    .from("memberships")
-    .select("*")
-    .eq("user_id", user.id)
-    .single();
-
   const modal = document.getElementById("subscriptionModal");
+  if (!modal) return;
+
+  // 공통 닫기
+  const close = () => {
+    modal.style.display = "none";
+    if (window.__subModalTimer) { clearTimeout(window.__subModalTimer); window.__subModalTimer = null; }
+  };
+
+  // 모달 표시 + 로딩 플레이스홀더 먼저 렌더 (빈칸 방지)
   modal.style.display = "block";
+  
+  modal.innerHTML = `
+    <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:460px; margin:0 auto;">
+      <h3 style="margin:0 0 8px;">정기구독</h3>
+      <p style="margin:0;">불러오는 중...</p>
+    </div>
+  `;
 
-  // 기존 내용 초기화
-  modal.innerHTML = "";
+  // ESC / 바깥 클릭 닫기(중복 부착 방지)
+  if (!modal.__outsideCloseBound) {
+    modal.addEventListener("mousedown", (e) => {
+      const panel = modal.querySelector(".modal-panel") || modal.firstElementChild || null;
+      if (panel && !panel.contains(e.target)) close();
+    });
+    modal.__outsideCloseBound = true;
+  }
+  if (!window.__subEscBound) {
+    window.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+    window.__subEscBound = true;
+  }
 
-  if (error || !data || data.status === "inactive") {
-    // ✅ 구독이 없는 경우 → 결제창 안내
+  try {
+    // ✅ 행이 없어도 에러를 내지 않도록 변경
+    const { data, error } = await window.supabaseClient
+      .from("memberships")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error || !data || data.status === "inactive") {
+      // 구독 없음/비활성 → 결제 선택 화면 (항상 렌더)
+      modal.innerHTML = `
+        <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:460px; margin:0 auto;">
+          <h3 style="margin:0 0 8px;">정기구독 결제</h3>
+          <p style="margin:0 0 12px;">전화번호 인증이 완료되었습니다. 결제 방법을 선택하세요.</p>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn-success" onclick="startGoogleSubscription()">Google 정기구독 결제</button>
+            <button class="btn-success" onclick="startKakaoSubscription()">Kakao 정기구독 결제</button>
+            <button id="subCloseBtn" style="border:1px solid #ddd; background:#f5f5f5; border-radius:6px; padding:6px 10px;">닫기</button>
+          </div>
+        </div>
+      `;
+// 바깥 클릭으로 닫기 (중복 부착 방지)
+if (!modal.__outsideCloseBound) {
+  const outsideHandler = (e) => {
+    const panel = modal.querySelector(".modal-panel");
+    // 패널 밖을 클릭/터치하면 닫기
+    if (panel && !panel.contains(e.target)) {
+      modal.style.display = "none";
+    }
+  };
+  modal.addEventListener("mousedown", outsideHandler);
+  modal.addEventListener("touchstart", outsideHandler, { passive: true });
+  modal.__outsideCloseBound = true;
+}
+
+
+      const btn = document.getElementById("subCloseBtn");
+      if (btn) btn.addEventListener("click", close);
+      return;
+    }
+
+    // 활성 구독 정보 + 2초 자동 닫기
+    const nextDate = data.current_period_end
+      ? new Date(data.current_period_end).toLocaleDateString("ko-KR")
+      : "-";
+
     modal.innerHTML = `
-      <h3>정기구독 결제</h3>
-      <p>전화번호 인증이 완료되었습니다. 결제 방법을 선택하세요.</p>
-      <button onclick="startGoogleSubscription()">Google 정기구독 결제</button>
-      <button onclick="startKakaoSubscription()">Kakao 정기구독 결제</button>
-    `;
-  } else {
-    // ✅ 이미 구독 중인 경우 → 결제 정보 + 해지 버튼
-    const nextDate = new Date(data.current_period_end).toLocaleDateString("ko-KR");
-    modal.innerHTML = `
-      <h3>정기구독 정보</h3>
-      <p><strong>플랜:</strong> ${data.plan}</p>
-      <p><strong>상태:</strong> ${data.status}</p>
-      <p><strong>다음 결제일:</strong> ${nextDate}</p>
-      <button id="cancelSubBtn">정기결제 해지 신청</button>
+      <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:460px; margin:0 auto;">
+        <h3 style="margin:0 0 8px;">정기구독 정보</h3>
+        <p style="margin:4px 0;"><strong>플랜:</strong> ${data.plan}</p>
+        <p style="margin:4px 0;"><strong>상태:</strong> ${data.status}</p>
+        <p style="margin:4px 0 12px;"><strong>다음 결제일:</strong> ${nextDate}</p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="cancelSubBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기결제 해지 신청</button>
+          <button id="subCloseBtn2" class="btn-success">닫기</button>
+        </div>
+        <div style="margin-top:8px; color:#888; font-size:12px;">3초 후 자동으로 닫혀요.</div>
+      </div>
     `;
 
-    document.getElementById("cancelSubBtn").addEventListener("click", async () => {
-      if (!confirm("이번 달 말일에 해지됩니다. 진행할까요?")) return;
+    // 자동 닫기
+    if (window.__subModalTimer) { clearTimeout(window.__subModalTimer); }
+    window.__subModalTimer = setTimeout(close, 3000);
 
-      const res = await fetch("/api/payment/manage-subscription?action=cancel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id }),
+    // 해지
+    const cancelBtn = document.getElementById("cancelSubBtn");
+    if (cancelBtn) {
+      cancelBtn.addEventListener("click", async () => {
+        if (!confirm("이번 달 말일에 해지됩니다. 진행할까요?")) return;
+        const res = await fetch("/api/payment/manage-subscription?action=cancel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: user.id }),
+        });
+        const result = await res.json();
+        if (res.ok) { alert("✅ " + (result.message || "해지 신청이 접수되었습니다.")); close(); }
+        else       { alert("❌ " + (result.error || "요청에 실패했습니다.")); }
       });
-
-      const result = await res.json();
-      if (res.ok) {
-        alert("✅ " + result.message);
-        modal.style.display = "none";
-      } else {
-        alert("❌ " + result.error);
-      }
+    }
+    const closeBtn2 = document.getElementById("subCloseBtn2");
+    if (closeBtn2) closeBtn2.addEventListener("click", close);
+  } catch (e) {
+    // 어떤 예외여도 결제 선택 화면으로 폴백
+    console.warn("[openSubscriptionModal] error:", e);
+    modal.innerHTML = `
+      <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:460px; margin:0 auto;">
+        <h3 style="margin:0 0 8px;">정기구독 결제</h3>
+        <p style="margin:0 0 12px;">전화번호 인증이 완료되었습니다. 결제 방법을 선택하세요.</p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          에러발생.....창을 닫고 다시 결제하기를 클릭해주세요.
+          <button id="subCloseBtn" style="border:1px solid #ddd; background:#f5f5f5; border-radius:6px; padding:6px 10px;">닫기</button>
+        </div>
+      </div>
+    `;
+    const btn = document.getElementById("subCloseBtn");
+    if (btn) btn.addEventListener("click", () => {
+      modal.style.display = "none";
     });
   }
 };
+
 
 
 
@@ -1391,7 +1485,7 @@ if (formDate === todayKey && window.lastOutputData) {
 
     // 2-3) 사후 동기화(최신 DB 기준 표시)
     const gateDb = await buildGateFromDb(userId, profile);
-    console.log(`[limit] 오늘 남은 횟수: ${gateDb.remaining}/${gateDb.limit}`);
+   // console.log(`[limit] 오늘 남은 횟수: ${gateDb.remaining}/${gateDb.limit}`);
     updateCountDisplayFromGate(gateDb);
 
     // 3) 출력 실행 + 직전키 갱신
@@ -4090,37 +4184,49 @@ document.addEventListener("DOMContentLoaded", async () => {
         .eq("user_id", session.user.id)
         .single();
 
-      if (!profErr && profile) {
-        // ✅ KST 기준 날짜
-        const today = getKSTDateKey();
+if (!profErr && profile) {
+  // ✅ KST 기준 날짜
+  const today = getKSTDateKey();
 
-        // 오늘 카운트
-        const { data: countRow } = await window.supabaseClient
-          .from("saju_counts")
-          .select("count")
-          .eq("user_id", session.user.id)
-          .eq("count_date", today)
-          .maybeSingle();
-        const todayCount = Number(countRow?.count || 0);
+  // ✅ 오늘 카운트: profiles를 최우선으로 사용 (수동 한도 변경 시 0으로 리셋된 값을 신뢰)
+  const profDateKey = String(profile?.daily_usage_date || '').slice(0, 10);
+  let todayCount;
 
-        // 누적 합
-        let totalCount = 0;
-        const { data: allRows } = await window.supabaseClient
-          .from("saju_counts")
-          .select("count")
-          .eq("user_id", session.user.id);
-        if (Array.isArray(allRows)) {
-          totalCount = allRows.reduce((s, r) => s + (Number(r.count) || 0), 0);
-        }
+  if (profDateKey === today) {
+    // 프로필이 오늘 기준으로 갱신되어 있으면 그 값을 사용
+    todayCount = Number(profile?.daily_usage_count) || 0;
+  } else {
+    // (백업 경로) 프로필 날짜가 오늘이 아니면 saju_counts에서 조회
+    const { data: countRow } = await window.supabaseClient
+      .from("saju_counts")
+      .select("count")
+      .eq("user_id", session.user.id)
+      .eq("count_date", today)
+      .maybeSingle();
+    todayCount = Number(countRow?.count || 0);
+  }
 
-        // 회원별 일일 제한 (프로필 daily_limit 우선, 없으면 getDailyLimit)
-        const configured = Number(profile.daily_limit ?? NaN);
-        const limit = Number.isFinite(configured) ? configured : Number(getDailyLimit(profile));
-        const remaining = !Number.isFinite(limit) ? Infinity : Math.max(limit - todayCount, 0);
+  // 누적 합
+  let totalCount = 0;
+  const { data: allRows } = await window.supabaseClient
+    .from("saju_counts")
+    .select("count")
+    .eq("user_id", session.user.id);
+  if (Array.isArray(allRows)) {
+    totalCount = allRows.reduce((s, r) => s + (Number(r.count) || 0), 0);
+  }
 
-        // ✅ 단일 소스 gate로 화면 출력
-        updateCountDisplayFromGate({ limit, remaining, todayCount, totalCount });
-      }
+  // 회원별 일일 제한 (프로필 daily_limit 우선, 없으면 getDailyLimit)
+  const configured = Number(profile.daily_limit ?? NaN);
+  const limit = Number.isFinite(configured) ? configured : Number(getDailyLimit(profile));
+
+  // ✅ 남은 횟수는 limit - 오늘(profile 기준)로 계산
+  const remaining = !Number.isFinite(limit) ? Infinity : Math.max(limit - todayCount, 0);
+
+  // ✅ 단일 소스 gate로 화면 출력
+  updateCountDisplayFromGate({ limit, remaining, todayCount, totalCount });
+}
+
     } else {
       // ✅ 출력횟수 초기화 (세션 없음 = 비로그인)
       const todayKST = getKSTDateKey();

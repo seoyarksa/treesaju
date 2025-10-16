@@ -136,7 +136,6 @@ if (profileErr) {
 
 //
 // ✅ 2️⃣ 사용자가 해지 신청 (결제일 기준 한 달 후 해지)
-//
 async function cancelSubscription(req, res) {
   const { user_id } = req.body;
   if (!user_id) return res.status(400).json({ error: "Missing user_id" });
@@ -144,28 +143,34 @@ async function cancelSubscription(req, res) {
   try {
     const { data: membership, error: fetchErr } = await supabase
       .from("memberships")
-      .select("current_period_end")
+      .select("current_period_end, status")
       .eq("user_id", user_id)
-      .maybeSingle();
+      .maybeSingle(); // ← 행 없으면 null, 에러 아님
 
     if (fetchErr) throw fetchErr;
     if (!membership) throw new Error("Membership not found");
 
-    const cancelDate = new Date(membership.current_period_end);
-    const now = new Date();
+    // current_period_end 없으면 오늘로 처리(안내용)
+    const cancelDate = membership.current_period_end
+      ? new Date(membership.current_period_end)
+      : new Date();
 
+    const nowIso = new Date().toISOString();
+
+    // 🔑 핵심: status는 그대로 두고, cancel_at_period_end만 true로
     const { data, error } = await supabase
       .from("memberships")
       .update({
-        status: "cancel_requested",
         cancel_at_period_end: true,
-        updated_at: now.toISOString(),
+        updated_at: nowIso,
       })
       .eq("user_id", user_id)
+      .in("status", ["active", "past_due"]) // 진행 중인 구독만
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
+    if (!data) throw new Error("No active membership to cancel");
 
     return res.status(200).json({
       ok: true,
@@ -178,41 +183,47 @@ async function cancelSubscription(req, res) {
   }
 }
 
+
 //
 // ✅ 3️⃣ 자동 해지 (cron job)
-//
 async function autoCancelExpired(req, res) {
   try {
-    const now = new Date().toISOString();
+    const nowIso = new Date().toISOString();
 
+    // 해지 신청 + 기간 종료 도달한 대상
     const { data: targets, error } = await supabase
       .from("memberships")
       .select("user_id")
       .eq("cancel_at_period_end", true)
-      .lte("current_period_end", now)
-      .eq("status", "cancel_requested");
+      .lte("current_period_end", nowIso)
+      .in("status", ["active", "past_due"]); // 진행 중이던 것만
 
     if (error) throw error;
-    if (!targets?.length)
-      return res.status(200).json({ message: "해지 대상 없음" });
+    if (!targets?.length) {
+      return res.status(200).json({ ok: true, message: "해지 대상 없음", count: 0 });
+    }
 
     for (const t of targets) {
-      await supabase
+      // 1) 멤버십 중지
+      const { error: upErr } = await supabase
         .from("memberships")
         .update({
-          status: "inactive",
+          status: "inactive",          // ✅ 허용값 사용 ('canceled'로 바꾸고 싶으면 여기만 변경)
           cancel_at_period_end: false,
-          updated_at: now,
+          updated_at: nowIso,
         })
         .eq("user_id", t.user_id);
+      if (upErr) throw upErr;
 
-      await supabase
+      // 2) 프로필 등급 복귀
+      const { error: profErr } = await supabase
         .from("profiles")
         .update({
-          grade: "basic", // ✅ 해지 시 basic으로 복귀
-          updated_at: now,
+          grade: "basic",
+          updated_at: nowIso,
         })
         .eq("user_id", t.user_id);
+      if (profErr) throw profErr;
 
       console.log(`[✅ 해지 완료] user_id: ${t.user_id}`);
     }
