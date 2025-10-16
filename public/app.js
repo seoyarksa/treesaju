@@ -1037,6 +1037,20 @@ window.openSubscriptionModal = async function() {
 
   // 모달 표시 + 로딩 플레이스홀더 먼저 렌더 (빈칸 방지)
   modal.style.display = "block";
+  // ✅ 오버레이가 화면 전체를 덮도록 필수 스타일 보장(한 번만)
+if (!modal.__overlayStyled) {
+  Object.assign(modal.style, {
+    position: "fixed",
+    inset: "0",
+    zIndex: "9999",
+    background: "rgba(0,0,0,.35)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "16px",
+  });
+  modal.__overlayStyled = true;
+}
   modal.innerHTML = `
     <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:460px; margin:0 auto;">
       <h3 style="margin:0 0 8px;">정기구독</h3>
@@ -1044,14 +1058,21 @@ window.openSubscriptionModal = async function() {
     </div>
   `;
 
-  // ESC / 바깥 클릭 닫기(중복 부착 방지)
-  if (!modal.__outsideCloseBound) {
-    modal.addEventListener("mousedown", (e) => {
-      const panel = modal.querySelector(".modal-panel") || modal.firstElementChild || null;
-      if (panel && !panel.contains(e.target)) close();
-    });
-    modal.__outsideCloseBound = true;
-  }
+// ✅ 패널 내부 클릭은 닫히지 않게 막고, 오버레이(바깥) 클릭 시 닫기
+const panel = modal.querySelector(".modal-panel");
+if (panel && !panel.__stopBound) {
+  panel.addEventListener("mousedown", (e) => e.stopPropagation());
+  panel.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: true });
+  panel.__stopBound = true;
+}
+
+// 오버레이 바깥 클릭 닫기 (modal 자체에 바인딩 — 한 번만)
+if (!modal.__outsideCloseBound) {
+  const onOutside = () => { close(); }; // 네 close() 그대로 사용
+  modal.addEventListener("mousedown", onOutside);
+  modal.addEventListener("touchstart", onOutside, { passive: true });
+  modal.__outsideCloseBound = true;
+}
   if (!window.__subEscBound) {
     window.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
     window.__subEscBound = true;
