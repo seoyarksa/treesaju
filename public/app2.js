@@ -1037,9 +1037,8 @@ window.openSubscriptionModal = async function() {
     if (window.__subModalTimer) { clearTimeout(window.__subModalTimer); window.__subModalTimer = null; }
   };
 
-  // 모달 표시 + 로딩 플레이스홀더 먼저 렌더 (빈칸 방지)
+  // 모달 표시 + 로딩 플레이스홀더 (빈칸 방지)
   modal.style.display = "block";
-  
   modal.innerHTML = `
     <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:460px; margin:0 auto;">
       <h3 style="margin:0 0 8px;">정기구독</h3>
@@ -1061,7 +1060,6 @@ window.openSubscriptionModal = async function() {
   }
 
   try {
-    // ✅ 행이 없어도 에러를 내지 않도록 변경
     const { data, error } = await window.supabaseClient
       .from("memberships")
       .select("*")
@@ -1069,7 +1067,7 @@ window.openSubscriptionModal = async function() {
       .maybeSingle();
 
     if (error || !data || data.status === "inactive") {
-      // 구독 없음/비활성 → 결제 선택 화면 (항상 렌더)
+      // 구독 없음/비활성 → 결제 선택 화면
       modal.innerHTML = `
         <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:460px; margin:0 auto;">
           <h3 style="margin:0 0 8px;">정기구독 결제</h3>
@@ -1081,28 +1079,16 @@ window.openSubscriptionModal = async function() {
           </div>
         </div>
       `;
-// 바깥 클릭으로 닫기 (중복 부착 방지)
-if (!modal.__outsideCloseBound) {
-  const outsideHandler = (e) => {
-    const panel = modal.querySelector(".modal-panel");
-    // 패널 밖을 클릭/터치하면 닫기
-    if (panel && !panel.contains(e.target)) {
-      modal.style.display = "none";
-    }
-  };
-  modal.addEventListener("mousedown", outsideHandler);
-  modal.addEventListener("touchstart", outsideHandler, { passive: true });
-  modal.__outsideCloseBound = true;
-}
-
-
       const btn = document.getElementById("subCloseBtn");
       if (btn) btn.addEventListener("click", close);
       return;
     }
 
-    // 활성 구독 정보 + 2초 자동 닫기
-    const nextDate = data.current_period_end
+    // 활성 구독 정보
+    const isCancelRequested = !!data.cancel_at_period_end;
+    const statusText = isCancelRequested ? `${data.status} (해지 신청됨)` : data.status;
+    const dateLabel  = isCancelRequested ? "해지 예정일" : "다음 결제일";
+    const dateValue  = data.current_period_end
       ? new Date(data.current_period_end).toLocaleDateString("ko-KR")
       : "-";
 
@@ -1110,54 +1096,84 @@ if (!modal.__outsideCloseBound) {
       <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:460px; margin:0 auto;">
         <h3 style="margin:0 0 8px;">정기구독 정보</h3>
         <p style="margin:4px 0;"><strong>플랜:</strong> ${data.plan}</p>
-        <p style="margin:4px 0;"><strong>상태:</strong> ${data.status}</p>
-        <p style="margin:4px 0 12px;"><strong>다음 결제일:</strong> ${nextDate}</p>
+        <p style="margin:4px 0;"><strong>상태:</strong> ${statusText}</p>
+        <p style="margin:4px 0 12px;"><strong>${dateLabel}:</strong> ${dateValue}</p>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <button id="cancelSubBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기결제 해지 신청</button>
+          ${
+            isCancelRequested
+              ? `<button id="resumeSubBtn" class="btn-success">재구독 신청하기</button>`
+              : `<button id="cancelSubBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기결제 해지 신청</button>`
+          }
           <button id="subCloseBtn2" class="btn-success">닫기</button>
         </div>
-        <div style="margin-top:8px; color:#888; font-size:12px;">3초 후 자동으로 닫혀요.</div>
+        ${
+          isCancelRequested
+            ? `<div style="margin-top:8px; color:#888; font-size:12px;">해지 신청이 완료되었습니다. ${dateLabel}까지 이용 가능합니다.</div>`
+            : `<div style="margin-top:8px; color:#888; font-size:12px;">5초 후 자동으로 닫혀요.</div>`
+        }
       </div>
     `;
 
-    // 자동 닫기
-    if (window.__subModalTimer) { clearTimeout(window.__subModalTimer); }
-    window.__subModalTimer = setTimeout(close, 3000);
-
-    // 해지
-    const cancelBtn = document.getElementById("cancelSubBtn");
-    if (cancelBtn) {
-      cancelBtn.addEventListener("click", async () => {
-        if (!confirm("이번 달 말일에 해지됩니다. 진행할까요?")) return;
-        const res = await fetch("/api/payment/manage-subscription?action=cancel", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: user.id }),
-        });
-        const result = await res.json();
-        if (res.ok) { alert("✅ " + (result.message || "해지 신청이 접수되었습니다.")); close(); }
-        else       { alert("❌ " + (result.error || "요청에 실패했습니다.")); }
-      });
-    }
+    // 닫기 버튼
     const closeBtn2 = document.getElementById("subCloseBtn2");
     if (closeBtn2) closeBtn2.addEventListener("click", close);
+
+    if (!isCancelRequested) {
+      // 해지 신청
+      const cancelBtn = document.getElementById("cancelSubBtn");
+      if (cancelBtn) {
+        cancelBtn.addEventListener("click", async () => {
+          if (!confirm("이번 달 말일에 해지됩니다. 진행할까요?")) return;
+          const res = await fetch("/api/payment/manage-subscription?action=cancel", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: user.id }),
+          });
+          const result = await res.json();
+          if (res.ok) { alert("✅ " + (result.message || "해지 신청이 접수되었습니다.")); close(); }
+          else       { alert("❌ " + (result.error || "요청에 실패했습니다.")); }
+        });
+      }
+
+      // 자동 닫기
+      if (window.__subModalTimer) { clearTimeout(window.__subModalTimer); }
+      window.__subModalTimer = setTimeout(close, 5000);
+    } else {
+      // 재구독 신청
+      const resumeBtn = document.getElementById("resumeSubBtn");
+      if (resumeBtn) {
+        resumeBtn.addEventListener("click", async () => {
+          const res = await fetch("/api/payment/manage-subscription?action=resume", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: user.id }),
+          });
+          const result = await res.json();
+          if (res.ok) {
+            alert("✅ 재구독 신청이 완료되었습니다.");
+            setTimeout(() => window.location.reload(), 300);
+          } else {
+            alert("❌ " + (result.error || "요청에 실패했습니다."));
+          }
+        });
+      }
+    }
   } catch (e) {
-    // 어떤 예외여도 결제 선택 화면으로 폴백
     console.warn("[openSubscriptionModal] error:", e);
+    // 폴백: 결제 선택 화면
     modal.innerHTML = `
       <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:460px; margin:0 auto;">
         <h3 style="margin:0 0 8px;">정기구독 결제</h3>
         <p style="margin:0 0 12px;">전화번호 인증이 완료되었습니다. 결제 방법을 선택하세요.</p>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          에러발생.....창을 닫고 다시 결제하기를 클릭해주세요.
+          <button class="btn-success" onclick="startGoogleSubscription()">Google 정기구독 결제</button>
+          <button class="btn-success" onclick="startKakaoSubscription()">Kakao 정기구독 결제</button>
           <button id="subCloseBtn" style="border:1px solid #ddd; background:#f5f5f5; border-radius:6px; padding:6px 10px;">닫기</button>
         </div>
       </div>
     `;
     const btn = document.getElementById("subCloseBtn");
-    if (btn) btn.addEventListener("click", () => {
-      modal.style.display = "none";
-    });
+    if (btn) btn.addEventListener("click", () => { modal.style.display = "none"; });
   }
 };
 
