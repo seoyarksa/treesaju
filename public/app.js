@@ -995,6 +995,8 @@ window.startKakaoSubscription = async function() {
           const data = await res.json();
           if (res.ok) {
             alert("✅ 정기결제 등록 및 프리미엄 등급 적용 완료");
+                        // ✅ 결제/등록 성공 후 메인 창 새로고침
+            setTimeout(() => { window.location.reload(); }, 300);
           } else {
             alert("❌ 서버 등록 실패: " + (data.error || "서버 오류"));
           }
