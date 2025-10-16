@@ -1423,6 +1423,16 @@ if (formDate === todayKey && window.lastOutputData) {
         alert(reason);
         return;
       }
+ // ✅ 허용된 경우: RPC가 반영한 최신값으로 즉시 UI 갱신
+ if (typeof updateCountDisplayFromGate === "function") {
+   updateCountDisplayFromGate({
+     daily_limit: ok.limit,           // 총 한도
+     daily_usage_count: ok.today,     // 오늘 사용(= 방금 +1 반영됨)
+     totalCount: ok.total,            // 누적 총계
+     limit: ok.limit                  // (호환용) 네 함수가 limit도 참조하면 대비
+   });
+ }
+
     }
 
     // 2-3) 사후 동기화(최신 DB 기준 표시)
