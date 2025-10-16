@@ -1013,7 +1013,7 @@ window.startKakaoSubscription = async function() {
     console.error("[startKakaoSubscription error]", err);
     alert("내부 오류: " + err.message);
   }
-  window.openSubscriptionModal();
+
 };
 
 
