@@ -1078,6 +1078,21 @@ window.openSubscriptionModal = async function() {
           </div>
         </div>
       `;
+// 바깥 클릭으로 닫기 (중복 부착 방지)
+if (!modal.__outsideCloseBound) {
+  const outsideHandler = (e) => {
+    const panel = modal.querySelector(".modal-panel");
+    // 패널 밖을 클릭/터치하면 닫기
+    if (panel && !panel.contains(e.target)) {
+      modal.style.display = "none";
+    }
+  };
+  modal.addEventListener("mousedown", outsideHandler);
+  modal.addEventListener("touchstart", outsideHandler, { passive: true });
+  modal.__outsideCloseBound = true;
+}
+
+
       const btn = document.getElementById("subCloseBtn");
       if (btn) btn.addEventListener("click", close);
       return;
