@@ -474,7 +474,7 @@ function updateCountDisplayFromGate(gate) {
   }
   const remain = Number(gate?.remaining) || 0;
   const limit  = Number(gate?.limit) || 0;
-  el.textContent = `오늘 남은 횟수 (${remain}/${limit}) / 누적 총 ${total}회`;
+  el.textContent = `오늘 남은 횟수 (총${limit}회 중 ${remain}) / 누적 총 ${total}회`;
 }
 
 
