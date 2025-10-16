@@ -1044,17 +1044,46 @@ window.openSubscriptionModal = async function() {
       <button onclick="startGoogleSubscription()">Google 정기구독 결제</button>
       <button onclick="startKakaoSubscription()">Kakao 정기구독 결제</button>
     `;
+    const closeBtn = document.getElementById("subscriptionModalClose");
+if (closeBtn) closeBtn.onclick = () => { modal.style.display = "none"; };
+modal.onclick = (e) => { if (e.target === modal) modal.style.display = "none"; };
   } else {
     // ✅ 이미 구독 중인 경우 → 결제 정보 + 해지 버튼
-    const nextDate = new Date(data.current_period_end).toLocaleDateString("ko-KR");
-    modal.innerHTML = `
-      <h3>정기구독 정보</h3>
-      <p><strong>플랜:</strong> ${data.plan}</p>
-      <p><strong>상태:</strong> ${data.status}</p>
-      <p><strong>다음 결제일:</strong> ${nextDate}</p>
-      <button id="cancelSubBtn">정기결제 해지 신청</button>
-    `;
+    // 기존: 구독중 화면 렌더
+const nextDate = new Date(data.current_period_end).toLocaleDateString("ko-KR");
+modal.innerHTML = `
+  <div id="subscriptionModalContent" style="position:relative; background:#fff; padding:16px; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.2);">
+    <button id="subscriptionModalClose" style="position:absolute; right:8px; top:8px; border:none; background:transparent; font-size:18px; cursor:pointer;">×</button>
+    <h3>정기구독 정보</h3>
+    <p><strong>플랜:</strong> ${data.plan}</p>
+    <p><strong>상태:</strong> ${data.status}</p>
+    <p><strong>다음 결제일:</strong> ${nextDate}</p>
+    <button id="cancelSubBtn">정기결제 해지 신청</button>
+  </div>
+`;
 
+// ★ 닫기 버튼
+const closeBtn = document.getElementById("subscriptionModalClose");
+if (closeBtn) closeBtn.onclick = () => { modal.style.display = "none"; };
+
+// ★ 오버레이(모달 바깥) 클릭 시 닫기
+modal.onclick = (e) => {
+  if (e.target === modal) modal.style.display = "none";
+};
+
+// ★ ESC 키로 닫기
+const onEsc = (e) => { if (e.key === 'Escape') { modal.style.display = 'none'; window.removeEventListener('keydown', onEsc); } };
+window.addEventListener('keydown', onEsc);
+
+// ★ 2초 후 자동 닫힘 (구독중 화면에서만)
+if (window.__subCloseTimer) clearTimeout(window.__subCloseTimer);
+window.__subCloseTimer = setTimeout(() => {
+  modal.style.display = "none";
+  window.removeEventListener('keydown', onEsc);
+}, 2000);
+
+
+//구독해지 이벤트
     document.getElementById("cancelSubBtn").addEventListener("click", async () => {
       if (!confirm("이번 달 말일에 해지됩니다. 진행할까요?")) return;
 
