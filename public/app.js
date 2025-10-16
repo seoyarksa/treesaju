@@ -466,26 +466,14 @@ function updateCountDisplayFromGate(gate) {
   const el = document.getElementById("count-display");
   if (!el) return;
 
-  const LIMIT_UNLIMITED = 2147483000;
+  const total = Number(gate?.totalCount) || 0;
 
-  // limit은 gate.limit → gate.daily_limit 순으로 사용
-  let limit = Number(gate?.limit ?? gate?.daily_limit ?? 0);
-  if (!Number.isFinite(limit)) limit = 0;
-
-  // ★ used는 무조건 daily_usage_count만 참조
-  let used = Number(gate?.daily_usage_count ?? 0);
-  if (!Number.isFinite(used)) used = 0;
-
-  const isUnlimited = (gate?.limit === Infinity) || (gate?.remaining === Infinity) || (limit >= LIMIT_UNLIMITED);
-  const total = Number(gate?.totalCount ?? gate?.total ?? 0) || 0;
-
-  // ★ remaining = limit - daily_usage_count (직관 계산)
-  const remain = isUnlimited ? Infinity : Math.max(limit - used, 0);
-
-  if (isUnlimited) {
+  if (gate?.limit === Infinity || gate?.remaining === Infinity) {
     el.textContent = `오늘 남은 횟수 (∞/∞) / 누적 총 ${total}회`;
     return;
   }
+  const remain = Number(gate?.remaining) || 0;
+  const limit  = Number(gate?.limit) || 0;
   el.textContent = `오늘 남은 횟수 (총${limit}회 중 ${remain}회) / 누적 총 ${total}회`;
 }
 
