@@ -1440,6 +1440,37 @@ document.addEventListener("DOMContentLoaded", ()=>{ wireProfileEditEvents(); });
 //   wireProfileEditEvents();
 </script>
 
+<script>
+  (function setupSajuHistoryOutsideClose() {
+    const modal = document.getElementById("saju-history-panel");
+    if (!modal) return;
+
+    // 패널 열림 여부 판단(표현 방식에 맞게 보완 가능)
+    const isOpen = () => modal.style.display !== "none";
+
+    // 패널 내부 클릭은 버블링 막기
+    modal.addEventListener("mousedown", (e) => {
+      e.stopPropagation();
+    });
+
+    // 문서 어디든 클릭했을 때, 패널 바깥이면 닫기
+    document.addEventListener("mousedown", (e) => {
+      if (!isOpen()) return;
+      // modal 영역 밖을 클릭했는지?
+      if (!modal.contains(e.target)) {
+        modal.style.display = "none";
+      }
+    });
+
+    // Esc 키로 닫기
+    document.addEventListener("keydown", (e) => {
+      if (!isOpen()) return;
+      if (e.key === "Escape") {
+        modal.style.display = "none";
+      }
+    });
+  })();
+</script>
 
 
 </body>
