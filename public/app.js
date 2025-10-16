@@ -891,8 +891,14 @@ await window.supabaseClient
 
 
 // ✅ index.html의 결제 모달 표시
-const subModal = document.getElementById("subscriptionModal");
-if (subModal) subModal.style.display = "block";
+// ✅ 정기구독 모달을 즉시 렌더링(빈칸 방지)
+if (typeof window.openSubscriptionModal === "function") {
+  window.openSubscriptionModal();
+} else {
+  // (혹시 함수가 아직 로드 전이면 최소한 열어두기)
+  const subModal = document.getElementById("subscriptionModal");
+  if (subModal) subModal.style.display = "block";
+}
 
 
     // 4) UI 갱신
