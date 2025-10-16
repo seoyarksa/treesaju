@@ -474,7 +474,7 @@ function updateCountDisplayFromGate(gate) {
   }
   const remain = Number(gate?.remaining) || 0;
   const limit  = Number(gate?.limit) || 0;
-  el.textContent = `오늘 남은 횟수 (총${limit}회 중 ${remain}회) / 누적 총 ${total}회`;
+  el.textContent = `오늘 남은 횟수 (${remain}/${limit}) / 누적 총 ${total}회`;
 }
 
 
@@ -597,7 +597,6 @@ async function loadSajuHistory(userId, page = 1, search = "") {
       <thead>
         <tr>
           <th>이름</th>
-          <th>달력</th>   <!-- ← 추가: 음력/양력 -->
           <th>생년월일</th>
           <th>성별</th>
           <th>등록일</th>
@@ -623,7 +622,6 @@ async function loadSajuHistory(userId, page = 1, search = "") {
 
 
       </td>
-      <td>${(record.calendar_type || '').toLowerCase() === 'lunar' ? '음력' : '양력'}</td>
       <td>${record.birth_date}</td>
       <td>${record.gender}</td>
       <td>${new Date(record.created_at).toLocaleDateString()}</td>
@@ -893,14 +891,9 @@ await window.supabaseClient
 
 
 // ✅ index.html의 결제 모달 표시
-// ✅ 결제 모달 즉시 렌더 (내용까지 채움)
-if (typeof window.openSubscriptionModal === 'function') {
-  await window.openSubscriptionModal();
-} else {
-  // 비상용: 함수가 없으면 최소한 보이게만
-  const subModal = document.getElementById("subscriptionModal");
-  if (subModal) subModal.style.display = "block";
-}
+const subModal = document.getElementById("subscriptionModal");
+if (subModal) subModal.style.display = "block";
+
 
     // 4) UI 갱신
     const { data: { session } } = await window.supabaseClient.auth.getSession();
@@ -1044,46 +1037,17 @@ window.openSubscriptionModal = async function() {
       <button onclick="startGoogleSubscription()">Google 정기구독 결제</button>
       <button onclick="startKakaoSubscription()">Kakao 정기구독 결제</button>
     `;
-    const closeBtn = document.getElementById("subscriptionModalClose");
-if (closeBtn) closeBtn.onclick = () => { modal.style.display = "none"; };
-modal.onclick = (e) => { if (e.target === modal) modal.style.display = "none"; };
   } else {
     // ✅ 이미 구독 중인 경우 → 결제 정보 + 해지 버튼
-    // 기존: 구독중 화면 렌더
-const nextDate = new Date(data.current_period_end).toLocaleDateString("ko-KR");
-modal.innerHTML = `
-  <div id="subscriptionModalContent" style="position:relative; background:#fff; padding:16px; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.2);">
-    <button id="subscriptionModalClose" style="position:absolute; right:8px; top:8px; border:none; background:transparent; font-size:18px; cursor:pointer;">×</button>
-    <h3>정기구독 정보</h3>
-    <p><strong>플랜:</strong> ${data.plan}</p>
-    <p><strong>상태:</strong> ${data.status}</p>
-    <p><strong>다음 결제일:</strong> ${nextDate}</p>
-    <button id="cancelSubBtn">정기결제 해지 신청</button>
-  </div>
-`;
+    const nextDate = new Date(data.current_period_end).toLocaleDateString("ko-KR");
+    modal.innerHTML = `
+      <h3>정기구독 정보</h3>
+      <p><strong>플랜:</strong> ${data.plan}</p>
+      <p><strong>상태:</strong> ${data.status}</p>
+      <p><strong>다음 결제일:</strong> ${nextDate}</p>
+      <button id="cancelSubBtn">정기결제 해지 신청</button>
+    `;
 
-// ★ 닫기 버튼
-const closeBtn = document.getElementById("subscriptionModalClose");
-if (closeBtn) closeBtn.onclick = () => { modal.style.display = "none"; };
-
-// ★ 오버레이(모달 바깥) 클릭 시 닫기
-modal.onclick = (e) => {
-  if (e.target === modal) modal.style.display = "none";
-};
-
-// ★ ESC 키로 닫기
-const onEsc = (e) => { if (e.key === 'Escape') { modal.style.display = 'none'; window.removeEventListener('keydown', onEsc); } };
-window.addEventListener('keydown', onEsc);
-
-// ★ 2초 후 자동 닫힘 (구독중 화면에서만)
-if (window.__subCloseTimer) clearTimeout(window.__subCloseTimer);
-window.__subCloseTimer = setTimeout(() => {
-  modal.style.display = "none";
-  window.removeEventListener('keydown', onEsc);
-}, 2000);
-
-
-//구독해지 이벤트
     document.getElementById("cancelSubBtn").addEventListener("click", async () => {
       if (!confirm("이번 달 말일에 해지됩니다. 진행할까요?")) return;
 
@@ -1286,7 +1250,7 @@ async function handleSajuSubmit(e) {
       const remainingPreview = (limitGuest === Infinity) ? Infinity : Math.max(limitGuest - todayCount, 0);
 
       if (limitGuest !== Infinity && remainingPreview <= 0) {
-        alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다.[내일 시도하시거나 회원가입 또는 구독 결제가 필요합니다]");
+        alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다.");
         updateCountDisplayFromGate({
           limit: limitGuest,
           remaining: 0,
@@ -1353,7 +1317,7 @@ if (formDate === todayKey && window.lastOutputData) {
     // ✅ 반드시 풀프로필 확보 (정책 필드 포함)
  let { data: profile, error: pErr } = await window.supabaseClient
    .from("profiles")
-   .select("role, grade, created_at, daily_limit, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
+   .select("role, created_at, daily_limit, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
    .eq("user_id", userId)
    .maybeSingle();   // ← 행이 없으면 null을 주고, throw 안 함
 
@@ -1371,7 +1335,7 @@ if (formDate === todayKey && window.lastOutputData) {
     const preGate = await buildGateFromDb(userId, profile);
     if (preGate.limit !== Infinity && preGate.remaining <= 0) {
       // 등급별 메시지 커스터마이즈 가능
-      alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다. 정기구독을 신청하세요");
+      alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다.");
       updateCountDisplayFromGate(preGate);
       return; // ✅ 출력 차단
     }
@@ -1423,22 +1387,12 @@ if (formDate === todayKey && window.lastOutputData) {
         alert(reason);
         return;
       }
- // ✅ 허용된 경우: RPC가 반영한 최신값으로 즉시 UI 갱신
- if (typeof updateCountDisplayFromGate === "function") {
-   updateCountDisplayFromGate({
-     daily_limit: ok.limit,           // 총 한도
-     daily_usage_count: ok.today,     // 오늘 사용(= 방금 +1 반영됨)
-     totalCount: ok.total,            // 누적 총계
-     limit: ok.limit                  // (호환용) 네 함수가 limit도 참조하면 대비
-   });
- }
-
     }
 
     // 2-3) 사후 동기화(최신 DB 기준 표시)
-   // const gateDb = await buildGateFromDb(userId, profile);
-   // console.log(`[limit] 오늘 남은 횟수: ${gateDb.remaining}/${gateDb.limit}`);
-   // updateCountDisplayFromGate(gateDb);
+    const gateDb = await buildGateFromDb(userId, profile);
+    console.log(`[limit] 오늘 남은 횟수: ${gateDb.remaining}/${gateDb.limit}`);
+    updateCountDisplayFromGate(gateDb);
 
     // 3) 출력 실행 + 직전키 갱신
     renderSaju(formData);
