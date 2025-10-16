@@ -1243,6 +1243,9 @@ function checkGuestMonthlyLimit() {
 window.lastOutputData = null;   // ✅ 전역 변수로 선언
 
 async function handleSajuSubmit(e) {
+
+    // ✅ 여기에 선언 (함수 스코프)
+  let rpcGate = null;
   e.preventDefault();
   console.log("[DEBUG] handleSajuSubmit 실행됨");
 
@@ -1425,26 +1428,27 @@ if (formDate === todayKey && window.lastOutputData) {
       }
  // ✅ 허용된 경우: RPC가 반영한 최신값으로 즉시 UI 갱신
  if (typeof updateCountDisplayFromGate === "function") {
-   updateCountDisplayFromGate({
-     daily_limit: ok.limit,           // 총 한도
-     daily_usage_count: ok.today,     // 오늘 사용(= 방금 +1 반영됨)
-     totalCount: ok.total,            // 누적 총계
-     limit: ok.limit                  // (호환용) 네 함수가 limit도 참조하면 대비
-   });
- }
+      updateCountDisplayFromGate({
+        daily_limit: ok.limit,
+        daily_usage_count: ok.today,
+        totalCount: ok.total,
+        limit: ok.limit,
+      });
+    }
+    // ✅ 비교용으로 보관
+    rpcGate = ok;
 
     }
 
-    // 2-3) 사후 동기화(최신 DB 기준 표시)
-const gateDb = await buildGateFromDb(userId, profile);
-// RPC가 막 반영한 값(ok.today)을 기준으로, DB에서 읽은 used(=daily_usage_count)가
-// 더 크거나 같을 때만(=적어도 동일/더 최신) 덮어쓰기. 아니면 유지.
-const usedDb = Number(gateDb?.daily_usage_count ?? 0);
-const usedRpc = Number(ok?.today ?? 0); // 앞에서 받은 RPC 결과
-if (usedDb >= usedRpc) {
-  console.log(`[limit] 오늘 남은 횟수: ${gateDb.remaining}/${gateDb.limit}`);
-  updateCountDisplayFromGate(gateDb);
-}
+  // 2-3) 사후 동기화(최신 DB 기준 표시)
+  const gateDb = await buildGateFromDb(userId, profile);
+  const usedDb  = Number(gateDb?.daily_usage_count ?? gateDb?.todayCount ?? 0);
+  const usedRpc = Number(rpcGate?.today ?? -1); // rpcGate 없으면 DB 우선
+  if (usedDb >= usedRpc) {
+    updateCountDisplayFromGate(gateDb);
+  } else {
+    console.log('[limit] skip DB overwrite (RPC newer)', { usedRpc, usedDb });
+  }
 
     // 3) 출력 실행 + 직전키 갱신
     renderSaju(formData);
