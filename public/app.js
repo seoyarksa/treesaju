@@ -1436,9 +1436,15 @@ if (formDate === todayKey && window.lastOutputData) {
     }
 
     // 2-3) 사후 동기화(최신 DB 기준 표시)
-    const gateDb = await buildGateFromDb(userId, profile);
-    console.log(`[limit] 오늘 남은 횟수: ${gateDb.remaining}/${gateDb.limit}`);
-    updateCountDisplayFromGate(gateDb);
+const gateDb = await buildGateFromDb(userId, profile);
+// RPC가 막 반영한 값(ok.today)을 기준으로, DB에서 읽은 used(=daily_usage_count)가
+// 더 크거나 같을 때만(=적어도 동일/더 최신) 덮어쓰기. 아니면 유지.
+const usedDb = Number(gateDb?.daily_usage_count ?? 0);
+const usedRpc = Number(ok?.today ?? 0); // 앞에서 받은 RPC 결과
+if (usedDb >= usedRpc) {
+  console.log(`[limit] 오늘 남은 횟수: ${gateDb.remaining}/${gateDb.limit}`);
+  updateCountDisplayFromGate(gateDb);
+}
 
     // 3) 출력 실행 + 직전키 갱신
     renderSaju(formData);
