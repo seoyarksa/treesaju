@@ -193,52 +193,78 @@ if (action === 'verify') {
   if (ageSec > OTP_TTL_SEC)             return json(400, { ok:false, error:'Code expired' });
   if (String(row.code) !== String(code)) return json(400, { ok:false, error:'Invalid code' });
 
-  // 2) profiles — user_id 전용
-  const nowIso = new Date().toISOString();
+// 2) profiles — user_id 전용
+const nowIso = new Date().toISOString();
 
-  // 2-0) 현행 프로필 조회 (user_id만 사용)
-  const profSel = await supabase
+// 2-0) 현행 프로필 조회 (user_id만 사용)
+const { data: prof, error: selErr } = await supabase
+  .from('profiles')
+  .select('user_id, phone, phone_verified, phone_verified_at')
+  .eq('user_id', userId)
+  .maybeSingle();
+
+if (selErr) {
+  // 조회 에러는 치명적이진 않지만 로그 정도는 추천
+  console.warn('[profiles select] err:', selErr);
+}
+
+// 2-1) 없으면 생성 (핫픽스: 최초 인증 시 자동 생성)
+if (!prof) {
+  const row = {
+    user_id: userId,
+    phone,                      // 국제 포맷 +82
+    phone_verified: true,
+    phone_verified_at: nowIso,  // ★ 인증시각 저장
+    created_at: nowIso,
+    updated_at: nowIso,
+  };
+
+  const { data: insRows, error: insErr } = await supabase
     .from('profiles')
-    .select('user_id, phone, phone_verified')
-    .eq('user_id', userId)
-    .limit(1);
+    .insert(row)
+    .select('user_id, phone, phone_verified, phone_verified_at');
 
-  const prof = profSel.error ? null : (profSel.data?.[0] || null);
-
-  // 2-1) 없으면 생성 (핫픽스: 최초 인증 시 자동 생성)
-  if (!prof) {
-    const { data: insRows, error: insErr } = await supabase
-      .from('profiles')
-      .insert({ user_id: userId, phone, phone_verified: true, created_at: nowIso, updated_at: nowIso })
-      .select('user_id, phone, phone_verified');
-
-    if (insErr) {
-      return json(500, { ok:false, error:'Profile insert failed', details: insErr.message, stage:'auto_insert_profile' });
+  if (insErr) {
+    // ★ 유니크 충돌(이미 다른 계정이 같은 번호 사용)
+    const raw = `${insErr?.code||''} ${insErr?.message||''} ${insErr?.details||''} ${insErr?.hint||''}`.toLowerCase();
+    const isUnique = insErr?.code === '23505'
+      || /duplicate key|unique constraint|profiles.*phone/i.test(raw);
+    if (isUnique) {
+      return json(409, { ok:false, error:'이미 존재하는 번호입니다.', code:'PHONE_CONFLICT' });
     }
-    return json(200, { ok:true, verified:true, via:'auto_insert_profile', profile: insRows?.[0] || null });
+    return json(500, { ok:false, error:'Profile insert failed', details: insErr.message, stage:'auto_insert_profile' });
   }
 
-  // 2-2) 있으면 업데이트 (전화번호 비면 채움)
-  const patch = { phone_verified: true, updated_at: nowIso };
-  const hasPhone = typeof prof.phone === 'string' && prof.phone.trim() !== '';
-  if (!hasPhone) patch.phone = phone;
+  return json(200, { ok:true, verified:true, via:'auto_insert_profile', profile: insRows?.[0] || null });
+}
 
-  const { data: updRows, error: updErr } = await supabase
-    .from('profiles')
-    .update(patch)
-    .eq('user_id', userId)
-    .select('user_id, phone, phone_verified');
+// 2-2) 있으면 업데이트 (전화번호 비면 채움)
+const patch = {
+  phone_verified: true,
+  phone_verified_at: nowIso,  // ★ 인증시각 저장
+  updated_at: nowIso,
+};
+const hasPhone = typeof prof.phone === 'string' && prof.phone.trim() !== '';
+if (!hasPhone) patch.phone = phone;
+
+const { data: updRows, error: updErr } = await supabase
+  .from('profiles')
+  .update(patch)
+  .eq('user_id', userId)
+  .select('user_id, phone, phone_verified, phone_verified_at');
 
 if (updErr) {
   const raw = `${updErr?.code||''} ${updErr?.message||''} ${updErr?.details||''} ${updErr?.hint||''}`.toLowerCase();
-  const isUnique =
-    updErr?.code === '23505' ||
-    /duplicate key|unique constraint|profiles_phone_key|uniq_profiles_phone_verified/.test(raw);
-
+  const isUnique = updErr?.code === '23505'
+    || /duplicate key|unique constraint|profiles.*phone|uniq_profiles_phone/i.test(raw);
   if (isUnique) {
-    // 이미 등록된 전화번호
     return json(409, { ok:false, error:'이미 존재하는 번호입니다.', code:'PHONE_CONFLICT' });
   }
+  return json(500, { ok:false, error:'Profile update failed', details: updErr.message, stage:'update_profile' });
+}
+
+return json(200, { ok:true, verified:true, via:'update_profile', profile: updRows?.[0] || null });
+
 
   // 그 외 일반 오류는 400으로
   return json(400, {
