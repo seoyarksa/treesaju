@@ -1055,7 +1055,7 @@ async function startFixedTermPay({ months, amount, productId, dailyLimit = 60 })
 
   // 4) 결제창 호출 (일반결제: pg='kakaopay')
   IMP.request_pay({
-    pg: "kakaopay",              // ★ 일반결제
+    pg: "kakaopay.TC0ONETIME",    // ★ 원타임(테스트 MID)
     pay_method: "card",
     merchant_uid: merchantUid,
     name: `${months}개월 구독 (1일 ${dailyLimit}회)`,
