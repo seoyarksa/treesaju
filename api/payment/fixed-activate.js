@@ -2,33 +2,31 @@
 
 // 로컬 개발에서만 .env 로드 (Vercel 프로덕션은 필요 없음)
 if (process.env.NODE_ENV !== 'production') {
-  try { require('dotenv').config(); } catch (e) {}
+  try { require('dotenv').config(); } catch {}
 }
 
 import { createClient } from '@supabase/supabase-js';
 
-// ── 환경변수 읽기 (이름 차이 대비)
+// 환경변수 이름 차이 대응
 const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
-// 서버용 Supabase 클라이언트
 const supabase =
   SUPABASE_URL && SERVICE_ROLE_KEY
     ? createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } })
     : null;
 
 /**
- * 3/6개월 선결제 완료 → 구독 기간 활성화
- * 요청 바디: { imp_uid, merchant_uid, user_id, productId, termMonths, dailyLimit, price }
+ * 3/6개월 선결제 완료 → 구독 활성화
+ * body: { imp_uid, merchant_uid, user_id, termMonths(3|6), price, productId? }
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
-
   if (!supabase) {
     return res.status(500).json({
       error: 'SERVER_ENV_MISSING',
@@ -41,52 +39,80 @@ export default async function handler(req, res) {
       imp_uid,
       merchant_uid,
       user_id,
-      productId,
-      termMonths,   // 3 | 6
-      dailyLimit,   // 60
-      price,        // 60000 | 100000
+      termMonths,  // 3 | 6
+      price,       // 60000 | 100000
+      productId,   // (옵션) 기록용
     } = req.body || {};
 
     if (!imp_uid || !merchant_uid || !user_id || !termMonths || !price) {
       return res.status(400).json({ error: 'MISSING_PARAMS' });
     }
 
-    // TODO(운영 권장): imp_uid로 아임포트 결제 검증
-    // const ok = await verifyIamport(imp_uid, price);
-    // if (!ok) return res.status(400).json({ error: 'INVALID_PAYMENT' });
+    // 등급 매핑: 3개월= premium3 / 6개월= premium6
+    const planName = Number(termMonths) === 6 ? 'premium6' : 'premium3';
 
-    // 기간 계산: now → now + termMonths
+    // 기간 계산
     const now = new Date();
     const end = new Date(now);
     end.setMonth(end.getMonth() + Number(termMonths));
 
-    // memberships upsert (user_id 고유 기준 가정)
-    const { data, error } = await supabase
+    const nowISO = now.toISOString();
+    const endISO = end.toISOString();
+
+    // 결제 메타데이터 (문자열로 저장)
+    const metadata = JSON.stringify({
+      imp_uid,
+      merchant_uid,
+      termMonths: Number(termMonths),
+      price: Number(price),
+      provider: 'kakao',
+      kind: 'fixed',
+      ...(productId ? { productId } : {}),
+    });
+
+    // 공통 payload (테이블에 실제 존재하는 컬럼만 사용)
+    const payload = {
+      plan: planName,                // premium3 | premium6
+      status: 'active',
+      current_period_end: endISO,    // 만료일
+      cancel_at_period_end: true,    // 자동 해지 예정
+      cancel_effective_at: endISO,   // 만료일=해지 효력일
+      provider: 'kakao',
+      price_id: null,
+      metadata,
+      created_at: nowISO,            // 시작일
+      updated_at: nowISO,
+    };
+
+    // 1) 업데이트 시도 (user_id로 식별)
+    let { data: upd, error: updErr } = await supabase
       .from('memberships')
-      .upsert({
-        user_id,
-        plan: productId || (Number(termMonths) === 6 ? 'fixed_6m_60' : 'fixed_3m_60'),
-        status: 'active',
-        price,
-        daily_limit: dailyLimit ?? 60,
-        current_period_start: now.toISOString(),
-        current_period_end: end.toISOString(),
-        cancel_at_period_end: false,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id' })
+      .update(payload)
+      .eq('user_id', user_id)
+      .select()
+      .maybeSingle();
+
+    if (updErr) {
+      return res.status(400).json({ error: 'DB_UPDATE_FAILED', detail: updErr.message });
+    }
+    if (upd) {
+      return res.status(200).json({ ok: true, membership: upd, mode: 'updated' });
+    }
+
+    // 2) 없으면 새로 생성
+    const insertRow = { user_id, ...payload };
+    let { data: ins, error: insErr } = await supabase
+      .from('memberships')
+      .insert(insertRow)
       .select()
       .single();
 
-    if (error) {
-      return res.status(400).json({ error: 'DB_UPSERT_FAILED', detail: error.message });
+    if (insErr) {
+      return res.status(400).json({ error: 'DB_INSERT_FAILED', detail: insErr.message });
     }
 
-    // (선택) 결제 로그 남기기
-    // await supabase.from('payment_logs').insert({
-    //   type: 'fixed', user_id, imp_uid, merchant_uid, amount: price, productId, term_months: termMonths
-    // });
+    return res.status(200).json({ ok: true, membership: ins, mode: 'inserted' });
 
-    return res.status(200).json({ ok: true, membership: data });
   } catch (e) {
     return res.status(500).json({ error: e?.message || 'INTERNAL_ERROR' });
   }
