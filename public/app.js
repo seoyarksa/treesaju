@@ -1037,6 +1037,90 @@ window.startKakaoSubscriptionBasic = () => window.startKakaoSubscription('basic'
 window.startKakaoSubscriptionPlus  = () => window.startKakaoSubscription('plus');  // 1일 150회 · 16,500원
 
 
+//카카오 3개월 6개월 정기구독
+// ───────────────────────────────────────────────────────────
+// 3/6개월 선결제: Iamport KakaoPay 일반결제 → 서버에 활성화 등록
+// ───────────────────────────────────────────────────────────
+async function startFixedTermPay({ months, amount, productId, dailyLimit = 60 }) {
+  // 1) 로그인 체크
+  const { data: { user } } = await window.supabaseClient.auth.getUser();
+  if (!user) return alert("로그인이 필요합니다.");
+
+  // 2) Iamport 초기화
+  const IMP = window.IMP;
+  IMP.init("imp81444885"); // 아임포트 V1 고객사 식별코드 (정기결제와 동일)
+
+  // 3) 주문번호 생성
+  const merchantUid = `order_fixed_${months}m_${Date.now()}`;
+
+  // 4) 결제창 호출 (일반결제: pg='kakaopay')
+  IMP.request_pay({
+    pg: "kakaopay",              // ★ 일반결제
+    pay_method: "card",
+    merchant_uid: merchantUid,
+    name: `${months}개월 구독 (1일 ${dailyLimit}회)`,
+    amount,                       // ★ 3개월=60000, 6개월=100000
+    buyer_email: user.email || "user@example.com",
+    buyer_name: user.user_metadata?.name || "홍길동",
+    buyer_tel: user.user_metadata?.phone || "01012345678",
+  }, async (rsp) => {
+    if (!rsp.success) {
+      console.warn("[fixed pay fail]", rsp);
+      return alert("❌ 결제 실패: " + rsp.error_msg);
+    }
+
+    // 5) 서버에 활성화 요청 (검증 + 기간부여)
+    try {
+      const res = await fetch("/api/payments/fixed/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imp_uid: rsp.imp_uid,        // 아임포트 결제건 식별자
+          merchant_uid: rsp.merchant_uid,
+          user_id: user.id,
+          productId,                   // 예: 'sub_3m_60_60000'
+          termMonths: months,          // 3 | 6
+          dailyLimit,                  // 60
+          price: amount,               // 60000 | 100000
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert("✅ 결제가 완료되었습니다. 구독이 활성화됐어요!");
+        setTimeout(() => window.location.reload(), 300);
+      } else {
+        alert("❌ 서버 처리 실패: " + (data.error || "서버 오류"));
+      }
+    } catch (err) {
+      console.error("[fixed activate error]", err);
+      alert("❌ 서버 통신 오류: " + err.message);
+    }
+  });
+}
+
+// 버튼 핸들러 (이미 바인딩되어 있으니 함수만 존재하면 됩니다)
+function startThreeMonthPlan() {
+  return startFixedTermPay({
+    months: 3,
+    amount: 60000,
+    productId: "sub_3m_60_60000",
+    dailyLimit: 60,
+  });
+}
+
+function startSixMonthPlan() {
+  return startFixedTermPay({
+    months: 6,
+    amount: 100000,
+    productId: "sub_6m_60_100000",
+    dailyLimit: 60,
+  });
+}
+
+
+
+
+
 
 
 // ✅ 정기구독 버튼 클릭 시
@@ -1172,10 +1256,8 @@ window.openSubscriptionModal = async function () {
 
     document.getElementById("btn3m")?.addEventListener("click", startThreeMonthPlan);
     document.getElementById("btn6m")?.addEventListener("click", startSixMonthPlan);
-document.getElementById("btnRecurringBasic")
-  ?.addEventListener("click", window.startKakaoSubscriptionBasic);
-document.getElementById("btnRecurringPlus")
-  ?.addEventListener("click", window.startKakaoSubscriptionPlus);
+document.getElementById("btnRecurringBasic")?.addEventListener("click", window.startKakaoSubscriptionBasic);
+document.getElementById("btnRecurringPlus")?.addEventListener("click", window.startKakaoSubscriptionPlus);
 
     document.getElementById("subCloseBtn")?.addEventListener("click", close);
   }
