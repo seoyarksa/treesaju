@@ -1099,24 +1099,13 @@ async function startFixedTermPay({ months, amount, productId, dailyLimit = 60 })
 }
 
 // 버튼 핸들러 (이미 바인딩되어 있으니 함수만 존재하면 됩니다)
-function startThreeMonthPlan() {
-  return startFixedTermPay({
-    months: 3,
-    amount: 60000,
-    productId: "sub_3m_60_60000",
-    dailyLimit: 60,
-  });
-}
-
-function startSixMonthPlan() {
-  return startFixedTermPay({
-    months: 6,
-    amount: 100000,
-    productId: "sub_6m_60_100000",
-    dailyLimit: 60,
-  });
-}
-
+// ★ 전역에 올려서 어디서든 호출 가능하게
+window.startThreeMonthPlan = function () {
+  return startFixedTermPay({ months: 3, amount: 60000, productId: "sub_3m_60_60000", dailyLimit: 60 });
+};
+window.startSixMonthPlan = function () {
+  return startFixedTermPay({ months: 6, amount: 100000, productId: "sub_6m_60_100000", dailyLimit: 60 });
+};
 
 
 
