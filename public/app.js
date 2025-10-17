@@ -1172,8 +1172,11 @@ window.openSubscriptionModal = async function () {
 
     document.getElementById("btn3m")?.addEventListener("click", startThreeMonthPlan);
     document.getElementById("btn6m")?.addEventListener("click", startSixMonthPlan);
-    document.getElementById("btnRecurringBasic")?.addEventListener("click", startRecurringBasic);
-    document.getElementById("btnRecurringPlus")?.addEventListener("click", startRecurringPlus);
+document.getElementById("btnRecurringBasic")
+  ?.addEventListener("click", window.startKakaoSubscriptionBasic);
+document.getElementById("btnRecurringPlus")
+  ?.addEventListener("click", window.startKakaoSubscriptionPlus);
+
     document.getElementById("subCloseBtn")?.addEventListener("click", close);
   }
 
