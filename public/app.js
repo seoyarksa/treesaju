@@ -1290,8 +1290,8 @@ const extraLine = end
         <h3 style="margin:0 0 8px;">구독 정보</h3>
         <p style="margin:4px 0;"><strong>플랜:</strong> ${data.plan ?? "-"}</p>
         <p style="margin:4px 0;"><strong>상태:</strong> ${statusText}</p>
-        <p style="margin:4px 0 12px;"><strong>${dateLabel}:</strong> ${dateValue} [  ${extraLine} ]</p>
-
+        <p style="margin:4px 0 12px;"><strong>${dateLabel}:</strong> ${dateValue}</p>
+        ${extraLine}<br>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
     ${
   isCancelRequested
@@ -1302,7 +1302,7 @@ const extraLine = end
         </div>
         ${
           isCancelRequested
-            ? `<div style="margin-top:8px; color:#888; font-size:12px;">해지 신청이 완료되었습니다. ${dateLabel}까지 이용 가능합니다.</div>`
+            ? `<div style="margin-top:8px; color:#888; font-size:12px;">(해지 신청이 완료되었습니다. ${dateLabel}까지 이용 가능합니다.)</div>`
             : `<div style="margin-top:8px; color:#888; font-size:12px;">5초 후 자동으로 닫혀요.</div>`
         }
       </div>
