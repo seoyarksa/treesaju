@@ -1293,11 +1293,11 @@ const extraLine = end
         <p style="margin:4px 0 12px;"><strong>${dateLabel}:</strong> ${dateValue}</p>
             ${extraLine}   <!-- ✅ 날짜 줄 바로 아래에 추가 -->
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          ${
-            isCancelRequested
-              ? `<button id="resumeSubBtn" class="btn-success">재구독 신청하기</button>`
-              : `<button id="cancelSubBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기결제 해지 신청</button>`
-          }
+    ${
+  isCancelRequested
+    ? `<button id="resumeSubBtn" class="btn-success">${resumeLabel}</button>`
+    : `<button id="cancelSubBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기결제 해지 신청</button>`
+}
           <button id="subCloseBtn2" class="btn-success">닫기</button>
         </div>
         ${
