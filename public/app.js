@@ -1298,6 +1298,7 @@ const extraLine = end
     ? `<button id="resumeSubBtn" class="btn-success">${resumeLabel}</button>`
     : `<button id="cancelSubBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기결제 해지 신청</button>`
 }
+ <button id="changePlanBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">플랜 변경</button>
           <button id="subCloseBtn2" class="btn-success">닫기</button>
         </div>
         ${
@@ -1309,6 +1310,34 @@ const extraLine = end
     `;
 
     document.getElementById("subCloseBtn2")?.addEventListener("click", close);
+
+    document.getElementById("changePlanBtn")?.addEventListener("click", async () => {
+  // 간단 드롭다운/선택 UI는 필요시 추가. 여기선 최소 로직만:
+  const curPlan = data.plan || '';
+  // 예시: 토글 업/다운그레이드
+  const target = (curPlan === 'premium_plus') ? 'premium' : 'premium_plus';
+
+  // 정기↔정기
+  if (curPlan === 'premium' || curPlan === 'premium_plus') {
+    const res = await fetch("/api/payment/manage-subscription?action=change_plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: user.id, new_plan: target }),
+    });
+    const json = await res.json();
+    if (!res.ok) return alert("변경 실패: " + (json.error || ''));
+    alert(json.message || "플랜이 변경되었습니다.");
+    return window.location.reload();
+  }
+
+  // 선결제 → 정기
+  if (curPlan === 'premium3' || curPlan === 'premium6') {
+    // 정기결제 플로우 시작(플러스 예시)
+    startRecurringPlus(); // 또는 startRecurringBasic();
+    return;
+  }
+});
+
 
     if (!isCancelRequested) {
       document.getElementById("cancelSubBtn")?.addEventListener("click", async () => {
