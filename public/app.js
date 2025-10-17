@@ -1290,8 +1290,8 @@ const extraLine = end
         <h3 style="margin:0 0 8px;">구독 정보</h3>
         <p style="margin:4px 0;"><strong>플랜:</strong> ${data.plan ?? "-"}</p>
         <p style="margin:4px 0;"><strong>상태:</strong> ${statusText}</p>
-        <p style="margin:4px 0 12px;"><strong>${dateLabel}:</strong> ${dateValue}</p>
-            ${extraLine}   <!-- ✅ 날짜 줄 바로 아래에 추가 -->
+        <p style="margin:4px 0 12px;"><strong>${dateLabel}:</strong> ${dateValue} [  ${extraLine} ]</p>
+
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
     ${
   isCancelRequested
