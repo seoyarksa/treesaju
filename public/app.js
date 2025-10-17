@@ -361,7 +361,7 @@ function getDailyLimit(profile = {}) {
       profile.role_assigned_at ||
       profile.created_at;
     const assignedAt = basis ? new Date(basis) : createdAt;
-    return Date.now() <= addMonths(assignedAt, 6).getTime() ? 100 : 0;
+    return Date.now() <= addMonths(assignedAt, 6).getTime() ? 100 : 1;
   }
 
   // 개별 daily_limit(숫자)은 admin/special 외 등급에서만 허용
@@ -373,10 +373,10 @@ function getDailyLimit(profile = {}) {
 
   switch (grade) {
     case "basic": {
-      // 과거 프리미엄 이력 있으면 0
-      if (profile.has_ever_premium) return 0;
-      // 가입 후 10일 동안 20, 이후 0  (SQL의 else 20 분기와 동일)
-      return daysSinceJoin >= 10 ? 0 : 20;
+      // 과거 프리미엄 이력 있으면 1
+      if (profile.has_ever_premium) return 1;
+      // 가입 후 10일 동안 20, 이후 1  (SQL의 else 20 분기와 동일)
+      return daysSinceJoin >= 10 ? 1 : 20;
     }
 
     case "premium": {
@@ -396,8 +396,8 @@ function getDailyLimit(profile = {}) {
     }
 
     default:
-      // 인지하지 못한 등급은 보수적으로 0
-      return 0;
+      // 인지하지 못한 등급은 보수적으로 1
+      return 1;
   }
 }
 
