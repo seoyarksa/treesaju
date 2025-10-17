@@ -22,6 +22,10 @@ export default async function handler(req, res) {
   if (req.method === "POST" && action === "cancel") {
     return await cancelSubscription(req, res);
   }
+   // ✅ 재구독(정기결제만 해당: cancel_at_period_end 해제)
+  if (req.method === "POST" && action === "resume") {
+    return await resumeSubscription(req, res);
+  }
   if (req.method === "GET" && action === "autoCancel") {
     return await autoCancelExpired(req, res);
   }
@@ -331,5 +335,77 @@ async function attemptPayment(customer_uid, token) {
       : { success: false, message: payJson.message };
   } catch (e) {
     return { success: false, message: e.message };
+  }
+}
+
+
+
+//
+// ✅ 재구독: 정기결제 해지 예약 취소 (정기 플랜만 대상)
+//  - cancel_at_period_end: false
+//  - cancel_effective_at: null
+//  - status: 'active' 로 복구
+//
+async function resumeSubscription(req, res) {
+  const { user_id } = req.body || {};
+  if (!user_id) return res.status(400).json({ error: "Missing user_id" });
+
+  try {
+    // 현재 멤버십 조회
+    const { data: membership, error: fetchErr } = await supabase
+      .from("memberships")
+      .select("id, user_id, plan, status, cancel_at_period_end, current_period_end")
+      .eq("user_id", user_id)
+      .maybeSingle();
+
+    if (fetchErr) throw fetchErr;
+    if (!membership) return res.status(404).json({ error: "Membership not found" });
+
+    // ⚠️ 선결제(premium3/premium6)는 '재구독' 개념이 아니라 '재구매'
+    if (membership.plan === "premium3" || membership.plan === "premium6") {
+      return res.status(400).json({ error: "FIXED_TERM_PLAN", message: "선결제 플랜은 재구독이 아닌 재구매가 필요합니다." });
+    }
+
+    const nowIso = new Date().toISOString();
+
+    // 정기 플랜(예: premium / premium_plus) → 해지 예약만 해제
+    const { data, error } = await supabase
+      .from("memberships")
+      .update({
+        cancel_at_period_end: false,
+        cancel_effective_at: null,
+        status: "active",
+        updated_at: nowIso,
+      })
+      .eq("user_id", user_id)
+      .select()
+      .maybeSingle();
+
+    if (error) throw error;
+
+    // (선택) 프로필 등급 복구: 현재 플랜명을 그대로 grade에 반영
+    //   - 너희 정책상 grade 값이 'premium' 또는 'premium_plus' 라면 아래 그대로 사용
+    const planGrade = (membership.plan === "premium_plus") ? "premium_plus" : "premium";
+    const { error: profileErr } = await supabase
+      .from("profiles")
+      .update({
+        grade: planGrade,
+        updated_at: nowIso,
+      })
+      .eq("user_id", user_id);
+
+    if (profileErr) {
+      console.warn("[resumeSubscription] profile update warn:", profileErr);
+      // 프로필 실패는 치명적이지 않으니 200은 유지, 필요하면 400으로 바꿔도 됨
+    }
+
+    return res.status(200).json({
+      ok: true,
+      message: "재구독이 완료되었습니다.",
+      membership: data,
+    });
+  } catch (err) {
+    console.error("[resumeSubscription] error:", err);
+    return res.status(500).json({ error: err.message });
   }
 }
