@@ -296,7 +296,10 @@ async function updateAuthUI(session) {
     let roleLabel = "";
     switch (grade) {
       case "admin":   roleLabel = "[관리자] ";   break;
-      case "premium": roleLabel = "[정기회원] "; break;
+      case "premium3": roleLabel = "[정기회원3] "; break;
+         case "premium6": roleLabel = "[정기회원6] "; break;
+            case "premium": roleLabel = "[정기회원] "; break;
+               case "premium_plus": roleLabel = "[정기회원+] "; break;
       case "special": roleLabel = "[특별회원] "; break;
       default:        roleLabel = "[일반회원] "; break;
     }
