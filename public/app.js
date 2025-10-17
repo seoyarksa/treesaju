@@ -1071,7 +1071,7 @@ async function startFixedTermPay({ months, amount, productId, dailyLimit = 60 })
 
     // 5) 서버에 활성화 요청 (검증 + 기간부여)
     try {
-      const res = await fetch("/api/payments/fixed/activate", {
+      const res = await fetch("/api/payments/fixed-activate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
