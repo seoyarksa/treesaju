@@ -956,49 +956,62 @@ window.startGoogleSubscription = function() {
 
 
 // ✅ 카카오 정기결제창 (V1 기준, 통합 API 버전)
-window.startKakaoSubscription = async function() {
+// tier: 'basic' | 'plus'  (기본값: 'basic')
+window.startKakaoSubscription = async function(tier = 'basic') {
   try {
     // 1️⃣ Supabase 로그인 확인
     const { data: { user } } = await window.supabaseClient.auth.getUser();
     if (!user) return alert("로그인이 필요합니다.");
 
+    // ── 플랜 매핑 (금액/일일한도/표시명/내부코드) ─────────────────────────
+    const PLAN = {
+      basic: { amount: 11000, daily_limit: 60,  name: "Kakao 정기구독 (월간)",  planId: "recurring_monthly_60"  },
+      plus:  { amount: 16500, daily_limit: 150, name: "Kakao 정기구독+ (월간)", planId: "recurring_monthly_150" },
+    };
+    const sel = PLAN[tier] || PLAN.basic;
+
     const IMP = window.IMP;
     IMP.init("imp81444885"); // ✅ 아임포트 V1 고객사 식별코드
 
     const userId = user.id;
-    const customerUid = "kakao_" + userId; // 고객별 고유 빌링 UID
+    // ⚠️ 동시에 두 플랜을 운용할 수도 있으니 tier를 붙여 UID를 구분(권장)
+    const customerUid = `kakao_${userId}_${tier}`; // 고객별·플랜별 고유 빌링 UID
 
     // 2️⃣ 결제창 호출
     IMP.request_pay({
-      pg: "kakaopay.TCSUBSCRIP",  // ✅ 테스트용 카카오페이 PG상점 ID
+      pg: "kakaopay.TCSUBSCRIP",          // ✅ 테스트용 카카오페이 PG상점 ID
       pay_method: "card",
-      merchant_uid: "order_" + new Date().getTime(),
-      name: "Kakao 정기구독 (월간)",
-      amount: 11000,
-      customer_uid: customerUid,
+      merchant_uid: `order_${tier}_` + new Date().getTime(), // 주문번호에 tier 반영
+      name: sel.name,                      // ★ 플랜명
+      amount: sel.amount,                  // ★ 금액(기본 11,000원 / 플러스 16,500원)
+      customer_uid: customerUid,           // 플랜별 빌링키 UID
       buyer_email: user.email || "user@example.com",
-      buyer_name: "홍길동",
-      buyer_tel: "01012345678"
+      buyer_name: user.user_metadata?.name || "홍길동",
+      buyer_tel: user.user_metadata?.phone || "01012345678",
     }, async function (rsp) {
       if (rsp.success) {
         alert("결제 성공 🎉\n결제번호: " + rsp.imp_uid);
 
         try {
-          // 3️⃣ 서버로 정기결제 등록 요청
+          // 3️⃣ 서버로 정기결제 등록 요청 (플랜 정보 함께 전달)
           const res = await fetch("/api/payment/manage-subscription?action=register", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               imp_uid: rsp.imp_uid,
               customer_uid: rsp.customer_uid || customerUid,
-              user_id: userId
+              user_id: userId,
+              // ↓ 서버에서 플랜/가격/일일한도 저장·검증할 수 있게 함께 보냄
+              tier,                               // 'basic' | 'plus'
+              planId: sel.planId,                 // 예: 'recurring_monthly_150'
+              price: sel.amount,                  // 11000 | 16500
+              daily_limit: sel.daily_limit,       // 60 | 150
             }),
           });
 
           const data = await res.json();
           if (res.ok) {
             alert("✅ 정기결제 등록 및 프리미엄 등급 적용 완료");
-                        // ✅ 결제/등록 성공 후 메인 창 새로고침
             setTimeout(() => { window.location.reload(); }, 300);
           } else {
             alert("❌ 서버 등록 실패: " + (data.error || "서버 오류"));
@@ -1009,7 +1022,6 @@ window.startKakaoSubscription = async function() {
         }
 
       } else {
-        // 결제 실패
         console.warn("[결제 실패]", rsp);
         alert("❌ 결제 실패: " + rsp.error_msg);
       }
@@ -1018,8 +1030,12 @@ window.startKakaoSubscription = async function() {
     console.error("[startKakaoSubscription error]", err);
     alert("내부 오류: " + err.message);
   }
-
 };
+
+// (선택) 버튼에서 쓰기 편하도록 얇은 래퍼 제공
+window.startKakaoSubscriptionBasic = () => window.startKakaoSubscription('basic'); // 1일 60회 · 11,000원
+window.startKakaoSubscriptionPlus  = () => window.startKakaoSubscription('plus');  // 1일 150회 · 16,500원
+
 
 
 
