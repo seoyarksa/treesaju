@@ -1243,8 +1243,8 @@ window.openSubscriptionModal = async function () {
       </div>
     `;
 
-    document.getElementById("btn3m")?.addEventListener("click", startThreeMonthPlan);
-    document.getElementById("btn6m")?.addEventListener("click", startSixMonthPlan);
+document.getElementById("btn3m")?.addEventListener("click", window.startThreeMonthPlan);
+document.getElementById("btn6m")?.addEventListener("click", window.startSixMonthPlan);
 document.getElementById("btnRecurringBasic")?.addEventListener("click", window.startKakaoSubscriptionBasic);
 document.getElementById("btnRecurringPlus")?.addEventListener("click", window.startKakaoSubscriptionPlus);
 
