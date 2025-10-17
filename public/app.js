@@ -1271,12 +1271,27 @@ document.getElementById("btnRecurringPlus")?.addEventListener("click", window.st
       ? new Date(data.current_period_end).toLocaleDateString("ko-KR")
       : "-";
 
+const isFixed = data.plan === 'premium3' || data.plan === 'premium6';
+const resumeLabel = isFixed ? '다시 구매하기' : '재구독 신청하기';
+
+
+// ✅ 여기서 남은 일수 계산
+const end = data.current_period_end ? new Date(data.current_period_end) : null;
+const daysLeft = end ? Math.max(0, Math.ceil((end - new Date()) / 86400000)) : null;
+const extraLine = end
+  ? `<div style="margin-top:6px;color:#888;font-size:12px;">
+       ${isCancelRequested ? "해지 예정일까지" : "다음 결제일까지"} 약 ${daysLeft}일 남았습니다.
+     </div>`
+  : "";
+
+
     modal.innerHTML = `
       <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:520px; margin:0 auto;">
         <h3 style="margin:0 0 8px;">구독 정보</h3>
         <p style="margin:4px 0;"><strong>플랜:</strong> ${data.plan ?? "-"}</p>
         <p style="margin:4px 0;"><strong>상태:</strong> ${statusText}</p>
         <p style="margin:4px 0 12px;"><strong>${dateLabel}:</strong> ${dateValue}</p>
+            ${extraLine}   <!-- ✅ 날짜 줄 바로 아래에 추가 -->
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           ${
             isCancelRequested
@@ -1310,8 +1325,18 @@ document.getElementById("btnRecurringPlus")?.addEventListener("click", window.st
 
       if (window.__subModalTimer) clearTimeout(window.__subModalTimer);
       window.__subModalTimer = setTimeout(close, 5000);
-    } else {
-      document.getElementById("resumeSubBtn")?.addEventListener("click", async () => {
+} else {
+  const resumeBtn = document.getElementById("resumeSubBtn");
+  if (resumeBtn) {
+    resumeBtn.addEventListener("click", async () => {
+      // 선결제 플랜은 재구매 UX로 전환
+      if (data.plan === 'premium3' || data.plan === 'premium6') {
+        renderPurchaseChoices();
+        return;
+      }
+
+      // 정기구독 플랜(예: premium_plus)은 기존 resume API 호출
+      try {
         const res = await fetch("/api/payment/manage-subscription?action=resume", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1324,8 +1349,14 @@ document.getElementById("btnRecurringPlus")?.addEventListener("click", window.st
         } else {
           alert("❌ " + (result.error || "요청에 실패했습니다."));
         }
-      });
-    }
+      } catch (err) {
+        console.error("[resume error]", err);
+        alert("❌ 서버 통신 오류: " + err.message);
+      }
+    });
+  }
+}
+
   } catch (e) {
     console.warn("[openSubscriptionModal] error:", e);
     renderPurchaseChoices();
