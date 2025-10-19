@@ -1271,6 +1271,19 @@ document.getElementById("btnRecurringPlus")?.addEventListener("click", window.st
       ? new Date(data.current_period_end).toLocaleDateString("ko-KR")
       : "-";
 
+
+
+// ✅ 여기서 남은 일수 계산
+const end = data.current_period_end ? new Date(data.current_period_end) : null;
+const daysLeft = end ? Math.max(0, Math.ceil((end - new Date()) / 86400000)) : null;
+const extraLine = end
+  ? `<div style="margin-top:6px;color:#888;font-size:12px;">
+       ${isCancelRequested ? "해지 예정일까지" : "다음 결제일까지"} 약 ${daysLeft}일 남았습니다.
+     </div>`
+  : "";
+
+
+
       const plan = (data.plan || '').trim();
 
 // 버튼 라벨 결정
@@ -1282,16 +1295,6 @@ else if (plan === 'premium6') changeLabel = '프리미엄3으로 전환';
 
 const isFixed = data.plan === 'premium3' || data.plan === 'premium6';
 const resumeLabel = isFixed ? '다시 구매하기' : '재구독 신청하기';
-
-
-// ✅ 여기서 남은 일수 계산
-const end = data.current_period_end ? new Date(data.current_period_end) : null;
-const daysLeft = end ? Math.max(0, Math.ceil((end - new Date()) / 86400000)) : null;
-const extraLine = end
-  ? `<div style="margin-top:6px;color:#888;font-size:12px;">
-       ${isCancelRequested ? "해지 예정일까지" : "다음 결제일까지"} 약 ${daysLeft}일 남았습니다.
-     </div>`
-  : "";
 
 
     modal.innerHTML = `
