@@ -1271,6 +1271,15 @@ document.getElementById("btnRecurringPlus")?.addEventListener("click", window.st
       ? new Date(data.current_period_end).toLocaleDateString("ko-KR")
       : "-";
 
+      const plan = (data.plan || '').trim();
+
+// 버튼 라벨 결정
+let changeLabel = '플랜 변경';
+if (plan === 'premium') changeLabel = '프리미엄+로 전환';
+else if (plan === 'premium_plus') changeLabel = '프리미엄(기본)으로 전환';
+else if (plan === 'premium3') changeLabel = '프리미엄6으로 전환';
+else if (plan === 'premium6') changeLabel = '프리미엄3으로 전환';
+
 const isFixed = data.plan === 'premium3' || data.plan === 'premium6';
 const resumeLabel = isFixed ? '다시 구매하기' : '재구독 신청하기';
 
