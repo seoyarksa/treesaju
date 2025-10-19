@@ -1310,8 +1310,8 @@ const resumeLabel = isFixed ? '다시 구매하기' : '재구독 신청하기';
     ? `<button id="resumeSubBtn" class="btn-success">${resumeLabel}</button>`
     : `<button id="cancelSubBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기결제 해지 신청</button>`
 }
- <button id="changePlanBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;" class="btn-success">${changeLabel}</button>
-          <button id="subCloseBtn2" >닫기</button>
+ <button id="changePlanBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">${changeLabel}</button>
+          <button id="subCloseBtn2" class="btn-success">닫기</button>
         </div>
         ${
           isCancelRequested
