@@ -1208,26 +1208,46 @@ window.openSubscriptionModal = async function () {
     }
 
     // ── 활성 구독 화면 ────────────────────────────────────────
-    const isCancelRequested = !!data.cancel_at_period_end;
-    const statusText = isCancelRequested ? `${data.status} (해지 신청됨)` : data.status;
-
-    const dateLabel = isCancelRequested ? "해지 예정일" : "다음 결제일";
-    const dateValue = data.current_period_end
-      ? new Date(data.current_period_end).toLocaleDateString("ko-KR")
-      : "-";
-
-    const end = data.current_period_end ? new Date(data.current_period_end) : null;
-    const daysLeft = end ? Math.max(0, Math.ceil((end - new Date()) / 86400000)) : null;
-    const extraLine = end
-      ? `<div style="margin-top:6px;color:#888;font-size:12px;">
-           ${isCancelRequested ? "해지 예정일까지" : "다음 결제일까지"} 약 ${daysLeft}일 남았습니다.
-         </div>`
-      : "";
 
     const plan = (data.plan || "").trim();
     const isFixed = plan === "premium3" || plan === "premium6";
     const isRecurring = plan === "premium" || plan === "premium_plus";
     const resumeLabel = isFixed ? "다시 구매하기" : "재구독 신청하기";
+const isCancelRequested = !!data.cancel_at_period_end;
+
+// ✅ 라벨
+const dateLabel = isFixed
+  ? "만료일"
+  : (isCancelRequested ? "해지 예정일" : "다음 결제일");
+
+// ✅ 상태 텍스트
+let statusText;
+if (isFixed) {
+  // 선결제는 해지신청 개념 대신 만료 예정으로 표시
+  if (data.status === "active") {
+    statusText = isCancelRequested ? "active (만료 예정)" : "active (선결제)";
+  } else {
+    statusText = data.status;
+  }
+} else {
+  // 정기 구독만 해지 신청 문구
+  statusText = isCancelRequested ? `${data.status} (해지 신청됨)` : data.status;
+}
+
+// ✅ 날짜 값/남은 일수
+const dateValue = data.current_period_end
+  ? new Date(data.current_period_end).toLocaleDateString("ko-KR")
+  : "-";
+
+const end = data.current_period_end ? new Date(data.current_period_end) : null;
+const daysLeft = end ? Math.max(0, Math.ceil((end - new Date()) / 86400000)) : null;
+
+const extraLine = end
+  ? `<div style="margin-top:6px;color:#888;font-size:12px;">
+       ${dateLabel}까지 약 ${daysLeft}일 남았습니다.
+     </div>`
+  : "";
+
 
     // changePlan 버튼 라벨
     let changeLabel = "플랜 변경";
