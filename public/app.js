@@ -1283,7 +1283,7 @@ const extraLine = end
 
         ${
           isCancelRequested
-            ? `<div style="margin-top:8px; color:#888; font-size:12px;">(해지 신청이 완료되었습니다. ${dateLabel}까지 이용 가능합니다.)</div>`
+            ? `<div style="margin-top:8px; color:#888; font-size:12px;">(현재 ${dateLabel}까지 이용 가능합니다.)</div>`
             : `<div style="margin-top:8px; color:#888; font-size:12px;">5초 후 자동으로 닫혀요.</div>`
         }
       </div>
