@@ -41,8 +41,8 @@
         <th>권한(Role)</th>
         <th>가입일</th>
         <th>수정일</th>
-        <th>Trial 시작</th>
-        <th>Trial 종료</th>
+        <th>만료일</th>
+        <th>해지 효력일</th>
         <th>일일 사용일</th>
         <th>일일 사용 횟수</th>
         <th>일일 제한</th>
@@ -90,8 +90,13 @@
         </select>
       </label><br>
 
-      <label>Trial 시작: <input type="date" id="edit-trial_started_at"></label><br>
-      <label>Trial 종료: <input type="date" id="edit-trial_ends_at"></label><br>
+ <label>만료일 (current_period_end):
+  <input type="date" id="edit-current_period_end">
+</label><br>
+<label>해지 효력일 (cancel_effective_at):
+  <input type="date" id="edit-cancel_effective_at">
+</label><br>
+
       <label>일일 제한: <input type="number" id="edit-daily_limit"></label><br>
       <label>Special 지정일: <input type="date" id="edit-special_assigned_at"></label><br>
       <label>Premium 지정일: <input type="date" id="edit-premium_assigned_at"></label><br>
@@ -234,8 +239,17 @@
           <td>${member.role || "-"}</td>
           <td>${member.created_at ? new Date(member.created_at).toLocaleDateString() : "-"}</td>
           <td>${member.updated_at ? new Date(member.updated_at).toLocaleDateString() : "-"}</td>
-          <td>${member.trial_started_at ? new Date(member.trial_started_at).toLocaleDateString() : "-"}</td>
-          <td>${member.trial_ends_at ? new Date(member.trial_ends_at).toLocaleDateString() : "-"}</td>
+   <td>
+  ${member.current_period_end
+    ? new Date(member.current_period_end).toLocaleDateString('ko-KR')
+    : "-"}
+</td>
+<td>
+  ${member.cancel_effective_at
+    ? new Date(member.cancel_effective_at).toLocaleDateString('ko-KR')
+    : "-"}
+</td>
+
           <td>${member.daily_usage_date || "-"}</td>
           <td>${member.daily_usage_count ?? "-"}</td>
           <td>${member.daily_limit ?? "-"}</td>
