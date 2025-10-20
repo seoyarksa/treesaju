@@ -1338,15 +1338,42 @@ const isRecurring = plan === 'premium' || plan === 'premium_plus';
 
     document.getElementById("subCloseBtn2")?.addEventListener("click", close);
 
-// 플랜 변경 버튼: 현재 플랜에 맞춰 동작
 document.getElementById("changePlanBtn")?.addEventListener("click", async () => {
-  // 정기 ↔ 정기 토글
-  if (plan === 'premium' || plan === 'premium_plus') {
-    const newPlan = (plan === 'premium') ? 'premium_plus' : 'premium';
+  const curPlan = (data.plan || '').trim();
+
+  // ─────────────────────────────────────────────
+  // A) 현재 정기 구독 (premium / premium_plus)
+  //    - 간단 선택창으로
+  //      1: 정기 내에서 플랜 전환(토글)
+  //      3: 프리미엄3(선결제)로 전환
+  //      6: 프리미엄6(선결제)로 전환
+  // ─────────────────────────────────────────────
+  if (curPlan === 'premium' || curPlan === 'premium_plus') {
+    const how = window.prompt(
+      "변경 방법을 선택하세요:\n" +
+      "1 = 정기 내에서 플랜 전환(기본↔플러스)\n" +
+      "3 = 프리미엄3(선결제)로 전환\n" +
+      "6 = 프리미엄6(선결제)로 전환",
+      "1"
+    );
+
+    if (how === '3') {
+      // 정기 → 3개월(선결제)
+      if (typeof switchRecurringToFixed === 'function') return switchRecurringToFixed('premium3');
+      return (window.startThreeMonthPlan || startThreeMonthPlan)();
+    }
+    if (how === '6') {
+      // 정기 → 6개월(선결제)
+      if (typeof switchRecurringToFixed === 'function') return switchRecurringToFixed('premium6');
+      return (window.startSixMonthPlan || startSixMonthPlan)();
+    }
+
+    // 기본: 정기 내에서 플랜 토글 (premium ↔ premium_plus)
+    const target = (curPlan === 'premium_plus') ? 'premium' : 'premium_plus';
     const res = await fetch("/api/payment/manage-subscription?action=change_plan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: user.id, new_plan: newPlan }),
+      body: JSON.stringify({ user_id: user.id, new_plan: target }),
     });
     const json = await res.json();
     if (!res.ok) return alert("변경 실패: " + (json.error || ''));
@@ -1354,25 +1381,38 @@ document.getElementById("changePlanBtn")?.addEventListener("click", async () => 
     return window.location.reload();
   }
 
-  // 선결제 3↔6 토글은 즉시 재구매 흐름
-  if (plan === 'premium3') return startSixMonthPlan();
-  if (plan === 'premium6') return startThreeMonthPlan();
+  // ─────────────────────────────────────────────
+  // B) 현재 선결제 (premium3 / premium6)
+  //    - 선택창으로
+  //      S: 선결제 간 전환(3↔6) → 즉시 재구매
+  //      B: 정기(기본)로 전환 → 정기 결제 시작
+  //      P: 정기(플러스)로 전환 → 정기 결제 시작
+  // ─────────────────────────────────────────────
+  if (curPlan === 'premium3' || curPlan === 'premium6') {
+    const how = window.prompt(
+      "변경 방법을 선택하세요:\n" +
+      "S = 선결제 간 전환(3↔6)\n" +
+      "B = 정기(기본)로 전환\n" +
+      "P = 정기(플러스)로 전환",
+      "S"
+    );
+    const h = (how || '').toLowerCase();
 
-  // 예외 시 구매 선택 화면
+    if (h === 'b') {
+      return (window.startKakaoSubscriptionBasic || startKakaoSubscriptionBasic)();
+    }
+    if (h === 'p') {
+      return (window.startKakaoSubscriptionPlus || startKakaoSubscriptionPlus)();
+    }
+
+    // 기본: 선결제 간 전환(즉시 재구매)
+    if (curPlan === 'premium3') return (window.startSixMonthPlan || startSixMonthPlan)();
+    return (window.startThreeMonthPlan || startThreeMonthPlan)();
+  }
+
+  // 예외 플랜 → 구매 선택 화면으로 폴백
   renderPurchaseChoices();
 });
-
-// ✅ 정기 → 선결제(3개월/6개월) 전환(재구매) 버튼
-document.getElementById("to3mBtn")?.addEventListener("click", () => {
-  if (typeof switchRecurringToFixed === 'function') return switchRecurringToFixed('premium3');
-  window.startThreeMonthPlan(); // 폴백
-});
-document.getElementById("to6mBtn")?.addEventListener("click", () => {
-  if (typeof switchRecurringToFixed === 'function') return switchRecurringToFixed('premium6');
-  window.startSixMonthPlan();
-});
-
-
 
 
     if (!isCancelRequested) {
