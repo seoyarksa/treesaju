@@ -1155,7 +1155,7 @@ window.openSubscriptionModal = async function () {
   function renderPurchaseChoices() {
     modal.innerHTML = `
       <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:520px; margin:0 auto;">
-        <h3 style="margin:0 0 8px;">카카오 구독 결제</h3>
+        <h3 style="margin:0 0 8px;">구독 결제</h3>
         <p style="margin:0 0 12px;">전화번호 인증이 완료되었습니다. 상품을 선택해 결제하세요.</p>
 
         <div style="background:#f9fafb; border:1px solid #eee; border-radius:8px; padding:12px; margin-bottom:12px;">
