@@ -37,9 +37,7 @@ if (req.method === "POST" && action === "change_plan") {
   if (req.method === "GET" && action === "charge") {
     return await chargeBilling(req, res);
   }
- if (req.method === "POST" && action === "schedule_from_fixed") {
-   return await scheduleRecurringFromFixed(req, res);
- }
+
   return res.status(405).json({ error: "Invalid request" });
 }
 
@@ -205,9 +203,9 @@ async function autoCancelExpired(req, res) {
     const nowIso = new Date().toISOString();
 
     // 해지 신청 + 기간 종료 도달한 대상
-   let { data: targets, error } = await supabase
+    const { data: targets, error } = await supabase
       .from("memberships")
-     .select("id, user_id, plan, status, provider, current_period_end, metadata")
+      .select("user_id")
       .eq("cancel_at_period_end", true)
       .lte("current_period_end", nowIso)
       .in("status", ["active", "past_due"]); // 진행 중이던 것만
@@ -218,78 +216,6 @@ async function autoCancelExpired(req, res) {
     }
 
     for (const t of targets) {
-           // 예약된 다음 플랜이 있는지 확인
-     const meta = (typeof t.metadata === 'object' && t.metadata) ? t.metadata : safeJsonParse(t.metadata);
-     const hasNext = !!meta?.next_plan;
-
-     if (hasNext) {
-       // 1) (가능하면) 첫 과금 시도
-       let paid = false;
-       let failMsg = null;
-       try {
-         // customer_uid가 미리 저장되어 있으면 자동 과금 시도
-         if (meta.next_customer_uid) {
-           const tokenRes = await fetch("https://api.iamport.kr/users/getToken", {
-             method: "POST",
-             headers: { "Content-Type": "application/json" },
-             body: JSON.stringify({
-               imp_key: process.env.IAMPORT_API_KEY,
-               imp_secret: process.env.IAMPORT_API_SECRET,
-             }),
-           });
-           const tokenJson = await tokenRes.json();
-           const access_token = tokenJson?.response?.access_token;
-           if (!access_token) throw new Error("토큰 발급 실패");
-
-           // 금액은 예약된 next_price 사용
-           const result = await attemptPayment(meta.next_customer_uid, access_token, meta.next_price, 
-             meta.next_plan === 'premium_plus' ? '월간 프리미엄+(자동전환)' : '월간 프리미엄(자동전환)');
-           paid = !!result.success;
-           if (!paid) failMsg = result.message || '결제 실패';
-         }
-       } catch (e) {
-         failMsg = e.message;
-       }
-
-       // 2) 결제 성공/실패 상관없이 플랜 전환 처리(실패 시 상태는 past_due)
-       const nextMonth = new Date();
-       nextMonth.setMonth(nextMonth.getMonth() + 1);
-       const nextMeta = { ...meta };
-       // 전환 완료 후 예약 필드 제거
-       delete nextMeta.next_plan;
-       delete nextMeta.next_price;
-       delete nextMeta.next_daily_limit;
-       delete nextMeta.next_provider;
-       delete nextMeta.next_tier;
-       delete nextMeta.next_start_at;
-
-       const { error: upErr } = await supabase
-         .from('memberships')
-         .update({
-           plan: meta.next_plan,                 // premium | premium_plus
-           provider: 'kakao',
-           status: paid ? 'active' : 'past_due', // 결제 실패 시 past_due로 표기
-           cancel_at_period_end: false,
-           current_period_end: nextMonth.toISOString(),
-           updated_at: new Date().toISOString(),
-           metadata: nextMeta,
-         })
-         .eq('id', t.id);
-       if (upErr) throw upErr;
-
-       // 프로필 등급도 결제 성공 시에만 올리거나, 정책에 따라 유지/강제 승격 결정
-       if (paid) {
-         const { error: profErr } = await supabase
-           .from('profiles')
-           .update({ grade: meta.next_plan === 'premium_plus' ? 'premium_plus' : 'premium', updated_at: new Date().toISOString() })
-           .eq('user_id', t.user_id);
-         if (profErr) throw profErr;
-       }
-
-       console.log(`[🔁 자동 전환] user=${t.user_id} → ${meta.next_plan} (${paid ? '결제성공' : ('결제실패: ' + (failMsg||''))})`);
-       continue;
-     }
-
       // 1) 멤버십 중지
       const { error: upErr } = await supabase
         .from("memberships")
@@ -588,77 +514,4 @@ async function changePlan(req, res) {
   }
 
   return res.status(400).json({ error: "UNSUPPORTED_CHANGE" });
-}
-
-
-// ✅ 5️⃣ 선결제 → 정기 전환 "예약" (연속성 유지)
-// body: { user_id, next_tier: 'basic' | 'plus' }
-async function scheduleRecurringFromFixed(req, res) {
-  try {
-    const { user_id, next_tier } = req.body || {};
-    if (!user_id || !['basic','plus'].includes(next_tier)) {
-      return res.status(400).json({ error: 'MISSING_PARAMS' });
-    }
-
-    // 현재 멤버십 조회
-    const { data: m, error: mErr } = await supabase
-      .from('memberships')
-      .select('plan, status, current_period_end, metadata')
-      .eq('user_id', user_id)
-      .maybeSingle();
-    if (mErr) throw mErr;
-    if (!m) return res.status(404).json({ error: 'MEMBERSHIP_NOT_FOUND' });
-
-    // 선결제 사용자만 예약 허용
-    if (m.plan !== 'premium3' && m.plan !== 'premium6') {
-      return res.status(400).json({ error: 'NOT_FIXED_PLAN' });
-    }
-
-    // 다음 플랜 정보 구성
-    const NEXT = {
-      plan: (next_tier === 'basic') ? 'premium' : 'premium_plus',
-      price: (next_tier === 'basic') ? 11000 : 16500,
-      daily_limit: (next_tier === 'basic') ? 60 : 150,
-      provider: 'kakao',
-      // 결제수단(빌링키) customer_uid는 기존 정기 결제 경험이 없을 수도 있으므로
-      // 필요 시 별도 수집 플로우를 나중에 추가(아래 auto-승격에서 처리 분기)
-    };
-
-    // metadata 갱신 (JSON merge)
-    const meta = (typeof m.metadata === 'object' && m.metadata) ? m.metadata : safeJsonParse(m.metadata);
-    const newMeta = {
-      ...meta,
-      next_plan: NEXT.plan,
-      next_price: NEXT.price,
-      next_daily_limit: NEXT.daily_limit,
-      next_provider: NEXT.provider,
-      next_tier, // 'basic' | 'plus'
-      next_start_at: m.current_period_end || null, // 만료일에 승격
-      // next_customer_uid:  (있다면 미리 저장 — 추후 결제 자동화에 사용)
-    };
-
-    const { data: up, error: upErr } = await supabase
-      .from('memberships')
-      .update({ metadata: newMeta, updated_at: new Date().toISOString() })
-      .eq('user_id', user_id)
-      .select()
-      .single();
-    if (upErr) throw upErr;
-
-    return res.status(200).json({
-      ok: true,
-      message: `만료일 이후 ${NEXT.plan}로 자동 전환이 예약되었습니다.`,
-      membership: up
-    });
-  } catch (e) {
-    console.error('[scheduleRecurringFromFixed] error:', e);
-    return res.status(500).json({ error: e.message || 'INTERNAL_ERROR' });
-  }
-}
-
-// 유틸: 안전 JSON 파싱
-function safeJsonParse(v) {
-  if (!v) return {};
-  if (typeof v === 'object') return v;
-  try { return JSON.parse(v); } catch { return {}; }
 }
