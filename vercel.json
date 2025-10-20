@@ -16,19 +16,12 @@
       "path": "/api/payment/manage-subscription?action=autoCancel",
       "schedule": "0 9 * * *"
     }
-  ],
-
-  "headers": [
+  ], 
+    "headers": [
     {
-      "source": "/(terms|privacy|business)\\.(.*)\\.html",
+      "source": "/legal/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
-      ]
-    },
-    {
-      "source": "/(terms|privacy|business)\\.html",
-      "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+        { "key": "Cache-Control", "value": "public, max-age=0, s-maxage=0, must-revalidate" }
       ]
     }
   ]
