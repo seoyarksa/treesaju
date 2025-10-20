@@ -1221,7 +1221,7 @@ window.openSubscriptionModal = async function () {
   function renderPurchaseChoices() {
     modal.innerHTML = `
       <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:520px; margin:0 auto;">
-        <h3 style="margin:0 0 8px;">구독 결제</h3>
+        <h3 style="margin:0 0 8px;">카카오 구독 결제</h3>
         <p style="margin:0 0 12px;">전화번호 인증이 완료되었습니다. 상품을 선택해 결제하세요.</p>
 
         <div style="background:#f9fafb; border:1px solid #eee; border-radius:8px; padding:12px; margin-bottom:12px;">
@@ -1284,7 +1284,7 @@ const extraLine = end
 
 
 
-      const plan = (data.plan || '').trim();
+const plan = (data.plan || '').trim();
 
 // 버튼 라벨 결정
 let changeLabel = '플랜 변경';
@@ -1293,8 +1293,12 @@ else if (plan === 'premium_plus') changeLabel = '프리미엄(기본)으로 전�
 else if (plan === 'premium3') changeLabel = '프리미엄6으로 전환';
 else if (plan === 'premium6') changeLabel = '프리미엄3으로 전환';
 
-const isFixed = data.plan === 'premium3' || data.plan === 'premium6';
+const isFixed = plan === 'premium3' || plan === 'premium6';
 const resumeLabel = isFixed ? '다시 구매하기' : '재구독 신청하기';
+
+// ✅ 추가: 정기 플랜 여부
+const isRecurring = plan === 'premium' || plan === 'premium_plus';
+
 
 
     modal.innerHTML = `
@@ -1304,15 +1308,26 @@ const resumeLabel = isFixed ? '다시 구매하기' : '재구독 신청하기';
         <p style="margin:4px 0;"><strong>상태:</strong> ${statusText}</p>
         <p style="margin:4px 0 12px;"><strong>${dateLabel}:</strong> ${dateValue}</p>
         ${extraLine}<br>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-    ${
-  isCancelRequested
-    ? `<button id="resumeSubBtn" class="btn-success">${resumeLabel}</button>`
-    : `<button id="cancelSubBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기결제 해지 신청</button>`
-}
- <button id="changePlanBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">${changeLabel}</button>
-          <button id="subCloseBtn2" class="btn-success">닫기</button>
-        </div>
+ 
+<div style="display:flex; gap:8px; flex-wrap:wrap;">
+  ${
+    isCancelRequested
+      ? `<button id="resumeSubBtn" class="btn-success">${resumeLabel}</button>`
+      : `<button id="cancelSubBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기결제 해지 신청</button>`
+  }
+
+  <!-- 기존 changePlanBtn: 현재 플랜 기준 토글 -->
+  <button id="changePlanBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">${changeLabel}</button>
+
+  <!-- ✅ 추가: 정기 사용자에게만 3/6개월로 전환(재구매) 버튼 노출 -->
+  ${isRecurring ? `
+    <button id="to3mBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">프리미엄3으로 전환</button>
+    <button id="to6mBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">프리미엄6으로 전환</button>
+  ` : ''}
+
+  <button id="subCloseBtn2" class="btn-success">닫기</button>
+</div>
+
         ${
           isCancelRequested
             ? `<div style="margin-top:8px; color:#888; font-size:12px;">(해지 신청이 완료되었습니다. ${dateLabel}까지 이용 가능합니다.)</div>`
@@ -1323,32 +1338,42 @@ const resumeLabel = isFixed ? '다시 구매하기' : '재구독 신청하기';
 
     document.getElementById("subCloseBtn2")?.addEventListener("click", close);
 
-    document.getElementById("changePlanBtn")?.addEventListener("click", async () => {
-  // 간단 드롭다운/선택 UI는 필요시 추가. 여기선 최소 로직만:
-  const curPlan = data.plan || '';
-  // 예시: 토글 업/다운그레이드
-  const target = (curPlan === 'premium_plus') ? 'premium' : 'premium_plus';
-
-  // 정기↔정기
-  if (curPlan === 'premium' || curPlan === 'premium_plus') {
+// 플랜 변경 버튼: 현재 플랜에 맞춰 동작
+document.getElementById("changePlanBtn")?.addEventListener("click", async () => {
+  // 정기 ↔ 정기 토글
+  if (plan === 'premium' || plan === 'premium_plus') {
+    const newPlan = (plan === 'premium') ? 'premium_plus' : 'premium';
     const res = await fetch("/api/payment/manage-subscription?action=change_plan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: user.id, new_plan: target }),
+      body: JSON.stringify({ user_id: user.id, new_plan: newPlan }),
     });
     const json = await res.json();
     if (!res.ok) return alert("변경 실패: " + (json.error || ''));
-    alert(json.message || "플랜이 변경되었습니다.");
+    alert(json.message || "플랜이 변경되었습니다. 다음 결제부터 적용돼요.");
     return window.location.reload();
   }
 
-  // 선결제 → 정기
-  if (curPlan === 'premium3' || curPlan === 'premium6') {
-    // 정기결제 플로우 시작(플러스 예시)
-    startRecurringPlus(); // 또는 startRecurringBasic();
-    return;
-  }
+  // 선결제 3↔6 토글은 즉시 재구매 흐름
+  if (plan === 'premium3') return startSixMonthPlan();
+  if (plan === 'premium6') return startThreeMonthPlan();
+
+  // 예외 시 구매 선택 화면
+  renderPurchaseChoices();
 });
+
+// ✅ 정기 → 선결제(3개월/6개월) 전환(재구매) 버튼
+document.getElementById("to3mBtn")?.addEventListener("click", () => {
+  // switchRecurringToFixed가 이미 정의돼 있으면 그걸 사용
+  if (typeof switchRecurringToFixed === 'function') return switchRecurringToFixed('premium3');
+  // 폴백: 바로 재구매 실행
+  startThreeMonthPlan();
+});
+document.getElementById("to6mBtn")?.addEventListener("click", () => {
+  if (typeof switchRecurringToFixed === 'function') return switchRecurringToFixed('premium6');
+  startSixMonthPlan();
+});
+
 
 
     if (!isCancelRequested) {
