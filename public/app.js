@@ -1361,35 +1361,34 @@ const extraLine = end
             (window.startThreeMonthPlan || startThreeMonthPlan)();
           }
         });
- sheet.querySelector("#optRecurringBasic")?.addEventListener("click", async () => {
-  try {
-    const res = await fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: user.id, next_tier: 'basic' }),
-    });
-    const json = await res.json();
-    if (!res.ok) return alert('전환 예약 실패: ' + (json.error || ''));
+ sheet.querySelector("#optRecurringBasic")?.addEventListener("click", () => {
+  fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: user.id, next_tier: 'basic' }),
+  })
+  .then(res => res.json().then(json => ({ ok: res.ok, json })))
+  .then(({ ok, json }) => {
+    if (!ok) return alert('전환 예약 실패: ' + (json.error || ''));
     alert(json.message || '만료일에 정기(기본)으로 자동 전환됩니다.');
-  } catch (e) {
-    alert('전환 예약 중 오류: ' + e.message);
-  }
+  })
+  .catch(e => alert('전환 예약 중 오류: ' + e.message));
 });
 
-sheet.querySelector("#optRecurringPlus")?.addEventListener("click", async () => {
-  try {
-    const res = await fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: user.id, next_tier: 'plus' }),
-    });
-    const json = await res.json();
-    if (!res.ok) return alert('전환 예약 실패: ' + (json.error || ''));
+sheet.querySelector("#optRecurringPlus")?.addEventListener("click", () => {
+  fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: user.id, next_tier: 'plus' }),
+  })
+  .then(res => res.json().then(json => ({ ok: res.ok, json })))
+  .then(({ ok, json }) => {
+    if (!ok) return alert('전환 예약 실패: ' + (json.error || ''));
     alert(json.message || '만료일에 정기(플러스)로 자동 전환됩니다.');
-  } catch (e) {
-    alert('전환 예약 중 오류: ' + e.message);
-  }
+  })
+  .catch(e => alert('전환 예약 중 오류: ' + e.message));
 });
+
 
         sheet.querySelector("#optCancel")?.addEventListener("click", () => {
           sheet.remove();
