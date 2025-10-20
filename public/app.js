@@ -1364,15 +1364,14 @@ document.getElementById("changePlanBtn")?.addEventListener("click", async () => 
 
 // ✅ 정기 → 선결제(3개월/6개월) 전환(재구매) 버튼
 document.getElementById("to3mBtn")?.addEventListener("click", () => {
-  // switchRecurringToFixed가 이미 정의돼 있으면 그걸 사용
   if (typeof switchRecurringToFixed === 'function') return switchRecurringToFixed('premium3');
-  // 폴백: 바로 재구매 실행
-  startThreeMonthPlan();
+  window.startThreeMonthPlan(); // 폴백
 });
 document.getElementById("to6mBtn")?.addEventListener("click", () => {
   if (typeof switchRecurringToFixed === 'function') return switchRecurringToFixed('premium6');
-  startSixMonthPlan();
+  window.startSixMonthPlan();
 });
+
 
 
 
