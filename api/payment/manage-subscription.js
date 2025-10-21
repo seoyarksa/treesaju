@@ -684,63 +684,47 @@ async function scheduleFromFixed(req, res) {
       return res.status(400).json({ error: 'TOO_EARLY_TO_SWITCH', remainingDays: daysLeft, allowed_from: '10days_before_expiry' });
     }
 
-    // 업데이트 payload
+    // 업데이트 payload (메타와 컬럼을 **동일 값으로 동시 세팅**)
     const nowIso = new Date().toISOString();
-    const metaObj = safeParse(mem.metadata) || {};
-    if (metaObj && typeof metaObj === 'object' && metaObj.scheduled_change) delete metaObj.scheduled_change;
+    const effectiveIso = end.toISOString();
 
-    const updates = {
-      scheduled_change_type:  'to_recurring',
-      scheduled_next_plan:    nextPlan,               // 'premium' | 'premium_plus'
-      scheduled_effective_at: end.toISOString(),      // 만료 직후
-      scheduled_requested_at: nowIso,
-      ...(metaObj && Object.keys(metaObj).length ? { metadata: metaObj } : {}) // jsonb 컬럼이면 객체 그대로 OK
+    const metaObj = safeParse(mem.metadata) || {};
+    metaObj.scheduled_change = {
+      type: 'to_recurring',
+      next_plan: nextPlan,        // 'premium' | 'premium_plus'  ← 트리거가 읽는 키
+      effective_at: effectiveIso,
+      requested_at: nowIso,
     };
 
-    // 🔴 실제 DB UPDATE + 반환 값으로 즉시 검증
-   // ---- 업데이트 payload 준비 이후(지금 코드 위치 그대로) ----
-const { data: upd, error: upErr } = await supabase
-  .from('memberships')
-  .update({
-    scheduled_change_type:  'to_recurring',
-    scheduled_next_plan:    nextPlan,
-    scheduled_effective_at: end.toISOString(),
-    scheduled_requested_at: nowIso,
-    // metadata 안에 옛날 scheduled_change 있으면 제거해서 덮어쓰기(선택)
-    ...( (() => {
-      const metaObj = safeParse(mem.metadata) || {};
-      if (metaObj && typeof metaObj === 'object' && metaObj.scheduled_change) {
-        delete metaObj.scheduled_change;
-        return { metadata: metaObj };
-      }
-      return {};
-    })() )
-  })
-  .eq('id', mem.id)
-  .select('id, scheduled_change_type, scheduled_next_plan, scheduled_effective_at, scheduled_requested_at')
-  .maybeSingle();
+    // 🔵 실제 DB UPDATE + 즉시 검증
+    const { data: upd, error: upErr } = await supabase
+      .from('memberships')
+      .update({
+        // 예약 컬럼들
+        scheduled_change_type:  'to_recurring',
+        scheduled_next_plan:    nextPlan,
+        scheduled_effective_at: effectiveIso,
+        scheduled_requested_at: nowIso,
+        // 메타도 동일 값으로
+        metadata: metaObj,
+      })
+      .eq('id', mem.id)
+      .select('id, scheduled_change_type, scheduled_next_plan, scheduled_effective_at, scheduled_requested_at')
+      .maybeSingle();
 
-if (upErr) {
-  return res.status(500).json({ error: 'DB_UPDATE_FAILED', detail: upErr.message });
-}
-if (!upd) {
-  // RLS/조건미스 등으로 갱신 0행
-  return res.status(500).json({ error: 'NO_ROW_UPDATED', id: mem.id });
-}
+    if (upErr) return res.status(500).json({ error: 'DB_UPDATE_FAILED', detail: upErr.message });
+    if (!upd)  return res.status(500).json({ error: 'NO_ROW_UPDATED', id: mem.id });
 
-// 최종 재조회(트리거가 값 지웠는지 탐지)
-const { data: re, error: reErr } = await supabase
-  .from('memberships')
-  .select('scheduled_change_type, scheduled_next_plan, scheduled_effective_at, scheduled_requested_at')
-  .eq('id', mem.id)
-  .maybeSingle();
-
-if (reErr) {
-  return res.status(500).json({ error: 'RECHECK_FAILED', detail: reErr.message });
-}
-if (!re?.scheduled_change_type) {
-  return res.status(500).json({ error: 'SCHEDULED_COLUMNS_WIPED_BY_TRIGGER', re });
-}
+    // 트리거가 값 지웠는지 재확인
+    const { data: re, error: reErr } = await supabase
+      .from('memberships')
+      .select('scheduled_change_type, scheduled_next_plan, scheduled_effective_at, scheduled_requested_at')
+      .eq('id', mem.id)
+      .maybeSingle();
+    if (reErr) return res.status(500).json({ error: 'RECHECK_FAILED', detail: reErr.message });
+    if (!re?.scheduled_change_type) {
+      return res.status(500).json({ error: 'SCHEDULED_COLUMNS_WIPED_BY_TRIGGER', re });
+    }
 
     return res.status(200).json({
       ok: true,
@@ -749,7 +733,7 @@ if (!re?.scheduled_change_type) {
       scheduled: {
         type: 'to_recurring',
         next_plan: nextPlan,
-        effective_at: end.toISOString(),
+        effective_at: effectiveIso,
         requested_at: nowIso
       }
     });
@@ -758,6 +742,7 @@ if (!re?.scheduled_change_type) {
     return res.status(500).json({ error: 'INTERNAL_ERROR', detail: e?.message || '' });
   }
 }
+
 
 
 
