@@ -607,6 +607,8 @@ async function changePlan(req, res) {
 // 핸들러 분기 그대로 사용:
 // if (req.method === "POST" && action === "schedule_from_fixed") return await scheduleFromFixed(req, res);
 
+// /api/payment/manage-subscription.js  내부
+
 async function scheduleFromFixed(req, res) {
   try {
     if (req.method !== 'POST') {
@@ -615,89 +617,83 @@ async function scheduleFromFixed(req, res) {
     }
 
     let { user_id, next_tier } = req.body || {};
-    user_id   = (user_id || '').trim();
-    next_tier = (next_tier || '').toString().trim().toLowerCase(); // 'basic' | 'plus'
-    if (!user_id || !['basic','plus'].includes(next_tier)) {
-      return res.status(400).json({ error: 'MISSING_PARAMS' });
-    }
+    user_id = (user_id || '').trim();
 
-    // 현재 멤버십
+    // ✅ 유연 매핑: 'basic'|'plus' 외에 'premium'|'premium_plus'도 허용
+    const raw = (next_tier || '').toString().trim().toLowerCase();
+    const tier =
+      { plus:'plus', 'premium_plus':'plus', 'premium+':'plus',
+        basic:'basic', premium:'basic' }[raw];
+
+    if (!user_id || !tier) {
+      return res.status(400).json({ error: 'MISSING_OR_INVALID_PARAMS' });
+    }
+    const nextPlan = tier === 'plus' ? 'premium_plus' : 'premium';
+
+    // 현재 멤버십 조회
     const { data: mem, error: selErr } = await supabase
       .from('memberships')
-      .select('id, user_id, plan, status, current_period_end, metadata, scheduled_change_type, scheduled_next_plan, scheduled_effective_at')
+      .select('id, user_id, plan, status, current_period_end, scheduled_change_type, scheduled_effective_at, metadata')
       .eq('user_id', user_id)
       .maybeSingle();
-    if (selErr) return res.status(500).json({ error: 'DB_SELECT_FAILED', detail: selErr.message });
-    if (!mem)   return res.status(404).json({ error: 'MEMBERSHIP_NOT_FOUND' });
 
-    const plan = (mem.plan || '').trim();
-    if (!['premium3','premium6'].includes(plan)) {
-      return res.status(400).json({ error: 'ONLY_FIXED_ALLOWED', detail: `current plan: ${plan}` });
+    if (selErr)   return res.status(500).json({ error: 'DB_SELECT_FAILED', detail: selErr.message });
+    if (!mem)     return res.status(404).json({ error: 'MEMBERSHIP_NOT_FOUND' });
+
+    // 선결제 플랜만 허용
+    if (!['premium3','premium6'].includes(mem.plan || '')) {
+      return res.status(400).json({ error: 'ONLY_FIXED_ALLOWED', detail: `current plan: ${mem.plan}` });
     }
     if (!mem.current_period_end) {
       return res.status(400).json({ error: 'NO_EXPIRE_DATE' });
     }
 
-    // 중복 예약 방지
-    if (mem.scheduled_change_type && mem.scheduled_effective_at) {
-      return res.status(409).json({
-        error: 'ALREADY_SCHEDULED',
-        detail: `scheduled ${mem.scheduled_change_type} → ${mem.scheduled_next_plan} at ${mem.scheduled_effective_at}`
-      });
-    }
-
-    // 10일 가드(서버 enforce)
+    // 10일 가드 (만료일 기준)
     const end = new Date(mem.current_period_end);
-    const now = new Date();
-    const daysLeft = Math.max(0, Math.ceil((end - now) / 86400000));
+    const daysLeft = Math.max(0, Math.ceil((end - new Date()) / 86400000));
     if (daysLeft > 10) {
       return res.status(400).json({
         error: 'TOO_EARLY_TO_SWITCH',
-        detail: `remainingDays=${daysLeft}, allowed_from=10days_before_expiry`,
         remainingDays: daysLeft,
+        allowed_from: '10days_before_expiry',
       });
     }
 
-    const nextPlan = (next_tier === 'plus') ? 'premium_plus' : 'premium';
-    const effective_at = end.toISOString();
-    const requested_at = new Date().toISOString();
+    // 이미 예약 존재하면 idempotent 처리(같은 타입이면 갱신/덮어쓰기)
+    const nowIso = new Date().toISOString();
 
-    // (선택) metadata 미러
-    let meta = {};
-    try { meta = typeof mem.metadata === 'string' ? JSON.parse(mem.metadata) : (mem.metadata || {}); } catch {}
-    meta.scheduled_change = {
-      type: 'to_recurring',
-      next_plan: nextPlan,
-      effective_at,
-      requested_at
+    const updates = {
+      scheduled_change_type:   'to_recurring',
+      scheduled_next_plan:     nextPlan,
+      scheduled_effective_at:  end.toISOString(),  // 만료 직후
+      scheduled_requested_at:  nowIso,
+      // ✅ 메타의 scheduled_change는 즉시 제거 (있다면)
+      metadata: mem.metadata && typeof mem.metadata === 'object'
+        ? (() => {
+            const clean = { ...mem.metadata };
+            if (clean.scheduled_change) delete clean.scheduled_change;
+            return clean;
+          })()
+        : mem.metadata // (jsonb 내부가 string이면 그대로 두되, 컬럼을 신뢰)
     };
 
-    // ✅ 컬럼 채우기 + 반환으로 즉시 검증
-    const { data: updated, error: upErr } = await supabase
+    const { error: upErr } = await supabase
       .from('memberships')
-      .update({
-        scheduled_change_type: 'to_recurring',
-        scheduled_next_plan:   nextPlan,
-        scheduled_effective_at: effective_at,
-        scheduled_requested_at: requested_at,
-        metadata: JSON.stringify(meta),
-        updated_at: requested_at,
-      })
-      .eq('id', mem.id)
-      .select('id, scheduled_change_type, scheduled_next_plan, scheduled_effective_at')
-      .single();
+      .update(updates)
+      .eq('id', mem.id);
 
     if (upErr) return res.status(500).json({ error: 'DB_UPDATE_FAILED', detail: upErr.message });
-    if (!updated?.scheduled_change_type || !updated?.scheduled_effective_at) {
-      return res.status(500).json({ error: 'UPDATE_DID_NOT_APPLY' });
-    }
 
     return res.status(200).json({
       ok: true,
-      source: 'manage-subscription@schedule_from_fixed@rev2',
-      message: `만료일(${end.toLocaleDateString('ko-KR')}) 이후 정기(${next_tier === 'basic' ? '기본' : '플러스'})로 전환이 예약되었습니다.`,
+      message: `만료일(${end.toLocaleDateString('ko-KR')}) 이후 정기(${nextPlan === 'premium' ? '기본' : '플러스'}) 전환이 예약되었습니다.`,
       remainingDays: daysLeft,
-      scheduled: { type: 'to_recurring', next_plan: nextPlan, effective_at }
+      scheduled: {
+        type: 'to_recurring',
+        next_plan: nextPlan,
+        effective_at: end.toISOString(),
+        requested_at: nowIso
+      }
     });
   } catch (e) {
     return res.status(500).json({ error: 'INTERNAL_ERROR', detail: e?.message || '' });
