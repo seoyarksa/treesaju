@@ -2,14 +2,11 @@
 import { createClient } from '@supabase/supabase-js';
 
 // /api/terminate-other-sessions.js
-const SUPABASE_URL  = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SERVICE_KEY   = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-// 배포 직후 로그에서 환경 확인
-console.log('[terminate-other-sessions] ENV:',
-  { SUPABASE_URL: !!SUPABASE_URL, SERVICE_KEY: !!SERVICE_KEY });
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export default async function handler(req, res) {
+  // ✅ 헬스 체크: GET 허용
   if (req.method === 'GET' && (req.query.health || req.query._health)) {
     return res.status(200).json({
       ok: true,
@@ -18,9 +15,9 @@ export default async function handler(req, res) {
     });
   }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
-  }
+  // ✅ 실제 관리자 세션 종료: POST만 허용
+  if (req.method !== 'POST')
+    return res.status(405).json({ error: 'Method not allowed' });
 
   const { user_id } = req.body || {};
   if (!user_id) return res.status(400).json({ error: 'user_id required' });
@@ -29,7 +26,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // GoTrue Admin API (모든 세션 무효화)
     const endpoint = `${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(user_id)}/logout`;
     const resp = await fetch(endpoint, {
       method: 'POST',
@@ -41,10 +37,8 @@ export default async function handler(req, res) {
     });
 
     const text = await resp.text();
-
-    // 응답을 있는 그대로 전달(상태/본문)
     if (!resp.ok) {
-      console.error('[terminate-other-sessions] upstream', resp.status, text);
+      // 업스트림 응답 그대로 반환해 원인 파악 쉽게
       return res.status(resp.status).send(text || 'failed');
     }
 
