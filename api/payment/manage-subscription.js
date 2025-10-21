@@ -40,6 +40,10 @@ if (req.method === "POST" && action === "change_plan") {
   if (req.method === "GET" && action === "charge") {
     return await chargeBilling(req, res);
   }
+    // ✅ 새로 추가: 예약 전환 집행
+  if (req.method === "GET" && action === "process_scheduled") {
+    return await processScheduledChanges(req, res);
+  }
 
   return res.status(405).json({ error: "Invalid request" });
 }
@@ -684,5 +688,121 @@ async function scheduleFromFixed(req, res) {
     });
   } catch (e) {
     return res.status(500).json({ error: 'INTERNAL_ERROR', detail: e?.message || '' });
+  }
+}
+
+
+// ✅ 예약 전환 집행기
+// -----------------------------
+async function processScheduledChanges(req, res) {
+  try {
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    // 1) 후보 조회: metadata 에 scheduled_change 흔적이 있는 것(문자열 JSON이라 LIKE로 1차 필터)
+    const { data: rows, error } = await supabase
+      .from("memberships")
+      .select("id, user_id, plan, status, provider, current_period_end, metadata");
+    if (error) throw error;
+
+    let processed = 0;
+    let skipped = 0;
+    const failures = [];
+
+    for (const row of rows || []) {
+      let md;
+      try {
+        // metadata 가 문자열인 테이블 구조를 가정
+        md = typeof row.metadata === "string" ? JSON.parse(row.metadata) : (row.metadata || {});
+      } catch {
+        skipped++;
+        continue; // 손상된 메타데이터는 스킵
+      }
+      const sc = md?.scheduled_change;
+      if (!sc) { skipped++; continue; }
+
+      const effAt = new Date(sc.effective_at || 0);
+      if (!(effAt instanceof Date) || isNaN(effAt.getTime())) { skipped++; continue; }
+      if (effAt > now) { skipped++; continue; } // 아직 시점 도달 X
+
+      // 전환 집행
+      try {
+        if (sc.type === "to_recurring") {
+          // tier -> plan 매핑
+          const planMap = { basic: "premium", plus: "premium_plus" };
+          const nextPlan = planMap[sc.tier];
+          if (!nextPlan) throw new Error("Unknown tier for to_recurring");
+
+          // 새 주기 종료일: effective_at + 1개월
+          const nextEnd = new Date(effAt);
+          nextEnd.setMonth(nextEnd.getMonth() + 1);
+
+          // memberships 업데이트
+          const { data: up, error: upErr } = await supabase
+            .from("memberships")
+            .update({
+              plan: nextPlan,
+              status: "active",
+              provider: "kakao",
+              cancel_at_period_end: false,
+              current_period_end: nextEnd.toISOString(),
+              updated_at: nowIso,
+              // metadata: scheduled_change -> scheduled_change_applied 로 이동
+              metadata: JSON.stringify({
+                ...md,
+                scheduled_change_applied: {
+                  ...sc,
+                  applied_at: nowIso,
+                },
+                // 재처리 방지: 원 키 제거
+                // (JSON.stringify 전에 지워도 되지만, 위처럼 덮어쓰기가 간단)
+              }),
+            })
+            .eq("id", row.id)
+            .select()
+            .single();
+          if (upErr) throw upErr;
+
+          // profiles.grade 동기화
+          const { error: profErr } = await supabase
+            .from("profiles")
+            .update({ grade: nextPlan, updated_at: nowIso })
+            .eq("user_id", row.user_id);
+          if (profErr) throw profErr;
+
+          // metadata 에서 scheduled_change 제거(위 JSON에서 지우지 못했으므로 한 번 더 정리)
+          try {
+            const appliedMd = typeof up.metadata === "string" ? JSON.parse(up.metadata) : (up.metadata || {});
+            if (appliedMd.scheduled_change) delete appliedMd.scheduled_change;
+
+            await supabase
+              .from("memberships")
+              .update({ metadata: JSON.stringify(appliedMd) })
+              .eq("id", up.id);
+          } catch { /* 정리 실패는 치명적이지 않음 */ }
+
+          processed++;
+          continue;
+        }
+
+        // (확장 여지) 다른 유형들: to_fixed 등
+        // if (sc.type === "to_fixed") { ... }
+
+        // 알 수 없는 유형
+        skipped++;
+      } catch (e) {
+        failures.push({ user_id: row.user_id, error: e.message });
+      }
+    }
+
+    return res.status(200).json({
+      ok: true,
+      processed,
+      skipped,
+      failures,
+    });
+  } catch (err) {
+    console.error("[processScheduledChanges] error:", err);
+    return res.status(500).json({ error: err.message });
   }
 }
