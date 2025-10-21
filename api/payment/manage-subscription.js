@@ -17,6 +17,11 @@ export default async function handler(req, res) {
   const action = rawAction.toLowerCase().replace(/-/g, '_').trim();
   console.log('[manage-subscription] method=%s raw=%s -> %s url=%s',
     req.method, rawAction, action, req.url);
+
+      // (선택) 헬스체크
+  if ((req.method === 'GET' || req.method === 'POST') && action === 'health') {
+    return res.status(200).json({ ok: true, ts: new Date().toISOString() });
+  }
   // ✅ 예약 집행 엔드포인트(크론/수동 호출)
   if ((req.method === "GET" || req.method === "POST") && action === "apply_scheduled_changes") {
     return await processScheduledChanges(req, res);
