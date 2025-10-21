@@ -1248,17 +1248,17 @@ window.openSubscriptionModal = async function () {
     // ✅ 전환/새구매 허용 조건: 만료 10일 전부터
     const canSwitchOrBuy = !end || daysLeft <= 10;
 
-    const extraLine = end
-      ? `<div style="margin-top:6px;color:#888;font-size:12px;">
-           ${dateLabel}까지 약 ${daysLeft}일 남았습니다.
-         </div>`
-      : "";
+   // const extraLine = end
+   //   ? `<div style="margin-top:6px;color:#888;font-size:12px;">
+    //       ${dateLabel}까지 약 ${daysLeft}일 남았습니다.
+   //      </div>`
+   //   : "";
 
     const switchNotice = end
       ? `<div style="margin-top:6px;color:${canSwitchOrBuy ? '#0a7c0a' : '#c0392b'};font-size:12px;">
            ${canSwitchOrBuy
-             ? "지금은 플랜 변경/새 구매가 가능합니다. (만료일까지 " + daysLeft + "일)"
-             : "플랜 변경/새 구매는 <b>만료 10일 전부터</b> 가능합니다. (남은 " + daysLeft + "일)"
+             ? "지금은 플랜 변경 or 새 구매가 가능합니다. (만료일까지 약" + daysLeft + "일 남음)"
+             : "플랜 변경 or 새 구매는 <b>만료 10일 전부터</b> 가능합니다. (현재 남은 일수: 약 " + daysLeft + "일)"
            }
          </div>`
       : "";
@@ -1293,7 +1293,7 @@ window.openSubscriptionModal = async function () {
         <p style="margin:4px 0;"><strong>플랜:</strong> ${data.plan ?? "-"}</p>
         <p style="margin:4px 0;"><strong>상태:</strong> ${statusText}</p>
         <p style="margin:4px 0 12px;"><strong>${dateLabel}:</strong> ${dateValue}</p>
-        ${extraLine}${switchNotice}<br>
+        ${switchNotice}<br>
 
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           ${
@@ -1327,6 +1327,7 @@ window.openSubscriptionModal = async function () {
     if (isRecurring) {
       disableIfLocked("to3mBtn");
       disableIfLocked("to6mBtn");
+      disableIfLocked("resumeSubBtn");
     }
 
     // ✅ 변경 버튼(전환/새구매 전체 가드)
@@ -1452,6 +1453,9 @@ window.openSubscriptionModal = async function () {
       const resumeBtn = document.getElementById("resumeSubBtn");
       if (resumeBtn) {
         resumeBtn.addEventListener("click", async () => {
+                // ✅ 만료 10일 전부터만 가능
+      if (!guardSwitch()) return;
+      // 선결제 플랜은 재구매 UX로 전환
           if (plan === "premium3" || plan === "premium6") {
             renderPurchaseChoices();
             return;
