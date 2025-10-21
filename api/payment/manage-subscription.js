@@ -196,36 +196,108 @@ async function cancelSubscription(req, res) {
 
 //
 // ✅ 3️⃣ 자동 해지 (cron job)
+// 만료 도달 시 처리:
+// 1) memberships.metadata.scheduled_next 가 있으면 그 계획으로 전환
+// 2) 없으면 기존 로직대로 inactive 처리 + profile 등급 basic 복귀
 async function autoCancelExpired(req, res) {
   try {
-    const nowIso = new Date().toISOString();
+    const now = new Date();
+    const nowIso = now.toISOString();
 
-    // 해지 신청 + 기간 종료 도달한 대상
+    // 해지 신청(true) + 기간 종료 도달 + 진행 중인 구독만
     const { data: targets, error } = await supabase
       .from("memberships")
-      .select("user_id")
+      .select("user_id, plan, status, current_period_end, metadata")
       .eq("cancel_at_period_end", true)
       .lte("current_period_end", nowIso)
-      .in("status", ["active", "past_due"]); // 진행 중이던 것만
+      .in("status", ["active", "past_due"]);
 
     if (error) throw error;
+
     if (!targets?.length) {
-      return res.status(200).json({ ok: true, message: "해지 대상 없음", count: 0 });
+      return res.status(200).json({ ok: true, message: "해지/전환 대상 없음", count: 0 });
     }
 
+    let switched = 0; // 예약 전환 수
+    let canceled = 0; // 비활성 처리 수
+
+    // 안전 파서 (문자열 2중 직렬화 대비)
+    const safeParse = (raw) => {
+      if (!raw) return null;
+      try {
+        const a = typeof raw === "string" ? JSON.parse(raw) : raw;
+        // 어떤 경우엔 문자열 안에 또 JSON이 들어있을 수 있음
+        if (typeof a === "string") {
+          try { return JSON.parse(a); } catch { return a; }
+        }
+        return a;
+      } catch {
+        return null;
+      }
+    };
+
     for (const t of targets) {
-      // 1) 멤버십 중지
+      const meta = safeParse(t.metadata) || {};
+      const scheduled = meta?.scheduled_next;
+      const end = t.current_period_end ? new Date(t.current_period_end) : null;
+
+      // 방어: 정말로 만료를 지났는지 재확인
+      if (!end || now < end) continue;
+
+      // ① 예약 전환이 있는 경우 (예: 고정→정기 전환)
+      if (scheduled?.kind === "recurring") {
+        // next plan 결정
+        const nextPlan = scheduled.plan === "premium_plus" ? "premium_plus" : "premium";
+
+        // 다음 주기 종료일(간단히 +1개월)
+        const nextEnd = new Date();
+        nextEnd.setMonth(nextEnd.getMonth() + 1);
+
+        // metadata에서 예약 정보 제거(원하면 history에 남겨도 좋음)
+        try { delete meta.scheduled_next; } catch {}
+
+        // 멤버십 전환
+        const { error: upErr } = await supabase
+          .from("memberships")
+          .update({
+            plan: nextPlan,
+            status: "active",
+            cancel_at_period_end: false,
+            current_period_end: nextEnd.toISOString(),
+            updated_at: nowIso,
+            metadata: JSON.stringify(meta),
+          })
+          .eq("user_id", t.user_id);
+
+        if (upErr) throw upErr;
+
+        // 프로필 등급도 맞춰 반영
+        const { error: profErr } = await supabase
+          .from("profiles")
+          .update({
+            grade: nextPlan,            // 'premium' | 'premium_plus'
+            updated_at: nowIso,
+          })
+          .eq("user_id", t.user_id);
+
+        if (profErr) throw profErr;
+
+        switched++;
+        console.log(`[🔁 예약 전환 완료] user_id=${t.user_id}, plan=${nextPlan}`);
+        continue;
+      }
+
+      // ② 예약 전환이 없으면 기존대로 비활성 처리
       const { error: upErr } = await supabase
         .from("memberships")
         .update({
-          status: "inactive",          // ✅ 허용값 사용 ('canceled'로 바꾸고 싶으면 여기만 변경)
+          status: "inactive",
           cancel_at_period_end: false,
           updated_at: nowIso,
         })
         .eq("user_id", t.user_id);
       if (upErr) throw upErr;
 
-      // 2) 프로필 등급 복귀
       const { error: profErr } = await supabase
         .from("profiles")
         .update({
@@ -235,13 +307,16 @@ async function autoCancelExpired(req, res) {
         .eq("user_id", t.user_id);
       if (profErr) throw profErr;
 
-      console.log(`[✅ 해지 완료] user_id: ${t.user_id}`);
+      canceled++;
+      console.log(`[✅ 해지 완료] user_id=${t.user_id}`);
     }
 
     return res.status(200).json({
       ok: true,
-      count: targets.length,
-      message: `${targets.length}명의 구독 해지 완료`,
+      message: `처리 완료: 예약 전환 ${switched}건, 해지 ${canceled}건`,
+      switched,
+      canceled,
+      count: (switched + canceled),
     });
   } catch (err) {
     console.error("[autoCancelExpired] error:", err);
