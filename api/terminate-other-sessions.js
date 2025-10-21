@@ -1,11 +1,11 @@
 // /api/terminate-other-sessions.js
-// /api/terminate-other-sessions.js
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export default async function handler(req, res) {
-  // 헬스 체크 (GET)
-  if (req.method === 'GET' && (req.query.health || req.query._health)) {
+  // ✅ 헬스: 메서드 무관(POST/GET/무엇이든) + 에러 절대 안 냄
+  const isHealth = req.query && (req.query.health !== undefined || req.query._health !== undefined);
+  if (isHealth) {
     return res.status(200).json({
       ok: true,
       SUPABASE_URL: !!SUPABASE_URL,
@@ -14,8 +14,10 @@ export default async function handler(req, res) {
     });
   }
 
-  // 관리자: 특정 user_id 세션 전부 종료 (POST)
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  // ✅ 실제 세션 종료는 POST만
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
   const { user_id } = req.body || {};
   if (!user_id) return res.status(400).json({ error: 'user_id required' });
@@ -28,18 +30,17 @@ export default async function handler(req, res) {
     const resp = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${SERVICE_KEY}`, // Service Role 키
+        Authorization: `Bearer ${SERVICE_KEY}`, // Service Role
         apikey: SERVICE_KEY,
         'Content-Type': 'application/json',
       },
     });
 
-    if (!resp.ok) {
-      const text = await resp.text();
-      return res.status(resp.status).send(text || 'failed');
-    }
+    const text = await resp.text();
+    if (!resp.ok) return res.status(resp.status).send(text || 'failed');
+
     return res.status(200).json({ ok: true });
-  } catch (e) {
+  } catch {
     return res.status(500).json({ error: 'INTERNAL_ERROR' });
   }
 }
