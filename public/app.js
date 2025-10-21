@@ -1405,53 +1405,50 @@ document.getElementById("changePlanBtn")?.addEventListener("click", async () => 
 // 선결제 → 정기(기본)
 sheet.querySelector("#optRecurringBasic")?.addEventListener("click", async () => {
   if (!guardSwitch()) return;
-
-  // 안내: 만료일 이후부터 정기(기본) 시작
-  const endStr = end ? end.toLocaleDateString('ko-KR') : '만료일';
-  if (!confirm(`정기(기본) 전환을 예약할까요?\n전환은 ${endStr} 이후부터 적용됩니다.`)) return;
-
   try {
-    // 만료 시 전환 예약
-    const res = await fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
+    const res  = await fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: user.id, next_tier: 'basic' }), // 'basic' | 'plus'
+      body: JSON.stringify({ user_id: user.id, next_tier: 'basic' }),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json?.error || '예약 실패');
-
-    alert(json.message || `만료일(${endStr})에 정기(기본)으로 자동 전환됩니다.`);
-    // 필요 시 UI 접기/갱신
-    document.getElementById('planSwitchSheet')?.remove();
-    // setTimeout(() => window.location.reload(), 300); // 새로고침 원하면 활성화
+    if (!res.ok) {
+      console.error('[schedule_from_fixed:basic] status', res.status, json);
+      const msg = json?.message || json?.error || '예약 실패';
+      const detail = json?.detail ? `\n상세: ${json.detail}` : '';
+      const remain = Number.isFinite(json?.remainingDays) ? `\n남은일수: ${json.remainingDays}` : '';
+      return alert(`전환 예약 중 오류: ${msg}${detail}${remain}`);
+    }
+    alert(json.message || '만료일에 정기(기본)으로 자동 전환됩니다.');
   } catch (e) {
+    console.error('[schedule_from_fixed:basic] fetch error', e);
     alert('전환 예약 중 오류: ' + e.message);
   }
 });
 
-// 선결제 → 정기(플러스)
 sheet.querySelector("#optRecurringPlus")?.addEventListener("click", async () => {
   if (!guardSwitch()) return;
-
-  const endStr = end ? end.toLocaleDateString('ko-KR') : '만료일';
-  if (!confirm(`정기(플러스) 전환을 예약할까요?\n전환은 ${endStr} 이후부터 적용됩니다.`)) return;
-
   try {
-    const res = await fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
+    const res  = await fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: user.id, next_tier: 'plus' }),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json?.error || '예약 실패');
-
-    alert(json.message || `만료일(${endStr})에 정기(플러스)로 자동 전환됩니다.`);
-    document.getElementById('planSwitchSheet')?.remove();
-    // setTimeout(() => window.location.reload(), 300);
+    if (!res.ok) {
+      console.error('[schedule_from_fixed:plus] status', res.status, json);
+      const msg = json?.message || json?.error || '예약 실패';
+      const detail = json?.detail ? `\n상세: ${json.detail}` : '';
+      const remain = Number.isFinite(json?.remainingDays) ? `\n남은일수: ${json.remainingDays}` : '';
+      return alert(`전환 예약 중 오류: ${msg}${detail}${remain}`);
+    }
+    alert(json.message || '만료일에 정기(플러스)로 자동 전환됩니다.');
   } catch (e) {
+    console.error('[schedule_from_fixed:plus] fetch error', e);
     alert('전환 예약 중 오류: ' + e.message);
   }
 });
+
 
         sheet.querySelector("#optCancel")?.addEventListener("click", () => {
           sheet.remove();
