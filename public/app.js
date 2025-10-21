@@ -1123,13 +1123,11 @@ window.openSubscriptionModal = async function () {
   const modal = document.getElementById("subscriptionModal");
   if (!modal) return;
 
-  // ── 공통: 닫기 ───────────────────────────────────────────────
   const close = () => {
     modal.style.display = "none";
     if (window.__subModalTimer) { clearTimeout(window.__subModalTimer); window.__subModalTimer = null; }
   };
 
-  // 최초 플레이스홀더
   modal.style.display = "block";
   modal.innerHTML = `
     <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:520px; margin:0 auto;">
@@ -1138,7 +1136,6 @@ window.openSubscriptionModal = async function () {
     </div>
   `;
 
-  // ESC / 바깥 클릭 닫기(중복 방지)
   if (!modal.__outsideCloseBound) {
     modal.addEventListener("mousedown", (e) => {
       const panel = modal.querySelector(".modal-panel") || modal.firstElementChild || null;
@@ -1151,38 +1148,35 @@ window.openSubscriptionModal = async function () {
     window.__subEscBound = true;
   }
 
-  // ── 결제 선택 화면(미보유/비활성) ───────────────────────────
   function renderPurchaseChoices() {
     modal.innerHTML = `
       <style>
-    .modal-panel{
-      background:#fff; border-radius:10px; padding:16px; max-width:520px; margin:0 auto;
-      font-size:16px; line-height:1.55; -webkit-text-size-adjust:100%;
-    }
-    .modal-panel h3{ margin:0 0 8px; font-size:20px; }
-    .modal-panel p{  margin:0 0 12px; font-size:14px; }
-    .modal-panel .plan{ background:#f9fafb; border:1px solid #eee; border-radius:8px; padding:12px; margin-bottom:12px; }
-    .modal-panel ul{ margin:0; padding-left:18px; line-height:1.6; }
-    .modal-panel li{ font-size:14px; }
+        .modal-panel{
+          background:#fff; border-radius:10px; padding:16px; max-width:520px; margin:0 auto;
+          font-size:16px; line-height:1.55; -webkit-text-size-adjust:100%;
+        }
+        .modal-panel h3{ margin:0 0 8px; font-size:20px; }
+        .modal-panel p{  margin:0 0 12px; font-size:14px; }
+        .modal-panel .plan{ background:#f9fafb; border:1px solid #eee; border-radius:8px; padding:12px; margin-bottom:12px; }
+        .modal-panel ul{ margin:0; padding-left:18px; line-height:1.6; }
+        .modal-panel li{ font-size:14px; }
+        @media (max-width:480px){
+          .modal-panel{ max-width:94vw; padding:14px; font-size:14px; }
+          .modal-panel h3{ font-size:18px; }
+          .modal-panel p, .modal-panel li{ font-size:13px; }
+        }
+        @media (max-width:360px){
+          .modal-panel{ padding:12px; font-size:13px; }
+          .modal-panel h3{ font-size:16px; }
+          .modal-panel p, .modal-panel li{ font-size:12px; }
+        }
+      </style>
+      <div class="modal-panel">
+        <h3>구독 결제</h3>
+        <p>전화번호 인증이 완료되었습니다. 상품을 선택해 결제하세요.</p>
 
-    /* 모바일에서 글자/여백 축소 */
-    @media (max-width:480px){
-      .modal-panel{ max-width:94vw; padding:14px; font-size:14px; }
-      .modal-panel h3{ font-size:18px; }
-      .modal-panel p, .modal-panel li{ font-size:13px; }
-    }
-    @media (max-width:360px){
-      .modal-panel{ padding:12px; font-size:13px; }
-      .modal-panel h3{ font-size:16px; }
-      .modal-panel p, .modal-panel li{ font-size:12px; }
-    }
-  </style>
-      <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:520px; margin:0 auto;">
-        <h3 style="margin:0 0 8px;">구독 결제</h3>
-        <p style="margin:0 0 12px;">전화번호 인증이 완료되었습니다. 상품을 선택해 결제하세요.</p>
-
-        <div style="background:#f9fafb; border:1px solid #eee; border-radius:8px; padding:12px; margin-bottom:12px;">
-          <ul style="margin:0; padding-left:18px; line-height:1.6;">
+        <div class="plan">
+          <ul>
             <li><strong>3개월 구독</strong>: 1일 60회 · <strong>3개월간 60,000원</strong></li>
             <li><strong>6개월 구독</strong>: 1일 60회 · <strong>6개월간 100,000원</strong></li>
             <li><strong>정기구독</strong> (기본): 1일 60회 · <strong>월 11,000원</strong></li>
@@ -1200,7 +1194,6 @@ window.openSubscriptionModal = async function () {
       </div>
     `;
 
-    // 전역(또는 동일 스코프) 함수 바인딩
     document.getElementById("btn3m")?.addEventListener("click", () => {
       (window.startThreeMonthPlan || startThreeMonthPlan)();
     });
@@ -1217,79 +1210,83 @@ window.openSubscriptionModal = async function () {
   }
 
   try {
-    // ── 구독 상태 조회 ────────────────────────────────────────
     const { data, error } = await window.supabaseClient
       .from("memberships")
       .select("*")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    // 미보유/비활성 ⇒ 결제 선택
     if (error || !data || data.status === "inactive") {
       renderPurchaseChoices();
       return;
     }
 
-    // ── 활성 구독 화면 ────────────────────────────────────────
-
     const plan = (data.plan || "").trim();
     const isFixed = plan === "premium3" || plan === "premium6";
     const isRecurring = plan === "premium" || plan === "premium_plus";
     const resumeLabel = isFixed ? "다시 구매하기" : "재구독 신청하기";
-const isCancelRequested = !!data.cancel_at_period_end;
+    const isCancelRequested = !!data.cancel_at_period_end;
 
-// ✅ 라벨
-const dateLabel = isFixed
-  ? "만료일"
-  : (isCancelRequested ? "해지 예정일" : "다음 결제일");
+    const dateLabel = isFixed ? "만료일" : (isCancelRequested ? "해지 예정일" : "다음 결제일");
 
-// ✅ 상태 텍스트
-let statusText;
-if (isFixed) {
-  // 선결제는 해지신청 개념 대신 만료 예정으로 표시
-  if (data.status === "active") {
-    statusText = isCancelRequested ? "active (만료 예정)" : "active (선결제)";
-  } else {
-    statusText = data.status;
-  }
-} else {
-  // 정기 구독만 해지 신청 문구
-  statusText = isCancelRequested ? `${data.status} (해지 신청됨)` : data.status;
-}
+    let statusText;
+    if (isFixed) {
+      statusText = (data.status === "active")
+        ? (isCancelRequested ? "active (만료 예정)" : "active (선결제)")
+        : data.status;
+    } else {
+      statusText = isCancelRequested ? `${data.status} (해지 신청됨)` : data.status;
+    }
 
-// ✅ 날짜 값/남은 일수
-const dateValue = data.current_period_end
-  ? new Date(data.current_period_end).toLocaleDateString("ko-KR")
-  : "-";
+    const dateValue = data.current_period_end
+      ? new Date(data.current_period_end).toLocaleDateString("ko-KR")
+      : "-";
 
-const end = data.current_period_end ? new Date(data.current_period_end) : null;
-const daysLeft = end ? Math.max(0, Math.ceil((end - new Date()) / 86400000)) : null;
-// ✅ 추가: 만료 10일 전부터만 전환/구매 허용
-const canSwitchOrBuy = !end || daysLeft <= 10; // end 없으면(미보유) 언제든 가능
-// 안내 문구(상단 extraLine 바로 아래에 추가 추천)
-const switchNotice = end
-  ? `<div style="margin-top:6px;color:${canSwitchOrBuy ? '#0a7c0a' : '#c0392b'};font-size:12px;">
-       ${canSwitchOrBuy
-         ? "지금은 플랜 변경/새 구매가 가능합니다. (만료일까지 " + daysLeft + "일)"
-         : "플랜 변경/새 구매는 <b>만료 10일 전부터</b> 가능합니다. (남은 " + daysLeft + "일)"
-       }
-     </div>`
-  : "";
+    const end = data.current_period_end ? new Date(data.current_period_end) : null;
+    const daysLeft = end ? Math.max(0, Math.ceil((end - new Date()) / 86400000)) : null;
 
-const extraLine = end
-  ? `<div style="margin-top:6px;color:#888;font-size:12px;">
-       ${dateLabel}까지 약 ${daysLeft}일 남았습니다.
-     </div>`
-  : "";
+    // ✅ 전환/새구매 허용 조건: 만료 10일 전부터
+    const canSwitchOrBuy = !end || daysLeft <= 10;
 
+    const extraLine = end
+      ? `<div style="margin-top:6px;color:#888;font-size:12px;">
+           ${dateLabel}까지 약 ${daysLeft}일 남았습니다.
+         </div>`
+      : "";
 
-    // changePlan 버튼 라벨
+    const switchNotice = end
+      ? `<div style="margin-top:6px;color:${canSwitchOrBuy ? '#0a7c0a' : '#c0392b'};font-size:12px;">
+           ${canSwitchOrBuy
+             ? "지금은 플랜 변경/새 구매가 가능합니다. (만료일까지 " + daysLeft + "일)"
+             : "플랜 변경/새 구매는 <b>만료 10일 전부터</b> 가능합니다. (남은 " + daysLeft + "일)"
+           }
+         </div>`
+      : "";
+
+    // ✅ 공통 가드 & 비활성화 유틸
+    const guardSwitch = () => {
+      if (!canSwitchOrBuy) {
+        alert("현재 플랜의 만료일까지 " + daysLeft + "일 남았습니다.\n플랜 변경 또는 새 구매는 만료 10일 전부터 가능합니다.");
+        return false;
+      }
+      return true;
+    };
+    const disableIfLocked = (btnId) => {
+      const el = document.getElementById(btnId);
+      if (!el) return;
+      if (!canSwitchOrBuy) {
+        el.setAttribute("disabled", "disabled");
+        el.style.opacity = "0.5";
+        el.style.cursor = "not-allowed";
+        el.title = "만료 10일 전부터 가능합니다.";
+      }
+    };
+
     let changeLabel = "플랜 변경";
     if (plan === "premium") changeLabel = "프리미엄+로 전환";
     else if (plan === "premium_plus") changeLabel = "프리미엄(기본)으로 전환";
     else if (plan === "premium3" || plan === "premium6") changeLabel = "다른 플랜으로 전환";
 
-    // 렌더링
     modal.innerHTML = `
       <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:520px; margin:0 auto;">
         <h3 style="margin:0 0 8px;">구독 정보</h3>
@@ -1313,7 +1310,6 @@ const extraLine = end
           ` : ""}
 
           <button id="subCloseBtn2" class="btn-success">닫기</button>
-   
         </div>
 
         ${
@@ -1324,11 +1320,19 @@ const extraLine = end
       </div>
     `;
 
-    // 공통 바인딩
     document.getElementById("subCloseBtn2")?.addEventListener("click", close);
 
-    // 정기↔정기 토글 + 정기→선결제/ 선결제→정기/선결제 전환
+    // ✅ 버튼 비활성화(UX)
+    disableIfLocked("changePlanBtn");
+    if (isRecurring) {
+      disableIfLocked("to3mBtn");
+      disableIfLocked("to6mBtn");
+    }
+
+    // ✅ 변경 버튼(전환/새구매 전체 가드)
     document.getElementById("changePlanBtn")?.addEventListener("click", async () => {
+      if (!guardSwitch()) return;
+
       const curPlan = plan;
 
       // A) 정기 (premium / premium_plus)
@@ -1350,7 +1354,6 @@ const extraLine = end
           return (window.startSixMonthPlan || startSixMonthPlan)();
         }
 
-        // 기본: 정기 내 토글
         const target = (curPlan === "premium_plus") ? "premium" : "premium_plus";
         const res = await fetch("/api/payment/manage-subscription?action=change_plan", {
           method: "POST",
@@ -1389,7 +1392,9 @@ const extraLine = end
         const panel = modal.querySelector(".modal-panel");
         (panel ? panel : modal).appendChild(sheet);
 
+        // ✅ 시트 내부 옵션도 가드
         sheet.querySelector("#optFixedToggle")?.addEventListener("click", () => {
+          if (!guardSwitch()) return;
           if (curPlan === "premium3") {
             (window.startSixMonthPlan || startSixMonthPlan)();
           } else {
@@ -1397,9 +1402,11 @@ const extraLine = end
           }
         });
         sheet.querySelector("#optRecurringBasic")?.addEventListener("click", () => {
+          if (!guardSwitch()) return;
           (window.startKakaoSubscriptionBasic || startKakaoSubscriptionBasic)();
         });
         sheet.querySelector("#optRecurringPlus")?.addEventListener("click", () => {
+          if (!guardSwitch()) return;
           (window.startKakaoSubscriptionPlus || startKakaoSubscriptionPlus)();
         });
         sheet.querySelector("#optCancel")?.addEventListener("click", () => {
@@ -1409,23 +1416,23 @@ const extraLine = end
         return;
       }
 
-      // 알 수 없는 플랜 → 구매 선택
       renderPurchaseChoices();
     });
 
-    // 정기 → 3/6개월 전환(빠른 버튼) 바인딩
+    // ✅ 정기 → 3/6 빠른 전환 버튼(가드 포함)
     if (isRecurring) {
       document.getElementById("to3mBtn")?.addEventListener("click", () => {
+        if (!guardSwitch()) return;
         if (typeof switchRecurringToFixed === "function") return switchRecurringToFixed("premium3");
         (window.startThreeMonthPlan || startThreeMonthPlan)();
       });
       document.getElementById("to6mBtn")?.addEventListener("click", () => {
+        if (!guardSwitch()) return;
         if (typeof switchRecurringToFixed === "function") return switchRecurringToFixed("premium6");
         (window.startSixMonthPlan || startSixMonthPlan)();
       });
     }
 
-    // 해지 신청/자동 닫기/재구독
     if (!isCancelRequested) {
       document.getElementById("cancelSubBtn")?.addEventListener("click", async () => {
         if (!confirm("이번 달 말일에 해지됩니다. 진행할까요?")) return;
@@ -1445,12 +1452,10 @@ const extraLine = end
       const resumeBtn = document.getElementById("resumeSubBtn");
       if (resumeBtn) {
         resumeBtn.addEventListener("click", async () => {
-          // 선결제 플랜은 재구매 UX로 전환
           if (plan === "premium3" || plan === "premium6") {
             renderPurchaseChoices();
             return;
           }
-          // 정기 플랜은 resume 호출
           try {
             const res = await fetch("/api/payment/manage-subscription?action=resume", {
               method: "POST",
@@ -1476,7 +1481,6 @@ const extraLine = end
     renderPurchaseChoices();
   }
 };
-
 
 
 
