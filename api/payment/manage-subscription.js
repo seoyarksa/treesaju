@@ -605,6 +605,8 @@ async function changePlan(req, res) {
 
 // ✅ 선결제(premium3/6) → 정기(기본/플러스) "예약"
 // body: { user_id, next_tier: 'basic' | 'plus' }
+// 예약: 선결제(premium3/6) → 정기(basic/plus) 전환을 만료일에 집행하도록 저장
+// 예약: 선결제(premium3/6) → 정기(basic/plus) 전환을 만료일에 집행하도록 저장
 async function scheduleFromFixed(req, res) {
   try {
     if (req.method !== 'POST') {
@@ -614,16 +616,16 @@ async function scheduleFromFixed(req, res) {
 
     let { user_id, next_tier } = req.body || {};
     user_id   = (user_id || '').trim();
-    next_tier = (next_tier || '').toString().trim().toLowerCase();
+    next_tier = (next_tier || '').toString().trim().toLowerCase(); // 'basic' | 'plus'
 
-    if (!user_id || !['basic','plus'].includes(next_tier)) {
+    if (!user_id || !['basic', 'plus'].includes(next_tier)) {
       return res.status(400).json({ error: 'MISSING_PARAMS' });
     }
 
     // 현재 멤버십 조회
     const { data: mem, error: selErr } = await supabase
       .from('memberships')
-      .select('user_id, plan, status, current_period_end, metadata')
+      .select('id, user_id, plan, status, current_period_end, metadata, scheduled_change_type, scheduled_next_plan, scheduled_effective_at')
       .eq('user_id', user_id)
       .maybeSingle();
 
@@ -631,18 +633,25 @@ async function scheduleFromFixed(req, res) {
     if (!mem)   return res.status(404).json({ error: 'MEMBERSHIP_NOT_FOUND' });
 
     const plan = (mem.plan || '').trim();
-    if (!['premium3','premium6'].includes(plan)) {
+    if (!['premium3', 'premium6'].includes(plan)) {
       return res.status(400).json({ error: 'ONLY_FIXED_ALLOWED', detail: `current plan: ${plan}` });
     }
     if (!mem.current_period_end) {
       return res.status(400).json({ error: 'NO_EXPIRE_DATE' });
     }
 
+    // 이미 예약이 살아있으면 중복 예약 방지
+    if (mem.scheduled_change_type && mem.scheduled_effective_at) {
+      return res.status(409).json({
+        error: 'ALREADY_SCHEDULED',
+        detail: `scheduled ${mem.scheduled_change_type} → ${mem.scheduled_next_plan} at ${mem.scheduled_effective_at}`
+      });
+    }
+
     // 남은 일수 계산 → 서버에서도 10일 제한 enforce
     const end = new Date(mem.current_period_end);
     const now = new Date();
-    const ms  = end - now;
-    const daysLeft = Math.max(0, Math.ceil(ms / 86400000));
+    const daysLeft = Math.max(0, Math.ceil((end - now) / 86400000));
     if (daysLeft > 10) {
       return res.status(400).json({
         error: 'TOO_EARLY_TO_SWITCH',
@@ -651,37 +660,41 @@ async function scheduleFromFixed(req, res) {
       });
     }
 
-    // metadata 안전 파싱/머지
-    let meta = {};
-    if (mem.metadata != null) {
-      try {
-        // TEXT에 JSON이 이스케이프되어 들어간 과거 레거시 케이스 대비
-        const raw = typeof mem.metadata === 'string' ? mem.metadata : JSON.stringify(mem.metadata);
-        try {
-          meta = JSON.parse(raw);
-        } catch {
-          meta = JSON.parse(raw.replace(/^"+|"+$/g, ''));
-        }
-      } catch {
-        meta = {};
-      }
-    }
+    // next_tier → 실제 멤버십 플랜명 매핑
+    const nextPlan = (next_tier === 'plus') ? 'premium_plus' : 'premium';
 
-    const effective_at = end.toISOString();
+    // (선택) metadata 안전 파싱 + 레거시 호환을 위해 scheduled_change도 넣어둠
+    let meta = {};
+    try {
+      if (mem.metadata != null) {
+        const raw = typeof mem.metadata === 'string' ? mem.metadata : JSON.stringify(mem.metadata);
+        try { meta = JSON.parse(raw); }
+        catch { meta = JSON.parse(raw.replace(/^"+|"+$/g, '')); } // 저장된 문자열에 외따옴표 감싸진 케이스
+      }
+    } catch { meta = {}; }
+
+    const effective_at  = end.toISOString();
+    const requested_at  = new Date().toISOString();
     meta.scheduled_change = {
       type: 'to_recurring',
-      tier: next_tier,                      // 'basic' | 'plus'
-      effective_at,                         // 만료 후 적용
-      requested_at: new Date().toISOString()
+      next_plan: nextPlan,      // 'premium' | 'premium_plus'
+      effective_at,
+      requested_at
     };
 
+    // ✅ 예약 정보만 기록 (현재 plan/status/current_period_end 변경 금지)
     const { error: upErr } = await supabase
       .from('memberships')
       .update({
-        metadata: JSON.stringify(meta),
-        updated_at: new Date().toISOString(),
+        scheduled_change_type: 'to_recurring',
+        scheduled_next_plan:   nextPlan,
+        scheduled_effective_at: effective_at,
+        scheduled_requested_at: requested_at,
+        metadata: JSON.stringify(meta),       // 레거시 호환용 미러
+        // updated_at은 set_updated_at 트리거가 있으면 자동, 없으면 아래 줄 유지
+        updated_at: requested_at,
       })
-      .eq('user_id', user_id);
+      .eq('id', mem.id);
 
     if (upErr) return res.status(500).json({ error: 'DB_UPDATE_FAILED', detail: upErr.message });
 
@@ -689,11 +702,19 @@ async function scheduleFromFixed(req, res) {
       ok: true,
       message: `만료일(${end.toLocaleDateString('ko-KR')}) 이후 정기(${next_tier === 'basic' ? '기본' : '플러스'})로 전환이 예약되었습니다.`,
       remainingDays: daysLeft,
+      scheduled: {
+        type: 'to_recurring',
+        next_plan: nextPlan,
+        effective_at
+      }
     });
   } catch (e) {
     return res.status(500).json({ error: 'INTERNAL_ERROR', detail: e?.message || '' });
   }
 }
+
+
+
 
 async function scheduleToFixed(req, res) {
   try {

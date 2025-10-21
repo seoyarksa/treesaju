@@ -1,5 +1,6 @@
-import dotenv from "dotenv";
-dotenv.config();
+
+// /api/payment/manage-subscription.js
+
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -19,11 +20,33 @@ export default async function handler(req, res) {
   if (req.method === "POST" && action === "cancel") {
     return await cancelSubscription(req, res);
   }
+    // 👇👇👇 추가: 선결제 → 정기 전환 "예약" (만료일 이후 적용)
+  if (req.method === "POST" && action === "schedule_from_fixed") {
+    return await scheduleFromFixed(req, res);
+  }
+  // 👆👆👆
+  // 정기 → 선결제 전환 "예약"
+if (req.method === "POST" && action === "schedule_to_fixed") {
+  return await scheduleToFixed(req, res);
+}
+   // ✅ 재구독(정기결제만 해당: cancel_at_period_end 해제)
+  if (req.method === "POST" && action === "resume") {
+    return await resumeSubscription(req, res);
+  }
+  // 핸들러 상단 액션 분기 추가
+if (req.method === "POST" && action === "change_plan") {
+  return await changePlan(req, res);
+}
+
   if (req.method === "GET" && action === "autoCancel") {
     return await autoCancelExpired(req, res);
   }
   if (req.method === "GET" && action === "charge") {
     return await chargeBilling(req, res);
+  }
+    // ✅ 새로 추가: 예약 전환 집행
+  if (req.method === "GET" && action === "process_scheduled") {
+    return await processScheduledChanges(req, res);
   }
 
   return res.status(405).json({ error: "Invalid request" });
@@ -136,7 +159,6 @@ if (profileErr) {
 
 //
 // ✅ 2️⃣ 사용자가 해지 신청 (결제일 기준 한 달 후 해지)
-//
 async function cancelSubscription(req, res) {
   const { user_id } = req.body;
   if (!user_id) return res.status(400).json({ error: "Missing user_id" });
@@ -144,28 +166,34 @@ async function cancelSubscription(req, res) {
   try {
     const { data: membership, error: fetchErr } = await supabase
       .from("memberships")
-      .select("current_period_end")
+      .select("current_period_end, status")
       .eq("user_id", user_id)
-      .maybeSingle();
+      .maybeSingle(); // ← 행 없으면 null, 에러 아님
 
     if (fetchErr) throw fetchErr;
     if (!membership) throw new Error("Membership not found");
 
-    const cancelDate = new Date(membership.current_period_end);
-    const now = new Date();
+    // current_period_end 없으면 오늘로 처리(안내용)
+    const cancelDate = membership.current_period_end
+      ? new Date(membership.current_period_end)
+      : new Date();
 
+    const nowIso = new Date().toISOString();
+
+    // 🔑 핵심: status는 그대로 두고, cancel_at_period_end만 true로
     const { data, error } = await supabase
       .from("memberships")
       .update({
-        status: "cancel_requested",
         cancel_at_period_end: true,
-        updated_at: now.toISOString(),
+        updated_at: nowIso,
       })
       .eq("user_id", user_id)
+      .in("status", ["active", "past_due"]) // 진행 중인 구독만
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
+    if (!data) throw new Error("No active membership to cancel");
 
     return res.status(200).json({
       ok: true,
@@ -178,49 +206,130 @@ async function cancelSubscription(req, res) {
   }
 }
 
+
 //
 // ✅ 3️⃣ 자동 해지 (cron job)
-//
+// 만료 도달 시 처리:
+// 1) memberships.metadata.scheduled_next 가 있으면 그 계획으로 전환
+// 2) 없으면 기존 로직대로 inactive 처리 + profile 등급 basic 복귀
 async function autoCancelExpired(req, res) {
   try {
-    const now = new Date().toISOString();
+    const now = new Date();
+    const nowIso = now.toISOString();
 
+    // 해지 신청(true) + 기간 종료 도달 + 진행 중인 구독만
     const { data: targets, error } = await supabase
       .from("memberships")
-      .select("user_id")
+      .select("user_id, plan, status, current_period_end, metadata")
       .eq("cancel_at_period_end", true)
-      .lte("current_period_end", now)
-      .eq("status", "cancel_requested");
+      .lte("current_period_end", nowIso)
+      .in("status", ["active", "past_due"]);
 
     if (error) throw error;
-    if (!targets?.length)
-      return res.status(200).json({ message: "해지 대상 없음" });
+
+    if (!targets?.length) {
+      return res.status(200).json({ ok: true, message: "해지/전환 대상 없음", count: 0 });
+    }
+
+    let switched = 0; // 예약 전환 수
+    let canceled = 0; // 비활성 처리 수
+
+    // 안전 파서 (문자열 2중 직렬화 대비)
+    const safeParse = (raw) => {
+      if (!raw) return null;
+      try {
+        const a = typeof raw === "string" ? JSON.parse(raw) : raw;
+        // 어떤 경우엔 문자열 안에 또 JSON이 들어있을 수 있음
+        if (typeof a === "string") {
+          try { return JSON.parse(a); } catch { return a; }
+        }
+        return a;
+      } catch {
+        return null;
+      }
+    };
 
     for (const t of targets) {
-      await supabase
+      const meta = safeParse(t.metadata) || {};
+      const scheduled = meta?.scheduled_next;
+      const end = t.current_period_end ? new Date(t.current_period_end) : null;
+
+      // 방어: 정말로 만료를 지났는지 재확인
+      if (!end || now < end) continue;
+
+      // ① 예약 전환이 있는 경우 (예: 고정→정기 전환)
+      if (scheduled?.kind === "recurring") {
+        // next plan 결정
+        const nextPlan = scheduled.plan === "premium_plus" ? "premium_plus" : "premium";
+
+        // 다음 주기 종료일(간단히 +1개월)
+        const nextEnd = new Date();
+        nextEnd.setMonth(nextEnd.getMonth() + 1);
+
+        // metadata에서 예약 정보 제거(원하면 history에 남겨도 좋음)
+        try { delete meta.scheduled_next; } catch {}
+
+        // 멤버십 전환
+        const { error: upErr } = await supabase
+          .from("memberships")
+          .update({
+            plan: nextPlan,
+            status: "active",
+            cancel_at_period_end: false,
+            current_period_end: nextEnd.toISOString(),
+            updated_at: nowIso,
+            metadata: JSON.stringify(meta),
+          })
+          .eq("user_id", t.user_id);
+
+        if (upErr) throw upErr;
+
+        // 프로필 등급도 맞춰 반영
+        const { error: profErr } = await supabase
+          .from("profiles")
+          .update({
+            grade: nextPlan,            // 'premium' | 'premium_plus'
+            updated_at: nowIso,
+          })
+          .eq("user_id", t.user_id);
+
+        if (profErr) throw profErr;
+
+        switched++;
+        console.log(`[🔁 예약 전환 완료] user_id=${t.user_id}, plan=${nextPlan}`);
+        continue;
+      }
+
+      // ② 예약 전환이 없으면 기존대로 비활성 처리
+      const { error: upErr } = await supabase
         .from("memberships")
         .update({
           status: "inactive",
           cancel_at_period_end: false,
-          updated_at: now,
+          updated_at: nowIso,
         })
         .eq("user_id", t.user_id);
+      if (upErr) throw upErr;
 
-      await supabase
+      const { error: profErr } = await supabase
         .from("profiles")
         .update({
-          grade: "basic", // ✅ 해지 시 basic으로 복귀
-          updated_at: now,
+          grade: "basic",
+          updated_at: nowIso,
         })
         .eq("user_id", t.user_id);
+      if (profErr) throw profErr;
 
-      console.log(`[✅ 해지 완료] user_id: ${t.user_id}`);
+      canceled++;
+      console.log(`[✅ 해지 완료] user_id=${t.user_id}`);
     }
 
     return res.status(200).json({
       ok: true,
-      count: targets.length,
-      message: `${targets.length}명의 구독 해지 완료`,
+      message: `처리 완료: 예약 전환 ${switched}건, 해지 ${canceled}건`,
+      switched,
+      canceled,
+      count: (switched + canceled),
     });
   } catch (err) {
     console.error("[autoCancelExpired] error:", err);
@@ -317,5 +426,453 @@ async function attemptPayment(customer_uid, token) {
       : { success: false, message: payJson.message };
   } catch (e) {
     return { success: false, message: e.message };
+  }
+}
+
+
+
+//
+// ✅ 재구독: 정기결제 해지 예약 취소 (정기 플랜만 대상)
+//  - cancel_at_period_end: false
+//  - cancel_effective_at: null
+//  - status: 'active' 로 복구
+//
+async function resumeSubscription(req, res) {
+  const { user_id } = req.body || {};
+  if (!user_id) return res.status(400).json({ error: "Missing user_id" });
+
+  try {
+    // 현재 멤버십 조회
+    const { data: membership, error: fetchErr } = await supabase
+      .from("memberships")
+      .select("id, user_id, plan, status, cancel_at_period_end, current_period_end")
+      .eq("user_id", user_id)
+      .maybeSingle();
+
+    if (fetchErr) throw fetchErr;
+    if (!membership) return res.status(404).json({ error: "Membership not found" });
+
+    // ⚠️ 선결제(premium3/premium6)는 '재구독' 개념이 아니라 '재구매'
+    if (membership.plan === "premium3" || membership.plan === "premium6") {
+      return res.status(400).json({ error: "FIXED_TERM_PLAN", message: "선결제 플랜은 재구독이 아닌 재구매가 필요합니다." });
+    }
+
+    const nowIso = new Date().toISOString();
+
+    // 정기 플랜(예: premium / premium_plus) → 해지 예약만 해제
+    const { data, error } = await supabase
+      .from("memberships")
+      .update({
+        cancel_at_period_end: false,
+        cancel_effective_at: null,
+        status: "active",
+        updated_at: nowIso,
+      })
+      .eq("user_id", user_id)
+      .select()
+      .maybeSingle();
+
+    if (error) throw error;
+
+    // (선택) 프로필 등급 복구: 현재 플랜명을 그대로 grade에 반영
+    //   - 너희 정책상 grade 값이 'premium' 또는 'premium_plus' 라면 아래 그대로 사용
+    const planGrade = (membership.plan === "premium_plus") ? "premium_plus" : "premium";
+    const { error: profileErr } = await supabase
+      .from("profiles")
+      .update({
+        grade: planGrade,
+        updated_at: nowIso,
+      })
+      .eq("user_id", user_id);
+
+    if (profileErr) {
+      console.warn("[resumeSubscription] profile update warn:", profileErr);
+      // 프로필 실패는 치명적이지 않으니 200은 유지, 필요하면 400으로 바꿔도 됨
+    }
+
+    return res.status(200).json({
+      ok: true,
+      message: "재구독이 완료되었습니다.",
+      membership: data,
+    });
+  } catch (err) {
+    console.error("[resumeSubscription] error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+
+// 하단에 함수 추가 플랜변경
+async function changePlan(req, res) {
+  const { user_id, new_plan } = req.body || {};
+  if (!user_id || !new_plan) {
+    return res.status(400).json({ error: "MISSING_PARAMS" });
+  }
+
+  // 허용 플랜만
+  const allowed = new Set(["premium", "premium_plus", "premium3", "premium6"]);
+  if (!allowed.has(new_plan)) {
+    return res.status(400).json({ error: "INVALID_PLAN" });
+  }
+
+  // 현재 멤버십 확인
+  const { data: cur, error: fetchErr } = await supabase
+    .from("memberships")
+    .select("id, user_id, plan, status, current_period_end, cancel_at_period_end")
+    .eq("user_id", user_id)
+    .maybeSingle();
+  if (fetchErr) return res.status(400).json({ error: "DB_SELECT_FAILED", detail: fetchErr.message });
+  if (!cur) return res.status(404).json({ error: "NOT_FOUND" });
+
+  const nowIso = new Date().toISOString();
+  const isRecurring = (p) => p === "premium" || p === "premium_plus";
+  const isFixed     = (p) => p === "premium3" || p === "premium6";
+
+  // 타입이 같은 정기↔정기 변경
+  if (isRecurring(cur.plan) && isRecurring(new_plan)) {
+    const { data, error } = await supabase
+      .from("memberships")
+      .update({
+        plan: new_plan,
+        // 정기 구독은 자동 갱신이므로 해지 예약은 유지/해제하지 않음
+        updated_at: nowIso,
+      })
+      .eq("id", cur.id)
+      .select()
+      .maybeSingle();
+    if (error) return res.status(400).json({ error: "DB_UPDATE_FAILED", detail: error.message });
+
+    // 프로필 등급도 맞춰줌
+    const planGrade = new_plan === "premium_plus" ? "premium_plus" : "premium";
+    await supabase.from("profiles")
+      .update({ grade: planGrade, updated_at: nowIso })
+      .eq("user_id", user_id);
+
+    return res.status(200).json({
+      ok: true,
+      mode: "recurring_changed",
+      message: "플랜이 변경되었습니다. 다음 결제부터 새 요금이 적용됩니다.",
+      membership: data,
+    });
+  }
+
+  // 타입이 바뀌는 경우(정기↔선결제)
+  // 정기는 해지 예약만 걸어두고(기간 끝나면 종료), 프런트에서 새 상품 결제 유도
+  if (isRecurring(cur.plan) && isFixed(new_plan)) {
+    const { data, error } = await supabase
+      .from("memberships")
+      .update({
+        cancel_at_period_end: true,
+        // cur.current_period_end 는 그대로. 만료일 도달 시 cron(autoCancel)로 비활성화됨
+        updated_at: nowIso,
+      })
+      .eq("id", cur.id)
+      .select()
+      .maybeSingle();
+    if (error) return res.status(400).json({ error: "DB_UPDATE_FAILED", detail: error.message });
+
+    return res.status(200).json({
+      ok: true,
+      mode: "switch_to_fixed",
+      message: "정기 구독이 기간 만료 시 자동 종료됩니다. 원하는 선결제 상품을 다시 구매해 주세요.",
+      membership: data,
+    });
+  }
+
+  if (isFixed(cur.plan) && isRecurring(new_plan)) {
+    // 선결제에서 정기로 전환: 지금 플랜은 그대로 두고, 프런트에서 정기 결제 시작(등록)
+    return res.status(200).json({
+      ok: true,
+      mode: "switch_to_recurring",
+      message: "정기 구독 등록을 진행해 주세요.",
+      membership: cur,
+    });
+  }
+
+  // 선결제↔선결제 변경은 사실 '재구매'이므로 서버에선 안내만
+  if (isFixed(cur.plan) && isFixed(new_plan)) {
+    return res.status(200).json({
+      ok: true,
+      mode: "fixed_to_fixed",
+      message: "새 선결제 상품으로 다시 구매해 주세요.",
+      membership: cur,
+    });
+  }
+
+  return res.status(400).json({ error: "UNSUPPORTED_CHANGE" });
+}
+
+
+// ✅ 선결제(premium3/6) → 정기(기본/플러스) "예약"
+// body: { user_id, next_tier: 'basic' | 'plus' }
+async function scheduleFromFixed(req, res) {
+  try {
+    if (req.method !== 'POST') {
+      res.setHeader('Allow', 'POST');
+      return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
+    }
+
+    let { user_id, next_tier } = req.body || {};
+    user_id   = (user_id || '').trim();
+    next_tier = (next_tier || '').toString().trim().toLowerCase();
+
+    if (!user_id || !['basic','plus'].includes(next_tier)) {
+      return res.status(400).json({ error: 'MISSING_PARAMS' });
+    }
+
+    // 현재 멤버십 조회
+    const { data: mem, error: selErr } = await supabase
+      .from('memberships')
+      .select('user_id, plan, status, current_period_end, metadata')
+      .eq('user_id', user_id)
+      .maybeSingle();
+
+    if (selErr) return res.status(500).json({ error: 'DB_SELECT_FAILED', detail: selErr.message });
+    if (!mem)   return res.status(404).json({ error: 'MEMBERSHIP_NOT_FOUND' });
+
+    const plan = (mem.plan || '').trim();
+    if (!['premium3','premium6'].includes(plan)) {
+      return res.status(400).json({ error: 'ONLY_FIXED_ALLOWED', detail: `current plan: ${plan}` });
+    }
+    if (!mem.current_period_end) {
+      return res.status(400).json({ error: 'NO_EXPIRE_DATE' });
+    }
+
+    // 남은 일수 계산 → 서버에서도 10일 제한 enforce
+    const end = new Date(mem.current_period_end);
+    const now = new Date();
+    const ms  = end - now;
+    const daysLeft = Math.max(0, Math.ceil(ms / 86400000));
+    if (daysLeft > 10) {
+      return res.status(400).json({
+        error: 'TOO_EARLY_TO_SWITCH',
+        detail: `remainingDays=${daysLeft}, allowed_from=10days_before_expiry`,
+        remainingDays: daysLeft,
+      });
+    }
+
+    // metadata 안전 파싱/머지
+    let meta = {};
+    if (mem.metadata != null) {
+      try {
+        // TEXT에 JSON이 이스케이프되어 들어간 과거 레거시 케이스 대비
+        const raw = typeof mem.metadata === 'string' ? mem.metadata : JSON.stringify(mem.metadata);
+        try {
+          meta = JSON.parse(raw);
+        } catch {
+          meta = JSON.parse(raw.replace(/^"+|"+$/g, ''));
+        }
+      } catch {
+        meta = {};
+      }
+    }
+
+    const effective_at = end.toISOString();
+    meta.scheduled_change = {
+      type: 'to_recurring',
+      tier: next_tier,                      // 'basic' | 'plus'
+      effective_at,                         // 만료 후 적용
+      requested_at: new Date().toISOString()
+    };
+
+    const { error: upErr } = await supabase
+      .from('memberships')
+      .update({
+        metadata: JSON.stringify(meta),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', user_id);
+
+    if (upErr) return res.status(500).json({ error: 'DB_UPDATE_FAILED', detail: upErr.message });
+
+    return res.status(200).json({
+      ok: true,
+      message: `만료일(${end.toLocaleDateString('ko-KR')}) 이후 정기(${next_tier === 'basic' ? '기본' : '플러스'})로 전환이 예약되었습니다.`,
+      remainingDays: daysLeft,
+    });
+  } catch (e) {
+    return res.status(500).json({ error: 'INTERNAL_ERROR', detail: e?.message || '' });
+  }
+}
+
+async function scheduleToFixed(req, res) {
+  try {
+    const { user_id, termMonths } = req.body || {};
+    if (!user_id || ![3, 6, "3", "6"].includes(termMonths)) {
+      return res.status(400).json({ error: "MISSING_OR_INVALID_PARAMS" });
+    }
+    const months = Number(termMonths);
+    const targetPlan = months === 6 ? "premium6" : "premium3";
+
+    // 현재 멤버십 조회
+    const { data: mem, error } = await supabase
+      .from("memberships")
+      .select("id, user_id, plan, status, current_period_end, metadata")
+      .eq("user_id", user_id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!mem) return res.status(404).json({ error: "MEMBERSHIP_NOT_FOUND" });
+
+    // 정기만 허용
+    if (!["premium", "premium_plus"].includes(mem.plan)) {
+      return res.status(400).json({ error: "NOT_RECURRING_PLAN" });
+    }
+    if (!mem.current_period_end) {
+      return res.status(400).json({ error: "NO_CURRENT_PERIOD_END" });
+    }
+
+    const effective_at = new Date(mem.current_period_end).toISOString();
+
+    // metadata 갱신: scheduled_change + 플래그만 (결제 정보는 fixed-activate에서 채움)
+    let meta = {};
+    try { meta = mem.metadata ? JSON.parse(mem.metadata) : {}; } catch {}
+
+    meta.scheduled_change = {
+      type: "to_fixed",
+      plan: targetPlan,           // premium3 | premium6
+      termMonths: months,
+      effective_at,               // 만료일
+      requested_at: new Date().toISOString()
+    };
+
+    const { data: upd, error: upErr } = await supabase
+      .from("memberships")
+      .update({
+        metadata: JSON.stringify(meta),
+        // 정기는 그대로 유지 (plan/status/current_period_end 변경 X)
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", mem.id)
+      .select()
+      .maybeSingle();
+
+    if (upErr) throw upErr;
+
+    return res.status(200).json({
+      ok: true,
+      message: `전환이 예약되었습니다. (${targetPlan} / 효력: ${effective_at})`,
+      membership: upd
+    });
+  } catch (e) {
+    console.error("[scheduleToFixed] error:", e);
+    return res.status(500).json({ error: e.message || "INTERNAL_ERROR" });
+  }
+}
+
+
+
+
+// ✅ 예약 전환 집행기
+// -----------------------------
+async function processScheduledChanges(req, res) {
+  try {
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    // 1) 후보 조회: metadata 에 scheduled_change 흔적이 있는 것(문자열 JSON이라 LIKE로 1차 필터)
+    const { data: rows, error } = await supabase
+      .from("memberships")
+      .select("id, user_id, plan, status, provider, current_period_end, metadata");
+    if (error) throw error;
+
+    let processed = 0;
+    let skipped = 0;
+    const failures = [];
+
+    for (const row of rows || []) {
+      let md;
+      try {
+        // metadata 가 문자열인 테이블 구조를 가정
+        md = typeof row.metadata === "string" ? JSON.parse(row.metadata) : (row.metadata || {});
+      } catch {
+        skipped++;
+        continue; // 손상된 메타데이터는 스킵
+      }
+      const sc = md?.scheduled_change;
+      if (!sc) { skipped++; continue; }
+
+      const effAt = new Date(sc.effective_at || 0);
+      if (!(effAt instanceof Date) || isNaN(effAt.getTime())) { skipped++; continue; }
+      if (effAt > now) { skipped++; continue; } // 아직 시점 도달 X
+
+      // 전환 집행
+      try {
+        if (sc.type === "to_recurring") {
+          // tier -> plan 매핑
+          const planMap = { basic: "premium", plus: "premium_plus" };
+          const nextPlan = planMap[sc.tier];
+          if (!nextPlan) throw new Error("Unknown tier for to_recurring");
+
+          // 새 주기 종료일: effective_at + 1개월
+          const nextEnd = new Date(effAt);
+          nextEnd.setMonth(nextEnd.getMonth() + 1);
+
+          // memberships 업데이트
+          const { data: up, error: upErr } = await supabase
+            .from("memberships")
+            .update({
+              plan: nextPlan,
+              status: "active",
+              provider: "kakao",
+              cancel_at_period_end: false,
+              current_period_end: nextEnd.toISOString(),
+              updated_at: nowIso,
+              // metadata: scheduled_change -> scheduled_change_applied 로 이동
+              metadata: JSON.stringify({
+                ...md,
+                scheduled_change_applied: {
+                  ...sc,
+                  applied_at: nowIso,
+                },
+                // 재처리 방지: 원 키 제거
+                // (JSON.stringify 전에 지워도 되지만, 위처럼 덮어쓰기가 간단)
+              }),
+            })
+            .eq("id", row.id)
+            .select()
+            .single();
+          if (upErr) throw upErr;
+
+          // profiles.grade 동기화
+          const { error: profErr } = await supabase
+            .from("profiles")
+            .update({ grade: nextPlan, updated_at: nowIso })
+            .eq("user_id", row.user_id);
+          if (profErr) throw profErr;
+
+          // metadata 에서 scheduled_change 제거(위 JSON에서 지우지 못했으므로 한 번 더 정리)
+          try {
+            const appliedMd = typeof up.metadata === "string" ? JSON.parse(up.metadata) : (up.metadata || {});
+            if (appliedMd.scheduled_change) delete appliedMd.scheduled_change;
+
+            await supabase
+              .from("memberships")
+              .update({ metadata: JSON.stringify(appliedMd) })
+              .eq("id", up.id);
+          } catch { /* 정리 실패는 치명적이지 않음 */ }
+
+          processed++;
+          continue;
+        }
+
+        // (확장 여지) 다른 유형들: to_fixed 등
+        // if (sc.type === "to_fixed") { ... }
+
+        // 알 수 없는 유형
+        skipped++;
+      } catch (e) {
+        failures.push({ user_id: row.user_id, error: e.message });
+      }
+    }
+
+    return res.status(200).json({
+      ok: true,
+      processed,
+      skipped,
+      failures,
+    });
+  } catch (err) {
+    console.error("[processScheduledChanges] error:", err);
+    return res.status(500).json({ error: err.message });
   }
 }
