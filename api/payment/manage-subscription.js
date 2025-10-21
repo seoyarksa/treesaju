@@ -17,18 +17,11 @@ export default async function handler(req, res) {
   const action = rawAction.toLowerCase().replace(/-/g, '_').trim();
   console.log('[manage-subscription] method=%s raw=%s -> %s url=%s',
     req.method, rawAction, action, req.url);
-  if (req.method === "POST" && action === "register") {
-    return await registerBilling(req, res);
-  }
-  if (req.method === "POST" && action === "cancel") {
-    return await cancelSubscription(req, res);
-  }
-
   // ✅ 예약 집행 엔드포인트(크론/수동 호출)
   if ((req.method === "GET" || req.method === "POST") && action === "apply_scheduled_changes") {
     return await processScheduledChanges(req, res);
   }
-    // 👇👇👇 추가: 선결제 → 정기 전환 "예약" (만료일 이후 적용)
+      // 👇👇👇 추가: 선결제 → 정기 전환 "예약" (만료일 이후 적용)
   if (req.method === "POST" && action === "schedule_from_fixed") {
     return await scheduleFromFixed(req, res);
   }
@@ -37,6 +30,16 @@ export default async function handler(req, res) {
 if (req.method === "POST" && action === "schedule_to_fixed") {
   return await scheduleToFixed(req, res);
 }
+
+  if (req.method === "POST" && action === "register") {
+    return await registerBilling(req, res);
+  }
+  if (req.method === "POST" && action === "cancel") {
+    return await cancelSubscription(req, res);
+  }
+
+
+
    // ✅ 재구독(정기결제만 해당: cancel_at_period_end 해제)
   if (req.method === "POST" && action === "resume") {
     return await resumeSubscription(req, res);
