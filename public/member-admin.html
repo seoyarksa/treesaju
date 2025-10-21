@@ -295,8 +295,9 @@
       document.getElementById("edit-role").value  = data.role  || "normal";
 
       const d = s => s ? s.split("T")[0] : "";
-      document.getElementById("edit-trial_started_at").value        = d(data.trial_started_at);
-      document.getElementById("edit-trial_ends_at").value           = d(data.trial_ends_at);
+  document.getElementById("edit-current_period_end").value   = d(data.current_period_end);
+  document.getElementById("edit-cancel_effective_at").value  = d(data.cancel_effective_at);
+
       document.getElementById("edit-daily_limit").value             = data.daily_limit ?? "";
       document.getElementById("edit-special_assigned_at").value     = d(data.special_assigned_at);
       document.getElementById("edit-premium_assigned_at").value     = d(data.premium_assigned_at);
@@ -330,8 +331,8 @@
         phone: Vtxt("edit-phone"),
         grade: Vtxt("edit-grade"),
         role:  Vtxt("edit-role"),
-        trial_started_at: Vdate("edit-trial_started_at"),
-        trial_ends_at:    Vdate("edit-trial_ends_at"),
+    current_period_end:  Vdate("edit-current_period_end"),
+    cancel_effective_at: Vdate("edit-cancel_effective_at"),
         daily_limit:      Vnum("edit-daily_limit"),
         special_assigned_at:       Vdate("edit-special_assigned_at"),
         premium_assigned_at:       Vdate("edit-premium_assigned_at"),
