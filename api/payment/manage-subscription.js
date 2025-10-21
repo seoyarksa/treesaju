@@ -654,14 +654,13 @@ async function scheduleFromFixed(req, res) {
     let { user_id, next_tier } = req.body || {};
     user_id = (user_id || '').trim();
 
-    // 'basic'|'plus' 외에 'premium'|'premium_plus' 허용
     const raw = (next_tier || '').toString().trim().toLowerCase();
     const tier = { plus:'plus', 'premium_plus':'plus', 'premium+':'plus', basic:'basic', premium:'basic' }[raw];
     if (!user_id || !tier) return res.status(400).json({ error: 'MISSING_OR_INVALID_PARAMS' });
 
     const nextPlan = tier === 'plus' ? 'premium_plus' : 'premium';
 
-    // 현재 멤버십 조회
+    // 현재 멤버십
     const { data: mem, error: selErr } = await supabase
       .from('memberships')
       .select('id, user_id, plan, status, current_period_end, metadata')
@@ -671,7 +670,6 @@ async function scheduleFromFixed(req, res) {
     if (selErr)   return res.status(500).json({ error: 'DB_SELECT_FAILED', detail: selErr.message });
     if (!mem)     return res.status(404).json({ error: 'MEMBERSHIP_NOT_FOUND' });
 
-    // 선결제만 허용
     if (!['premium3','premium6'].includes(mem.plan || '')) {
       return res.status(400).json({ error: 'ONLY_FIXED_ALLOWED', detail: `current plan: ${mem.plan}` });
     }
@@ -684,47 +682,42 @@ async function scheduleFromFixed(req, res) {
       return res.status(400).json({ error: 'TOO_EARLY_TO_SWITCH', remainingDays: daysLeft, allowed_from: '10days_before_expiry' });
     }
 
-    // 업데이트 payload (메타와 컬럼을 **동일 값으로 동시 세팅**)
+    // === 여기부터 핵심: 컬럼 + 메타를 "동일 값"으로 동시 세팅 ===
     const nowIso = new Date().toISOString();
     const effectiveIso = end.toISOString();
 
     const metaObj = safeParse(mem.metadata) || {};
     metaObj.scheduled_change = {
       type: 'to_recurring',
-      next_plan: nextPlan,        // 'premium' | 'premium_plus'  ← 트리거가 읽는 키
+      next_plan: nextPlan,                                  // 트리거 호환 키
+      tier: nextPlan === 'premium_plus' ? 'plus' : 'basic', // 레거시 호환 키(있으면 좋음)
       effective_at: effectiveIso,
       requested_at: nowIso,
     };
 
-    // 🔵 실제 DB UPDATE + 즉시 검증
     const { data: upd, error: upErr } = await supabase
       .from('memberships')
       .update({
-        // 예약 컬럼들
         scheduled_change_type:  'to_recurring',
         scheduled_next_plan:    nextPlan,
         scheduled_effective_at: effectiveIso,
         scheduled_requested_at: nowIso,
-        // 메타도 동일 값으로
         metadata: metaObj,
       })
       .eq('id', mem.id)
-      .select('id, scheduled_change_type, scheduled_next_plan, scheduled_effective_at, scheduled_requested_at')
+      .select('id, scheduled_change_type, scheduled_next_plan, scheduled_effective_at, scheduled_requested_at, metadata')
       .maybeSingle();
 
     if (upErr) return res.status(500).json({ error: 'DB_UPDATE_FAILED', detail: upErr.message });
     if (!upd)  return res.status(500).json({ error: 'NO_ROW_UPDATED', id: mem.id });
 
-    // 트리거가 값 지웠는지 재확인
+    // 재조회(트리거 개입 여부 확인)
     const { data: re, error: reErr } = await supabase
       .from('memberships')
-      .select('scheduled_change_type, scheduled_next_plan, scheduled_effective_at, scheduled_requested_at')
+      .select('scheduled_change_type, scheduled_next_plan, scheduled_effective_at, scheduled_requested_at, metadata')
       .eq('id', mem.id)
       .maybeSingle();
     if (reErr) return res.status(500).json({ error: 'RECHECK_FAILED', detail: reErr.message });
-    if (!re?.scheduled_change_type) {
-      return res.status(500).json({ error: 'SCHEDULED_COLUMNS_WIPED_BY_TRIGGER', re });
-    }
 
     return res.status(200).json({
       ok: true,
@@ -735,6 +728,21 @@ async function scheduleFromFixed(req, res) {
         next_plan: nextPlan,
         effective_at: effectiveIso,
         requested_at: nowIso
+      },
+      // ✅ 디버그/검증용으로 DB에 최종 들어간 값을 같이 반환
+      dbg_upd: {
+        scheduled_change_type:  upd.scheduled_change_type,
+        scheduled_next_plan:    upd.scheduled_next_plan,
+        scheduled_effective_at: upd.scheduled_effective_at,
+        scheduled_requested_at: upd.scheduled_requested_at,
+        meta_has_scheduled: !!(safeParse(upd.metadata)?.scheduled_change),
+      },
+      dbg_re: {
+        scheduled_change_type:  re?.scheduled_change_type || null,
+        scheduled_next_plan:    re?.scheduled_next_plan || null,
+        scheduled_effective_at: re?.scheduled_effective_at || null,
+        scheduled_requested_at: re?.scheduled_requested_at || null,
+        meta_has_scheduled: !!(safeParse(re?.metadata)?.scheduled_change),
       }
     });
   } catch (e) {
