@@ -690,35 +690,28 @@ async function scheduleFromFixed(req, res) {
    // ---- 업데이트 payload 준비 이후(지금 코드 위치 그대로) ----
 const { data: upd, error: upErr } = await supabase
   .from('memberships')
-  .update(updates)
+  .update({
+    scheduled_change_type:  'to_recurring',
+    scheduled_next_plan:    nextPlan,
+    scheduled_effective_at: end.toISOString(),
+    scheduled_requested_at: nowIso,
+  })
   .eq('id', mem.id)
   .select('id, scheduled_change_type, scheduled_next_plan, scheduled_effective_at, scheduled_requested_at')
   .maybeSingle();
 
-if (upErr) {
-  console.error('[scheduleFromFixed] DB_UPDATE_FAILED:', upErr);
-  return res.status(500).json({ error: 'DB_UPDATE_FAILED', detail: upErr.message });
-}
-if (!upd) {
-  console.error('[scheduleFromFixed] NO_ROW_UPDATED id=', mem.id);
-  return res.status(500).json({ error: 'NO_ROW_UPDATED' });
-}
+if (upErr) return res.status(500).json({ error: 'DB_UPDATE_FAILED', detail: upErr.message });
+if (!upd)  return res.status(500).json({ error: 'NO_ROW_UPDATED', detail: { id: mem.id } });
 
-// 🔎 트리거가 값을 지웠는지 재조회로 확정
-const { data: re, error: reErr } = await supabase
+// 재조회로 최종 확인 (트리거가 지웠는지 탐지)
+const { data: re } = await supabase
   .from('memberships')
-  .select('scheduled_change_type, scheduled_next_plan, scheduled_effective_at, scheduled_requested_at')
+  .select('scheduled_change_type')
   .eq('id', mem.id)
   .maybeSingle();
-
-if (reErr) {
-  console.warn('[scheduleFromFixed] REFETCH_WARN:', reErr);
-} else if (!re?.scheduled_change_type) {
-  console.error('[scheduleFromFixed] SCHEDULED_COLUMNS_WIPED_BY_TRIGGER id=', mem.id, 'refetch=', re);
-  return res.status(500).json({ error: 'SCHEDULED_COLUMNS_WIPED_BY_TRIGGER', detail: re });
+if (!re?.scheduled_change_type) {
+  return res.status(500).json({ error:'SCHEDULED_COLUMNS_WIPED_BY_TRIGGER', id: mem.id });
 }
-
-console.log('[scheduleFromFixed] saved:', upd);
 
     return res.status(200).json({
       ok: true,
