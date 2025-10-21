@@ -1306,8 +1306,8 @@ window.openSubscriptionModal = async function () {
   ${changeLabel}
 </button>
           ${isRecurring ? `
-            <button id="to3mBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">프리미엄3으로 전환</button>
-            <button id="to6mBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">프리미엄6으로 전환</button>
+            <button id="to3mBtn" class="btn-success">프리미엄3으로 전환</button>
+            <button id="to6mBtn" class="btn-success">프리미엄6으로 전환</button>
           ` : ""}
 
           <button id="subCloseBtn2" class="btn-success">닫기</button>
