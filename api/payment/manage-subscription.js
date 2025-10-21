@@ -706,22 +706,40 @@ const { data: upd, error: upErr } = await supabase
     scheduled_next_plan:    nextPlan,
     scheduled_effective_at: end.toISOString(),
     scheduled_requested_at: nowIso,
+    // metadata 안에 옛날 scheduled_change 있으면 제거해서 덮어쓰기(선택)
+    ...( (() => {
+      const metaObj = safeParse(mem.metadata) || {};
+      if (metaObj && typeof metaObj === 'object' && metaObj.scheduled_change) {
+        delete metaObj.scheduled_change;
+        return { metadata: metaObj };
+      }
+      return {};
+    })() )
   })
   .eq('id', mem.id)
   .select('id, scheduled_change_type, scheduled_next_plan, scheduled_effective_at, scheduled_requested_at')
   .maybeSingle();
 
-if (upErr) return res.status(500).json({ error: 'DB_UPDATE_FAILED', detail: upErr.message });
-if (!upd)  return res.status(500).json({ error: 'NO_ROW_UPDATED', detail: { id: mem.id } });
+if (upErr) {
+  return res.status(500).json({ error: 'DB_UPDATE_FAILED', detail: upErr.message });
+}
+if (!upd) {
+  // RLS/조건미스 등으로 갱신 0행
+  return res.status(500).json({ error: 'NO_ROW_UPDATED', id: mem.id });
+}
 
-// 재조회로 최종 확인 (트리거가 지웠는지 탐지)
-const { data: re } = await supabase
+// 최종 재조회(트리거가 값 지웠는지 탐지)
+const { data: re, error: reErr } = await supabase
   .from('memberships')
-  .select('scheduled_change_type')
+  .select('scheduled_change_type, scheduled_next_plan, scheduled_effective_at, scheduled_requested_at')
   .eq('id', mem.id)
   .maybeSingle();
+
+if (reErr) {
+  return res.status(500).json({ error: 'RECHECK_FAILED', detail: reErr.message });
+}
 if (!re?.scheduled_change_type) {
-  return res.status(500).json({ error:'SCHEDULED_COLUMNS_WIPED_BY_TRIGGER', id: mem.id });
+  return res.status(500).json({ error: 'SCHEDULED_COLUMNS_WIPED_BY_TRIGGER', re });
 }
 
     return res.status(200).json({
