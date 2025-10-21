@@ -3,7 +3,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABAS
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export default async function handler(req, res) {
-  // ✅ 헬스: 메서드 무관(POST/GET/무엇이든) + 에러 절대 안 냄
+  // ✅ 1) 헬스: 메서드 무관 + 최우선 분기
   const isHealth = req.query && (req.query.health !== undefined || req.query._health !== undefined);
   if (isHealth) {
     return res.status(200).json({
@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     });
   }
 
-  // ✅ 실제 세션 종료는 POST만
+  // ✅ 2) 실제 종료는 POST만
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     const resp = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${SERVICE_KEY}`, // Service Role
+        Authorization: `Bearer ${SERVICE_KEY}`,
         apikey: SERVICE_KEY,
         'Content-Type': 'application/json',
       },
