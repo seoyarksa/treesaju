@@ -20,6 +20,11 @@ export default async function handler(req, res) {
   if (req.method === "POST" && action === "cancel") {
     return await cancelSubscription(req, res);
   }
+
+  // ✅ 예약 집행 엔드포인트(크론/수동 호출)
+  if ((req.method === "GET" || req.method === "POST") && action === "apply_scheduled_changes") {
+    return await processScheduledChanges(req, res);
+  }
     // 👇👇👇 추가: 선결제 → 정기 전환 "예약" (만료일 이후 적용)
   if (req.method === "POST" && action === "schedule_from_fixed") {
     return await scheduleFromFixed(req, res);
@@ -339,6 +344,14 @@ async function autoCancelExpired(req, res) {
 //
 async function chargeBilling(req, res) {
   try {
+    const safeParse = (raw) => {
+      if (!raw) return null;
+      try {
+        const a = typeof raw === "string" ? JSON.parse(raw) : raw;
+        if (typeof a === "string") { try { return JSON.parse(a); } catch { return a; } }
+        return a;
+      } catch { return null; }
+    };
     const now = new Date();
     now.setHours(now.getHours() + 9); // KST
     const today = now.toISOString();
@@ -370,7 +383,8 @@ async function chargeBilling(req, res) {
     for (const u of users) {
       const end = new Date(u.current_period_end);
       if (now >= end) {
-        const customer_uid = u.metadata?.customer_uid;
+        const m = safeParse(u.metadata) || {};
+        const customer_uid = m.customer_uid;
         if (!customer_uid) continue;
 
         const result = await attemptPayment(customer_uid, access_token);
@@ -608,7 +622,14 @@ async function changePlan(req, res) {
 // if (req.method === "POST" && action === "schedule_from_fixed") return await scheduleFromFixed(req, res);
 
 // /api/payment/manage-subscription.js  내부
-
+const safeParse = (raw) => {
+  if (raw == null) return null;
+  try {
+    const a = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (typeof a === 'string') { try { return JSON.parse(a); } catch { return a; } }
+    return a;
+  } catch { return null; }
+};
 async function scheduleFromFixed(req, res) {
   try {
     if (req.method !== 'POST') {
@@ -633,7 +654,7 @@ async function scheduleFromFixed(req, res) {
     // 현재 멤버십 조회
     const { data: mem, error: selErr } = await supabase
       .from('memberships')
-      .select('id, user_id, plan, status, current_period_end, scheduled_change_type, scheduled_effective_at, metadata')
+      .select('id, user_id, plan, status, current_period_end, scheduled_change_type, scheduled_next_plan, scheduled_effective_at, metadata')
       .eq('user_id', user_id)
       .maybeSingle();
 
@@ -648,6 +669,8 @@ async function scheduleFromFixed(req, res) {
       return res.status(400).json({ error: 'NO_EXPIRE_DATE' });
     }
 
+    // 이미 같은 타입 예약이면 덮어쓰기 허용(플랜 변경 갱신)
+    // 다른 타입(to_fixed)이었으면 에러 또는 무시 정책 택1 (여기선 덮어쓰기)
     // 10일 가드 (만료일 기준)
     const end = new Date(mem.current_period_end);
     const daysLeft = Math.max(0, Math.ceil((end - new Date()) / 86400000));
@@ -662,20 +685,19 @@ async function scheduleFromFixed(req, res) {
     // 이미 예약 존재하면 idempotent 처리(같은 타입이면 갱신/덮어쓰기)
     const nowIso = new Date().toISOString();
 
-    const updates = {
+    let updates = {
       scheduled_change_type:   'to_recurring',
       scheduled_next_plan:     nextPlan,
       scheduled_effective_at:  end.toISOString(),  // 만료 직후
       scheduled_requested_at:  nowIso,
       // ✅ 메타의 scheduled_change는 즉시 제거 (있다면)
-      metadata: mem.metadata && typeof mem.metadata === 'object'
-        ? (() => {
-            const clean = { ...mem.metadata };
-            if (clean.scheduled_change) delete clean.scheduled_change;
-            return clean;
-          })()
-        : mem.metadata // (jsonb 내부가 string이면 그대로 두되, 컬럼을 신뢰)
+     
     };
+
+    // 메타에 예약 잔재 있으면 삭제(문자열/객체 모두 대응)
+    const metaObj = safeParse(mem.metadata) || {};
+    if (metaObj.scheduled_change) delete metaObj.scheduled_change;
+    if (Object.keys(metaObj).length) updates.metadata = metaObj;
 
     const { error: upErr } = await supabase
       .from('memberships')
