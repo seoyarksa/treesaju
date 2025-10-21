@@ -5,18 +5,20 @@
     }
   },
 
-    "crons": [
+  "crons": [
     {
-      "path": "/api/payment/charge-billing",
-      "schedule": "0 9 * * *"  
-    }
-  ], 
-    "crons": [
+      "path": "/api/payment/manage-subscription?action=process_scheduled",
+      "schedule": "*/1 * * * *"
+    },
+    {
+      "path": "/api/payment/manage-subscription?action=charge",
+      "schedule": "0 0 * * *"
+    },
     {
       "path": "/api/payment/manage-subscription?action=autoCancel",
-      "schedule": "0 9 * * *"
+      "schedule": "5 0 * * *"
     }
-  ], 
+  ],
     "headers": [
     {
       "source": "/legal/(.*)",

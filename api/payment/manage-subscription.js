@@ -25,6 +25,10 @@ export default async function handler(req, res) {
     return await scheduleFromFixed(req, res);
   }
   // 👆👆👆
+  // 정기 → 선결제 전환 "예약"
+if (req.method === "POST" && action === "schedule_to_fixed") {
+  return await scheduleToFixed(req, res);
+}
    // ✅ 재구독(정기결제만 해당: cancel_at_period_end 해제)
   if (req.method === "POST" && action === "resume") {
     return await resumeSubscription(req, res);
@@ -690,6 +694,72 @@ async function scheduleFromFixed(req, res) {
     return res.status(500).json({ error: 'INTERNAL_ERROR', detail: e?.message || '' });
   }
 }
+
+async function scheduleToFixed(req, res) {
+  try {
+    const { user_id, termMonths } = req.body || {};
+    if (!user_id || ![3, 6, "3", "6"].includes(termMonths)) {
+      return res.status(400).json({ error: "MISSING_OR_INVALID_PARAMS" });
+    }
+    const months = Number(termMonths);
+    const targetPlan = months === 6 ? "premium6" : "premium3";
+
+    // 현재 멤버십 조회
+    const { data: mem, error } = await supabase
+      .from("memberships")
+      .select("id, user_id, plan, status, current_period_end, metadata")
+      .eq("user_id", user_id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!mem) return res.status(404).json({ error: "MEMBERSHIP_NOT_FOUND" });
+
+    // 정기만 허용
+    if (!["premium", "premium_plus"].includes(mem.plan)) {
+      return res.status(400).json({ error: "NOT_RECURRING_PLAN" });
+    }
+    if (!mem.current_period_end) {
+      return res.status(400).json({ error: "NO_CURRENT_PERIOD_END" });
+    }
+
+    const effective_at = new Date(mem.current_period_end).toISOString();
+
+    // metadata 갱신: scheduled_change + 플래그만 (결제 정보는 fixed-activate에서 채움)
+    let meta = {};
+    try { meta = mem.metadata ? JSON.parse(mem.metadata) : {}; } catch {}
+
+    meta.scheduled_change = {
+      type: "to_fixed",
+      plan: targetPlan,           // premium3 | premium6
+      termMonths: months,
+      effective_at,               // 만료일
+      requested_at: new Date().toISOString()
+    };
+
+    const { data: upd, error: upErr } = await supabase
+      .from("memberships")
+      .update({
+        metadata: JSON.stringify(meta),
+        // 정기는 그대로 유지 (plan/status/current_period_end 변경 X)
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", mem.id)
+      .select()
+      .maybeSingle();
+
+    if (upErr) throw upErr;
+
+    return res.status(200).json({
+      ok: true,
+      message: `전환이 예약되었습니다. (${targetPlan} / 효력: ${effective_at})`,
+      membership: upd
+    });
+  } catch (e) {
+    console.error("[scheduleToFixed] error:", e);
+    return res.status(500).json({ error: e.message || "INTERNAL_ERROR" });
+  }
+}
+
+
 
 
 // ✅ 예약 전환 집행기
