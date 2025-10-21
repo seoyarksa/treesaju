@@ -6,10 +6,7 @@
   },
 
   "crons": [
-    {
-      "path": "/api/payment/apply-scheduled-changes",
-      "schedule": "*/10 * * * *"
-    },
+     { "path": "/api/payment/manage-subscription?action=apply_scheduled_changes", "schedule": "*/10 * * * *" },
     {
       "path": "/api/payment/manage-subscription?action=charge",
       "schedule": "0 0 * * *"
