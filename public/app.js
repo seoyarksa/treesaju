@@ -1461,18 +1461,38 @@ sheet.querySelector("#optRecurringPlus")?.addEventListener("click", async () => 
     });
 
     // ✅ 정기 → 3/6 빠른 전환 버튼(가드 포함)
-    if (isRecurring) {
-      document.getElementById("to3mBtn")?.addEventListener("click", () => {
-        if (!guardSwitch()) return;
-        if (typeof switchRecurringToFixed === "function") return switchRecurringToFixed("premium3");
-        (window.startThreeMonthPlan || startThreeMonthPlan)();
-      });
-      document.getElementById("to6mBtn")?.addEventListener("click", () => {
-        if (!guardSwitch()) return;
-        if (typeof switchRecurringToFixed === "function") return switchRecurringToFixed("premium6");
-        (window.startSixMonthPlan || startSixMonthPlan)();
-      });
-    }
+   // 정기 → 3/6개월 전환(빠른 버튼) 바인딩
+if (isRecurring) {
+  document.getElementById("to3mBtn")?.addEventListener("click", async () => {
+    if (!guardSwitch()) return;
+    // 1) 전환 예약
+    const r = await fetch("/api/payment/manage-subscription?action=schedule_to_fixed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: user.id, termMonths: 3 })
+    });
+    const j = await r.json();
+    if (!r.ok) return alert("전환 예약 실패: " + (j.error || ""));
+    alert(j.message || "만료일에 프리미엄3으로 자동 전환됩니다. 결제를 진행합니다.");
+
+    // 2) 선결제 (효력은 만료일에 시작)
+    (window.startThreeMonthPlan || startThreeMonthPlan)();
+  });
+
+  document.getElementById("to6mBtn")?.addEventListener("click", async () => {
+    if (!guardSwitch()) return;
+    const r = await fetch("/api/payment/manage-subscription?action=schedule_to_fixed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: user.id, termMonths: 6 })
+    });
+    const j = await r.json();
+    if (!r.ok) return alert("전환 예약 실패: " + (j.error || ""));
+    alert(j.message || "만료일에 프리미엄6으로 자동 전환됩니다. 결제를 진행합니다.");
+
+    (window.startSixMonthPlan || startSixMonthPlan)();
+  });
+}
 
     if (!isCancelRequested) {
       document.getElementById("cancelSubBtn")?.addEventListener("click", async () => {
