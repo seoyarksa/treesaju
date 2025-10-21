@@ -1274,12 +1274,12 @@ window.openSubscriptionModal = async function () {
     const disableIfLocked = (btnId) => {
       const el = document.getElementById(btnId);
       if (!el) return;
-      if (!canSwitchOrBuy) {
-        el.setAttribute("disabled", "disabled");
-        el.style.opacity = "0.5";
-        el.style.cursor = "not-allowed";
-        el.title = "만료 10일 전부터 가능합니다.";
-      }
+  if (!canSwitchOrBuy) {
+    el.disabled = true;                 // ← 보이되 비활성
+    el.style.opacity = "0.5";
+    el.style.cursor = "not-allowed";
+    el.title = "만료 10일 전부터 가능합니다.";
+  }
     };
 
     let changeLabel = "플랜 변경";
@@ -1329,12 +1329,11 @@ window.openSubscriptionModal = async function () {
       disableIfLocked("to6mBtn");
       disableIfLocked("resumeSubBtn");
     }
-
+      disableIfLocked("resumeSubBtn");
     // ✅ 변경 버튼(전환/새구매 전체 가드)
-    document.getElementById("changePlanBtn")?.addEventListener("click", async () => {
-      if (!guardSwitch()) return;
-
-      const curPlan = plan;
+document.getElementById("changePlanBtn")?.addEventListener("click", async () => {
+  if (!guardSwitch()) return;  // ✅ 10일 규칙 가드
+  const curPlan = plan;
 
       // A) 정기 (premium / premium_plus)
       if (curPlan === "premium" || curPlan === "premium_plus") {
