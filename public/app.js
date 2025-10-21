@@ -1302,8 +1302,9 @@ window.openSubscriptionModal = async function () {
               : `<button id="cancelSubBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기결제 해지 신청</button>`
           }
 
-          <button id="changePlanBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">${changeLabel}</button>
-
+       <button id="changePlanBtn" class="btn-success">
+  ${changeLabel}
+</button>
           ${isRecurring ? `
             <button id="to3mBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">프리미엄3으로 전환</button>
             <button id="to6mBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">프리미엄6으로 전환</button>
