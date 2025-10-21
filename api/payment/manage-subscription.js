@@ -12,8 +12,11 @@ console.log("[ENV CHECK] SUPABASE_SERVICE_ROLE_KEY:", !!process.env.SUPABASE_SER
 
 
 export default async function handler(req, res) {
-  const { action } = req.query;
-
+  // 🔎 액션 정규화 + 라우팅 로그 (가장 먼저!)
+  const rawAction = (req.query?.action ?? '').toString();
+  const action = rawAction.toLowerCase().replace(/-/g, '_').trim();
+  console.log('[manage-subscription] method=%s raw=%s -> %s url=%s',
+    req.method, rawAction, action, req.url);
   if (req.method === "POST" && action === "register") {
     return await registerBilling(req, res);
   }
