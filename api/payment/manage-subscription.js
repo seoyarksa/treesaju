@@ -44,10 +44,7 @@ if (req.method === "POST" && action === "change_plan") {
   if (req.method === "GET" && action === "charge") {
     return await chargeBilling(req, res);
   }
-    // ✅ 새로 추가: 예약 전환 집행
-  if (req.method === "GET" && action === "process_scheduled") {
-    return await processScheduledChanges(req, res);
-  }
+
 
   return res.status(405).json({ error: "Invalid request" });
 }
