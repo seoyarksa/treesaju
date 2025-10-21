@@ -2,7 +2,7 @@
 
 
 // git add .
-// git commit -m "배포에러수정"   
+// git commit -m "정기결제연동"   
 // git push origin main
 // git push
 //강제실행   vercel --prod --force
@@ -1154,6 +1154,29 @@ window.openSubscriptionModal = async function () {
   // ── 결제 선택 화면(미보유/비활성) ───────────────────────────
   function renderPurchaseChoices() {
     modal.innerHTML = `
+      <style>
+    .modal-panel{
+      background:#fff; border-radius:10px; padding:16px; max-width:520px; margin:0 auto;
+      font-size:16px; line-height:1.55; -webkit-text-size-adjust:100%;
+    }
+    .modal-panel h3{ margin:0 0 8px; font-size:20px; }
+    .modal-panel p{  margin:0 0 12px; font-size:14px; }
+    .modal-panel .plan{ background:#f9fafb; border:1px solid #eee; border-radius:8px; padding:12px; margin-bottom:12px; }
+    .modal-panel ul{ margin:0; padding-left:18px; line-height:1.6; }
+    .modal-panel li{ font-size:14px; }
+
+    /* 모바일에서 글자/여백 축소 */
+    @media (max-width:480px){
+      .modal-panel{ max-width:94vw; padding:14px; font-size:14px; }
+      .modal-panel h3{ font-size:18px; }
+      .modal-panel p, .modal-panel li{ font-size:13px; }
+    }
+    @media (max-width:360px){
+      .modal-panel{ padding:12px; font-size:13px; }
+      .modal-panel h3{ font-size:16px; }
+      .modal-panel p, .modal-panel li{ font-size:12px; }
+    }
+  </style>
       <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:520px; margin:0 auto;">
         <h3 style="margin:0 0 8px;">구독 결제</h3>
         <p style="margin:0 0 12px;">전화번호 인증이 완료되었습니다. 상품을 선택해 결제하세요.</p>

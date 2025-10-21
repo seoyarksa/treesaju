@@ -24,9 +24,9 @@
 </head>
 <body>
   <h2>회원관리</h2>
-
+ 
   <input type="text" id="searchInput" placeholder="닉네임/이메일 검색" />
-  <button onclick="loadMembers(1)">검색</button>
+  <button onclick="loadMembers(1)">검색</button>   <a href="https://supabase.com/dashboard/project/dxrgobsgeeshkybkbnxo/editor/45485" target="_blank">전체테이블 보기</a> 
 
   <table>
     <thead>
@@ -41,8 +41,8 @@
         <th>권한(Role)</th>
         <th>가입일</th>
         <th>수정일</th>
-        <th>Trial 시작</th>
-        <th>Trial 종료</th>
+        <th>만료일</th>
+        <th>해지 효력일</th>
         <th>일일 사용일</th>
         <th>일일 사용 횟수</th>
         <th>일일 제한</th>
@@ -90,8 +90,13 @@
         </select>
       </label><br>
 
-      <label>Trial 시작: <input type="date" id="edit-trial_started_at"></label><br>
-      <label>Trial 종료: <input type="date" id="edit-trial_ends_at"></label><br>
+ <label>만료일 (current_period_end):
+  <input type="date" id="edit-current_period_end">
+</label><br>
+<label>해지 효력일 (cancel_effective_at):
+  <input type="date" id="edit-cancel_effective_at">
+</label><br>
+
       <label>일일 제한: <input type="number" id="edit-daily_limit"></label><br>
       <label>Special 지정일: <input type="date" id="edit-special_assigned_at"></label><br>
       <label>Premium 지정일: <input type="date" id="edit-premium_assigned_at"></label><br>
@@ -234,8 +239,17 @@
           <td>${member.role || "-"}</td>
           <td>${member.created_at ? new Date(member.created_at).toLocaleDateString() : "-"}</td>
           <td>${member.updated_at ? new Date(member.updated_at).toLocaleDateString() : "-"}</td>
-          <td>${member.trial_started_at ? new Date(member.trial_started_at).toLocaleDateString() : "-"}</td>
-          <td>${member.trial_ends_at ? new Date(member.trial_ends_at).toLocaleDateString() : "-"}</td>
+   <td>
+  ${member.current_period_end
+    ? new Date(member.current_period_end).toLocaleDateString('ko-KR')
+    : "-"}
+</td>
+<td>
+  ${member.cancel_effective_at
+    ? new Date(member.cancel_effective_at).toLocaleDateString('ko-KR')
+    : "-"}
+</td>
+
           <td>${member.daily_usage_date || "-"}</td>
           <td>${member.daily_usage_count ?? "-"}</td>
           <td>${member.daily_limit ?? "-"}</td>
@@ -281,8 +295,9 @@
       document.getElementById("edit-role").value  = data.role  || "normal";
 
       const d = s => s ? s.split("T")[0] : "";
-      document.getElementById("edit-trial_started_at").value        = d(data.trial_started_at);
-      document.getElementById("edit-trial_ends_at").value           = d(data.trial_ends_at);
+  document.getElementById("edit-current_period_end").value   = d(data.current_period_end);
+  document.getElementById("edit-cancel_effective_at").value  = d(data.cancel_effective_at);
+
       document.getElementById("edit-daily_limit").value             = data.daily_limit ?? "";
       document.getElementById("edit-special_assigned_at").value     = d(data.special_assigned_at);
       document.getElementById("edit-premium_assigned_at").value     = d(data.premium_assigned_at);
@@ -316,8 +331,8 @@
         phone: Vtxt("edit-phone"),
         grade: Vtxt("edit-grade"),
         role:  Vtxt("edit-role"),
-        trial_started_at: Vdate("edit-trial_started_at"),
-        trial_ends_at:    Vdate("edit-trial_ends_at"),
+    current_period_end:  Vdate("edit-current_period_end"),
+    cancel_effective_at: Vdate("edit-cancel_effective_at"),
         daily_limit:      Vnum("edit-daily_limit"),
         special_assigned_at:       Vdate("edit-special_assigned_at"),
         premium_assigned_at:       Vdate("edit-premium_assigned_at"),

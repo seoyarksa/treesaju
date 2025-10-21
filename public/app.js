@@ -1264,6 +1264,17 @@ const dateValue = data.current_period_end
 
 const end = data.current_period_end ? new Date(data.current_period_end) : null;
 const daysLeft = end ? Math.max(0, Math.ceil((end - new Date()) / 86400000)) : null;
+// ✅ 추가: 만료 10일 전부터만 전환/구매 허용
+const canSwitchOrBuy = !end || daysLeft <= 10; // end 없으면(미보유) 언제든 가능
+// 안내 문구(상단 extraLine 바로 아래에 추가 추천)
+const switchNotice = end
+  ? `<div style="margin-top:6px;color:${canSwitchOrBuy ? '#0a7c0a' : '#c0392b'};font-size:12px;">
+       ${canSwitchOrBuy
+         ? "지금은 플랜 변경/새 구매가 가능합니다. (만료일까지 " + daysLeft + "일)"
+         : "플랜 변경/새 구매는 <b>만료 10일 전부터</b> 가능합니다. (남은 " + daysLeft + "일)"
+       }
+     </div>`
+  : "";
 
 const extraLine = end
   ? `<div style="margin-top:6px;color:#888;font-size:12px;">
@@ -1285,7 +1296,7 @@ const extraLine = end
         <p style="margin:4px 0;"><strong>플랜:</strong> ${data.plan ?? "-"}</p>
         <p style="margin:4px 0;"><strong>상태:</strong> ${statusText}</p>
         <p style="margin:4px 0 12px;"><strong>${dateLabel}:</strong> ${dateValue}</p>
-        ${extraLine}<br>
+        ${extraLine}${switchNotice}<br>
 
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           ${
@@ -1302,6 +1313,7 @@ const extraLine = end
           ` : ""}
 
           <button id="subCloseBtn2" class="btn-success">닫기</button>
+   
         </div>
 
         ${
