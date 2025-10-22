@@ -28,6 +28,11 @@ export default async function handler(req, res) {
     return await switchFromFixedToRecurring(req, res);
   }
 
+    // ✅ 즉시 전환(정기 → 선결제)
+if (req.method === "POST" && action === "activate_fixed") {
+  return await activateFixedAfterPayment(req, res);
+}
+
   // (기존) 예약 관련은 막아둔 상태라면 그대로 두세요
   if (req.method === "POST" && action === "schedule_from_fixed") {
     return res.status(409).json({ error: 'SCHEDULING_DISABLED', message: '...' });
@@ -808,5 +813,115 @@ async function switchFromFixedToRecurring(req, res) {
   } catch (e) {
     console.error('[switchFromFixedToRecurring] error:', e);
     return res.status(500).json({ error: 'INTERNAL_ERROR', detail: e?.message || '' });
+  }
+}
+
+
+
+async function activateFixedAfterPayment(req, res) {
+  const { imp_uid, user_id, termMonths } = req.body || {};
+  if (!imp_uid || !user_id || ![3, 6].includes(Number(termMonths))) {
+    return res.status(400).json({ error: "MISSING_OR_INVALID_PARAMS" });
+  }
+
+  try {
+    // 1) 아임포트 결제 검증
+    const tokRes = await fetch("https://api.iamport.kr/users/getToken", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imp_key: process.env.IAMPORT_API_KEY,
+        imp_secret: process.env.IAMPORT_API_SECRET,
+      }),
+    });
+    const tokJson = await tokRes.json();
+    const access_token = tokJson?.response?.access_token;
+    if (!access_token) throw new Error("IAMPORT_TOKEN_FAIL");
+
+    const payRes = await fetch(`https://api.iamport.kr/payments/${imp_uid}`, {
+      headers: { Authorization: access_token },
+    });
+    const payJson = await payRes.json();
+    const payment = payJson?.response;
+    if (!payment || payment.status !== "paid") {
+      return res.status(400).json({ error: "PAYMENT_NOT_PAID" });
+    }
+
+    // 2) 현재 멤버십 조회
+    const { data: cur, error: selErr } = await supabase
+      .from("memberships")
+      .select("id, user_id, plan, status, current_period_end, provider, metadata")
+      .eq("user_id", user_id)
+      .maybeSingle();
+    if (selErr) throw selErr;
+
+    // 3) 새 만료일 계산: “기존 만료일 다음날 00:00 KST부터 +3/6개월”
+    const now = new Date();
+    const prevEnd = cur?.current_period_end ? new Date(cur.current_period_end) : now;
+    // ‘다음날 00:00 KST’로 기준 시점 잡기
+    const kstBase = new Date(prevEnd.getTime() + 9 * 3600 * 1000); // KST로 보정
+    kstBase.setUTCHours(0, 0, 0, 0); // 00:00
+    const startAtKST = new Date(kstBase.getTime() + 24 * 3600 * 1000); // 다음날 00:00
+    const expireAtKST = new Date(startAtKST);
+    expireAtKST.setMonth(expireAtKST.getMonth() + Number(termMonths));
+
+    // 4) metadata 갱신
+    const targetPlan = Number(termMonths) === 6 ? "premium6" : "premium3";
+    let meta = {};
+    try { meta = cur?.metadata ? (typeof cur.metadata === "string" ? JSON.parse(cur.metadata) : cur.metadata) : {}; } catch {}
+    meta.provider = "kakao";
+    meta.kind = "fixed";
+    meta.last_purchase = {
+      imp_uid,
+      merchant_uid: payment.merchant_uid,
+      termMonths: Number(termMonths),
+      price: payment.amount,
+      at: new Date().toISOString(),
+    };
+    meta.purchases = Array.isArray(meta.purchases) ? meta.purchases : [];
+    meta.purchases.push(meta.last_purchase);
+    if (meta.scheduled_change) delete meta.scheduled_change; // 혹시 남아있다면 제거
+
+    // 5) memberships 즉시 전환 (정기 해지 플래그 해제, status=active)
+    const { data: upd, error: upErr } = await supabase
+      .from("memberships")
+      .update({
+        plan: targetPlan,
+        status: "active",
+        provider: "kakao",
+        cancel_at_period_end: false,
+        cancel_effective_at: null,
+        current_period_end: expireAtKST.toISOString(), // 고정제 만료일
+        metadata: meta, // jsonb 컬럼: 객체 그대로 OK
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", user_id)
+      .select()
+      .maybeSingle();
+
+    if (upErr) throw upErr;
+
+    // 6) 프로필 등급 동기화(트리거가 하더라도 안전하게 한 번 더)
+    const { error: profErr } = await supabase
+      .from("profiles")
+      .update({
+        grade: targetPlan, // premium3/6 → 등급 정책대로 premium로 매핑할 거면 여기서 변경
+        daily_limit: targetPlan === "premium6" || targetPlan === "premium3" ? 60 : 60, // 정책에 맞게
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", user_id);
+    if (profErr) {
+      // 트리거가 처리할 수 있으므로 에러는 경고로만
+      console.warn("[activateFixedAfterPayment] profile update warn:", profErr);
+    }
+
+    return res.status(200).json({
+      ok: true,
+      message: `프리미엄${termMonths}으로 전환 완료. 만료: ${expireAtKST.toISOString().slice(0, 10)}`,
+      membership: upd,
+    });
+  } catch (e) {
+    console.error("[activateFixedAfterPayment] error:", e);
+    return res.status(500).json({ error: e.message || "INTERNAL_ERROR" });
   }
 }
