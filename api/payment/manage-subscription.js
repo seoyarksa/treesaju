@@ -818,9 +818,31 @@ async function switchFromFixedToRecurring(req, res) {
 
 
 
+// util: 개월 더하기 (UTC 기반, 말일 이슈 단순화)
+function addMonthsUTC(date, months) {
+  const d = new Date(date);
+  const y = d.getUTCFullYear();
+  const m = d.getUTCMonth();
+  const day = d.getUTCDate();
+  return new Date(Date.UTC(y, m + months, day, d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds(), d.getUTCMilliseconds()));
+}
+
+// 안전 파서 (jsonb↔string 모두 대응)
+function safeParse(raw) {
+  if (raw == null) return {};
+  try {
+    const a = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return (typeof a === "string") ? JSON.parse(a) : (a || {});
+  } catch { return {}; }
+}
+
+// manage-subscription.js 내부
+// manage-subscription.js 내부
 async function activateFixedAfterPayment(req, res) {
   const { imp_uid, user_id, termMonths } = req.body || {};
-  if (!imp_uid || !user_id || ![3, 6].includes(Number(termMonths))) {
+  const months = Number(termMonths);
+
+  if (!imp_uid || !user_id || ![3, 6].includes(months)) {
     return res.status(400).json({ error: "MISSING_OR_INVALID_PARAMS" });
   }
 
@@ -847,7 +869,7 @@ async function activateFixedAfterPayment(req, res) {
       return res.status(400).json({ error: "PAYMENT_NOT_PAID" });
     }
 
-    // 2) 현재 멤버십 조회
+    // 2) 현재 멤버십 조회(있을 수도, 없을 수도 있음)
     const { data: cur, error: selErr } = await supabase
       .from("memberships")
       .select("id, user_id, plan, status, current_period_end, provider, metadata")
@@ -855,70 +877,100 @@ async function activateFixedAfterPayment(req, res) {
       .maybeSingle();
     if (selErr) throw selErr;
 
-    // 3) 새 만료일 계산: “기존 만료일 다음날 00:00 KST부터 +3/6개월”
+    // 3) 새 만료일 계산:
+    //    - 기존 만료일이 미래면: "기존 만료 다음날 00:00 KST" 기준으로 +3/6개월
+    //    - 그 외(없거나 과거): "지금 기준(KST) 00:00"부터 +3/6개월
     const now = new Date();
-    const prevEnd = cur?.current_period_end ? new Date(cur.current_period_end) : now;
-    // ‘다음날 00:00 KST’로 기준 시점 잡기
-    const kstBase = new Date(prevEnd.getTime() + 9 * 3600 * 1000); // KST로 보정
-    kstBase.setUTCHours(0, 0, 0, 0); // 00:00
-    const startAtKST = new Date(kstBase.getTime() + 24 * 3600 * 1000); // 다음날 00:00
-    const expireAtKST = new Date(startAtKST);
-    expireAtKST.setMonth(expireAtKST.getMonth() + Number(termMonths));
+    const baseStart = (() => {
+      const KST = 9 * 3600 * 1000;
+      const hasFutureEnd =
+        cur?.current_period_end && new Date(cur.current_period_end).getTime() > Date.now();
+      const startSrc = hasFutureEnd ? new Date(cur.current_period_end) : now;
 
-    // 4) metadata 갱신
-    const targetPlan = Number(termMonths) === 6 ? "premium6" : "premium3";
+      const kst = new Date(startSrc.getTime() + KST);
+      kst.setUTCHours(0, 0, 0, 0);              // KST 00:00
+      if (hasFutureEnd) kst.setUTCDate(kst.getUTCDate() + 1); // 다음날 00:00
+      return kst;
+    })();
+
+    const expireAtKST = new Date(baseStart);
+    expireAtKST.setMonth(expireAtKST.getMonth() + months);
+
+    // 4) metadata 누적
+    const targetPlan = months === 6 ? "premium6" : "premium3";
     let meta = {};
     try { meta = cur?.metadata ? (typeof cur.metadata === "string" ? JSON.parse(cur.metadata) : cur.metadata) : {}; } catch {}
     meta.provider = "kakao";
     meta.kind = "fixed";
-    meta.last_purchase = {
+    const purchase = {
       imp_uid,
       merchant_uid: payment.merchant_uid,
-      termMonths: Number(termMonths),
+      termMonths: months,
       price: payment.amount,
       at: new Date().toISOString(),
     };
     meta.purchases = Array.isArray(meta.purchases) ? meta.purchases : [];
-    meta.purchases.push(meta.last_purchase);
-    if (meta.scheduled_change) delete meta.scheduled_change; // 혹시 남아있다면 제거
+    meta.purchases.push(purchase);
+    meta.last_purchase = purchase;
+    if (meta.scheduled_change) delete meta.scheduled_change;
 
-    // 5) memberships 즉시 전환 (정기 해지 플래그 해제, status=active)
-    const { data: upd, error: upErr } = await supabase
-      .from("memberships")
-      .update({
-        plan: targetPlan,
-        status: "active",
-        provider: "kakao",
-        cancel_at_period_end: false,
-        cancel_effective_at: null,
-        current_period_end: expireAtKST.toISOString(), // 고정제 만료일
-        metadata: meta, // jsonb 컬럼: 객체 그대로 OK
-        updated_at: new Date().toISOString(),
-      })
-      .eq("user_id", user_id)
-      .select()
-      .maybeSingle();
+    const nowIso = new Date().toISOString();
 
-    if (upErr) throw upErr;
+    // 5) 업서트: 있으면 UPDATE, 없으면 INSERT
+    let upserted;
+    if (cur?.id) {
+      const { data: upd, error: upErr } = await supabase
+        .from("memberships")
+        .update({
+          plan: targetPlan,
+          status: "active",
+          provider: "kakao",
+          cancel_at_period_end: false,
+          cancel_effective_at: null,
+          current_period_end: expireAtKST.toISOString(),
+          metadata: meta,                 // jsonb: 객체 그대로
+          updated_at: nowIso,
+        })
+        .eq("id", cur.id)
+        .select()
+        .maybeSingle();
+      if (upErr) throw upErr;
+      upserted = upd;
+    } else {
+      const { data: ins, error: insErr } = await supabase
+        .from("memberships")
+        .insert({
+          user_id,
+          plan: targetPlan,
+          status: "active",
+          provider: "kakao",
+          cancel_at_period_end: false,
+          cancel_effective_at: null,
+          current_period_end: expireAtKST.toISOString(),
+          metadata: meta,
+          created_at: nowIso,
+          updated_at: nowIso,
+        })
+        .select()
+        .maybeSingle();
+      if (insErr) throw insErr;
+      upserted = ins;
+    }
 
-    // 6) 프로필 등급 동기화(트리거가 하더라도 안전하게 한 번 더)
-    const { error: profErr } = await supabase
+    // 6) 프로필 등급도 안전 반영(트리거가 있더라도 한번 더)
+    await supabase
       .from("profiles")
       .update({
-        grade: targetPlan, // premium3/6 → 등급 정책대로 premium로 매핑할 거면 여기서 변경
-        daily_limit: targetPlan === "premium6" || targetPlan === "premium3" ? 60 : 60, // 정책에 맞게
-        updated_at: new Date().toISOString(),
+        grade: targetPlan,                 // 정책상 premium3/6 ⇒ grade=premium 로 강제라면 여기서 바꿔도 됨
+        daily_limit: 60,                   // 정책에 맞게
+        updated_at: nowIso,
       })
       .eq("user_id", user_id);
-    if (profErr) {
-      // 트리거가 처리할 수 있으므로 에러는 경고로만
-      console.warn("[activateFixedAfterPayment] profile update warn:", profErr);
-    }
 
     return res.status(200).json({
       ok: true,
-      message: `프리미엄${termMonths}으로 전환 완료. 만료: ${expireAtKST.toISOString().slice(0, 10)}`,
-      membership: upd,
+      message: `프리미엄${months}으로 전환/구매 완료. 만료: ${expireAtKST.toISOString().slice(0,10)}`,
+      membership: upserted,
     });
   } catch (e) {
     console.error("[activateFixedAfterPayment] error:", e);
