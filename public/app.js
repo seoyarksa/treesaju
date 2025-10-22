@@ -1129,22 +1129,27 @@ function msLeftUntil(endDate) {
   return Math.max(0, new Date(endDate).getTime() - Date.now());
 }
 
-// ✅ "X시간 Y분" 포맷 (1시간 미만이면 "Z분")
-function formatRemainingMs(ms) {
-  const totalMins = Math.ceil(ms / 60000);
-  const hours = Math.floor(totalMins / 60);
-  const mins = totalMins % 60;
-  if (hours <= 0) return `${totalMins}분`;
-  if (mins === 0)  return `${hours}시간`;
-  return `${hours}시간 ${mins}분`;
+
+function formatRemaining(endDate) {
+  const ms = msLeftUntil(endDate);
+  if (ms === Infinity) return '-';
+  const ONE_DAY = 24 * 60 * 60 * 1000;
+
+  if (ms > ONE_DAY) {
+    const days = Math.ceil(ms / ONE_DAY);
+    return `${days}일`;
+  } else {
+    const totalMins = Math.ceil(ms / 60000);
+    const hours = Math.floor(totalMins / 60);
+    const mins = totalMins % 60;
+    if (hours <= 0) return `${totalMins}분`;
+    if (mins === 0)  return `${hours}시간`;
+    return `${hours}시간 ${mins}분`;
+  }
 }
 
-// KST 기준 '일수'는 기존 daysLeftByKST 유지
-function msLeft(endDate) {
-  if (!endDate) return Infinity;
-  // 시간 차이는 타임존 보정이 필요없음: 두 timestamp의 차이(ms)
-  return new Date(endDate).getTime() - Date.now();
-}
+
+
 
 
 function formatKSTDate(dateLike) {
@@ -1281,22 +1286,19 @@ const dateValue = data.current_period_end
 
 
 const end = data.current_period_end ? new Date(data.current_period_end) : null;
+const ONE_DAY = 24 * 60 * 60 * 1000;
+const canSwitchOrBuy = end ? msLeftUntil(end) <= ONE_DAY : true;
+const remainingLabel = end ? formatRemaining(end) : '-';
 
-// ✅ 남은 시간(ms) 기준으로 판단
-const leftMs = end ? msLeftUntil(end) : Infinity;
-
-// ✅ 전환/새구매 허용: "만료 24시간 이내"부터
-const canSwitchOrBuy = leftMs <= 24 * 60 * 60 * 1000;
-
-// 안내 문구
 const switchNotice = end
   ? `<div style="margin-top:6px;color:${canSwitchOrBuy ? '#0a7c0a' : '#c0392b'};font-size:12px;">
        ${canSwitchOrBuy
-         ? `지금은 플랜 변경 or 새 구매가 가능합니다. (만료까지 약 ${formatRemainingMs(leftMs)} 남음)`
-         : `플랜 변경 or 새 구매는 <b>만료 24시간 전부터</b> 가능합니다. (현재 남은 시간: 약 ${formatRemainingMs(leftMs)})`
+         ? `지금은 플랜 변경 or 새 구매가 가능합니다. (만료까지 약 ${remainingLabel} 남음)`
+         : `플랜 변경 or 새 구매는 <b>만료 24시간 전부터</b> 가능합니다. (현재 남은 시간: 약 ${remainingLabel})`
        }
      </div>`
   : "";
+
 
 
 
