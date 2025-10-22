@@ -1287,54 +1287,67 @@ window.openSubscriptionModal = async function () {
     else if (plan === "premium_plus") changeLabel = "프리미엄(기본)으로 전환";
     else if (plan === "premium3" || plan === "premium6") changeLabel = "다른 플랜으로 전환";
 
-    modal.innerHTML = `
-      <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:520px; margin:0 auto;">
-        <h3 style="margin:0 0 8px;">구독 정보</h3>
-        <p style="margin:4px 0;"><strong>플랜:</strong> ${data.plan ?? "-"}</p>
-        <p style="margin:4px 0;"><strong>상태:</strong> ${statusText}</p>
-        <p style="margin:4px 0 12px;"><strong>${dateLabel}:</strong> ${dateValue}</p>
-        ${switchNotice}<br>
+// ...위쪽 로직 동일...
 
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          ${
-            isCancelRequested
+// 버튼 영역 (렌더링) --------------- // CHANGED: 정기 플랜에서만 해지/재구독 버튼 노출
+modal.innerHTML = `
+  <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:520px; margin:0 auto;">
+    <h3 style="margin:0 0 8px;">구독 정보</h3>
+    <p style="margin:4px 0;"><strong>플랜:</strong> ${data.plan ?? "-"}</p>
+    <p style="margin:4px 0;"><strong>상태:</strong> ${statusText}</p>
+    <p style="margin:4px 0 12px;"><strong>${dateLabel}:</strong> ${dateValue}</p>
+    ${switchNotice}<br>
+
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      ${
+        // 정기 구독일 때만 해지/재구독 버튼 표시
+        isRecurring
+          ? (isCancelRequested
               ? `<button id="resumeSubBtn" class="btn-success">${resumeLabel}</button>`
               : `<button id="cancelSubBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기결제 해지 신청</button>`
-          }
+            )
+          : '' // 선결제(premium3/6)는 버튼 숨김
+      }
 
-       <button id="changePlanBtn" class="btn-success">
-  ${changeLabel}
-</button>
-          ${isRecurring ? `
-            <button id="to3mBtn" class="btn-success">프리미엄3으로 전환</button>
-            <button id="to6mBtn" class="btn-success">프리미엄6으로 전환</button>
-          ` : ""}
+      <button id="changePlanBtn" class="btn-success">
+        ${changeLabel}
+      </button>
 
-          <button id="subCloseBtn2" class="btn-success">닫기</button>
-        </div>
+      ${isRecurring ? `
+        <button id="to3mBtn" class="btn-success">프리미엄3으로 전환</button>
+        <button id="to6mBtn" class="btn-success">프리미엄6으로 전환</button>
+      ` : ""}
 
-        ${
-          isCancelRequested
-            ? `<div style="margin-top:8px; color:#888; font-size:12px;">(현재 ${dateLabel}까지 이용 가능합니다.)</div>`
-            : `<div style="margin-top:8px; color:#888; font-size:12px;">5초 후 자동으로 닫혀요.</div>`
-        }
-      </div>
-    `;
+      <button id="subCloseBtn2" class="btn-success">닫기</button>
+    </div>
 
-    document.getElementById("subCloseBtn2")?.addEventListener("click", close);
-
-    // ✅ 버튼 비활성화(UX)
-    disableIfLocked("changePlanBtn");
-    if (isRecurring) {
-      disableIfLocked("to3mBtn");
-      disableIfLocked("to6mBtn");
-      disableIfLocked("resumeSubBtn");
+    ${
+      isCancelRequested
+        ? `<div style="margin-top:8px; color:#888; font-size:12px;">(현재 ${dateLabel}까지 이용 가능합니다.)</div>`
+        : `<div style="margin-top:8px; color:#888; font-size:12px;">5초 후 자동으로 닫혀요.</div>`
     }
-      disableIfLocked("resumeSubBtn");
-    // ✅ 변경 버튼(전환/새구매 전체 가드)
+  </div>
+`;
+
+// 이벤트/가드 -----------------------
+document.getElementById("subCloseBtn2")?.addEventListener("click", close);
+
+// 버튼 비활성화(UX)
+disableIfLocked("changePlanBtn");
+if (isRecurring) {
+  // 정기에서만 존재할 수 있는 버튼들만 가드
+  disableIfLocked("to3mBtn");
+  disableIfLocked("to6mBtn");
+  disableIfLocked("resumeSubBtn");
+  disableIfLocked("cancelSubBtn");
+}
+
+// 변경 버튼(전환/새구매 전체 가드)
 document.getElementById("changePlanBtn")?.addEventListener("click", async () => {
   if (!guardSwitch()) return;  // ✅ 1일 규칙 가드
   const curPlan = plan;
+  // ... 이하 기존 로직 유지 ...
+});
 
       // A) 정기 (premium / premium_plus)
       if (curPlan === "premium" || curPlan === "premium_plus") {
