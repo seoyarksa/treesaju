@@ -1351,7 +1351,7 @@ document.getElementById("changePlanBtn")?.addEventListener("click", async () => 
   if (!guardSwitch()) return;  // ✅ 1일 규칙 가드
   const curPlan = plan;
 
-  // A) 정기 (premium / premium_plus)
+// A) 정기 (premium / premium_plus)
 if (curPlan === "premium" || curPlan === "premium_plus") {
   const howRaw = window.prompt(
     "변경 방법을 선택하세요:\n" +
@@ -1361,11 +1361,12 @@ if (curPlan === "premium" || curPlan === "premium_plus") {
     "1"
   );
 
-  // ✅ 취소 또는 공백/무효 입력 → 아무 것도 하지 않음
-  if (howRaw === null) return;                 // [취소]
+  // ✅ [취소] 또는 공백/무효 입력이면 즉시 반환 (아무 것도 하지 않음)
+  if (howRaw === null) return;
   const how = String(howRaw).trim();
-  if (!["1", "3", "6"].includes(how)) return;  // [무효 입력]
+  if (!["1", "3", "6"].includes(how)) return;
 
+  // ✅ 3/6 선택 시: 선결제로 “즉시 전환” (구매 플로우 진입)
   if (how === "3") {
     if (typeof switchRecurringToFixed === "function") return switchRecurringToFixed("premium3");
     return (window.startThreeMonthPlan || startThreeMonthPlan)();
@@ -1375,7 +1376,7 @@ if (curPlan === "premium" || curPlan === "premium_plus") {
     return (window.startSixMonthPlan || startSixMonthPlan)();
   }
 
-  // ✅ 오직 "1"을 선택했을 때만 정기↔정기 전환 실행
+  // ✅ 오직 "1"일 때만 정기↔정기 즉시 전환
   if (how === "1") {
     const target = (curPlan === "premium_plus") ? "premium" : "premium_plus";
     const res = await fetch("/api/payment/manage-subscription?action=change_plan", {
@@ -1385,69 +1386,97 @@ if (curPlan === "premium" || curPlan === "premium_plus") {
     });
     const json = await res.json();
     if (!res.ok) return alert("변경 실패: " + (json.error || ""));
-    alert(json.message || "플랜이 변경되었습니다. 다음 결제부터 적용돼요.");
+    alert(json.message || "플랜이 즉시 변경되었습니다. 결제는 다음 주기부터 새 요금으로 진행됩니다.");
     return window.location.reload();
   }
 
   return; // 방어적 반환
 }
 
-      // B) 선결제 (premium3 / premium6) → 클릭 패널
-      if (curPlan === "premium3" || curPlan === "premium6") {
-        const old = document.getElementById("planSwitchSheet");
-        if (old) { old.remove(); return; }
+// B) 선결제 (premium3 / premium6) → 클릭 패널
+if (curPlan === "premium3" || curPlan === "premium6") {
+  const old = document.getElementById("planSwitchSheet");
+  if (old) { old.remove(); return; }
 
-        const sheet = document.createElement("div");
-        sheet.id = "planSwitchSheet";
-        sheet.style.cssText = "margin-top:8px; border:1px solid #eee; background:#fafafa; border-radius:8px; padding:10px;";
+  const sheet = document.createElement("div");
+  sheet.id = "planSwitchSheet";
+  sheet.style.cssText = "margin-top:8px; border:1px solid #eee; background:#fafafa; border-radius:8px; padding:10px;";
 
-        const primaryFixedLabel = (curPlan === "premium3")
-          ? "프리미엄6(6개월)로 전환"
-          : "프리미엄3(3개월)로 전환";
+  const primaryFixedLabel = (curPlan === "premium3")
+    ? "프리미엄6(6개월)로 전환"
+    : "프리미엄3(3개월)로 전환";
 
-        sheet.innerHTML = `
-          <div style="font-size:13px; color:#555; margin-bottom:8px;">변경 방법을 선택하세요</div>
-          <div style="display:flex; flex-wrap:wrap; gap:8px;">
-            <button id="optFixedToggle"   style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">${primaryFixedLabel}</button>
-            <button id="optRecurringBasic" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기(기본)으로 전환</button>
-            <button id="optRecurringPlus"  style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기(플러스)로 전환</button>
-            <button id="optCancel"          style="border:1px solid #ddd; background:#f5f5f5; border-radius:6px; padding:6px 10px;">닫기</button>
-          </div>
-        `;
+  sheet.innerHTML = `
+    <div style="font-size:13px; color:#555; margin-bottom:8px;">변경 방법을 선택하세요</div>
+    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+      <button id="optFixedToggle"    style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">${primaryFixedLabel}</button>
+      <button id="optRecurringBasic" class="btn-success">정기(기본)으로 즉시 전환</button>
+      <button id="optRecurringPlus"  class="btn-success">정기(플러스)로 즉시 전환</button>
+      <button id="optCancel"         style="border:1px solid #ddd; background:#f5f5f5; border-radius:6px; padding:6px 10px;">닫기</button>
+    </div>
+  `;
 
-        const panel = modal.querySelector(".modal-panel");
-        (panel ? panel : modal).appendChild(sheet);
+  const panel = modal.querySelector(".modal-panel");
+  (panel ? panel : modal).appendChild(sheet);
 
-        // ✅ 시트 내부 옵션도 가드
-        sheet.querySelector("#optFixedToggle")?.addEventListener("click", () => {
-          if (!guardSwitch()) return;
-          if (curPlan === "premium3") {
-            (window.startSixMonthPlan || startSixMonthPlan)();
-          } else {
-            (window.startThreeMonthPlan || startThreeMonthPlan)();
-          }
-        });
-// 선결제 → 정기(기본)
-sheet.querySelector("#optRecurringBasic")?.addEventListener("click", async () => {
-  if (!guardSwitch()) return;             // D-1 가드
-  // ✅ 예약 호출 금지: D-1부터는 바로 정기 등록 플로우 진입
-  (window.startKakaoSubscriptionBasic || startKakaoSubscriptionBasic)();
-});
+  // 선결제 ↔ 선결제 토글(구매 플로우로 즉시 전환)
+  sheet.querySelector("#optFixedToggle")?.addEventListener("click", () => {
+    if (curPlan === "premium3") {
+      (window.startSixMonthPlan || startSixMonthPlan)();
+    } else {
+      (window.startThreeMonthPlan || startThreeMonthPlan)();
+    }
+  });
 
-// 선결제 → 정기(플러스)
-sheet.querySelector("#optRecurringPlus")?.addEventListener("click", async () => {
-  if (!guardSwitch()) return;             // D-1 가드
-  // ✅ 예약 호출 금지: D-1부터는 바로 정기 등록 플로우 진입
-  (window.startKakaoSubscriptionPlus || startKakaoSubscriptionPlus)();
-});
-
-
-        sheet.querySelector("#optCancel")?.addEventListener("click", () => {
-          sheet.remove();
-        });
-
-        return;
+  // 선결제 → 정기(기본) 즉시 전환
+  sheet.querySelector("#optRecurringBasic")?.addEventListener("click", async () => {
+    try {
+      const res  = await fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id, next_tier: 'basic' }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error('[from_fixed:basic] status', res.status, json);
+        return alert(`전환 실패: ${json?.message || json?.error || ''}`);
       }
+      alert(json.message || '정기(기본)으로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
+      window.location.reload();
+    } catch (e) {
+      console.error('[from_fixed:basic] fetch error', e);
+      alert('전환 실패: ' + e.message);
+    }
+  });
+
+  // 선결제 → 정기(플러스) 즉시 전환
+  sheet.querySelector("#optRecurringPlus")?.addEventListener("click", async () => {
+    try {
+      const res  = await fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id, next_tier: 'plus' }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error('[from_fixed:plus] status', res.status, json);
+        return alert(`전환 실패: ${json?.message || json?.error || ''}`);
+      }
+      alert(json.message || '정기(플러스)로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
+      window.location.reload();
+    } catch (e) {
+      console.error('[from_fixed:plus] fetch error', e);
+      alert('전환 실패: ' + e.message);
+    }
+  });
+
+  sheet.querySelector("#optCancel")?.addEventListener("click", () => {
+    sheet.remove();
+  });
+
+  return;
+}
+
 
       renderPurchaseChoices();
     });
