@@ -22,19 +22,20 @@ export default async function handler(req, res) {
   if ((req.method === 'GET' || req.method === 'POST') && action === 'health') {
     return res.status(200).json({ ok: true, ts: new Date().toISOString() });
   }
-  // ✅ 예약 집행 엔드포인트(크론/수동 호출)
-  if ((req.method === "GET" || req.method === "POST") && action === "apply_scheduled_changes") {
-    return await processScheduledChanges(req, res);
+
+  // ✅ 즉시 전환(선결제 → 정기)
+  if (req.method === "POST" && action === "switch_from_fixed_to_recurring") {
+    return await switchFromFixedToRecurring(req, res);
   }
-      // 👇👇👇 추가: 선결제 → 정기 전환 "예약" (만료일 이후 적용)
+
+  // (기존) 예약 관련은 막아둔 상태라면 그대로 두세요
   if (req.method === "POST" && action === "schedule_from_fixed") {
-    return await scheduleFromFixed(req, res);
+    return res.status(409).json({ error: 'SCHEDULING_DISABLED', message: '...' });
   }
-  // 👆👆👆
-  // 정기 → 선결제 전환 "예약"
-if (req.method === "POST" && action === "schedule_to_fixed") {
-  return await scheduleToFixed(req, res);
-}
+  if (req.method === "POST" && action === "schedule_to_fixed") {
+    return res.status(409).json({ error: 'SCHEDULING_TO_FIXED_DISABLED', message: '...' });
+  }
+
 
   if (req.method === "POST" && action === "register") {
     return await registerBilling(req, res);
@@ -675,114 +676,66 @@ async function scheduleToFixed(req, res) {
 
 
 
-
-
-// ✅ 예약 전환 집행기
-// -----------------------------
-async function processScheduledChanges(req, res) {
+async function switchFromFixedToRecurring(req, res) {
   try {
-    const now = new Date();
-    const nowIso = now.toISOString();
+    const { user_id, next_tier } = req.body || {};
+    if (!user_id || !next_tier) return res.status(400).json({ error: "MISSING_PARAMS" });
 
-    // 1) 우선 컬럼 조건으로 뽑아 처리
-    const { data: colTargets, error: colErr } = await supabase
+    const raw   = String(next_tier).trim().toLowerCase();
+    const tier  = { plus:'plus','premium_plus':'plus','premium+':'plus', basic:'basic', premium:'basic' }[raw];
+    if (!tier)  return res.status(400).json({ error: "INVALID_TIER" });
+    const nextPlan = tier === 'plus' ? 'premium_plus' : 'premium';
+
+    const { data: mem, error: selErr } = await supabase
       .from('memberships')
-      .select('id, user_id, plan, status, provider, current_period_end, metadata, scheduled_change_type, scheduled_next_plan, scheduled_effective_at')
-      .eq('status', 'active')
-      .not('scheduled_change_type', 'is', null)
-      .not('scheduled_effective_at', 'is', null)
-      .lte('scheduled_effective_at', nowIso);
-    if (colErr) throw colErr;
+      .select('id, user_id, plan, status, provider, current_period_end')
+      .eq('user_id', user_id)
+      .maybeSingle();
+    if (selErr) return res.status(500).json({ error: "DB_SELECT_FAILED", detail: selErr.message });
+    if (!mem)   return res.status(404).json({ error: "MEMBERSHIP_NOT_FOUND" });
 
-    let processed = 0, skipped = 0, failures = [];
+    if (!['premium3','premium6'].includes(mem.plan || ''))
+      return res.status(400).json({ error: "ONLY_FIXED_ALLOWED", detail: `current plan: ${mem.plan}` });
+    if (!mem.current_period_end)
+      return res.status(400).json({ error: "NO_EXPIRE_DATE" });
 
-    const handleToRecurring = async (row, effectiveAt, nextPlan) => {
-      const eff = new Date(effectiveAt || nowIso);
-      const nextEnd = new Date(eff);
-      nextEnd.setMonth(nextEnd.getMonth() + 1);
+    const end = new Date(mem.current_period_end);
+    const nextEnd = new Date(end);
+    nextEnd.setMonth(nextEnd.getMonth() + 1);
 
-      let meta = {};
-      try { meta = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : (row.metadata || {}); } catch {}
-      if (meta.scheduled_change) delete meta.scheduled_change;
+    const nowIso = new Date().toISOString();
 
-      const { error: upErr } = await supabase
-        .from('memberships')
-        .update({
-          plan: nextPlan,
-          status: 'active',
-          provider: row.provider || 'kakao',
-          cancel_at_period_end: false,
-          current_period_end: nextEnd.toISOString(),
-          // 컬럼 초기화
-          scheduled_change_type: null,
-          scheduled_next_plan: null,
-          scheduled_effective_at: null,
-          scheduled_requested_at: null,
-          scheduled_note: null,
-          metadata: JSON.stringify(meta),
-          updated_at: nowIso,
-        })
-        .eq('id', row.id);
-      if (upErr) throw upErr;
+    // ✅ 예약 컬럼 제거 후 깔끔한 업데이트
+    const { error: upErr } = await supabase
+      .from('memberships')
+      .update({
+        plan: nextPlan,
+        status: 'active',
+        provider: mem.provider || 'kakao',
+        cancel_at_period_end: false,
+        cancel_effective_at: null,
+        current_period_end: nextEnd.toISOString(),
+        updated_at: nowIso,
+      })
+      .eq('id', mem.id);
+    if (upErr) return res.status(500).json({ error: "DB_UPDATE_FAILED", detail: upErr.message });
 
-      const { error: profErr } = await supabase
-        .from('profiles').update({ grade: nextPlan, updated_at: nowIso })
-        .eq('user_id', row.user_id);
-      if (profErr) throw profErr;
+    // 프로필은 트리거가 동기화한다면 생략 가능. 보조 동기화 원하면 유지
+    await supabase.from('profiles')
+      .update({
+        grade: nextPlan,
+        daily_limit: nextPlan === 'premium_plus' ? 150 : 60,
+        updated_at: nowIso
+      })
+      .eq('user_id', user_id);
 
-      processed++;
-    };
-
-    // 1-a) 컬럼 우선 처리
-    for (const r of (colTargets || [])) {
-      try {
-        if (r.scheduled_change_type === 'to_recurring') {
-          const nextPlan = (r.scheduled_next_plan === 'premium_plus') ? 'premium_plus' : 'premium';
-          await handleToRecurring(r, r.scheduled_effective_at, nextPlan);
-        } else {
-          skipped++;
-        }
-      } catch (e) {
-        failures.push({ id: r.id, error: e.message });
-      }
-    }
-
-    // 2) 메타 fallback (레거시 남아있을 수 있음)
-    const { data: rows, error } = await supabase
-      .from("memberships")
-      .select("id, user_id, plan, status, provider, current_period_end, metadata");
-    if (error) throw error;
-
-    for (const row of rows || []) {
-      let md;
-      try { md = typeof row.metadata === "string" ? JSON.parse(row.metadata) : (row.metadata || {}); }
-      catch { skipped++; continue; }
-      const sc = md?.scheduled_change;
-      if (!sc) { skipped++; continue; }
-
-      const effAt = new Date(sc.effective_at || 0);
-      if (!(effAt instanceof Date) || isNaN(effAt.getTime()) || effAt > now) { skipped++; continue; }
-
-      try {
-        if (sc.type === "to_recurring") {
-          // 레거시는 next_plan(정상) 또는 tier(구버전) 둘 다 케어
-          const nextPlan =
-            sc.next_plan && ['premium','premium_plus'].includes(sc.next_plan)
-              ? sc.next_plan
-              : (sc.tier === 'plus' ? 'premium_plus' : 'premium');
-
-          await handleToRecurring(row, effAt.toISOString(), nextPlan);
-        } else {
-          skipped++;
-        }
-      } catch (e) {
-        failures.push({ id: row.id, error: e.message });
-      }
-    }
-
-    return res.status(200).json({ ok: true, processed, skipped, failures, source: 'processScheduledChanges@rev2' });
-  } catch (err) {
-    console.error("[processScheduledChanges] error:", err);
-    return res.status(500).json({ error: err.message });
+    return res.status(200).json({
+      ok: true,
+      message: `정기(${nextPlan === 'premium' ? '기본' : '플러스'})로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.`,
+      membership: { plan: nextPlan, current_period_end: nextEnd.toISOString() }
+    });
+  } catch (e) {
+    console.error('[switchFromFixedToRecurring] error:', e);
+    return res.status(500).json({ error: 'INTERNAL_ERROR', detail: e?.message || '' });
   }
 }
