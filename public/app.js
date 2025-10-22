@@ -1245,8 +1245,8 @@ window.openSubscriptionModal = async function () {
     const end = data.current_period_end ? new Date(data.current_period_end) : null;
     const daysLeft = end ? Math.max(0, Math.ceil((end - new Date()) / 86400000)) : null;
 
-    // ✅ 전환/새구매 허용 조건: 만료 10일 전부터
-    const canSwitchOrBuy = !end || daysLeft <= 10;
+    // ✅ 전환/새구매 허용 조건: 만료 1일 전부터
+    const canSwitchOrBuy = !end || daysLeft <= 1;
 
    // const extraLine = end
    //   ? `<div style="margin-top:6px;color:#888;font-size:12px;">
@@ -1258,7 +1258,7 @@ window.openSubscriptionModal = async function () {
       ? `<div style="margin-top:6px;color:${canSwitchOrBuy ? '#0a7c0a' : '#c0392b'};font-size:12px;">
            ${canSwitchOrBuy
              ? "지금은 플랜 변경 or 새 구매가 가능합니다. (만료일까지 약" + daysLeft + "일 남음)"
-             : "플랜 변경 or 새 구매는 <b>만료 10일 전부터</b> 가능합니다. (현재 남은 일수: 약 " + daysLeft + "일)"
+             : "플랜 변경 or 새 구매는 <b>만료 1일 전부터</b> 가능합니다. (현재 남은 일수: 약 " + daysLeft + "일)"
            }
          </div>`
       : "";
@@ -1266,7 +1266,7 @@ window.openSubscriptionModal = async function () {
     // ✅ 공통 가드 & 비활성화 유틸
     const guardSwitch = () => {
       if (!canSwitchOrBuy) {
-        alert("현재 플랜의 만료일까지 " + daysLeft + "일 남았습니다.\n플랜 변경 또는 새 구매는 만료 10일 전부터 가능합니다.");
+        alert("현재 플랜의 만료일까지 " + daysLeft + "일 남았습니다.\n플랜 변경 또는 새 구매는 만료 1일 전부터 가능합니다.");
         return false;
       }
       return true;
@@ -1278,7 +1278,7 @@ window.openSubscriptionModal = async function () {
     el.disabled = true;                 // ← 보이되 비활성
     el.style.opacity = "0.5";
     el.style.cursor = "not-allowed";
-    el.title = "만료 10일 전부터 가능합니다.";
+    el.title = "만료 1일 전부터 가능합니다.";
   }
     };
 
@@ -1333,7 +1333,7 @@ window.openSubscriptionModal = async function () {
       disableIfLocked("resumeSubBtn");
     // ✅ 변경 버튼(전환/새구매 전체 가드)
 document.getElementById("changePlanBtn")?.addEventListener("click", async () => {
-  if (!guardSwitch()) return;  // ✅ 10일 규칙 가드
+  if (!guardSwitch()) return;  // ✅ 1일 규칙 가드
   const curPlan = plan;
 
       // A) 정기 (premium / premium_plus)
