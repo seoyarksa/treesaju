@@ -1114,6 +1114,18 @@ window.startSixMonthPlan = function () {
 
 // ✅ 정기구독 버튼 클릭 시
 // 전역: 자동 닫힘 타이머(있으면 유지)
+
+function daysLeftByKST(endDate) {
+  if (!endDate) return Infinity;
+  const KST_OFFSET = 9 * 60 * 60 * 1000;
+  const endMsKST = new Date(endDate).getTime() + KST_OFFSET;
+  const nowMsKST = Date.now() + KST_OFFSET;
+  const endDay = Math.floor(endMsKST / 86400000);
+  const nowDay = Math.floor(nowMsKST / 86400000);
+  return Math.max(0, endDay - nowDay);
+}
+
+
 window.__subModalTimer = window.__subModalTimer || null;
 
 window.openSubscriptionModal = async function () {
@@ -1242,8 +1254,8 @@ window.openSubscriptionModal = async function () {
       ? new Date(data.current_period_end).toLocaleDateString("ko-KR")
       : "-";
 
-    const end = data.current_period_end ? new Date(data.current_period_end) : null;
-    const daysLeft = end ? Math.max(0, Math.ceil((end - new Date()) / 86400000)) : null;
+ const end = data.current_period_end ? new Date(data.current_period_end) : null;
+const daysLeft = end ? daysLeftByKST(end) : null;
 
     // ✅ 전환/새구매 허용 조건: 만료 1일 전부터
     const canSwitchOrBuy = !end || daysLeft <= 1;
@@ -1407,49 +1419,16 @@ document.getElementById("changePlanBtn")?.addEventListener("click", async () => 
         });
 // 선결제 → 정기(기본)
 sheet.querySelector("#optRecurringBasic")?.addEventListener("click", async () => {
-  if (!guardSwitch()) return;
-  try {
-    const res  = await fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: user.id, next_tier: 'basic' }),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      console.error('[schedule_from_fixed:basic] status', res.status, json);
-      const msg = json?.message || json?.error || '예약 실패';
-      const detail = json?.detail ? `\n상세: ${json.detail}` : '';
-      const remain = Number.isFinite(json?.remainingDays) ? `\n남은일수: ${json.remainingDays}` : '';
-      return alert(`전환 예약 중 오류: ${msg}${detail}${remain}`);
-    }
-    alert(json.message || '만료일에 정기(기본)으로 자동 전환됩니다.');
-  } catch (e) {
-    console.error('[schedule_from_fixed:basic] fetch error', e);
-    alert('전환 예약 중 오류: ' + e.message);
-  }
+  if (!guardSwitch()) return;             // D-1 가드
+  // ✅ 예약 호출 금지: D-1부터는 바로 정기 등록 플로우 진입
+  (window.startKakaoSubscriptionBasic || startKakaoSubscriptionBasic)();
 });
 
+// 선결제 → 정기(플러스)
 sheet.querySelector("#optRecurringPlus")?.addEventListener("click", async () => {
-  if (!guardSwitch()) return;
-  try {
-    const res  = await fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: user.id, next_tier: 'plus' }),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      console.error('[schedule_from_fixed:plus] status', res.status, json);
-      const msg = json?.message || json?.error || '예약 실패';
-      const detail = json?.detail ? `\n상세: ${json.detail}` : '';
-      const remain = Number.isFinite(json?.remainingDays) ? `\n남은일수: ${json.remainingDays}` : '';
-      return alert(`전환 예약 중 오류: ${msg}${detail}${remain}`);
-    }
-    alert(json.message || '만료일에 정기(플러스)로 자동 전환됩니다.');
-  } catch (e) {
-    console.error('[schedule_from_fixed:plus] fetch error', e);
-    alert('전환 예약 중 오류: ' + e.message);
-  }
+  if (!guardSwitch()) return;             // D-1 가드
+  // ✅ 예약 호출 금지: D-1부터는 바로 정기 등록 플로우 진입
+  (window.startKakaoSubscriptionPlus || startKakaoSubscriptionPlus)();
 });
 
 

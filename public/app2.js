@@ -1245,8 +1245,8 @@ window.openSubscriptionModal = async function () {
     const end = data.current_period_end ? new Date(data.current_period_end) : null;
     const daysLeft = end ? Math.max(0, Math.ceil((end - new Date()) / 86400000)) : null;
 
-    // ✅ 전환/새구매 허용 조건: 만료 10일 전부터
-    const canSwitchOrBuy = !end || daysLeft <= 10;
+    // ✅ 전환/새구매 허용 조건: 만료 1일 전부터
+    const canSwitchOrBuy = !end || daysLeft <= 1;
 
    // const extraLine = end
    //   ? `<div style="margin-top:6px;color:#888;font-size:12px;">
@@ -1258,7 +1258,7 @@ window.openSubscriptionModal = async function () {
       ? `<div style="margin-top:6px;color:${canSwitchOrBuy ? '#0a7c0a' : '#c0392b'};font-size:12px;">
            ${canSwitchOrBuy
              ? "지금은 플랜 변경 or 새 구매가 가능합니다. (만료일까지 약" + daysLeft + "일 남음)"
-             : "플랜 변경 or 새 구매는 <b>만료 10일 전부터</b> 가능합니다. (현재 남은 일수: 약 " + daysLeft + "일)"
+             : "플랜 변경 or 새 구매는 <b>만료 1일 전부터</b> 가능합니다. (현재 남은 일수: 약 " + daysLeft + "일)"
            }
          </div>`
       : "";
@@ -1266,7 +1266,7 @@ window.openSubscriptionModal = async function () {
     // ✅ 공통 가드 & 비활성화 유틸
     const guardSwitch = () => {
       if (!canSwitchOrBuy) {
-        alert("현재 플랜의 만료일까지 " + daysLeft + "일 남았습니다.\n플랜 변경 또는 새 구매는 만료 10일 전부터 가능합니다.");
+        alert("현재 플랜의 만료일까지 " + daysLeft + "일 남았습니다.\n플랜 변경 또는 새 구매는 만료 1일 전부터 가능합니다.");
         return false;
       }
       return true;
@@ -1278,7 +1278,7 @@ window.openSubscriptionModal = async function () {
     el.disabled = true;                 // ← 보이되 비활성
     el.style.opacity = "0.5";
     el.style.cursor = "not-allowed";
-    el.title = "만료 10일 전부터 가능합니다.";
+    el.title = "만료 1일 전부터 가능합니다.";
   }
     };
 
@@ -1288,52 +1288,55 @@ window.openSubscriptionModal = async function () {
     else if (plan === "premium3" || plan === "premium6") changeLabel = "다른 플랜으로 전환";
 
     modal.innerHTML = `
-      <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:520px; margin:0 auto;">
-        <h3 style="margin:0 0 8px;">구독 정보</h3>
-        <p style="margin:4px 0;"><strong>플랜:</strong> ${data.plan ?? "-"}</p>
-        <p style="margin:4px 0;"><strong>상태:</strong> ${statusText}</p>
-        <p style="margin:4px 0 12px;"><strong>${dateLabel}:</strong> ${dateValue}</p>
-        ${switchNotice}<br>
+  <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:520px; margin:0 auto;">
+    <h3 style="margin:0 0 8px;">구독 정보</h3>
+    <p style="margin:4px 0;"><strong>플랜:</strong> ${data.plan ?? "-"}</p>
+    <p style="margin:4px 0;"><strong>상태:</strong> ${statusText}</p>
+    <p style="margin:4px 0 12px;"><strong>${dateLabel}:</strong> ${dateValue}</p>
+    ${switchNotice}<br>
 
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          ${
-            isCancelRequested
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      ${
+        isRecurring
+          ? (isCancelRequested
               ? `<button id="resumeSubBtn" class="btn-success">${resumeLabel}</button>`
               : `<button id="cancelSubBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기결제 해지 신청</button>`
-          }
+            )
+          : ''
+      }
 
-       <button id="changePlanBtn" class="btn-success">
-  ${changeLabel}
-</button>
-          ${isRecurring ? `
-            <button id="to3mBtn" class="btn-success">프리미엄3으로 전환</button>
-            <button id="to6mBtn" class="btn-success">프리미엄6으로 전환</button>
-          ` : ""}
+      <button id="changePlanBtn" class="btn-success">${changeLabel}</button>
 
-          <button id="subCloseBtn2" class="btn-success">닫기</button>
-        </div>
+      ${isRecurring ? `
+        <button id="to3mBtn" class="btn-success">프리미엄3으로 전환</button>
+        <button id="to6mBtn" class="btn-success">프리미엄6으로 전환</button>
+      ` : ""}
 
-        ${
-          isCancelRequested
-            ? `<div style="margin-top:8px; color:#888; font-size:12px;">(현재 ${dateLabel}까지 이용 가능합니다.)</div>`
-            : `<div style="margin-top:8px; color:#888; font-size:12px;">5초 후 자동으로 닫혀요.</div>`
-        }
-      </div>
-    `;
+      <button id="subCloseBtn2" class="btn-success">닫기</button>
+    </div>
+
+    ${
+      isCancelRequested
+        ? `<div style="margin-top:8px; color:#888; font-size:12px;">(현재 ${dateLabel}까지 이용 가능합니다.)</div>`
+        : `<div style="margin-top:8px; color:#888; font-size:12px;">5초 후 자동으로 닫혀요.</div>`
+    }
+  </div>
+`;
 
     document.getElementById("subCloseBtn2")?.addEventListener("click", close);
 
     // ✅ 버튼 비활성화(UX)
-    disableIfLocked("changePlanBtn");
-    if (isRecurring) {
-      disableIfLocked("to3mBtn");
-      disableIfLocked("to6mBtn");
-      disableIfLocked("resumeSubBtn");
-    }
-      disableIfLocked("resumeSubBtn");
+disableIfLocked("changePlanBtn");
+if (isRecurring) {
+  disableIfLocked("to3mBtn");
+  disableIfLocked("to6mBtn");
+  disableIfLocked("resumeSubBtn");
+  disableIfLocked("cancelSubBtn");
+}
+
     // ✅ 변경 버튼(전환/새구매 전체 가드)
 document.getElementById("changePlanBtn")?.addEventListener("click", async () => {
-  if (!guardSwitch()) return;  // ✅ 10일 규칙 가드
+  if (!guardSwitch()) return;  // ✅ 1일 규칙 가드
   const curPlan = plan;
 
       // A) 정기 (premium / premium_plus)
