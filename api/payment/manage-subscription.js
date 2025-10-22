@@ -22,19 +22,20 @@ export default async function handler(req, res) {
   if ((req.method === 'GET' || req.method === 'POST') && action === 'health') {
     return res.status(200).json({ ok: true, ts: new Date().toISOString() });
   }
-  // ✅ 예약 집행 엔드포인트(크론/수동 호출)
-  if ((req.method === "GET" || req.method === "POST") && action === "apply_scheduled_changes") {
-    return await processScheduledChanges(req, res);
+
+  // ✅ 즉시 전환(선결제 → 정기)
+  if (req.method === "POST" && action === "switch_from_fixed_to_recurring") {
+    return await switchFromFixedToRecurring(req, res);
   }
-      // 👇👇👇 추가: 선결제 → 정기 전환 "예약" (만료일 이후 적용)
+
+  // (기존) 예약 관련은 막아둔 상태라면 그대로 두세요
   if (req.method === "POST" && action === "schedule_from_fixed") {
-    return await scheduleFromFixed(req, res);
+    return res.status(409).json({ error: 'SCHEDULING_DISABLED', message: '...' });
   }
-  // 👆👆👆
-  // 정기 → 선결제 전환 "예약"
-if (req.method === "POST" && action === "schedule_to_fixed") {
-  return await scheduleToFixed(req, res);
-}
+  if (req.method === "POST" && action === "schedule_to_fixed") {
+    return res.status(409).json({ error: 'SCHEDULING_TO_FIXED_DISABLED', message: '...' });
+  }
+
 
   if (req.method === "POST" && action === "register") {
     return await registerBilling(req, res);
@@ -673,6 +674,82 @@ async function scheduleToFixed(req, res) {
   }
 }
 
+
+
+async function switchFromFixedToRecurring(req, res) {
+  try {
+    const { user_id, next_tier } = req.body || {};
+    if (!user_id || !next_tier) {
+      return res.status(400).json({ error: "MISSING_PARAMS" });
+    }
+
+    // tier -> plan 매핑
+    const raw = String(next_tier).trim().toLowerCase();
+    const tier = { plus:'plus', 'premium_plus':'plus', 'premium+':'plus', basic:'basic', premium:'basic' }[raw];
+    if (!tier) return res.status(400).json({ error: "INVALID_TIER" });
+    const nextPlan = tier === 'plus' ? 'premium_plus' : 'premium';
+
+    // 현재 멤버십 조회
+    const { data: mem, error: selErr } = await supabase
+      .from('memberships')
+      .select('id, user_id, plan, status, provider, current_period_end')
+      .eq('user_id', user_id)
+      .maybeSingle();
+    if (selErr)   return res.status(500).json({ error: "DB_SELECT_FAILED", detail: selErr.message });
+    if (!mem)     return res.status(404).json({ error: "MEMBERSHIP_NOT_FOUND" });
+
+    // 선결제에서만 허용
+    if (!['premium3','premium6'].includes(mem.plan || '')) {
+      return res.status(400).json({ error: "ONLY_FIXED_ALLOWED", detail: `current plan: ${mem.plan}` });
+    }
+    if (!mem.current_period_end) {
+      return res.status(400).json({ error: "NO_EXPIRE_DATE" });
+    }
+
+    // 정책: 전환은 즉시 확정하되, 새 정기 주기는 "기존 만료일 다음날"부터 1개월
+    const end = new Date(mem.current_period_end);
+    const nextEnd = new Date(end);
+    nextEnd.setMonth(nextEnd.getMonth() + 1);
+
+    const nowIso = new Date().toISOString();
+
+    // 멤버십 업데이트 (예약 컬럼/메타 정리)
+    const { error: upErr } = await supabase
+      .from('memberships')
+      .update({
+        plan: nextPlan,
+        status: 'active',
+        provider: mem.provider || 'kakao',
+        cancel_at_period_end: false,
+        cancel_effective_at: null,
+        current_period_end: nextEnd.toISOString(), // 새 정기 주기 종료일
+        // 예약 관련 컬럼 클리어(혹시 남아있다면)
+        scheduled_change_type: null,
+        scheduled_next_plan: null,
+        scheduled_effective_at: null,
+        scheduled_requested_at: null,
+        scheduled_note: null,
+        updated_at: nowIso,
+      })
+      .eq('id', mem.id);
+    if (upErr) return res.status(500).json({ error: "DB_UPDATE_FAILED", detail: upErr.message });
+
+    // 프로필 등급은 effective_grade/trigger가 있다면 자동, 없다면 보조 업데이트
+    // (정기= 'premium' 또는 'premium_plus')
+    await supabase.from('profiles')
+      .update({ grade: nextPlan, updated_at: nowIso, daily_limit: nextPlan === 'premium_plus' ? 150 : 60 })
+      .eq('user_id', user_id);
+
+    return res.status(200).json({
+      ok: true,
+      message: `정기(${nextPlan === 'premium' ? '기본' : '플러스'})로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.`,
+      membership: { plan: nextPlan, current_period_end: nextEnd.toISOString() }
+    });
+  } catch (e) {
+    console.error('[switchFromFixedToRecurring] error:', e);
+    return res.status(500).json({ error: 'INTERNAL_ERROR', detail: e?.message || '' });
+  }
+}
 
 
 
