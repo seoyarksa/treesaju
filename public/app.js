@@ -1416,6 +1416,9 @@ if (curPlan === "premium" || curPlan === "premium_plus") {
   return; // 방어적 반환
 }
 
+
+
+
 // B) 선결제 (premium3 / premium6) → 클릭 패널
 if (curPlan === "premium3" || curPlan === "premium6") {
   const old = document.getElementById("planSwitchSheet");
@@ -1451,47 +1454,45 @@ if (curPlan === "premium3" || curPlan === "premium6") {
     }
   });
 
-  // 선결제 → 정기(기본) 즉시 전환
-  sheet.querySelector("#optRecurringBasic")?.addEventListener("click", async () => {
-    try {
-      const res  = await fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.id, next_tier: 'basic' }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        console.error('[from_fixed:basic] status', res.status, json);
-        return alert(`전환 실패: ${json?.message || json?.error || ''}`);
-      }
-      alert(json.message || '정기(기본)으로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
-      window.location.reload();
-    } catch (e) {
-      console.error('[from_fixed:basic] fetch error', e);
-      alert('전환 실패: ' + e.message);
-    }
+ // 공통: 선결제 → 정기 즉시 전환 호출 헬퍼
+async function callImmediateFromFixed(tier) {
+  const res  = await fetch('/api/payment/manage-subscription?action=switch_from_fixed_to_recurring', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: user.id, next_tier: tier }) // 'basic' | 'plus'
   });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    console.error('[from_fixed immediate]', tier, res.status, json);
+    const msg = json?.message || json?.error || '전환 실패';
+    throw new Error(msg);
+  }
+  return json;
+}
 
-  // 선결제 → 정기(플러스) 즉시 전환
-  sheet.querySelector("#optRecurringPlus")?.addEventListener("click", async () => {
-    try {
-      const res  = await fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.id, next_tier: 'plus' }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        console.error('[from_fixed:plus] status', res.status, json);
-        return alert(`전환 실패: ${json?.message || json?.error || ''}`);
-      }
-      alert(json.message || '정기(플러스)로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
-      window.location.reload();
-    } catch (e) {
-      console.error('[from_fixed:plus] fetch error', e);
-      alert('전환 실패: ' + e.message);
-    }
-  });
+// 선결제 → 정기(기본) 즉시 전환
+sheet.querySelector("#optRecurringBasic")?.addEventListener("click", async () => {
+  try {
+    const json = await callImmediateFromFixed('basic');
+    alert(json.message || '정기(기본)으로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
+    window.location.reload();
+  } catch (e) {
+    alert('전환 실패: ' + e.message);
+  }
+});
+
+// 선결제 → 정기(플러스) 즉시 전환
+sheet.querySelector("#optRecurringPlus")?.addEventListener("click", async () => {
+  try {
+    const json = await callImmediateFromFixed('plus');
+    alert(json.message || '정기(플러스)로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
+    window.location.reload();
+  } catch (e) {
+    alert('전환 실패: ' + e.message);
+  }
+});
+
+
 
   sheet.querySelector("#optCancel")?.addEventListener("click", () => {
     sheet.remove();

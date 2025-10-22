@@ -1114,11 +1114,53 @@ window.startSixMonthPlan = function () {
 
 // ✅ 정기구독 버튼 클릭 시
 // 전역: 자동 닫힘 타이머(있으면 유지)
+
+
+
+
 window.__subModalTimer = window.__subModalTimer || null;
 
 window.openSubscriptionModal = async function () {
   const { data: { user } } = await window.supabaseClient.auth.getUser();
   if (!user) return alert("로그인이 필요합니다.");
+
+function msLeftUntil(endDate) {
+  if (!endDate) return Infinity;
+  return Math.max(0, new Date(endDate).getTime() - Date.now());
+}
+
+
+function formatRemaining(endDate) {
+  const ms = msLeftUntil(endDate);
+  if (ms === Infinity) return '-';
+  const ONE_DAY = 24 * 60 * 60 * 1000;
+
+  if (ms > ONE_DAY) {
+    const days = Math.ceil(ms / ONE_DAY);
+    return `${days}일`;
+  } else {
+    const totalMins = Math.ceil(ms / 60000);
+    const hours = Math.floor(totalMins / 60);
+    const mins = totalMins % 60;
+    if (hours <= 0) return `${totalMins}분`;
+    if (mins === 0)  return `${hours}시간`;
+    return `${hours}시간 ${mins}분`;
+  }
+}
+
+
+
+
+
+function formatKSTDate(dateLike) {
+  const d = new Date(dateLike);
+  if (Number.isNaN(d.getTime())) return '-';
+  return d.toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+  });
+}
+
 
   const modal = document.getElementById("subscriptionModal");
   if (!modal) return;
@@ -1238,53 +1280,55 @@ window.openSubscriptionModal = async function () {
       statusText = isCancelRequested ? `${data.status} (해지 신청됨)` : data.status;
     }
 
-    const dateValue = data.current_period_end
-      ? new Date(data.current_period_end).toLocaleDateString("ko-KR")
-      : "-";
+const dateValue = data.current_period_end
+  ? formatKSTDate(data.current_period_end)
+  : "-";
 
-    const end = data.current_period_end ? new Date(data.current_period_end) : null;
-    const daysLeft = end ? Math.max(0, Math.ceil((end - new Date()) / 86400000)) : null;
 
-    // ✅ 전환/새구매 허용 조건: 만료 1일 전부터
-    const canSwitchOrBuy = !end || daysLeft <= 1;
+const end = data.current_period_end ? new Date(data.current_period_end) : null;
+const ONE_DAY = 24 * 60 * 60 * 1000;
+const canSwitchOrBuy = end ? msLeftUntil(end) <= ONE_DAY : true;
+const remainingLabel = end ? formatRemaining(end) : '-';
 
-   // const extraLine = end
-   //   ? `<div style="margin-top:6px;color:#888;font-size:12px;">
-    //       ${dateLabel}까지 약 ${daysLeft}일 남았습니다.
-   //      </div>`
-   //   : "";
+const switchNotice = end
+  ? `<div style="margin-top:6px;color:${canSwitchOrBuy ? '#0a7c0a' : '#c0392b'};font-size:12px;">
+       ${canSwitchOrBuy
+         ? `지금은 플랜 변경 or 새 구매가 가능합니다. (만료까지 약 ${remainingLabel} 남음)`
+         : `플랜 변경 or 새 구매는 <b>만료 24시간 전부터</b> 가능합니다. (현재 남은 시간: 약 ${remainingLabel})`
+       }
+     </div>`
+  : "";
 
-    const switchNotice = end
-      ? `<div style="margin-top:6px;color:${canSwitchOrBuy ? '#0a7c0a' : '#c0392b'};font-size:12px;">
-           ${canSwitchOrBuy
-             ? "지금은 플랜 변경 or 새 구매가 가능합니다. (만료일까지 약" + daysLeft + "일 남음)"
-             : "플랜 변경 or 새 구매는 <b>만료 1일 전부터</b> 가능합니다. (현재 남은 일수: 약 " + daysLeft + "일)"
-           }
-         </div>`
-      : "";
+
+
 
     // ✅ 공통 가드 & 비활성화 유틸
-    const guardSwitch = () => {
-      if (!canSwitchOrBuy) {
-        alert("현재 플랜의 만료일까지 " + daysLeft + "일 남았습니다.\n플랜 변경 또는 새 구매는 만료 1일 전부터 가능합니다.");
-        return false;
-      }
-      return true;
-    };
-    const disableIfLocked = (btnId) => {
-      const el = document.getElementById(btnId);
-      if (!el) return;
+const guardSwitch = () => {
   if (!canSwitchOrBuy) {
-    el.disabled = true;                 // ← 보이되 비활성
+    alert(
+      `현재 플랜 만료까지 약 ${formatRemainingMs(leftMs)} 남았습니다.\n` +
+      `플랜 변경 또는 새 구매는 만료 24시간 전부터 가능합니다.`
+    );
+    return false;
+  }
+  return true;
+};
+
+
+const disableIfLocked = (btnId) => {
+  const el = document.getElementById(btnId);
+  if (!el) return;
+  if (!canSwitchOrBuy) {
+    el.disabled = true;
     el.style.opacity = "0.5";
     el.style.cursor = "not-allowed";
-    el.title = "만료 1일 전부터 가능합니다.";
+    el.title = "만료 24시간 전부터 가능합니다.";
   }
-    };
+};
 
     let changeLabel = "플랜 변경";
-    if (plan === "premium") changeLabel = "프리미엄+로 전환";
-    else if (plan === "premium_plus") changeLabel = "프리미엄(기본)으로 전환";
+    if (plan === "premium") changeLabel = "다른 플랜으로 전환";
+    else if (plan === "premium_plus") changeLabel = "다른 플랜으로 전환";
     else if (plan === "premium3" || plan === "premium6") changeLabel = "다른 플랜으로 전환";
 
     modal.innerHTML = `
@@ -1307,10 +1351,7 @@ window.openSubscriptionModal = async function () {
 
       <button id="changePlanBtn" class="btn-success">${changeLabel}</button>
 
-      ${isRecurring ? `
-        <button id="to3mBtn" class="btn-success">프리미엄3으로 전환</button>
-        <button id="to6mBtn" class="btn-success">프리미엄6으로 전환</button>
-      ` : ""}
+${isRecurring ? `` : ``}
 
       <button id="subCloseBtn2" class="btn-success">닫기</button>
     </div>
@@ -1318,7 +1359,7 @@ window.openSubscriptionModal = async function () {
     ${
       isCancelRequested
         ? `<div style="margin-top:8px; color:#888; font-size:12px;">(현재 ${dateLabel}까지 이용 가능합니다.)</div>`
-        : `<div style="margin-top:8px; color:#888; font-size:12px;">5초 후 자동으로 닫혀요.</div>`
+        : `<div style="margin-top:8px; color:#888; font-size:12px;">10초 후 자동으로 닫혀요.</div>`
     }
   </div>
 `;
@@ -1327,138 +1368,138 @@ window.openSubscriptionModal = async function () {
 
     // ✅ 버튼 비활성화(UX)
 disableIfLocked("changePlanBtn");
-if (isRecurring) {
-  disableIfLocked("to3mBtn");
-  disableIfLocked("to6mBtn");
-  disableIfLocked("resumeSubBtn");
-  disableIfLocked("cancelSubBtn");
-}
 
     // ✅ 변경 버튼(전환/새구매 전체 가드)
 document.getElementById("changePlanBtn")?.addEventListener("click", async () => {
   if (!guardSwitch()) return;  // ✅ 1일 규칙 가드
   const curPlan = plan;
 
-      // A) 정기 (premium / premium_plus)
-      if (curPlan === "premium" || curPlan === "premium_plus") {
-        const how = window.prompt(
-          "변경 방법을 선택하세요:\n" +
-          "1 = 정기 내에서 플랜 전환(기본↔플러스)\n" +
-          "3 = 프리미엄3(선결제)로 전환\n" +
-          "6 = 프리미엄6(선결제)로 전환",
-          "1"
-        );
+// A) 정기 (premium / premium_plus)
+if (curPlan === "premium" || curPlan === "premium_plus") {
+  const howRaw = window.prompt(
+    "변경 방법을 선택하세요:\n" +
+    "1 = 정기 내에서 플랜 전환(기본↔플러스)\n" +
+    "3 = 프리미엄3(선결제)로 전환\n" +
+    "6 = 프리미엄6(선결제)로 전환",
+    "1"
+  );
 
-        if (how === "3") {
-          if (typeof switchRecurringToFixed === "function") return switchRecurringToFixed("premium3");
-          return (window.startThreeMonthPlan || startThreeMonthPlan)();
-        }
-        if (how === "6") {
-          if (typeof switchRecurringToFixed === "function") return switchRecurringToFixed("premium6");
-          return (window.startSixMonthPlan || startSixMonthPlan)();
-        }
+  // ✅ [취소] 또는 공백/무효 입력이면 즉시 반환 (아무 것도 하지 않음)
+  if (howRaw === null) return;
+  const how = String(howRaw).trim();
+  if (!["1", "3", "6"].includes(how)) return;
 
-        const target = (curPlan === "premium_plus") ? "premium" : "premium_plus";
-        const res = await fetch("/api/payment/manage-subscription?action=change_plan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: user.id, new_plan: target }),
-        });
-        const json = await res.json();
-        if (!res.ok) return alert("변경 실패: " + (json.error || ""));
-        alert(json.message || "플랜이 변경되었습니다. 다음 결제부터 적용돼요.");
-        return window.location.reload();
-      }
-
-      // B) 선결제 (premium3 / premium6) → 클릭 패널
-      if (curPlan === "premium3" || curPlan === "premium6") {
-        const old = document.getElementById("planSwitchSheet");
-        if (old) { old.remove(); return; }
-
-        const sheet = document.createElement("div");
-        sheet.id = "planSwitchSheet";
-        sheet.style.cssText = "margin-top:8px; border:1px solid #eee; background:#fafafa; border-radius:8px; padding:10px;";
-
-        const primaryFixedLabel = (curPlan === "premium3")
-          ? "프리미엄6(6개월)로 전환"
-          : "프리미엄3(3개월)로 전환";
-
-        sheet.innerHTML = `
-          <div style="font-size:13px; color:#555; margin-bottom:8px;">변경 방법을 선택하세요</div>
-          <div style="display:flex; flex-wrap:wrap; gap:8px;">
-            <button id="optFixedToggle"   style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">${primaryFixedLabel}</button>
-            <button id="optRecurringBasic" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기(기본)으로 전환</button>
-            <button id="optRecurringPlus"  style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기(플러스)로 전환</button>
-            <button id="optCancel"          style="border:1px solid #ddd; background:#f5f5f5; border-radius:6px; padding:6px 10px;">닫기</button>
-          </div>
-        `;
-
-        const panel = modal.querySelector(".modal-panel");
-        (panel ? panel : modal).appendChild(sheet);
-
-        // ✅ 시트 내부 옵션도 가드
-        sheet.querySelector("#optFixedToggle")?.addEventListener("click", () => {
-          if (!guardSwitch()) return;
-          if (curPlan === "premium3") {
-            (window.startSixMonthPlan || startSixMonthPlan)();
-          } else {
-            (window.startThreeMonthPlan || startThreeMonthPlan)();
-          }
-        });
-// 선결제 → 정기(기본)
-sheet.querySelector("#optRecurringBasic")?.addEventListener("click", async () => {
-  if (!guardSwitch()) return;
-  try {
-    const res  = await fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: user.id, next_tier: 'basic' }),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      console.error('[schedule_from_fixed:basic] status', res.status, json);
-      const msg = json?.message || json?.error || '예약 실패';
-      const detail = json?.detail ? `\n상세: ${json.detail}` : '';
-      const remain = Number.isFinite(json?.remainingDays) ? `\n남은일수: ${json.remainingDays}` : '';
-      return alert(`전환 예약 중 오류: ${msg}${detail}${remain}`);
-    }
-    alert(json.message || '만료일에 정기(기본)으로 자동 전환됩니다.');
-  } catch (e) {
-    console.error('[schedule_from_fixed:basic] fetch error', e);
-    alert('전환 예약 중 오류: ' + e.message);
+  // ✅ 3/6 선택 시: 선결제로 “즉시 전환” (구매 플로우 진입)
+  if (how === "3") {
+    if (typeof switchRecurringToFixed === "function") return switchRecurringToFixed("premium3");
+    return (window.startThreeMonthPlan || startThreeMonthPlan)();
   }
-});
-
-sheet.querySelector("#optRecurringPlus")?.addEventListener("click", async () => {
-  if (!guardSwitch()) return;
-  try {
-    const res  = await fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: user.id, next_tier: 'plus' }),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      console.error('[schedule_from_fixed:plus] status', res.status, json);
-      const msg = json?.message || json?.error || '예약 실패';
-      const detail = json?.detail ? `\n상세: ${json.detail}` : '';
-      const remain = Number.isFinite(json?.remainingDays) ? `\n남은일수: ${json.remainingDays}` : '';
-      return alert(`전환 예약 중 오류: ${msg}${detail}${remain}`);
-    }
-    alert(json.message || '만료일에 정기(플러스)로 자동 전환됩니다.');
-  } catch (e) {
-    console.error('[schedule_from_fixed:plus] fetch error', e);
-    alert('전환 예약 중 오류: ' + e.message);
+  if (how === "6") {
+    if (typeof switchRecurringToFixed === "function") return switchRecurringToFixed("premium6");
+    return (window.startSixMonthPlan || startSixMonthPlan)();
   }
-});
 
+  // ✅ 오직 "1"일 때만 정기↔정기 즉시 전환
+  if (how === "1") {
+    const target = (curPlan === "premium_plus") ? "premium" : "premium_plus";
+    const res = await fetch("/api/payment/manage-subscription?action=change_plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: user.id, new_plan: target }),
+    });
+    const json = await res.json();
+    if (!res.ok) return alert("변경 실패: " + (json.error || ""));
+    alert(json.message || "플랜이 즉시 변경되었습니다. 결제는 다음 주기부터 새 요금으로 진행됩니다.");
+    return window.location.reload();
+  }
 
-        sheet.querySelector("#optCancel")?.addEventListener("click", () => {
-          sheet.remove();
-        });
+  return; // 방어적 반환
+}
 
-        return;
+// B) 선결제 (premium3 / premium6) → 클릭 패널
+if (curPlan === "premium3" || curPlan === "premium6") {
+  const old = document.getElementById("planSwitchSheet");
+  if (old) { old.remove(); return; }
+
+  const sheet = document.createElement("div");
+  sheet.id = "planSwitchSheet";
+  sheet.style.cssText = "margin-top:8px; border:1px solid #eee; background:#fafafa; border-radius:8px; padding:10px;";
+
+  const primaryFixedLabel = (curPlan === "premium3")
+    ? "프리미엄6(6개월)로 전환"
+    : "프리미엄3(3개월)로 전환";
+
+  sheet.innerHTML = `
+    <div style="font-size:13px; color:#555; margin-bottom:8px;">변경 방법을 선택하세요</div>
+    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+      <button id="optFixedToggle"    style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">${primaryFixedLabel}</button>
+      <button id="optRecurringBasic" class="btn-success">정기(기본)으로 즉시 전환</button>
+      <button id="optRecurringPlus"  class="btn-success">정기(플러스)로 즉시 전환</button>
+      <button id="optCancel"         style="border:1px solid #ddd; background:#f5f5f5; border-radius:6px; padding:6px 10px;">닫기</button>
+    </div>
+  `;
+
+  const panel = modal.querySelector(".modal-panel");
+  (panel ? panel : modal).appendChild(sheet);
+
+  // 선결제 ↔ 선결제 토글(구매 플로우로 즉시 전환)
+  sheet.querySelector("#optFixedToggle")?.addEventListener("click", () => {
+    if (curPlan === "premium3") {
+      (window.startSixMonthPlan || startSixMonthPlan)();
+    } else {
+      (window.startThreeMonthPlan || startThreeMonthPlan)();
+    }
+  });
+
+  // 선결제 → 정기(기본) 즉시 전환
+  sheet.querySelector("#optRecurringBasic")?.addEventListener("click", async () => {
+    try {
+      const res  = await fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id, next_tier: 'basic' }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error('[from_fixed:basic] status', res.status, json);
+        return alert(`전환 실패: ${json?.message || json?.error || ''}`);
       }
+      alert(json.message || '정기(기본)으로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
+      window.location.reload();
+    } catch (e) {
+      console.error('[from_fixed:basic] fetch error', e);
+      alert('전환 실패: ' + e.message);
+    }
+  });
+
+  // 선결제 → 정기(플러스) 즉시 전환
+  sheet.querySelector("#optRecurringPlus")?.addEventListener("click", async () => {
+    try {
+      const res  = await fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id, next_tier: 'plus' }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error('[from_fixed:plus] status', res.status, json);
+        return alert(`전환 실패: ${json?.message || json?.error || ''}`);
+      }
+      alert(json.message || '정기(플러스)로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
+      window.location.reload();
+    } catch (e) {
+      console.error('[from_fixed:plus] fetch error', e);
+      alert('전환 실패: ' + e.message);
+    }
+  });
+
+  sheet.querySelector("#optCancel")?.addEventListener("click", () => {
+    sheet.remove();
+  });
+
+  return;
+}
+
 
       renderPurchaseChoices();
     });
@@ -1498,31 +1539,34 @@ if (isRecurring) {
 }
 
     if (!isCancelRequested) {
-      document.getElementById("cancelSubBtn")?.addEventListener("click", async () => {
-        if (!confirm("이번 달 말일에 해지됩니다. 진행할까요?")) return;
-        const res = await fetch("/api/payment/manage-subscription?action=cancel", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: user.id }),
-        });
-        const result = await res.json();
-        if (res.ok) { alert("✅ " + (result.message || "해지 신청이 접수되었습니다.")); close(); }
-        else       { alert("❌ " + (result.error || "요청에 실패했습니다.")); }
-      });
+document.getElementById("cancelSubBtn")?.addEventListener("click", async () => {
+  // 해지는 D-1 규칙과 무관 — 언제든 신청 가능
+  const targetText = end ? `다음 결제일(${formatKSTDate(end)}) 이후` : '다음 결제 주기 이후';
+  const ok = confirm(`해지 신청 시 ${targetText} 자동 해지됩니다. 진행할까요?`);
+  if (!ok) return;
+
+  const res = await fetch("/api/payment/manage-subscription?action=cancel", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: user.id }),
+  });
+  const result = await res.json();
+  if (res.ok) { alert("✅ " + (result.message || "해지 신청이 접수되었습니다.")); close(); }
+  else       { alert("❌ " + (result.error || "요청에 실패했습니다.")); }
+});
+
 
       if (window.__subModalTimer) clearTimeout(window.__subModalTimer);
-      window.__subModalTimer = setTimeout(close, 5000);
+      window.__subModalTimer = setTimeout(close, 10000); //10초후 닫기
     } else {
       const resumeBtn = document.getElementById("resumeSubBtn");
       if (resumeBtn) {
-        resumeBtn.addEventListener("click", async () => {
-                // ✅ 만료 10일 전부터만 가능
-      if (!guardSwitch()) return;
-      // 선결제 플랜은 재구매 UX로 전환
-          if (plan === "premium3" || plan === "premium6") {
-            renderPurchaseChoices();
-            return;
-          }
+resumeBtn.addEventListener("click", async () => {
+  if (plan === "premium3" || plan === "premium6") {
+    // 선결제는 재구독 개념이 없으므로 구매 UX로 전환
+    renderPurchaseChoices();
+    return;
+  }
           try {
             const res = await fetch("/api/payment/manage-subscription?action=resume", {
               method: "POST",
