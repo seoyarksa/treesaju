@@ -1342,8 +1342,9 @@ disableIfLocked("changePlanBtn");
 if (isRecurring) {
   disableIfLocked("to3mBtn");
   disableIfLocked("to6mBtn");
-  disableIfLocked("resumeSubBtn");
-  disableIfLocked("cancelSubBtn");
+  // 해지/재구독은 언제든 가능해야 하므로 잠금 금지
+  // disableIfLocked("resumeSubBtn");
+  // disableIfLocked("cancelSubBtn");
 }
 
     // ✅ 변경 버튼(전환/새구매 전체 가드)
@@ -1494,14 +1495,12 @@ if (isRecurring) {
     } else {
       const resumeBtn = document.getElementById("resumeSubBtn");
       if (resumeBtn) {
-        resumeBtn.addEventListener("click", async () => {
-                // ✅ 만료 10일 전부터만 가능
-      if (!guardSwitch()) return;
-      // 선결제 플랜은 재구매 UX로 전환
-          if (plan === "premium3" || plan === "premium6") {
-            renderPurchaseChoices();
-            return;
-          }
+resumeBtn.addEventListener("click", async () => {
+  if (plan === "premium3" || plan === "premium6") {
+    // 선결제는 재구독 개념이 없으므로 구매 UX로 전환
+    renderPurchaseChoices();
+    return;
+  }
           try {
             const res = await fetch("/api/payment/manage-subscription?action=resume", {
               method: "POST",
