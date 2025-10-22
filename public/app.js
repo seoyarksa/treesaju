@@ -1264,9 +1264,10 @@ function formatKSTDate(dateLike) {
       : "-";
 
  const end = data.current_period_end ? new Date(data.current_period_end) : null;
-const daysLeft = end ? Math.max(0, Math.ceil(msLeft / 86400000)) : null;
+const daysLeft = end ? daysLeftByKST(end) : null;
+
     // ✅ 전환/새구매 허용 조건: 만료 1일 전부터
-  const canSwitchOrBuy = !end || msLeft <= 24*60*60*1000;
+    const canSwitchOrBuy = !end || daysLeft <= 1;
 
    // const extraLine = end
    //   ? `<div style="margin-top:6px;color:#888;font-size:12px;">
