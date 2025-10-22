@@ -11,17 +11,6 @@ const supabase = createClient(
 console.log("[ENV CHECK] SUPABASE_SERVICE_ROLE_KEY:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 
-const safeParse = (raw) => {
-  if (raw == null) return null;
-  try {
-    const a = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    if (typeof a === 'string') { try { return JSON.parse(a); } catch { return a; } }
-    return a;
-  } catch { return null; }
-};
-const addMonths = (d, n) => { const x = new Date(d); x.setMonth(x.getMonth() + n); return x; };
-
-
 export default async function handler(req, res) {
   // 🔎 액션 정규화 + 라우팅 로그 (가장 먼저!)
   const rawAction = (req.query?.action ?? '').toString();
@@ -636,99 +625,30 @@ async function changePlan(req, res) {
 }
 
 
-// ───────────────────────────────────────────────────────────
-// 선결제(premium3/6) → 정기(premium/premium_plus) : 즉시 전환
-// 첫 결제 주기는 "기존 current_period_end"부터 시작(= current_period_end를 기존 만료일 +1개월로 이동)
-// ───────────────────────────────────────────────────────────
+// ✅ 선결제(premium3/6) → 정기(기본/플러스) "예약"
+// body: { user_id, next_tier: 'basic' | 'plus' }
+// 예약: 선결제(premium3/6) → 정기(basic/plus) 전환을 만료일에 집행하도록 저장
+// 예약: 선결제(premium3/6) → 정기(basic/plus) 전환을 만료일에 집행하도록 저장
+// 핸들러 분기 그대로 사용:
+// if (req.method === "POST" && action === "schedule_from_fixed") return await scheduleFromFixed(req, res);
+
+// 파일 상단: service role로 생성되어 있어야 함
+// const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+// 선결제 → 정기 전환 예약: 비활성 (안내만)
 async function scheduleFromFixed(req, res) {
-  try {
-    if (req.method !== 'POST') {
-      res.setHeader('Allow', 'POST');
-      return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
-    }
-
-    let { user_id, next_tier, customer_uid } = req.body || {};
-    user_id = (user_id || '').trim();
-
-    // 'basic'|'plus' 외에 'premium'|'premium_plus'도 허용
-    const raw = (next_tier || '').toString().trim().toLowerCase();
-    const tier = { plus:'plus','premium_plus':'plus','premium+':'plus', basic:'basic', premium:'basic' }[raw];
-    if (!user_id || !tier) return res.status(400).json({ error: 'MISSING_OR_INVALID_PARAMS' });
-
-    const nextPlan = tier === 'plus' ? 'premium_plus' : 'premium';
-
-    // 현재 멤버십 조회
-    const { data: mem, error: selErr } = await supabase
-      .from('memberships')
-      .select('id, user_id, plan, status, provider, current_period_end, metadata')
-      .eq('user_id', user_id)
-      .maybeSingle();
-    if (selErr) return res.status(500).json({ error: 'DB_SELECT_FAILED', detail: selErr.message });
-    if (!mem)   return res.status(404).json({ error: 'MEMBERSHIP_NOT_FOUND' });
-
-    // 선결제에서만 허용
-    if (!['premium3','premium6'].includes(mem.plan || '')) {
-      return res.status(400).json({ error: 'ONLY_FROM_FIXED', detail: `current plan: ${mem.plan}` });
-    }
-    if (!mem.current_period_end) return res.status(400).json({ error: 'NO_EXPIRE_DATE' });
-
-    const nowIso = new Date().toISOString();
-    const prevEnd = new Date(mem.current_period_end);
-    const nextEnd = addMonths(prevEnd, 1);
-
-    // metadata 정리(레거시 예약키 제거 + 선택적으로 customer_uid 저장)
-    const meta = safeParse(mem.metadata) || {};
-    if (meta.scheduled_change) delete meta.scheduled_change;
-    if (customer_uid) meta.customer_uid = customer_uid;
-
-    // 즉시 전환(멤버십/프로필 동기화)
-    const { error: upErr } = await supabase
-      .from('memberships')
-      .update({
-        plan: nextPlan,
-        status: 'active',
-        provider: mem.provider || 'kakao',
-        cancel_at_period_end: false,
-        current_period_end: nextEnd.toISOString(),
-        // 예약 흔적 초기화
-        scheduled_change_type: null,
-        scheduled_next_plan: null,
-        scheduled_effective_at: null,
-        scheduled_requested_at: null,
-        scheduled_note: null,
-        metadata: meta, // jsonb 컬럼이므로 객체 그대로
-        updated_at: nowIso,
-      })
-      .eq('id', mem.id);
-    if (upErr) return res.status(500).json({ error: 'DB_UPDATE_FAILED', detail: upErr.message });
-
-    const { error: profErr } = await supabase
-      .from('profiles')
-      .update({ grade: nextPlan, updated_at: nowIso })
-      .eq('user_id', user_id);
-    if (profErr) return res.status(500).json({ error: 'PROFILE_UPDATE_FAILED', detail: profErr.message });
-
-    return res.status(200).json({
-      ok: true,
-      mode: 'converted_now_from_fixed',
-      message: `정기(${nextPlan === 'premium' ? '기본' : '플러스'})로 즉시 전환되었습니다. 첫 결제 주기는 기존 만료일(${prevEnd.toLocaleDateString('ko-KR')})부터 시작하며, 다음 결제일은 ${nextEnd.toLocaleDateString('ko-KR')} 입니다.`,
-      info: {
-        previous_plan: mem.plan,
-        next_plan: nextPlan,
-        previous_expiry: prevEnd.toISOString(),
-        next_period_end: nextEnd.toISOString()
-      }
-    });
-  } catch (e) {
-    console.error('[scheduleFromFixed:convert_now] INTERNAL_ERROR:', e);
-    return res.status(500).json({ error: 'INTERNAL_ERROR', detail: e?.message || '' });
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
   }
+  return res.status(409).json({
+    ok: false,
+    error: 'SCHEDULING_DISABLED',
+    message: '현재는 선결제 → 정기 전환 “예약”을 지원하지 않습니다. 만료일 1일 전부터 정기 등록이 가능합니다. 만료일 이후에 정기 결제를 진행해 주세요.'
+  });
 }
 
-// ───────────────────────────────────────────────────────────
-// 정기(premium/premium_plus) → 선결제(premium3/premium6) : 즉시 전환
-// 고정기간의 만료일 = "기존 current_period_end + (3|6)개월"
-// ───────────────────────────────────────────────────────────
+// 정기 → 선결제 전환 예약: 비활성 (안내만)
 async function scheduleToFixed(req, res) {
   try {
     if (req.method !== 'POST') {
@@ -737,79 +657,22 @@ async function scheduleToFixed(req, res) {
     }
 
     const { user_id, termMonths } = req.body || {};
-    const months = Number(termMonths);
-    if (!user_id || !(months === 3 || months === 6)) {
+    if (!user_id || !termMonths) {
       return res.status(400).json({ error: 'MISSING_OR_INVALID_PARAMS' });
     }
-    const targetPlan = months === 6 ? 'premium6' : 'premium3';
 
-    // 현재 멤버십 조회
-    const { data: mem, error } = await supabase
-      .from('memberships')
-      .select('id, user_id, plan, status, provider, current_period_end, metadata')
-      .eq('user_id', user_id)
-      .maybeSingle();
-    if (error) return res.status(500).json({ error: 'DB_SELECT_FAILED', detail: error.message });
-    if (!mem)   return res.status(404).json({ error: 'MEMBERSHIP_NOT_FOUND' });
-
-    // 정기에서만 허용
-    if (!['premium','premium_plus'].includes(mem.plan || '')) {
-      return res.status(400).json({ error: 'ONLY_FROM_RECURRING', detail: `current plan: ${mem.plan}` });
-    }
-    if (!mem.current_period_end) return res.status(400).json({ error: 'NO_CURRENT_PERIOD_END' });
-
-    const nowIso = new Date().toISOString();
-    const prevEnd = new Date(mem.current_period_end);
-    const fixedEnd = addMonths(prevEnd, months);
-
-    // metadata 정리(레거시 예약키 제거 + kind 고정 표기 선택)
-    const meta = safeParse(mem.metadata) || {};
-    if (meta.scheduled_change) delete meta.scheduled_change;
-    meta.kind = 'fixed'; // 선택: 운영에서 쓰고 있다면 유지
-
-    // 즉시 전환(멤버십/프로필 동기화)
-    const { error: upErr } = await supabase
-      .from('memberships')
-      .update({
-        plan: targetPlan,
-        status: 'active',
-        provider: mem.provider || 'kakao',
-        cancel_at_period_end: false,
-        current_period_end: fixedEnd.toISOString(),
-        // 예약 흔적 초기화
-        scheduled_change_type: null,
-        scheduled_next_plan: null,
-        scheduled_effective_at: null,
-        scheduled_requested_at: null,
-        scheduled_note: null,
-        metadata: meta,
-        updated_at: nowIso,
-      })
-      .eq('id', mem.id);
-    if (upErr) return res.status(500).json({ error: 'DB_UPDATE_FAILED', detail: upErr.message });
-
-    const { error: profErr } = await supabase
-      .from('profiles')
-      .update({ grade: targetPlan, updated_at: nowIso })
-      .eq('user_id', user_id);
-    if (profErr) return res.status(500).json({ error: 'PROFILE_UPDATE_FAILED', detail: profErr.message });
-
-    return res.status(200).json({
-      ok: true,
-      mode: 'converted_now_to_fixed',
-      message: `선결제(${months}개월)로 즉시 전환되었습니다. 이용기간은 기존 결제 주기 종료일(${prevEnd.toLocaleDateString('ko-KR')}) 다음날부터 ${fixedEnd.toLocaleDateString('ko-KR')}까지 입니다.`,
-      info: {
-        previous_plan: mem.plan,
-        next_plan: targetPlan,
-        previous_period_end: prevEnd.toISOString(),
-        fixed_period_end: fixedEnd.toISOString()
-      }
+    return res.status(409).json({
+      ok: false,
+      error: 'SCHEDULING_TO_FIXED_DISABLED',
+      message: '현재는 정기 → 선결제 전환 “예약”을 지원하지 않습니다. 만료일 1일 전부터 전환/구매 진행이 가능합니다. 만료일 이후 원하시는 선결제 상품을 새로 구매해 주세요.',
+      hint: 'show_purchase_fixed_products'
     });
   } catch (e) {
-    console.error('[scheduleToFixed:convert_now] INTERNAL_ERROR:', e);
+    console.error('[scheduleToFixed] INTERNAL_ERROR:', e);
     return res.status(500).json({ error: 'INTERNAL_ERROR', detail: e?.message || '' });
   }
 }
+
 
 
 
