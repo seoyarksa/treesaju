@@ -1304,8 +1304,8 @@ const daysLeft = end ? daysLeftByKST(end) : null;
     };
 
     let changeLabel = "플랜 변경";
-    if (plan === "premium") changeLabel = "프리미엄+ 정기구독으로 전환";
-    else if (plan === "premium_plus") changeLabel = "프리미엄 정기구독(기본)으로 전환";
+    if (plan === "premium") changeLabel = "다른 플랜으로 전환";
+    else if (plan === "premium_plus") changeLabel = "다른 플랜으로 전환";
     else if (plan === "premium3" || plan === "premium6") changeLabel = "다른 플랜으로 전환";
 
     modal.innerHTML = `
@@ -1328,10 +1328,7 @@ const daysLeft = end ? daysLeftByKST(end) : null;
 
       <button id="changePlanBtn" class="btn-success">${changeLabel}</button>
 
-      ${isRecurring ? `
-        <button id="to3mBtn" class="btn-success">프리미엄3으로 전환</button>
-        <button id="to6mBtn" class="btn-success">프리미엄6으로 전환</button>
-      ` : ""}
+${isRecurring ? `` : ``}
 
       <button id="subCloseBtn2" class="btn-success">닫기</button>
     </div>
@@ -1348,49 +1345,52 @@ const daysLeft = end ? daysLeftByKST(end) : null;
 
     // ✅ 버튼 비활성화(UX)
 disableIfLocked("changePlanBtn");
-if (isRecurring) {
-  disableIfLocked("to3mBtn");
-  disableIfLocked("to6mBtn");
-  // 해지/재구독은 언제든 가능해야 하므로 잠금 금지
-  // disableIfLocked("resumeSubBtn");
-  // disableIfLocked("cancelSubBtn");
-}
 
     // ✅ 변경 버튼(전환/새구매 전체 가드)
 document.getElementById("changePlanBtn")?.addEventListener("click", async () => {
   if (!guardSwitch()) return;  // ✅ 1일 규칙 가드
   const curPlan = plan;
 
-      // A) 정기 (premium / premium_plus)
-      if (curPlan === "premium" || curPlan === "premium_plus") {
-        const how = window.prompt(
-          "변경 방법을 선택하세요:\n" +
-          "1 = 정기 내에서 플랜 전환(기본↔플러스)\n" +
-          "3 = 프리미엄3(선결제)로 전환\n" +
-          "6 = 프리미엄6(선결제)로 전환",
-          "1"
-        );
+  // A) 정기 (premium / premium_plus)
+if (curPlan === "premium" || curPlan === "premium_plus") {
+  const howRaw = window.prompt(
+    "변경 방법을 선택하세요:\n" +
+    "1 = 정기 내에서 플랜 전환(기본↔플러스)\n" +
+    "3 = 프리미엄3(선결제)로 전환\n" +
+    "6 = 프리미엄6(선결제)로 전환",
+    "1"
+  );
 
-        if (how === "3") {
-          if (typeof switchRecurringToFixed === "function") return switchRecurringToFixed("premium3");
-          return (window.startThreeMonthPlan || startThreeMonthPlan)();
-        }
-        if (how === "6") {
-          if (typeof switchRecurringToFixed === "function") return switchRecurringToFixed("premium6");
-          return (window.startSixMonthPlan || startSixMonthPlan)();
-        }
+  // ✅ 취소 또는 공백/무효 입력 → 아무 것도 하지 않음
+  if (howRaw === null) return;                 // [취소]
+  const how = String(howRaw).trim();
+  if (!["1", "3", "6"].includes(how)) return;  // [무효 입력]
 
-        const target = (curPlan === "premium_plus") ? "premium" : "premium_plus";
-        const res = await fetch("/api/payment/manage-subscription?action=change_plan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: user.id, new_plan: target }),
-        });
-        const json = await res.json();
-        if (!res.ok) return alert("변경 실패: " + (json.error || ""));
-        alert(json.message || "플랜이 변경되었습니다. 다음 결제부터 적용돼요.");
-        return window.location.reload();
-      }
+  if (how === "3") {
+    if (typeof switchRecurringToFixed === "function") return switchRecurringToFixed("premium3");
+    return (window.startThreeMonthPlan || startThreeMonthPlan)();
+  }
+  if (how === "6") {
+    if (typeof switchRecurringToFixed === "function") return switchRecurringToFixed("premium6");
+    return (window.startSixMonthPlan || startSixMonthPlan)();
+  }
+
+  // ✅ 오직 "1"을 선택했을 때만 정기↔정기 전환 실행
+  if (how === "1") {
+    const target = (curPlan === "premium_plus") ? "premium" : "premium_plus";
+    const res = await fetch("/api/payment/manage-subscription?action=change_plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: user.id, new_plan: target }),
+    });
+    const json = await res.json();
+    if (!res.ok) return alert("변경 실패: " + (json.error || ""));
+    alert(json.message || "플랜이 변경되었습니다. 다음 결제부터 적용돼요.");
+    return window.location.reload();
+  }
+
+  return; // 방어적 반환
+}
 
       // B) 선결제 (premium3 / premium6) → 클릭 패널
       if (curPlan === "premium3" || curPlan === "premium6") {
