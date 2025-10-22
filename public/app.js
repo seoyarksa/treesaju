@@ -1427,22 +1427,47 @@ if (curPlan === "premium3" || curPlan === "premium6") {
     }
   });
 
-// 선결제 → 정기(기본)
-sheet.querySelector("#optRecurringBasic")?.addEventListener("click", async () => {
-  if (!guardSwitch()) return;
-  // ⛔ 예약 API 호출 삭제
-  // ✅ 즉시 정기 결제 시작
-  (window.startKakaoSubscriptionBasic || startKakaoSubscriptionBasic)();
-});
+  // 선결제 → 정기(기본) 즉시 전환
+  sheet.querySelector("#optRecurringBasic")?.addEventListener("click", async () => {
+    try {
+      const res  = await fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id, next_tier: 'basic' }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error('[from_fixed:basic] status', res.status, json);
+        return alert(`전환 실패: ${json?.message || json?.error || ''}`);
+      }
+      alert(json.message || '정기(기본)으로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
+      window.location.reload();
+    } catch (e) {
+      console.error('[from_fixed:basic] fetch error', e);
+      alert('전환 실패: ' + e.message);
+    }
+  });
 
-// 선결제 → 정기(플러스)
-sheet.querySelector("#optRecurringPlus")?.addEventListener("click", async () => {
-  if (!guardSwitch()) return;
-  // ⛔ 예약 API 호출 삭제
-  // ✅ 즉시 정기 결제 시작
-  (window.startKakaoSubscriptionPlus || startKakaoSubscriptionPlus)();
-});
-
+  // 선결제 → 정기(플러스) 즉시 전환
+  sheet.querySelector("#optRecurringPlus")?.addEventListener("click", async () => {
+    try {
+      const res  = await fetch('/api/payment/manage-subscription?action=schedule_from_fixed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id, next_tier: 'plus' }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error('[from_fixed:plus] status', res.status, json);
+        return alert(`전환 실패: ${json?.message || json?.error || ''}`);
+      }
+      alert(json.message || '정기(플러스)로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
+      window.location.reload();
+    } catch (e) {
+      console.error('[from_fixed:plus] fetch error', e);
+      alert('전환 실패: ' + e.message);
+    }
+  });
 
   sheet.querySelector("#optCancel")?.addEventListener("click", () => {
     sheet.remove();
