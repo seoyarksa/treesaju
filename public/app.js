@@ -1115,6 +1115,15 @@ window.startSixMonthPlan = function () {
 // ✅ 정기구독 버튼 클릭 시
 // 전역: 자동 닫힘 타이머(있으면 유지)
 
+
+
+
+window.__subModalTimer = window.__subModalTimer || null;
+
+window.openSubscriptionModal = async function () {
+  const { data: { user } } = await window.supabaseClient.auth.getUser();
+  if (!user) return alert("로그인이 필요합니다.");
+
 function daysLeftByKST(endDate) {
   if (!endDate) return Infinity;
   const KST_OFFSET = 9 * 60 * 60 * 1000;
@@ -1126,11 +1135,13 @@ function daysLeftByKST(endDate) {
 }
 
 
-window.__subModalTimer = window.__subModalTimer || null;
+// KST 기준 '일수'는 기존 daysLeftByKST 유지
+function msLeft(endDate) {
+  if (!endDate) return Infinity;
+  // 시간 차이는 타임존 보정이 필요없음: 두 timestamp의 차이(ms)
+  return new Date(endDate).getTime() - Date.now();
+}
 
-window.openSubscriptionModal = async function () {
-  const { data: { user } } = await window.supabaseClient.auth.getUser();
-  if (!user) return alert("로그인이 필요합니다.");
 
 function formatKSTDate(dateLike) {
   const d = new Date(dateLike);
@@ -1259,15 +1270,20 @@ function formatKSTDate(dateLike) {
       statusText = isCancelRequested ? `${data.status} (해지 신청됨)` : data.status;
     }
 
-    const dateValue = data.current_period_end
-      ? new Date(data.current_period_end).toLocaleDateString("ko-KR")
-      : "-";
+const dateValue = data.current_period_end
+  ? formatKSTDate(data.current_period_end)
+  : "-";
 
- const end = data.current_period_end ? new Date(data.current_period_end) : null;
+
+const end = data.current_period_end ? new Date(data.current_period_end) : null;
 const daysLeft = end ? daysLeftByKST(end) : null;
 
-    // ✅ 전환/새구매 허용 조건: 만료 1일 전부터
-    const canSwitchOrBuy = !end || daysLeft <= 1;
+// ✅ 전환/새구매 허용 조건: 만료 1일 전부터(24시간 이하)
+const canSwitchOrBuy = !end || msLeft(end) <= 24*60*60*1000;
+
+const leftMs    = end ? Math.max(0, msLeft(end)) : null;
+const hoursLeft = leftMs != null ? Math.ceil(leftMs / (60*60*1000)) : null; // 0~24
+
 
    // const extraLine = end
    //   ? `<div style="margin-top:6px;color:#888;font-size:12px;">
@@ -1275,23 +1291,32 @@ const daysLeft = end ? daysLeftByKST(end) : null;
    //      </div>`
    //   : "";
 
-    const switchNotice = end
-      ? `<div style="margin-top:6px;color:${canSwitchOrBuy ? '#0a7c0a' : '#c0392b'};font-size:12px;">
-           ${canSwitchOrBuy
-             ? "지금은 플랜 변경 or 새 구매가 가능합니다. (만료일까지 약" + daysLeft + "일 남음)"
-             : "플랜 변경 or 새 구매는 <b>만료 1일 전부터</b> 가능합니다. (현재 남은 일수: 약 " + daysLeft + "일)"
-           }
-         </div>`
-      : "";
+const switchNotice = end
+  ? `<div style="margin-top:6px;color:${canSwitchOrBuy ? '#0a7c0a' : '#c0392b'};font-size:12px;">
+       ${
+         canSwitchOrBuy
+           // 24시간 이하면 시간 단위로 안내
+           ? ("지금은 플랜 변경 or 새 구매가 가능합니다. (만료일까지 약 " + (hoursLeft ?? 0) + "시간 남음)")
+           // 그 외는 일 단위
+           : ("플랜 변경 or 새 구매는 <b>만료 1일 전부터</b> 가능합니다. (현재 남은 일수: 약 " + (daysLeft ?? "-") + "일)")
+       }
+     </div>`
+  : "";
+
 
     // ✅ 공통 가드 & 비활성화 유틸
-    const guardSwitch = () => {
-      if (!canSwitchOrBuy) {
-        alert("현재 플랜의 만료일까지 " + daysLeft + "일 남았습니다.\n플랜 변경 또는 새 구매는 만료 1일 전부터 가능합니다.");
-        return false;
-      }
-      return true;
-    };
+const guardSwitch = () => {
+  if (!canSwitchOrBuy) {
+    alert(
+      "현재 플랜의 만료까지 " +
+      (daysLeft != null ? (daysLeft + "일") : "") +
+      " 남았습니다.\n플랜 변경 또는 새 구매는 만료 1일(24시간) 전부터 가능합니다."
+    );
+    return false;
+  }
+  return true;
+};
+
     const disableIfLocked = (btnId) => {
       const el = document.getElementById(btnId);
       if (!el) return;
