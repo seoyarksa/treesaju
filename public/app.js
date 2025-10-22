@@ -1304,8 +1304,8 @@ const daysLeft = end ? daysLeftByKST(end) : null;
     };
 
     let changeLabel = "플랜 변경";
-    if (plan === "premium") changeLabel = "프리미엄+로 전환";
-    else if (plan === "premium_plus") changeLabel = "프리미엄(기본)으로 전환";
+    if (plan === "premium") changeLabel = "프리미엄+ 정기구독으로 전환";
+    else if (plan === "premium_plus") changeLabel = "프리미엄 정기구독(기본)으로 전환";
     else if (plan === "premium3" || plan === "premium6") changeLabel = "다른 플랜으로 전환";
 
     modal.innerHTML = `
