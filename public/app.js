@@ -1132,6 +1132,15 @@ window.openSubscriptionModal = async function () {
   const { data: { user } } = await window.supabaseClient.auth.getUser();
   if (!user) return alert("로그인이 필요합니다.");
 
+function formatKSTDate(dateLike) {
+  const d = new Date(dateLike);
+  if (Number.isNaN(d.getTime())) return '-';
+  return d.toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+  });
+}
+
   const modal = document.getElementById("subscriptionModal");
   if (!modal) return;
 
@@ -1478,17 +1487,22 @@ if (isRecurring) {
 }
 
     if (!isCancelRequested) {
-      document.getElementById("cancelSubBtn")?.addEventListener("click", async () => {
-        if (!confirm("이번 달 말일에 해지됩니다. 진행할까요?")) return;
-        const res = await fetch("/api/payment/manage-subscription?action=cancel", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: user.id }),
-        });
-        const result = await res.json();
-        if (res.ok) { alert("✅ " + (result.message || "해지 신청이 접수되었습니다.")); close(); }
-        else       { alert("❌ " + (result.error || "요청에 실패했습니다.")); }
-      });
+document.getElementById("cancelSubBtn")?.addEventListener("click", async () => {
+  // 해지는 D-1 규칙과 무관 — 언제든 신청 가능
+  const targetText = end ? `다음 결제일(${formatKSTDate(end)}) 이후` : '다음 결제 주기 이후';
+  const ok = confirm(`해지 신청 시 ${targetText} 자동 해지됩니다. 진행할까요?`);
+  if (!ok) return;
+
+  const res = await fetch("/api/payment/manage-subscription?action=cancel", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: user.id }),
+  });
+  const result = await res.json();
+  if (res.ok) { alert("✅ " + (result.message || "해지 신청이 접수되었습니다.")); close(); }
+  else       { alert("❌ " + (result.error || "요청에 실패했습니다.")); }
+});
+
 
       if (window.__subModalTimer) clearTimeout(window.__subModalTimer);
       window.__subModalTimer = setTimeout(close, 5000);
