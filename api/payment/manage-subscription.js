@@ -524,14 +524,6 @@ async function resumeSubscription(req, res) {
   }
 }
 
-const safeParse = (raw) => {
-  if (raw == null) return null;
-  try {
-    const a = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    if (typeof a === 'string') { try { return JSON.parse(a); } catch { return a; } }
-    return a;
-  } catch { return null; }
-};
 
 // 하단에 함수 추가 플랜변경
 async function changePlan(req, res) {
@@ -607,14 +599,18 @@ async function changePlan(req, res) {
       if (!amount) return res.status(400).json({ error: "PLAN_PRICE_NOT_DEFINED" });
 
       // 2) 결제 키(customer_uid)
-      const meta = safeParse(cur.metadata) || {};
-      const customer_uid = meta?.customer_uid;
-      if (!customer_uid) {
-        return res.status(400).json({
-          error: "NO_BILLING_KEY",
-          message: "결제 등록 정보(customer_uid)가 없습니다. 먼저 정기 결제 등록을 진행해 주세요."
-        });
-      }
+const meta = safeParse(cur.metadata) || {};
+const customer_uid = meta?.customer_uid;
+if (!customer_uid) {
+  // 🔁 409 로 프런트에 '빌링키 등록부터 하라'고 안내
+  return res.status(409).json({
+    ok: false,
+    error: "NEED_BILLING_KEY",
+    message: "정기 플랜 전환에는 카드 자동결제 등록(빌링키)이 필요합니다. 결제 등록을 먼저 진행해 주세요.",
+    next_plan: new_plan,                 // 프런트가 어떤 플랜으로 가려는지 알 수 있게
+    hint: "start_billing_key"            // 프런트 분기 힌트
+  });
+}
 
       // 3) 아임포트 즉시 결제
       const token = await getIamportToken();
