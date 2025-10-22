@@ -679,41 +679,33 @@ async function scheduleToFixed(req, res) {
 async function switchFromFixedToRecurring(req, res) {
   try {
     const { user_id, next_tier } = req.body || {};
-    if (!user_id || !next_tier) {
-      return res.status(400).json({ error: "MISSING_PARAMS" });
-    }
+    if (!user_id || !next_tier) return res.status(400).json({ error: "MISSING_PARAMS" });
 
-    // tier -> plan 매핑
-    const raw = String(next_tier).trim().toLowerCase();
-    const tier = { plus:'plus', 'premium_plus':'plus', 'premium+':'plus', basic:'basic', premium:'basic' }[raw];
-    if (!tier) return res.status(400).json({ error: "INVALID_TIER" });
+    const raw   = String(next_tier).trim().toLowerCase();
+    const tier  = { plus:'plus','premium_plus':'plus','premium+':'plus', basic:'basic', premium:'basic' }[raw];
+    if (!tier)  return res.status(400).json({ error: "INVALID_TIER" });
     const nextPlan = tier === 'plus' ? 'premium_plus' : 'premium';
 
-    // 현재 멤버십 조회
     const { data: mem, error: selErr } = await supabase
       .from('memberships')
       .select('id, user_id, plan, status, provider, current_period_end')
       .eq('user_id', user_id)
       .maybeSingle();
-    if (selErr)   return res.status(500).json({ error: "DB_SELECT_FAILED", detail: selErr.message });
-    if (!mem)     return res.status(404).json({ error: "MEMBERSHIP_NOT_FOUND" });
+    if (selErr) return res.status(500).json({ error: "DB_SELECT_FAILED", detail: selErr.message });
+    if (!mem)   return res.status(404).json({ error: "MEMBERSHIP_NOT_FOUND" });
 
-    // 선결제에서만 허용
-    if (!['premium3','premium6'].includes(mem.plan || '')) {
+    if (!['premium3','premium6'].includes(mem.plan || ''))
       return res.status(400).json({ error: "ONLY_FIXED_ALLOWED", detail: `current plan: ${mem.plan}` });
-    }
-    if (!mem.current_period_end) {
+    if (!mem.current_period_end)
       return res.status(400).json({ error: "NO_EXPIRE_DATE" });
-    }
 
-    // 정책: 전환은 즉시 확정하되, 새 정기 주기는 "기존 만료일 다음날"부터 1개월
     const end = new Date(mem.current_period_end);
     const nextEnd = new Date(end);
     nextEnd.setMonth(nextEnd.getMonth() + 1);
 
     const nowIso = new Date().toISOString();
 
-    // 멤버십 업데이트 (예약 컬럼/메타 정리)
+    // ✅ 예약 컬럼 제거 후 깔끔한 업데이트
     const { error: upErr } = await supabase
       .from('memberships')
       .update({
@@ -722,22 +714,19 @@ async function switchFromFixedToRecurring(req, res) {
         provider: mem.provider || 'kakao',
         cancel_at_period_end: false,
         cancel_effective_at: null,
-        current_period_end: nextEnd.toISOString(), // 새 정기 주기 종료일
-        // 예약 관련 컬럼 클리어(혹시 남아있다면)
-        scheduled_change_type: null,
-        scheduled_next_plan: null,
-        scheduled_effective_at: null,
-        scheduled_requested_at: null,
-        scheduled_note: null,
+        current_period_end: nextEnd.toISOString(),
         updated_at: nowIso,
       })
       .eq('id', mem.id);
     if (upErr) return res.status(500).json({ error: "DB_UPDATE_FAILED", detail: upErr.message });
 
-    // 프로필 등급은 effective_grade/trigger가 있다면 자동, 없다면 보조 업데이트
-    // (정기= 'premium' 또는 'premium_plus')
+    // 프로필은 트리거가 동기화한다면 생략 가능. 보조 동기화 원하면 유지
     await supabase.from('profiles')
-      .update({ grade: nextPlan, updated_at: nowIso, daily_limit: nextPlan === 'premium_plus' ? 150 : 60 })
+      .update({
+        grade: nextPlan,
+        daily_limit: nextPlan === 'premium_plus' ? 150 : 60,
+        updated_at: nowIso
+      })
       .eq('user_id', user_id);
 
     return res.status(200).json({
@@ -750,7 +739,3 @@ async function switchFromFixedToRecurring(req, res) {
     return res.status(500).json({ error: 'INTERNAL_ERROR', detail: e?.message || '' });
   }
 }
-
-
-
-
