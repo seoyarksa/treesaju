@@ -1336,7 +1336,7 @@ ${isRecurring ? `` : ``}
     ${
       isCancelRequested
         ? `<div style="margin-top:8px; color:#888; font-size:12px;">(현재 ${dateLabel}까지 이용 가능합니다.)</div>`
-        : `<div style="margin-top:8px; color:#888; font-size:12px;">5초 후 자동으로 닫혀요.</div>`
+        : `<div style="margin-top:8px; color:#888; font-size:12px;">10초 후 자동으로 닫혀요.</div>`
     }
   </div>
 `;
@@ -1534,7 +1534,7 @@ document.getElementById("cancelSubBtn")?.addEventListener("click", async () => {
 
 
       if (window.__subModalTimer) clearTimeout(window.__subModalTimer);
-      window.__subModalTimer = setTimeout(close, 5000);
+      window.__subModalTimer = setTimeout(close, 10000); //10초후 닫기
     } else {
       const resumeBtn = document.getElementById("resumeSubBtn");
       if (resumeBtn) {
