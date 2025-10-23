@@ -1542,28 +1542,32 @@ document.getElementById("changePlanBtn")?.addEventListener("click", async () => 
     }
 
     // 선결제 → 정기(기본) 즉시 전환
-// 선결제 → 정기(기본)
-sheet.querySelector("#optRecurringBasic")?.addEventListener("click", async (e) => {
-  const btn = e.currentTarget;
-  await withBtnLock(btn, async () => {
+// 선결제 → 정기(기본) 즉시 전환
+sheet.querySelector("#optRecurringBasic")?.addEventListener("click", async () => {
+  try {
+    // 1) 빌링키 확인/등록
     const ok = await ensureBillingKeyForTier('basic');
     if (!ok) return;
 
-    const { res, json } = await safeFetch('/api/payment/manage-subscription?action=switch_from_fixed_to_recurring', {
+    // 2) 전환 API 호출
+    const res  = await fetch('/api/payment/manage-subscription?action=switch_from_fixed_to_recurring', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: user.id, next_tier: 'basic' }),
     });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json?.message || json?.error || '전환 실패');
 
-    if (!res?.ok) {
-      const msg = json?.message || json?.error || '전환 실패';
-      alert(`전환 실패: ${msg}`);
-      return;
-    }
-    alert(json?.message || '정기(기본)으로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
-    setTimeout(() => location.assign(location.href), 200); // 짧은 지연 후 새로고침
-  });
+    // 3) 알림 → 약간 지연 후 새로고침 (정기+와 동일)
+    alert(json.message || '정기(기본)으로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
+    setTimeout(() => {
+      try { window.location.reload(); } catch {}
+    }, 200);
+  } catch (e) {
+    alert('전환 실패: ' + e.message);
+  }
 });
+
 
 // 선결제 → 정기(플러스)도 동일 패턴
 
