@@ -68,6 +68,41 @@ if (req.method === "POST" && action === "change_plan") {
     return await chargeBilling(req, res);
   }
 
+  //임시 테스트용 이후 삭제
+  // handler 상단 액션 분기 근처
+if (req.method === "POST" && action === "debug_receipt") {
+  const now = new Date();
+  const imp = "debug_" + Date.now();
+  const merch = "debug_merch_" + Date.now();
+  try {
+    const { data, error } = await supabase
+      .from("payment_receipts")
+      .insert({
+        user_id: "5713065a-966a-4c5b-a3b2-1cf21b7fb574", // 네 UUID
+        kind: "recurring",
+        plan: "premium",
+        amount: 1234,
+        currency: "KRW",
+        imp_uid: imp,
+        merchant_uid: merch,
+        paid_at: now.toISOString(),
+        period_start: now.toISOString(),
+        period_end: new Date(now.getTime() + 86400000).toISOString(),
+      })
+      .select()
+      .maybeSingle();
+    if (error) {
+      console.error("[debug_receipt] insert ERROR", error);
+      return res.status(500).json({ ok: false, error });
+    }
+    console.log("[debug_receipt] insert OK", data);
+    return res.status(200).json({ ok: true, data });
+  } catch (e) {
+    console.error("[debug_receipt] exception", e);
+    return res.status(500).json({ ok: false, e: e?.message });
+  }
+}
+
 
   return res.status(405).json({ error: "Invalid request" });
 }
@@ -661,8 +696,11 @@ async function changePlan(req, res) {
       // [RECEIPT] 4.5) 결제 영수 기록 (확인용 원장) — 검증 통과 '직후'
       try {
 
-        console.log("[receipt] before", { where: "changePlan", user_id, plan: new_plan, imp: v?.imp_uid });
+       console.log("[MS] changePlan verify OK", { imp: v.imp_uid, status: v.status });
 
+console.log("[receipt] BEFORE changePlan", {
+  user_id, new_plan, imp_uid: v.imp_uid, merchant_uid: paid?.merchant_uid
+});
         await recordReceipt(supabase, {
           user_id,
           kind: "recurring",
