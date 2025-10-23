@@ -10,6 +10,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 console.log("[ENV CHECK] SUPABASE_SERVICE_ROLE_KEY:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+const BUILD_TAG = "rcpt-inline-2025-10-23-2";
 
 
 export default async function handler(req, res) {
@@ -19,6 +20,8 @@ export default async function handler(req, res) {
   console.log('[manage-subscription] method=%s raw=%s -> %s url=%s',
     req.method, rawAction, action, req.url);
 
+
+    console.log("[MS] ENTER build=%s", BUILD_TAG);
       // (선택) 헬스체크
   if ((req.method === 'GET' || req.method === 'POST') && action === 'health') {
     return res.status(200).json({ ok: true, ts: new Date().toISOString() });
@@ -694,10 +697,9 @@ async function changePlan(req, res) {
       nextEnd.setMonth(nextEnd.getMonth() + 1);
 
       // [RECEIPT] 4.5) 결제 영수 기록 (확인용 원장) — 검증 통과 '직후'
- // [RECEIPT] 4.5) 결제 영수 기록 (확인용 원장) — 검증 통과 '직후'
+// [RECEIPT] 4.5) 검증 직후 영수 기록 upsert
 console.log("[MS] changePlan verify OK", { imp: v.imp_uid, status: v.status });
 
-// ✅ 검증 통과 직후(v, paid 계산 끝), memberships 갱신 직전에 붙이기
 console.log("[receipt] BEFORE changePlan-inline", {
   user_id, new_plan, imp_uid: v.imp_uid, merchant_uid: paid?.merchant_uid
 });
@@ -707,22 +709,19 @@ const { data: rcpt, error: rcptErr } = await supabase
   .upsert({
     user_id,
     kind: "recurring",
-    plan: new_plan,                         // 'premium' | 'premium_plus'
+    plan: new_plan,
     months: null,
     amount,
     currency: "KRW",
-    imp_uid: v.imp_uid,                     // 검증 응답의 imp_uid
-    merchant_uid: paid.merchant_uid,        // again 호출 시 사용한 merchant_uid
+    imp_uid: v.imp_uid,
+    merchant_uid: paid.merchant_uid,
     customer_uid: customer_uid || null,
     pay_method: v.pay_method || "billing_key",
     pg_provider: v.pg_provider || null,
     pg_tid: v.pg_tid || null,
-    paid_at: v.paid_at
-      ? new Date(v.paid_at * 1000).toISOString()  // iamport paid_at=unix sec
-      : new Date().toISOString(),
-    // base = prevEnd > now ? prevEnd : now (위에서 이미 계산됨)
-    period_start: base.toISOString(),
-    period_end:   nextEnd.toISOString(),
+    paid_at: v.paid_at ? new Date(v.paid_at * 1000).toISOString() : new Date().toISOString(),
+    period_start: base.toISOString(),      // prevEnd>now ? prevEnd : now
+    period_end:   nextEnd.toISOString(),   // +1개월
     raw: { amount: v.amount, card_name: v.card_name },
   }, { onConflict: "imp_uid", ignoreDuplicates: true })
   .select("imp_uid, merchant_uid, paid_at")
@@ -788,11 +787,14 @@ if (rcptErr) {
 return res.status(200).json({
   ok: true,
   mode: "recurring_changed_charged_now",
-  receipt_inline: true,        // 배포본 확인용 플래그
-  receipt_upsert,              // ✅ 여기서 바로 실행 결과 확인 가능
-  message: `정기(${new_plan === "premium_plus" ? "플러스" : "기본"})로 전환되었습니다. 결제가 완료되었고 새 다음 결제일은 ${nextEnd.toISOString().slice(0,10)} 입니다.`,
+  build: BUILD_TAG,          // ← 배포본 확인
+  receipt_inline: true,      // ← 인라인 업서트 코드가 들어간 빌드임을 표시
+  receipt_upsert,            // ← { ok:true, data } 또는 { ok:false, error }
+  message: `정기(${new_plan === "premium_plus" ? "플러스" : "기본"})로 전환되었습니다. ...`,
   membership: updated,
 });
+
+
     } catch (e) {
       console.error("[changePlan recurring->recurring] error:", e);
       return res.status(500).json({ error: "PLAN_SWITCH_PAYMENT_FAILED", detail: e?.message || "" });
