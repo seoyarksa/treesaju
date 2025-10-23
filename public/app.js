@@ -1251,6 +1251,59 @@ function formatKSTDate(dateLike) {
     document.getElementById("subCloseBtn")?.addEventListener("click", close);
   }
 
+// ── 헬퍼: memberships.metadata에서 customer_uid 읽기
+async function readCustomerUid() {
+  const { data: { user } } = await window.supabaseClient.auth.getUser();
+  if (!user) throw new Error("로그인이 필요합니다.");
+
+  const { data, error } = await window.supabaseClient
+    .from("memberships")
+    .select("metadata")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  // metadata(JSON 또는 object) 안전 파싱
+  let meta = null;
+  try {
+    if (!data?.metadata) meta = null;
+    else meta = (typeof data.metadata === "string") ? JSON.parse(data.metadata) : data.metadata;
+  } catch { meta = null; }
+
+  return meta?.customer_uid || null;
+}
+
+// ── 헬퍼: 정기 전환 전에 빌링키 보장 (tier: 'basic' | 'plus')
+async function ensureBillingKeyForTier(tier) {
+  const existing = await readCustomerUid().catch(() => null);
+  if (existing) return true;
+
+  if (!confirm("정기 결제를 위해 카드 등록(빌링키)이 필요합니다. 지금 등록하시겠어요?")) {
+    return false;
+  }
+
+  // 등록 플로우 시작
+  if (tier === "plus") {
+    (window.startKakaoSubscriptionPlus || startKakaoSubscriptionPlus)();
+  } else {
+    (window.startKakaoSubscriptionBasic || startKakaoSubscriptionBasic)();
+  }
+
+  // 등록 완료 폴링(최대 60초, 2초 간격)
+  const timeoutMs = 60000;
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    await new Promise(r => setTimeout(r, 2000));
+    const uid = await readCustomerUid().catch(() => null);
+    if (uid) return true;
+  }
+  alert("카드 등록이 확인되지 않았습니다. 등록을 마친 후 다시 시도해 주세요.");
+  return false;
+}
+
+
+
   try {
     const { data, error } = await window.supabaseClient
       .from("memberships")
@@ -1305,8 +1358,9 @@ const switchNotice = end
     // ✅ 공통 가드 & 비활성화 유틸
 const guardSwitch = () => {
   if (!canSwitchOrBuy) {
+    const remain = end ? formatRemaining(end) : '-';
     alert(
-      `현재 플랜 만료까지 약 ${formatRemainingMs(leftMs)} 남았습니다.\n` +
+      `현재 플랜 만료까지 약 ${remain} 남았습니다.\n` +
       `플랜 변경 또는 새 구매는 만료 24시간 전부터 가능합니다.`
     );
     return false;
@@ -1488,26 +1542,47 @@ document.getElementById("changePlanBtn")?.addEventListener("click", async () => 
     }
 
     // 선결제 → 정기(기본) 즉시 전환
-    sheet.querySelector("#optRecurringBasic")?.addEventListener("click", async () => {
-      try {
-        const json = await callImmediateFromFixed('basic');
-        alert(json.message || '정기(기본)으로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
-        window.location.reload();
-      } catch (e) {
-        alert('전환 실패: ' + e.message);
-      }
-    });
+sheet.querySelector("#optRecurringBasic")?.addEventListener("click", async () => {
+  try {
+    const ok = await ensureBillingKeyForTier('basic');
+    if (!ok) return;
 
-    // 선결제 → 정기(플러스) 즉시 전환
-    sheet.querySelector("#optRecurringPlus")?.addEventListener("click", async () => {
-      try {
-        const json = await callImmediateFromFixed('plus');
-        alert(json.message || '정기(플러스)로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
-        window.location.reload();
-      } catch (e) {
-        alert('전환 실패: ' + e.message);
-      }
+    const res  = await fetch('/api/payment/manage-subscription?action=switch_from_fixed_to_recurring', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: user.id, next_tier: 'basic' }),
     });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json?.message || json?.error || '전환 실패');
+
+    alert(json.message || '정기(기본)으로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
+    window.location.reload();
+  } catch (e) {
+    alert('전환 실패: ' + e.message);
+  }
+});
+
+// 선결제 → 정기(플러스) 즉시 전환
+sheet.querySelector("#optRecurringPlus")?.addEventListener("click", async () => {
+  try {
+    const ok = await ensureBillingKeyForTier('plus');
+    if (!ok) return;
+
+    const res  = await fetch('/api/payment/manage-subscription?action=switch_from_fixed_to_recurring', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: user.id, next_tier: 'plus' }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json?.message || json?.error || '전환 실패');
+
+    alert(json.message || '정기(플러스)로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
+    window.location.reload();
+  } catch (e) {
+    alert('전환 실패: ' + e.message);
+  }
+});
+
 
     sheet.querySelector("#optCancel")?.addEventListener("click", () => {
       sheet.remove();
