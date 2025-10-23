@@ -1401,7 +1401,7 @@ window.openSubscriptionModal = async function () {
         <p id="gwDesc" style="margin:0 0 12px; font-size:13px; color:#555;"></p>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button id="gwBtnInicis" class="btn-outline" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:8px 12px;">이니시스 (카드/계좌)</button>
-          <button id="gwBtnKakao"  class="btn-success" style="border-radius:6px; padding:8px 12px;">카카오페이</button>
+          <button id="gwBtnKakao"  class="btn-success" style="border-radius:6px; padding:8px 12px;">카카오페이 간편결제</button>
           <button id="gwBtnClose"  class="btn-ghost"   style="border:1px solid #eee; background:#f5f5f5; border-radius:6px; padding:8px 12px;">취소</button>
         </div>
       </div>
