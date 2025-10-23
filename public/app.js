@@ -1359,7 +1359,7 @@ ${isRecurring ? `` : ``}
     ${
       isCancelRequested
         ? `<div style="margin-top:8px; color:#888; font-size:12px;">(현재 ${dateLabel}까지 이용 가능합니다.)</div>`
-        : `<div style="margin-top:8px; color:#888; font-size:12px;">10초 후 자동으로 닫혀요.</div>`
+        : `<div style="margin-top:8px; color:#888; font-size:12px;">10초 후 자동으로 닫혀요.<br> *주의: 플랜전환시 즉시 전환되므로 1일 사주출력횟수 제한치도 즉시 전환됩니다!!!</div>`
     }
   </div>
 `;
