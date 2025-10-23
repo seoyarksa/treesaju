@@ -1162,7 +1162,7 @@ window.startInicisSubscription = async function(tier = 'basic') {
 
     // 5) 결제창 호출 (결제창 방식: 최초 결제 + 빌링키 등록)
     IMP.request_pay({
-      pg: "html5_inicis.INIpayTest",            // ★ 실운영: "html5_inicis.{상점아이디}"
+      pg: "html5_inicis.MOI9890153",            // ★ 실운영: "html5_inicis.{상점아이디}"
       pay_method: "card",
       merchant_uid: `inicis_order_${tier}_` + Date.now(),
       name: sel.name,
@@ -1236,7 +1236,7 @@ async function startInicisFixedTermPay({ months, amount, productId, dailyLimit =
 
   // 4) 결제창 호출 (일반결제)
   IMP.request_pay({
-    pg: "html5_inicis.INIpayTest",       // ★ 실운영: "html5_inicis.{상점아이디}"
+    pg: "html5_inicis.MOI9890153",       // ★ 실운영: "html5_inicis.{상점아이디}"
     pay_method: "card",
     merchant_uid: merchantUid,
     name: `INICIS ${months}개월 구독 (1일 ${dailyLimit}회)`,
