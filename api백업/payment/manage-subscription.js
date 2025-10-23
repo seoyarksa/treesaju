@@ -3,14 +3,14 @@
 
 
 import { createClient } from "@supabase/supabase-js";
-import { recordReceipt } from '../../utils/recordReceipt'; // 경로 맞춰 수정
+import { recordReceipt } from '../utils/recordReceipt'; // 경로 맞춰 수정
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 console.log("[ENV CHECK] SUPABASE_SERVICE_ROLE_KEY:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
-const BUILD_TAG = "rcpt-inline-2025-10-23-2";
+const BUILD_TAG = "rcpt-inline-2025-10-23-04";
 
 
 export default async function handler(req, res) {
@@ -23,9 +23,11 @@ export default async function handler(req, res) {
 
     console.log("[MS] ENTER build=%s", BUILD_TAG);
       // (선택) 헬스체크
-  if ((req.method === 'GET' || req.method === 'POST') && action === 'health') {
-    return res.status(200).json({ ok: true, ts: new Date().toISOString() });
-  }
+// health 분기
+if ((req.method === 'GET' || req.method === 'POST') && action === 'health') {
+  return res.status(200).json({ ok: true, build: BUILD_TAG, ts: new Date().toISOString() });
+}
+
 
   // ✅ 즉시 전환(선결제 → 정기)
   if (req.method === "POST" && action === "switch_from_fixed_to_recurring") {
@@ -698,7 +700,8 @@ async function changePlan(req, res) {
 
       // [RECEIPT] 4.5) 결제 영수 기록 (확인용 원장) — 검증 통과 '직후'
 // [RECEIPT] 4.5) 검증 직후 영수 기록 upsert
-console.log("[MS] changePlan verify OK", { imp: v.imp_uid, status: v.status });
+let receipt_inline = false;
+let receipt_upsert = null;
 
 console.log("[receipt] BEFORE changePlan-inline", {
   user_id, new_plan, imp_uid: v.imp_uid, merchant_uid: paid?.merchant_uid
@@ -720,14 +723,20 @@ const { data: rcpt, error: rcptErr } = await supabase
     pg_provider: v.pg_provider || null,
     pg_tid: v.pg_tid || null,
     paid_at: v.paid_at ? new Date(v.paid_at * 1000).toISOString() : new Date().toISOString(),
-    period_start: base.toISOString(),      // prevEnd>now ? prevEnd : now
-    period_end:   nextEnd.toISOString(),   // +1개월
+    period_start: base.toISOString(),
+    period_end:   nextEnd.toISOString(),
     raw: { amount: v.amount, card_name: v.card_name },
   }, { onConflict: "imp_uid", ignoreDuplicates: true })
   .select("imp_uid, merchant_uid, paid_at")
   .maybeSingle();
 
-let receipt_upsert = null;
+receipt_inline = true;
+receipt_upsert = rcptErr
+  ? { ok: false, error: rcptErr }
+  : { ok: true, data: rcpt };
+
+
+
 if (rcptErr) {
   console.error("[receipt] ERROR changePlan-inline", JSON.stringify(rcptErr, null, 2));
   receipt_upsert = { ok: false, error: rcptErr };
@@ -787,12 +796,13 @@ if (rcptErr) {
 return res.status(200).json({
   ok: true,
   mode: "recurring_changed_charged_now",
-  build: BUILD_TAG,          // ← 배포본 확인
-  receipt_inline: true,      // ← 인라인 업서트 코드가 들어간 빌드임을 표시
-  receipt_upsert,            // ← { ok:true, data } 또는 { ok:false, error }
-  message: `정기(${new_plan === "premium_plus" ? "플러스" : "기본"})로 전환되었습니다. ...`,
+  build: BUILD_TAG,          // ✅ 배포본 식별
+  receipt_inline,            // ✅ 인라인 업서트 실행 여부
+  receipt_upsert,            // ✅ 성공/실패 및 데이터
+  message: `정기(${new_plan === "premium_plus" ? "플러스" : "기본"})로 전환되었습니다. 결제가 완료되었고 새 다음 결제일은 ${nextEnd.toISOString().slice(0,10)} 입니다.`,
   membership: updated,
 });
+
 
 
     } catch (e) {
