@@ -203,11 +203,12 @@ async function safeFetch(url, options) {
     const res = await fetch(url, options);
     let json = null;
     try { json = await res.json(); } catch {}
-    return { res, json };
-  } catch (error) {
-    return { res: null, json: null, error };
+    return { res, json, error: null };
+  } catch (e) {
+    return { res: null, json: null, error: e };
   }
 }
+
 
 // 짧은 대기
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -1316,6 +1317,27 @@ async function readCustomerUid() {
   return meta?.customer_uid || null;
 }
 
+// 네트워크 오류 등으로 응답을 못 받았을 때, 정말 전환이 반영됐는지 짧게 확인
+async function confirmSwitchSuccess(userId, tier, tries = 3, delayMs = 500) {
+  // tier: 'basic' | 'plus'  → 기대 plan: 'premium' | 'premium_plus'
+  const expectPlan = tier === 'plus' ? 'premium_plus' : 'premium';
+
+  for (let i = 0; i < tries; i++) {
+    const { data, error } = await window.supabaseClient
+      .from('memberships')
+      .select('plan, status, current_period_end')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!error && data && data.plan === expectPlan && data.status === 'active') {
+      return true; // 전환 성공으로 판단
+    }
+    await new Promise(r => setTimeout(r, delayMs)); // 잠깐 대기 후 재시도
+  }
+  return false; // 끝까지 확인 못함
+}
+
+
 // ── 헬퍼: 정기 전환 전에 빌링키 보장 (tier: 'basic' | 'plus')
 async function ensureBillingKeyForTier(tier) {
   const existing = await readCustomerUid().catch(() => null);
@@ -1604,13 +1626,12 @@ sheet.querySelector("#optRecurringBasic")?.addEventListener("click", async (e) =
       );
 
       // 네트워크 오류만 "무소음 처리"
-      if (error || !res) {
-        const okAfter = await confirmSwitchSuccess(user.id, 'basic');
-        if (okAfter) {
-          setTimeout(() => { try { window.location.reload(); } catch {} }, 200);
-        }
-        return; // 알림 없이 종료
-      }
+if (error || !res) {
+  const okAfter = await confirmSwitchSuccess(user.id, 'basic'); // 또는 'plus'
+  if (okAfter) setTimeout(() => { try { window.location.reload(); } catch {} }, 200);
+  return;
+}
+
 
       if (!res.ok) {
         const msg = json?.message || json?.error || '전환 실패';
@@ -1643,14 +1664,12 @@ sheet.querySelector("#optRecurringPlus")?.addEventListener("click", async (e) =>
         }
       );
 
-      // 네트워크 오류만 "무소음 처리"
-      if (error || !res) {
-        const okAfter = await confirmSwitchSuccess(user.id, 'plus');
-        if (okAfter) {
-          setTimeout(() => { try { window.location.reload(); } catch {} }, 200);
-        }
-        return;
-      }
+    // 네트워크 오류만 "무소음 처리"
+    if (error || !res) {
+      const okAfter = await confirmSwitchSuccess(user.id, 'plus');
+      if (okAfter) setTimeout(() => { try { window.location.reload(); } catch {} }, 200);
+      return;
+    }
 
       if (!res.ok) {
         const msg = json?.message || json?.error || '전환 실패';
