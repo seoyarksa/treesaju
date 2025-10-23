@@ -728,10 +728,13 @@ const { data: rcpt, error: rcptErr } = await supabase
   .select("imp_uid, merchant_uid, paid_at")
   .maybeSingle();
 
+let receipt_upsert = null;
 if (rcptErr) {
-  console.error("[receipt] ERROR changePlan-inline", rcptErr);  // 확인용: 실패해도 본 플로우는 계속
+  console.error("[receipt] ERROR changePlan-inline", JSON.stringify(rcptErr, null, 2));
+  receipt_upsert = { ok: false, error: rcptErr };
 } else {
   console.log("[receipt] AFTER changePlan-inline", rcpt);
+  receipt_upsert = { ok: true, data: rcpt };
 }
 
       
@@ -782,12 +785,14 @@ if (rcptErr) {
         .eq("user_id", user_id);
 
       // 7) 응답
-      return res.status(200).json({
-        ok: true,
-        mode: "recurring_changed_charged_now",
-        message: `정기(${new_plan === "premium_plus" ? "플러스" : "기본"})로 전환되었습니다. 결제가 완료되었고 새 다음 결제일은 ${nextEnd.toISOString().slice(0,10)} 입니다.`,
-        membership: updated,
-      });
+return res.status(200).json({
+  ok: true,
+  mode: "recurring_changed_charged_now",
+  receipt_inline: true,        // 배포본 확인용 플래그
+  receipt_upsert,              // ✅ 여기서 바로 실행 결과 확인 가능
+  message: `정기(${new_plan === "premium_plus" ? "플러스" : "기본"})로 전환되었습니다. 결제가 완료되었고 새 다음 결제일은 ${nextEnd.toISOString().slice(0,10)} 입니다.`,
+  membership: updated,
+});
     } catch (e) {
       console.error("[changePlan recurring->recurring] error:", e);
       return res.status(500).json({ error: "PLAN_SWITCH_PAYMENT_FAILED", detail: e?.message || "" });
