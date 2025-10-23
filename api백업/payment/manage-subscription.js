@@ -3,7 +3,7 @@
 
 
 import { createClient } from "@supabase/supabase-js";
-import { recordReceipt } from '../utils/recordReceipt'; // 경로 맞춰 수정
+import { recordReceipt } from '../../utils/recordReceipt'; // 경로 맞춰 수정
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -132,7 +132,8 @@ if (req.method === "POST" && action === "debug_receipt") {
 }
 
 
-  return res.status(405).json({ error: "Invalid request" });
+  return res.status(405).json({ error: "Invalid request", method: req.method, action });
+
 }
 
 //
