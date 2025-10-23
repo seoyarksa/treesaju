@@ -180,6 +180,40 @@ async function postJSON(url, data) {
 window.postJSON ||= postJSON;
 
 
+// 실패해도 버튼이 반드시 풀리도록 try/finally
+async function withBtnLock(btn, task) {
+  if (!btn) return;
+  if (btn.dataset.locked === '1') return;      // 더블클릭 방지
+  btn.dataset.locked = '1';
+  const prevDisabled = btn.disabled;
+  btn.disabled = true;
+  btn.style.opacity = '0.6';
+  try {
+    await task();
+  } finally {
+    btn.disabled = prevDisabled;
+    btn.style.opacity = '';
+    delete btn.dataset.locked;
+  }
+}
+
+// fetch 안전 래퍼: 네트워크 오류도 잡고, JSON 파싱 실패해도 죽지 않게
+async function safeFetch(url, options) {
+  try {
+    const res = await fetch(url, options);
+    let json = null;
+    try { json = await res.json(); } catch {}
+    return { res, json };
+  } catch (error) {
+    return { res: null, json: null, error };
+  }
+}
+
+// 짧은 대기
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+
+
 
 function normalizePhoneKR(raw, mode = 'intl') {
   const digits = String(raw || '').replace(/\D/g, '');
