@@ -72,6 +72,24 @@ if (req.method === "POST" && action === "change_plan") {
 }
 
 //
+async function verifyIamportPayment(token, imp_uid) {
+  const r = await fetch(`https://api.iamport.kr/payments/${imp_uid}`, {
+    headers: { Authorization: token }, // 아임포트는 Bearer 접두어 없이 토큰 문자열을 그대로 씀
+  });
+  const j = await r.json();
+  if (j.code !== 0) throw new Error(j.message || "PAYMENT_LOOKUP_FAILED");
+  return j.response; // { status:'paid', pay_method, pg_provider, pg_tid, paid_at, ... }
+}
+
+
+async function getPayment(access_token, imp_uid) {
+  const r = await fetch(`https://api.iamport.kr/payments/${imp_uid}`, {
+    headers: { Authorization: access_token },
+  });
+  const j = await r.json();
+  if (j.code !== 0) throw new Error(j.message || "PAYMENT_LOOKUP_FAILED");
+  return j.response; // { status, pay_method, pg_provider, pg_tid, paid_at, ... }
+}
 // ✅ 1️⃣ 결제 등록 및 프리미엄 등급 적용
 //
 async function registerBilling(req, res) {
@@ -533,14 +551,7 @@ async function resumeSubscription(req, res) {
 // 하단에 함수 추가 플랜변경
 // /api/payment/manage-subscription.js 내부
 // if (req.method === "POST" && action === "change_plan") return await changePlan(req, res);
-async function verifyIamportPayment(token, imp_uid) {
-  const r = await fetch(`https://api.iamport.kr/payments/${imp_uid}`, {
-    headers: { "Authorization": token },
-  });
-  const j = await r.json();
-  if (j.code !== 0) throw new Error(j.message || "PAYMENT_LOOKUP_FAILED");
-  return j.response; // { status, pay_method, pg_provider, pg_tid, paid_at, ... }
-}
+
 
 async function changePlan(req, res) {
   const { user_id, new_plan } = req.body || {};
@@ -814,14 +825,8 @@ async function scheduleToFixed(req, res) {
 // manage-subscription.js 내부
 // 라우팅: if (req.method === "POST" && action === "switch_from_fixed_to_recurring") return await switchFromFixedToRecurring(req, res);
 // (추가) 결제 검증 함수
-async function getPayment(access_token, imp_uid) {
-  const r = await fetch(`https://api.iamport.kr/payments/${imp_uid}`, {
-    headers: { Authorization: access_token },
-  });
-  const j = await r.json();
-  if (j.code !== 0) throw new Error(j.message || "PAYMENT_LOOKUP_FAILED");
-  return j.response; // { status, pay_method, pg_provider, pg_tid, paid_at, ... }
-}
+
+
 async function switchFromFixedToRecurring(req, res) {
   try {
     const { user_id, next_tier } = req.body || {};
@@ -872,77 +877,78 @@ async function switchFromFixedToRecurring(req, res) {
     if (!access_token) return res.status(500).json({ error: "IAMPORT_TOKEN_FAIL" });
 
     // 즉시 청구 (정기 시작 결제)
-  // 즉시 청구
-    const amount = (nextPlan === 'premium_plus') ? 16500 : 11000;
-    const merchant_uid = `switch-fixed2recurring-${Date.now()}`;
-    const againRes = await fetch("https://api.iamport.kr/subscribe/payments/again", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": access_token },
-      body: JSON.stringify({
-        customer_uid,
-        merchant_uid,
-        amount,
-        name: `정기(${nextPlan}) 시작 결제`,
-      }),
-    });
-    const again = await againRes.json();
-    if (again.code !== 0) {
-      return res.status(400).json({ error: "PAYMENT_FAILED", detail: again.message || "again failed" });
-    }
+  // 즉시 청구 (정기 시작 결제)
+const amount = (nextPlan === 'premium_plus') ? 16500 : 11000;
+const merchant_uid = `switch-fixed2recurring-${Date.now()}`; // ← 변수로 고정
+const againRes = await fetch("https://api.iamport.kr/subscribe/payments/again", {
+  method: "POST",
+  headers: { "Content-Type": "application/json", "Authorization": access_token },
+  body: JSON.stringify({
+    customer_uid,
+    merchant_uid,
+    amount,
+    name: `정기(${nextPlan}) 시작 결제`,
+  }),
+});
+const again = await againRes.json();
+if (again.code !== 0) {
+  return res.status(400).json({ error: "PAYMENT_FAILED", detail: again.message || "again failed" });
+}
 
-    // ✅ 결제 검증
-    const v = await getPayment(access_token, again.response.imp_uid);
-    if (v.status !== "paid") {
-      return res.status(402).json({ error: "PAYMENT_NOT_CONFIRMED" });
-    }
+// ✅ (1) 결제 검증
+const v = await getPayment(access_token, again.response.imp_uid);
+if (v.status !== "paid") {
+  return res.status(402).json({ error: "PAYMENT_NOT_CONFIRMED" });
+}
 
-    // 기간 계산(기존 동일)
-    const prevEnd = new Date(mem.current_period_end);
-    const now = new Date();
-    const base = (prevEnd > now ? prevEnd : now);
-    const nextEnd = new Date(base);
-    nextEnd.setMonth(nextEnd.getMonth() + 1);
+// 새 만료일 계산 (기존 동일)
+const prevEnd = new Date(mem.current_period_end);
+const now = new Date();
+const base = (prevEnd > now ? prevEnd : now);
+const nextEnd = new Date(base);
+nextEnd.setMonth(nextEnd.getMonth() + 1);
 
-    // ✅ last_purchase에 결제 메타 확장
-    const nowIso = new Date().toISOString();
-    const purchase = {
-      kind: 'recurring_start',
-      imp_uid: again.response.imp_uid,
-      merchant_uid,
-      amount: again.response.amount,
-      at: nowIso,
-      pay_method: v.pay_method || null,
-      pg_provider: v.pg_provider || null,
-      pg_tid: v.pg_tid || null,
-      paid_at_unix: v.paid_at || null, // unix(sec)
-    };
+// ✅ (2) last_purchase 메타 확장 (트리거가 100% 인식하도록)
+const nowIso = new Date().toISOString();
+const purchase = {
+  kind: 'recurring_start',
+  imp_uid: again.response.imp_uid,
+  merchant_uid,                 // 우리가 지정한 merchant_uid 그대로
+  amount: again.response.amount,
+  at: nowIso,
+  pay_method: v?.pay_method || "billing_key",
+  pg_provider: v?.pg_provider || null,
+  pg_tid: v?.pg_tid || null,
+  paid_at_unix: v?.paid_at || null,  // unix(sec)
+};
 
-    const newMeta = {
-      ...(meta || {}),
-      provider: 'kakao',
-      last_purchase: purchase,
-      purchases: [ ...(meta?.purchases || []), purchase ],
-    };
+const newMeta = {
+  ...(meta || {}),
+  provider: 'kakao',
+  last_purchase: purchase,
+  purchases: [ ...(meta?.purchases || []), purchase ],
+};
 
-    // ✅ jsonb 직렬화 안전화
-    const safeMeta = JSON.parse(JSON.stringify(newMeta));
+// ✅ (3) jsonb 직렬화 안전화 (Date/undefined 제거)
+const safeMeta = JSON.parse(JSON.stringify(newMeta));
 
-    // 멤버십 업데이트
-    const { data: upd, error: upErr } = await supabase
-      .from('memberships')
-      .update({
-        plan: nextPlan,
-        status: 'active',
-        provider: mem.provider || 'kakao',
-        cancel_at_period_end: false,
-        cancel_effective_at: null,
-        current_period_end: nextEnd.toISOString(),
-        metadata: safeMeta,
-        updated_at: nowIso,
-      })
-      .eq('id', mem.id)
-      .select()
-      .maybeSingle();
+// 멤버십 즉시 전환 (metadata에 safeMeta 사용)
+const { data: upd, error: upErr } = await supabase
+  .from('memberships')
+  .update({
+    plan: nextPlan,
+    status: 'active',
+    provider: mem.provider || 'kakao',
+    cancel_at_period_end: false,
+    cancel_effective_at: null,
+    current_period_end: nextEnd.toISOString(),
+    metadata: safeMeta,        // ← 여기!
+    updated_at: nowIso,
+  })
+  .eq('id', mem.id)
+  .select()
+  .maybeSingle();
+
 
     if (upErr) {
       return res.status(500).json({ error: "DB_UPDATE_FAILED", detail: upErr.message });
@@ -1087,7 +1093,7 @@ if (mem && (mem.plan === 'premium' || mem.plan === 'premium_plus')) {
       cancel_at_period_end: true,     // 고정제는 기간 끝에 자동 종료
       cancel_effective_at: expireAtKST.toISOString(),
       current_period_end:  expireAtKST.toISOString(),
-      metadata: meta,                 // jsonb: 객체 그대로
+      metadata: JSON.parse(JSON.stringify(meta)), // ✅ jsonb 직렬화 안전
       updated_at: nowISO,
     })
     .eq("id", mem.id)
@@ -1129,16 +1135,16 @@ if (mem && (mem.plan === 'premium' || mem.plan === 'premium_plus')) {
     };
 
     const payload = {
-      plan: planName,
-      status: 'active',
-      provider: 'kakao',
-      current_period_end: end.toISOString(),
-      cancel_at_period_end: true,
-      cancel_effective_at: end.toISOString(),
-      price_id: null,
-      metadata: meta, // jsonb
-      updated_at: nowISO
-    };
+       plan: planName,
+       status: 'active',
+       provider: 'kakao',
+       current_period_end: end.toISOString(),
+       cancel_at_period_end: true,
+       cancel_effective_at: end.toISOString(),
+       price_id: null,
+      metadata: JSON.parse(JSON.stringify(meta)), // ✅ jsonb 직렬화 안전
+       updated_at: nowISO
+     };
 
     if (mem) {
       const { data: upd, error: upErr } = await supabase
