@@ -1412,7 +1412,7 @@ ${isRecurring ? `` : ``}
 
     ${
       isCancelRequested
-        ? `<div style="margin-top:8px; color:#888; font-size:12px;">(현재 ${dateLabel}까지 이용 가능합니다.)</div>`
+        ? `<div style="margin-top:8px; color:#888; font-size:12px;">(현재 ${dateLabel}까지 이용 가능합니다. <br> *주의: 플랜전환시 즉시 전환되므로 1일 사주출력횟수 제한치도 즉시 전환됩니다!!!)</div>`
         : `<div style="margin-top:8px; color:#888; font-size:12px;">10초 후 자동으로 닫혀요.<br> *주의: 플랜전환시 즉시 전환되므로 1일 사주출력횟수 제한치도 즉시 전환됩니다!!!</div>`
     }
   </div>
@@ -1583,11 +1583,15 @@ sheet.querySelector("#optRecurringPlus")?.addEventListener("click", async () => 
     if (!res.ok) throw new Error(json?.message || json?.error || '전환 실패');
 
     alert(json.message || '정기(플러스)로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
-    window.location.reload();
+    // ✅ 성공 직후 즉시 새로고침 대신 약간 지연
+    setTimeout(() => {
+      try { window.location.reload(); } catch {}
+    }, 200);
   } catch (e) {
     alert('전환 실패: ' + e.message);
   }
 });
+
 
 
     sheet.querySelector("#optCancel")?.addEventListener("click", () => {
