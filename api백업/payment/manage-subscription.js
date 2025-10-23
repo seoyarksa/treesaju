@@ -22,6 +22,29 @@ export default async function handler(req, res) {
 
 
     console.log("[MS] ENTER build=%s", BUILD_TAG);
+
+      if ((req.method === 'GET' || req.method === 'POST') && (req.query?.action === 'whoami')) {
+    // ESM/CJS 케이스 모두 커버
+    let modulePath = 'unknown';
+    try {
+      // CJS
+      // eslint-disable-next-line no-undef
+      modulePath = __filename || modulePath;
+    } catch {}
+    try {
+      // ESM
+      modulePath = (new URL('', import.meta.url)).pathname || modulePath;
+    } catch {}
+    res.setHeader('x-build-tag', BUILD_TAG);
+    return res.status(200).json({
+      ok: true,
+      build: BUILD_TAG,
+      file: modulePath,
+      region: process.env.VERCEL_REGION || null,
+      url: process.env.VERCEL_URL || null,
+    });
+  }
+
       // (선택) 헬스체크
 // health 분기
 if ((req.method === 'GET' || req.method === 'POST') && action === 'health') {
