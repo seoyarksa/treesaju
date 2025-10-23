@@ -660,6 +660,9 @@ async function changePlan(req, res) {
 
       // [RECEIPT] 4.5) 결제 영수 기록 (확인용 원장) — 검증 통과 '직후'
       try {
+
+        console.log("[receipt] before", { where: "changePlan", user_id, plan: new_plan, imp: v?.imp_uid });
+
         await recordReceipt(supabase, {
           user_id,
           kind: "recurring",
@@ -683,6 +686,8 @@ async function changePlan(req, res) {
             }
           },
         });
+console.log("[receipt] after", { where: "changePlan" });
+
       } catch (logErr) {
         console.error("[recordReceipt/changePlan] ignored:", logErr);
         // 확인용이라 실패해도 본 플로우는 진행
@@ -918,6 +923,8 @@ async function switchFromFixedToRecurring(req, res) {
 
     // [RECEIPT] 확인용 영수 기록 (검증 직후)
     try {
+     console.log("[receipt] before", { where: "switchFromFixedToRecurring", user_id, plan: nextPlan, imp: v?.imp_uid });
+
       await recordReceipt(supabase, {
         user_id,
         kind: 'recurring',
@@ -937,6 +944,8 @@ async function switchFromFixedToRecurring(req, res) {
           card_name: v.card_name,
         },
       });
+
+      console.log("[receipt] after", { where: "changePlan" });
     } catch (e) {
       console.error('[recordReceipt/switchFromFixedToRecurring] ignored:', e);
       // 확인용이므로 실패해도 본 플로우는 계속
@@ -1097,6 +1106,7 @@ async function activateFixedAfterPayment(req, res) {
 
       // [RECEIPT] 결제 영수 기록 (검증 통과 직후)
       try {
+        console.log("[receipt] before", { where: "activateFixedAfterPayment:recurring->fixed", user_id, plan: planName, imp: payment?.imp_uid });
         await recordReceipt(supabase, {
           user_id,
           kind: "fixed",
@@ -1116,6 +1126,7 @@ async function activateFixedAfterPayment(req, res) {
             card_name: payment.card_name,
           },
         });
+        console.log("[receipt] after", { where: "activateFixedAfterPayment:recurring->fixed" });
       } catch (e) {
         console.error("[recordReceipt/activate_fixed:recurring->fixed] ignored:", e);
       }
