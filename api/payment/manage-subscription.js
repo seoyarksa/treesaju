@@ -531,6 +531,9 @@ async function resumeSubscription(req, res) {
 
 
 // 하단에 함수 추가 플랜변경
+// /api/payment/manage-subscription.js 내부
+// if (req.method === "POST" && action === "change_plan") return await changePlan(req, res);
+
 async function changePlan(req, res) {
   const { user_id, new_plan } = req.body || {};
   if (!user_id || !new_plan) {
@@ -547,8 +550,8 @@ async function changePlan(req, res) {
   const safeParse = (raw) => {
     if (raw == null) return null;
     try {
-      const a = typeof raw === 'string' ? JSON.parse(raw) : raw;
-      if (typeof a === 'string') { try { return JSON.parse(a); } catch { return a; } }
+      const a = typeof raw === "string" ? JSON.parse(raw) : raw;
+      if (typeof a === "string") { try { return JSON.parse(a); } catch { return a; } }
       return a;
     } catch { return null; }
   };
@@ -574,7 +577,7 @@ async function changePlan(req, res) {
         customer_uid,
         merchant_uid: "plan_switch_" + Date.now(),
         amount,
-        name
+        name,
       }),
     });
     const j = await r.json();
@@ -585,7 +588,7 @@ async function changePlan(req, res) {
   // 현재 멤버십
   const { data: cur, error: fetchErr } = await supabase
     .from("memberships")
-    .select("id, user_id, plan, status, current_period_end, cancel_at_period_end, metadata")
+    .select("id, user_id, plan, status, current_period_end, cancel_at_period_end, provider, metadata")
     .eq("user_id", user_id)
     .maybeSingle();
   if (fetchErr) return res.status(400).json({ error: "DB_SELECT_FAILED", detail: fetchErr.message });
@@ -604,34 +607,57 @@ async function changePlan(req, res) {
       if (!amount) return res.status(400).json({ error: "PLAN_PRICE_NOT_DEFINED" });
 
       // 2) 결제 키(customer_uid)
-const meta = safeParse(cur.metadata) || {};
-const customer_uid = meta?.customer_uid;
-if (!customer_uid) {
-  // 🔁 409 로 프런트에 '빌링키 등록부터 하라'고 안내
-  return res.status(409).json({
-    ok: false,
-    error: "NEED_BILLING_KEY",
-    message: "정기 플랜 전환에는 카드 자동결제 등록(빌링키)이 필요합니다. 결제 등록을 먼저 진행해 주세요.",
-    next_plan: new_plan,                 // 프런트가 어떤 플랜으로 가려는지 알 수 있게
-    hint: "start_billing_key"            // 프런트 분기 힌트
-  });
-}
+      const meta = safeParse(cur.metadata) || {};
+      const customer_uid = meta?.customer_uid;
+      if (!customer_uid) {
+        // 빌링키 등록 유도
+        return res.status(409).json({
+          ok: false,
+          error: "NEED_BILLING_KEY",
+          message: "정기 플랜 전환에는 카드 자동결제 등록(빌링키)이 필요합니다. 결제 등록을 먼저 진행해 주세요.",
+          next_plan: new_plan,
+          hint: "start_billing_key",
+        });
+      }
 
       // 3) 아임포트 즉시 결제
       const token = await getIamportToken();
-      await payNow(
+      const paid = await payNow(
         customer_uid,
         token,
         amount,
         new_plan === "premium_plus" ? "정기구독+ 플랜 변경 결제" : "정기구독(기본) 플랜 변경 결제"
       );
 
-      // 4) 다음 결제일 = 기존 current_period_end 기준 +1개월
+      // 4) 다음 결제일 = 기존 current_period_end 기준 +1개월 (과거면 now 기준)
       const baseEnd = cur.current_period_end ? new Date(cur.current_period_end) : new Date();
-      const nextEnd = new Date(baseEnd);
+      const now = new Date();
+      const base = baseEnd > now ? baseEnd : now;
+      const nextEnd = new Date(base);
       nextEnd.setMonth(nextEnd.getMonth() + 1);
 
-      // 5) 멤버십 갱신
+      // 5) 멤버십 갱신 (해지 예약 해제)
+      const newMeta = {
+        ...(meta || {}),
+        provider: cur.provider || "kakao",
+        last_purchase: {
+          kind: "recurring_switch",
+          imp_uid: paid?.imp_uid,
+          merchant_uid: paid?.merchant_uid,
+          amount: paid?.amount,
+          at: nowIso,
+          to_plan: new_plan,
+        },
+        purchases: [ ...(meta?.purchases || []), {
+          kind: "recurring_switch",
+          imp_uid: paid?.imp_uid,
+          merchant_uid: paid?.merchant_uid,
+          amount: paid?.amount,
+          at: nowIso,
+          to_plan: new_plan,
+        }],
+      };
+
       const { data: updated, error: upErr } = await supabase
         .from("memberships")
         .update({
@@ -640,6 +666,7 @@ if (!customer_uid) {
           cancel_at_period_end: false,
           cancel_effective_at: null,
           current_period_end: nextEnd.toISOString(),
+          metadata: newMeta,
           updated_at: nowIso,
         })
         .eq("id", cur.id)
@@ -647,7 +674,7 @@ if (!customer_uid) {
         .maybeSingle();
       if (upErr) return res.status(500).json({ error: "DB_UPDATE_FAILED", detail: upErr.message });
 
-      // 6) 프로필 동기화(트리거가 처리하더라도 보조로 업데이트)
+      // 6) 프로필 동기화(보조)
       const planGrade = new_plan === "premium_plus" ? "premium_plus" : "premium";
       const limit = new_plan === "premium_plus" ? 150 : 60;
       await supabase.from("profiles")
@@ -667,7 +694,7 @@ if (!customer_uid) {
     }
   }
 
-  // ▶ 정기 → 선결제 : 즉시 전환은 '구매'가 필요하므로, 안내만(프런트에서 결제 플로우 실행)
+  // ▶ 정기 → 선결제 : 즉시 전환은 '구매' 필요 → 프런트에서 3/6 결제로 이어지게
   if (isRecurring(cur.plan) && isFixed(new_plan)) {
     return res.status(200).json({
       ok: true,
@@ -677,7 +704,7 @@ if (!customer_uid) {
     });
   }
 
-  // ▶ 선결제 → 정기 : 즉시 전환은 정기 '등록/결제'가 필요 — 프런트에서 결제 시작
+  // ▶ 선결제 → 정기 : 즉시 전환은 정기 등록/결제 필요 → 프런트에서 billing key 등록/결제 진행
   if (isFixed(cur.plan) && isRecurring(new_plan)) {
     return res.status(200).json({
       ok: true,
@@ -752,37 +779,101 @@ async function scheduleToFixed(req, res) {
 
 
 
+// manage-subscription.js 내부
+// 라우팅: if (req.method === "POST" && action === "switch_from_fixed_to_recurring") return await switchFromFixedToRecurring(req, res);
+
 async function switchFromFixedToRecurring(req, res) {
   try {
     const { user_id, next_tier } = req.body || {};
     if (!user_id || !next_tier) return res.status(400).json({ error: "MISSING_PARAMS" });
 
-    const raw   = String(next_tier).trim().toLowerCase();
-    const tier  = { plus:'plus','premium_plus':'plus','premium+':'plus', basic:'basic', premium:'basic' }[raw];
-    if (!tier)  return res.status(400).json({ error: "INVALID_TIER" });
+    // tier 매핑
+    const raw  = String(next_tier).trim().toLowerCase();
+    const tier = { plus:'plus','premium_plus':'plus','premium+':'plus', basic:'basic', premium:'basic' }[raw];
+    if (!tier) return res.status(400).json({ error: "INVALID_TIER" });
     const nextPlan = tier === 'plus' ? 'premium_plus' : 'premium';
 
+    // 현재 멤버십 조회 (메타 포함: 빌링키 확인용)
     const { data: mem, error: selErr } = await supabase
       .from('memberships')
-      .select('id, user_id, plan, status, provider, current_period_end')
+      .select('id, user_id, plan, status, provider, current_period_end, metadata')
       .eq('user_id', user_id)
       .maybeSingle();
     if (selErr) return res.status(500).json({ error: "DB_SELECT_FAILED", detail: selErr.message });
     if (!mem)   return res.status(404).json({ error: "MEMBERSHIP_NOT_FOUND" });
 
-    if (!['premium3','premium6'].includes(mem.plan || ''))
+    // 선결제 → 정기만 허용
+    if (!['premium3','premium6'].includes(mem.plan || '')) {
       return res.status(400).json({ error: "ONLY_FIXED_ALLOWED", detail: `current plan: ${mem.plan}` });
-    if (!mem.current_period_end)
+    }
+    if (!mem.current_period_end) {
       return res.status(400).json({ error: "NO_EXPIRE_DATE" });
+    }
 
-    const end = new Date(mem.current_period_end);
-    const nextEnd = new Date(end);
+    // 빌링키 확인 (정기 과금 필수)
+    let meta = {};
+    try { meta = typeof mem.metadata === 'string' ? JSON.parse(mem.metadata) : (mem.metadata || {}); } catch {}
+    const customer_uid = meta?.customer_uid;
+    if (!customer_uid) {
+      return res.status(409).json({ error: "NEED_BILLING_KEY", next_plan: nextPlan });
+    }
+
+    // 아임포트 토큰
+    const tokRes = await fetch("https://api.iamport.kr/users/getToken", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imp_key: process.env.IAMPORT_API_KEY,
+        imp_secret: process.env.IAMPORT_API_SECRET,
+      }),
+    });
+    const tokJson = await tokRes.json();
+    const access_token = tokJson?.response?.access_token;
+    if (!access_token) return res.status(500).json({ error: "IAMPORT_TOKEN_FAIL" });
+
+    // 즉시 청구 (정기 시작 결제)
+    const amount = (nextPlan === 'premium_plus') ? 16500 : 11000;
+    const againRes = await fetch("https://api.iamport.kr/subscribe/payments/again", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": access_token },
+      body: JSON.stringify({
+        customer_uid,
+        merchant_uid: `switch-fixed2recurring-${Date.now()}`,
+        amount,
+        name: `정기(${nextPlan}) 시작 결제`,
+      }),
+    });
+    const again = await againRes.json();
+    if (again.code !== 0) {
+      return res.status(400).json({ error: "PAYMENT_FAILED", detail: again.message || "again failed" });
+    }
+
+    // 새 만료일 = “기존 만료일(next day 기준) + 1개월”
+    // (만약 기존 만료일이 과거라면 now 기준으로 1개월)
+    const prevEnd = new Date(mem.current_period_end);
+    const now = new Date();
+    const base = (prevEnd > now ? prevEnd : now);
+    const nextEnd = new Date(base);
     nextEnd.setMonth(nextEnd.getMonth() + 1);
 
+    // 메타 업데이트(결제 로그 적재)
     const nowIso = new Date().toISOString();
+    const purchase = {
+      kind: 'recurring_start',
+      imp_uid: again?.response?.imp_uid,
+      merchant_uid: again?.response?.merchant_uid,
+      amount: again?.response?.amount,
+      at: nowIso,
+    };
+    const newMeta = {
+      ...(meta || {}),
+      provider: 'kakao',
+      last_purchase: purchase,
+      purchases: [ ...(meta?.purchases || []), purchase ],
+    };
 
-    // ✅ 예약 컬럼 제거 후 깔끔한 업데이트
-    const { error: upErr } = await supabase
+    // 멤버십 즉시 전환
+    const { data: upd, error: upErr } = await supabase
       .from('memberships')
       .update({
         plan: nextPlan,
@@ -791,30 +882,35 @@ async function switchFromFixedToRecurring(req, res) {
         cancel_at_period_end: false,
         cancel_effective_at: null,
         current_period_end: nextEnd.toISOString(),
+        metadata: newMeta,          // jsonb: 객체 그대로 가능
         updated_at: nowIso,
       })
-      .eq('id', mem.id);
+      .eq('id', mem.id)
+      .select()
+      .maybeSingle();
     if (upErr) return res.status(500).json({ error: "DB_UPDATE_FAILED", detail: upErr.message });
 
-    // 프로필은 트리거가 동기화한다면 생략 가능. 보조 동기화 원하면 유지
+    // (보조) 프로필 동기화 — 트리거가 처리하더라도 안전망으로 1회 수행
     await supabase.from('profiles')
       .update({
         grade: nextPlan,
-        daily_limit: nextPlan === 'premium_plus' ? 150 : 60,
-        updated_at: nowIso
+        // 트리거가 daily_limit을 맞춘다면 이 줄은 생략 가능:
+        daily_limit: (nextPlan === 'premium_plus') ? 150 : 60,
+        updated_at: nowIso,
       })
       .eq('user_id', user_id);
 
     return res.status(200).json({
       ok: true,
-      message: `정기(${nextPlan === 'premium' ? '기본' : '플러스'})로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.`,
-      membership: { plan: nextPlan, current_period_end: nextEnd.toISOString() }
+      message: `정기(${nextPlan === 'premium' ? '기본' : '플러스'})로 즉시 전환되었습니다. 다음 결제일: ${nextEnd.toISOString().slice(0,10)}`,
+      membership: upd,
     });
   } catch (e) {
     console.error('[switchFromFixedToRecurring] error:', e);
     return res.status(500).json({ error: 'INTERNAL_ERROR', detail: e?.message || '' });
   }
 }
+
 
 
 
