@@ -694,42 +694,47 @@ async function changePlan(req, res) {
       nextEnd.setMonth(nextEnd.getMonth() + 1);
 
       // [RECEIPT] 4.5) 결제 영수 기록 (확인용 원장) — 검증 통과 '직후'
-      try {
+ // [RECEIPT] 4.5) 결제 영수 기록 (확인용 원장) — 검증 통과 '직후'
+console.log("[MS] changePlan verify OK", { imp: v.imp_uid, status: v.status });
 
-       console.log("[MS] changePlan verify OK", { imp: v.imp_uid, status: v.status });
-
-console.log("[receipt] BEFORE changePlan", {
+// ✅ 검증 통과 직후(v, paid 계산 끝), memberships 갱신 직전에 붙이기
+console.log("[receipt] BEFORE changePlan-inline", {
   user_id, new_plan, imp_uid: v.imp_uid, merchant_uid: paid?.merchant_uid
 });
-        await recordReceipt(supabase, {
-          user_id,
-          kind: "recurring",
-          plan: new_plan,                 // 'premium' | 'premium_plus'
-          amount,
-          imp_uid: v.imp_uid,             // 검증 응답의 imp_uid
-          merchant_uid: paid.merchant_uid,
-          customer_uid,
-          pay_method: v.pay_method || "billing_key",
-          pg_provider: v.pg_provider || null,
-          pg_tid: v.pg_tid || null,
-          // Iamport paid_at: Unix seconds → Date
-          paid_at: v.paid_at ? new Date(v.paid_at * 1000) : new Date(),
-          period_start: now,
-          period_end: nextEnd,
-          raw: {
-            paid_summary: {
-              amount: v.amount,
-              card_name: v.card_name,
-              // 필요 시 최소 필드만 저장 (민감정보 마스킹 권장)
-            }
-          },
-        });
-console.log("[receipt] after", { where: "changePlan" });
 
-      } catch (logErr) {
-        console.error("[recordReceipt/changePlan] ignored:", logErr);
-        // 확인용이라 실패해도 본 플로우는 진행
-      }
+const { data: rcpt, error: rcptErr } = await supabase
+  .from("payment_receipts")
+  .upsert({
+    user_id,
+    kind: "recurring",
+    plan: new_plan,                         // 'premium' | 'premium_plus'
+    months: null,
+    amount,
+    currency: "KRW",
+    imp_uid: v.imp_uid,                     // 검증 응답의 imp_uid
+    merchant_uid: paid.merchant_uid,        // again 호출 시 사용한 merchant_uid
+    customer_uid: customer_uid || null,
+    pay_method: v.pay_method || "billing_key",
+    pg_provider: v.pg_provider || null,
+    pg_tid: v.pg_tid || null,
+    paid_at: v.paid_at
+      ? new Date(v.paid_at * 1000).toISOString()  // iamport paid_at=unix sec
+      : new Date().toISOString(),
+    // base = prevEnd > now ? prevEnd : now (위에서 이미 계산됨)
+    period_start: base.toISOString(),
+    period_end:   nextEnd.toISOString(),
+    raw: { amount: v.amount, card_name: v.card_name },
+  }, { onConflict: "imp_uid", ignoreDuplicates: true })
+  .select("imp_uid, merchant_uid, paid_at")
+  .maybeSingle();
+
+if (rcptErr) {
+  console.error("[receipt] ERROR changePlan-inline", rcptErr);  // 확인용: 실패해도 본 플로우는 계속
+} else {
+  console.log("[receipt] AFTER changePlan-inline", rcpt);
+}
+
+      
 
       // 5) 멤버십 갱신 (해지 예약 해제) — 기존 로직 그대로
       const newMeta = {
