@@ -1132,6 +1132,164 @@ async function startFixedTermPay({ months, amount, productId, dailyLimit = 60 })
   });
 }
 
+
+// ───────────────────────────────────────────────────────────
+// INICIS(이니시스) - PortOne(아임포트) 결제 모듈
+//  - 정기결제: startInicisSubscription('basic'|'plus')
+//  - 선결제(3/6개월): startInicisThreeMonthPlan(), startInicisSixMonthPlan()
+// ───────────────────────────────────────────────────────────
+
+window.startInicisSubscription = async function(tier = 'basic') {
+  try {
+    // 1) Supabase 로그인 확인
+    const { data: { user } } = await window.supabaseClient.auth.getUser();
+    if (!user) return alert("로그인이 필요합니다.");
+
+    // 2) 플랜 매핑
+    const PLAN = {
+      basic: { amount: 11000,  daily_limit: 60,  name: "INICIS 정기구독 (월간)",  planId: "recurring_monthly_60"  },
+      plus:  { amount: 16500, daily_limit: 150, name: "INICIS 정기구독+ (월간)", planId: "recurring_monthly_150" },
+    };
+    const sel = PLAN[tier] || PLAN.basic;
+
+    // 3) PortOne 초기화
+    const IMP = window.IMP;
+    IMP.init("imp81444885"); // ← 당신의 고객사 식별코드로 유지
+
+    // 4) 고객별·플랜별 빌링키 UID (카카오와 충돌 방지용 prefix 변경)
+    const userId = user.id;
+    const customerUid = `inicis_${userId}_${tier}`; // 예: inicis_abc123_basic
+
+    // 5) 결제창 호출 (결제창 방식: 최초 결제 + 빌링키 등록)
+    IMP.request_pay({
+      pg: "html5_inicis.INIpayTest",            // ★ 실운영: "html5_inicis.{상점아이디}"
+      pay_method: "card",
+      merchant_uid: `inicis_order_${tier}_` + Date.now(),
+      name: sel.name,
+      amount: sel.amount,                       // 최초 결제금액
+      customer_uid: customerUid,                // 빌링키 UID
+      buyer_email: user.email || "user@example.com",
+      buyer_name: user.user_metadata?.name || "홍길동",
+      buyer_tel: user.user_metadata?.phone || "01012345678",
+    }, async function (rsp) {
+      if (!rsp.success) {
+        console.warn("[INICIS subs fail]", rsp);
+        return alert("❌ 결제 실패: " + (rsp.error_msg || "오류"));
+      }
+
+      alert("결제 성공 🎉\n결제번호: " + rsp.imp_uid);
+
+      // 6) 서버에 정기결제 등록(공용 엔드포인트 재사용)
+      try {
+        const res = await fetch("/api/payment/manage-subscription?action=register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            provider: "inicis",                // 구분용
+            imp_uid: rsp.imp_uid,
+            customer_uid: rsp.customer_uid || customerUid,
+            user_id: userId,
+            tier,                              // 'basic' | 'plus'
+            planId: sel.planId,
+            price: sel.amount,
+            daily_limit: sel.daily_limit,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          alert("✅ 정기결제 등록 및 프리미엄 등급 적용 완료");
+          setTimeout(() => { window.location.reload(); }, 300);
+        } else {
+          alert("❌ 서버 등록 실패: " + (data.error || "서버 오류"));
+        }
+      } catch (err) {
+        console.error("[INICIS subs fetch error]", err);
+        alert("❌ 서버 통신 오류: " + err.message);
+      }
+    });
+  } catch (err) {
+    console.error("[startInicisSubscription error]", err);
+    alert("내부 오류: " + err.message);
+  }
+};
+
+// 얇은 래퍼
+window.startInicisSubscriptionBasic = () => window.startInicisSubscription('basic');
+window.startInicisSubscriptionPlus  = () => window.startInicisSubscription('plus');
+
+
+// ───────────────────────────────────────────────────────────
+// INICIS 3/6개월 선결제(일반결제)
+//  - 카카오 버전(startFixedTermPay)과 동일 구조, pg만 이니시스로 변경
+// ───────────────────────────────────────────────────────────
+async function startInicisFixedTermPay({ months, amount, productId, dailyLimit = 60 }) {
+  // 1) 로그인 체크
+  const { data: { user } } = await window.supabaseClient.auth.getUser();
+  if (!user) return alert("로그인이 필요합니다.");
+
+  // 2) PortOne 초기화
+  const IMP = window.IMP;
+  IMP.init("imp81444885");
+
+  // 3) 주문번호
+  const merchantUid = `inicis_fixed_${months}m_${Date.now()}`;
+
+  // 4) 결제창 호출 (일반결제)
+  IMP.request_pay({
+    pg: "html5_inicis.INIpayTest",       // ★ 실운영: "html5_inicis.{상점아이디}"
+    pay_method: "card",
+    merchant_uid: merchantUid,
+    name: `INICIS ${months}개월 구독 (1일 ${dailyLimit}회)`,
+    amount,                               // 3개월=60000 / 6개월=100000
+    buyer_email: user.email || "user@example.com",
+    buyer_name: user.user_metadata?.name || "홍길동",
+    buyer_tel: user.user_metadata?.phone || "01012345678",
+  }, async (rsp) => {
+    if (!rsp.success) {
+      console.warn("[INICIS fixed fail]", rsp);
+      return alert("❌ 결제 실패: " + (rsp.error_msg || "오류"));
+    }
+
+    // 5) 서버에 활성화 요청(검증 + 기간부여)
+    try {
+      const res = await fetch("/api/payment/manage-subscription?action=activate_fixed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: "inicis",
+          imp_uid: rsp.imp_uid,
+          merchant_uid: rsp.merchant_uid,
+          user_id: user.id,
+          productId,          // 예: 'sub_3m_60_60000'
+          termMonths: months,  // 3 | 6
+          dailyLimit,          // 60
+          price: amount,       // 60000 | 100000
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert("✅ 결제가 완료되었습니다. 구독이 활성화됐어요!");
+        setTimeout(() => window.location.reload(), 300);
+      } else {
+        alert("❌ 서버 처리 실패: " + (data.error || "서버 오류"));
+      }
+    } catch (err) {
+      console.error("[INICIS fixed activate error]", err);
+      alert("❌ 서버 통신 오류: " + err.message);
+    }
+  });
+}
+
+// 전역 래퍼
+window.startInicisThreeMonthPlan = function () {
+  return startInicisFixedTermPay({ months: 3, amount: 60000, productId: "sub_3m_60_60000", dailyLimit: 60 });
+};
+window.startInicisSixMonthPlan = function () {
+  return startInicisFixedTermPay({ months: 6, amount: 100000, productId: "sub_6m_60_100000", dailyLimit: 60 });
+};
+
+
+
 // 버튼 핸들러 (이미 바인딩되어 있으니 함수만 존재하면 됩니다)
 // ★ 전역에 올려서 어디서든 호출 가능하게
 window.startThreeMonthPlan = function () {
@@ -1140,6 +1298,7 @@ window.startThreeMonthPlan = function () {
 window.startSixMonthPlan = function () {
   return startFixedTermPay({ months: 6, amount: 100000, productId: "sub_6m_60_100000", dailyLimit: 60 });
 };
+
 
 
 
