@@ -747,7 +747,7 @@ async function changePlan(req, res) {
   }
 
   // 이하 분기 동일 (원본 유지)
-  const isFixed = (p) => p === "premium3" || p === "premium6";
+
   if (isRecurring(cur.plan) && isFixed(new_plan)) {
     return res.status(200).json({
       ok: true,
