@@ -985,13 +985,22 @@ async function activateFixedAfterPayment(req, res) {
     // 메타 준비
     let meta = {};
     try { meta = mem?.metadata && typeof mem.metadata === 'string' ? JSON.parse(mem.metadata) : (mem?.metadata || {}); } catch {}
-    const purchase = {
-      imp_uid,
-      merchant_uid,
-      termMonths: months,
-      price: Number(price),
-      at: nowISO,
-    };
+const purchase = {
+  imp_uid,
+  merchant_uid,
+  termMonths: months,      // existing
+  price: Number(price),    // existing
+  amount: Number(price),   // ✅ 추가 (트리거/뷰 공통 호환)
+  at: nowISO,
+  pay_method: payment.pay_method || "card",
+  pg_provider: payment.pg_provider || null,
+  pg_tid: payment.pg_tid || null,
+  paid_at_unix: payment.paid_at || null,   // 있으면 넣기(옵션)
+};
+meta.last_purchase = purchase;
+meta.purchases = Array.isArray(meta.purchases) ? meta.purchases : [];
+meta.purchases.push(purchase);
+
 
     // 3) 현재 정기라면: "예약 기반 선결제" (기존 방식 유지: plan 변경 X, 해지예약 true, metadata에 예약 기록)
 // 3) 현재 정기라면: ❌ 예약 X → ✅ 즉시 plan을 고정제로 바꾸되,
