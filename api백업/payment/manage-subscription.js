@@ -827,8 +827,8 @@ async function scheduleToFixed(req, res) {
 
 
 
-// manage-subscription.js 내부
-// 라우팅: if (req.method === "POST" && action === "switch_from_fixed_to_recurring") return await switchFromFixedToRecurring(req, res);
+
+
 
 async function switchFromFixedToRecurring(req, res) {
   try {
@@ -896,21 +896,59 @@ async function switchFromFixedToRecurring(req, res) {
       return res.status(400).json({ error: "PAYMENT_FAILED", detail: again.message || "again failed" });
     }
 
-    // 새 만료일 = “기존 만료일(next day 기준) + 1개월”
-    // (만약 기존 만료일이 과거라면 now 기준으로 1개월)
+    // [RECEIPT] 결제 상태 서버 검증 (imp_uid 조회)
+    const imp_uid = again?.response?.imp_uid;
+    if (!imp_uid) return res.status(400).json({ error: "PAYMENT_NO_IMP_UID" });
+
+    const vRes = await fetch(`https://api.iamport.kr/payments/${imp_uid}`, {
+      headers: { Authorization: access_token },
+    });
+    const vJson = await vRes.json();
+    const v = vJson?.response;
+    if (!v || v.status !== 'paid') {
+      return res.status(402).json({ error: "PAYMENT_NOT_CONFIRMED" });
+    }
+
+    // 새 만료일 = “기존 만료일(or 현재) + 1개월”
     const prevEnd = new Date(mem.current_period_end);
     const now = new Date();
     const base = (prevEnd > now ? prevEnd : now);
     const nextEnd = new Date(base);
     nextEnd.setMonth(nextEnd.getMonth() + 1);
 
+    // [RECEIPT] 확인용 영수 기록 (검증 직후)
+    try {
+      await recordReceipt(supabase, {
+        user_id,
+        kind: 'recurring',
+        plan: nextPlan,
+        amount,
+        imp_uid: v.imp_uid,
+        merchant_uid: again?.response?.merchant_uid,
+        customer_uid,
+        pay_method: v.pay_method || 'billing_key',
+        pg_provider: v.pg_provider || null,
+        pg_tid: v.pg_tid || null,
+        paid_at: v.paid_at ? new Date(v.paid_at * 1000) : new Date(),
+        period_start: base,         // 이번 결제로 커버되는 시작
+        period_end: nextEnd,        // +1개월
+        raw: {
+          amount: v.amount,
+          card_name: v.card_name,
+        },
+      });
+    } catch (e) {
+      console.error('[recordReceipt/switchFromFixedToRecurring] ignored:', e);
+      // 확인용이므로 실패해도 본 플로우는 계속
+    }
+
     // 메타 업데이트(결제 로그 적재)
     const nowIso = new Date().toISOString();
     const purchase = {
       kind: 'recurring_start',
-      imp_uid: again?.response?.imp_uid,
+      imp_uid: v.imp_uid,
       merchant_uid: again?.response?.merchant_uid,
-      amount: again?.response?.amount,
+      amount: v.amount,
       at: nowIso,
     };
     const newMeta = {
@@ -930,7 +968,7 @@ async function switchFromFixedToRecurring(req, res) {
         cancel_at_period_end: false,
         cancel_effective_at: null,
         current_period_end: nextEnd.toISOString(),
-        metadata: newMeta,          // jsonb: 객체 그대로 가능
+        metadata: newMeta,
         updated_at: nowIso,
       })
       .eq('id', mem.id)
@@ -938,11 +976,10 @@ async function switchFromFixedToRecurring(req, res) {
       .maybeSingle();
     if (upErr) return res.status(500).json({ error: "DB_UPDATE_FAILED", detail: upErr.message });
 
-    // (보조) 프로필 동기화 — 트리거가 처리하더라도 안전망으로 1회 수행
+    // (보조) 프로필 동기화
     await supabase.from('profiles')
       .update({
         grade: nextPlan,
-        // 트리거가 daily_limit을 맞춘다면 이 줄은 생략 가능:
         daily_limit: (nextPlan === 'premium_plus') ? 150 : 60,
         updated_at: nowIso,
       })
@@ -958,6 +995,7 @@ async function switchFromFixedToRecurring(req, res) {
     return res.status(500).json({ error: 'INTERNAL_ERROR', detail: e?.message || '' });
   }
 }
+
 
 
 
