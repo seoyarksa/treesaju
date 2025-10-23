@@ -212,7 +212,15 @@ async function safeFetch(url, options) {
 // 짧은 대기
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-
+// 에러 메시지를 조금 더 자세히 합성
+function buildErrMsg(json, fallback = '전환 실패') {
+  const bits = [];
+  if (json?.message) bits.push(json.message);
+  if (json?.error && json.error !== json.message) bits.push(json.error);
+  if (json?.detail) bits.push(`상세: ${json.detail}`);
+  if (Number.isFinite(json?.remainingDays)) bits.push(`남은일수: ${json.remainingDays}`);
+  return bits.length ? bits.join('\n') : fallback;
+}
 
 
 function normalizePhoneKR(raw, mode = 'intl') {
@@ -1576,59 +1584,75 @@ document.getElementById("changePlanBtn")?.addEventListener("click", async () => 
     }
 
     // 선결제 → 정기(기본) 즉시 전환
-// 선결제 → 정기(기본) 즉시 전환
-sheet.querySelector("#optRecurringBasic")?.addEventListener("click", async () => {
-  try {
-    // 1) 빌링키 확인/등록
+sheet.querySelector("#optRecurringBasic")?.addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  await withBtnLock(btn, async () => {
+    // 1) 빌링키 보장 (없으면 등록 플로우 → 등록 실패 시 return false)
     const ok = await ensureBillingKeyForTier('basic');
     if (!ok) return;
 
-    // 2) 전환 API 호출
-    const res  = await fetch('/api/payment/manage-subscription?action=switch_from_fixed_to_recurring', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: user.id, next_tier: 'basic' }),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json?.message || json?.error || '전환 실패');
+    // 2) 전환 API
+    const { res, json } = await safeFetch(
+      '/api/payment/manage-subscription?action=switch_from_fixed_to_recurring',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id, next_tier: 'basic' }),
+      }
+    );
 
-    // 3) 알림 → 약간 지연 후 새로고침 (정기+와 동일)
-    alert(json.message || '정기(기본)으로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
+    if (!res) {
+      alert(buildErrMsg(json, '전환 실패: 네트워크 오류'));
+      return;
+    }
+    if (!res.ok) {
+      // 서버가 상세 사유를 주면 다 보여줌(DB_UPDATE_FAILED, INVALID_TIER 등)
+      alert('전환 실패: ' + buildErrMsg(json));
+      return;
+    }
+
+    alert(json?.message || '정기(기본)으로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
+    // 성공 직후 짧게 지연 후 새로고침(정기+와 동일)
     setTimeout(() => {
       try { window.location.reload(); } catch {}
     }, 200);
-  } catch (e) {
-    alert('전환 실패: ' + e.message);
-  }
+  }, '전환 중…');
 });
 
-
-// 선결제 → 정기(플러스)도 동일 패턴
 
 
 // 선결제 → 정기(플러스) 즉시 전환
-sheet.querySelector("#optRecurringPlus")?.addEventListener("click", async () => {
-  try {
+sheet.querySelector("#optRecurringPlus")?.addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  await withBtnLock(btn, async () => {
     const ok = await ensureBillingKeyForTier('plus');
     if (!ok) return;
 
-    const res  = await fetch('/api/payment/manage-subscription?action=switch_from_fixed_to_recurring', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: user.id, next_tier: 'plus' }),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json?.message || json?.error || '전환 실패');
+    const { res, json } = await safeFetch(
+      '/api/payment/manage-subscription?action=switch_from_fixed_to_recurring',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id, next_tier: 'plus' }),
+      }
+    );
 
-    alert(json.message || '정기(플러스)로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
-    // ✅ 성공 직후 즉시 새로고침 대신 약간 지연
+    if (!res) {
+      alert(buildErrMsg(json, '전환 실패: 네트워크 오류'));
+      return;
+    }
+    if (!res.ok) {
+      alert('전환 실패: ' + buildErrMsg(json));
+      return;
+    }
+
+    alert(json?.message || '정기(플러스)로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
     setTimeout(() => {
       try { window.location.reload(); } catch {}
     }, 200);
-  } catch (e) {
-    alert('전환 실패: ' + e.message);
-  }
+  }, '전환 중…');
 });
+
 
 
 
