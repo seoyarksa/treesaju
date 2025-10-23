@@ -994,52 +994,60 @@ async function activateFixedAfterPayment(req, res) {
     };
 
     // 3) 현재 정기라면: "예약 기반 선결제" (기존 방식 유지: plan 변경 X, 해지예약 true, metadata에 예약 기록)
-    if (mem && (mem.plan === 'premium' || mem.plan === 'premium_plus')) {
-      const effective_at = mem.current_period_end
-        ? new Date(mem.current_period_end).toISOString()
-        : nowISO;
+// 3) 현재 정기라면: ❌ 예약 X → ✅ 즉시 plan을 고정제로 바꾸되,
+//    유효기간은 "현재 정기 만료 다음날 00:00 KST부터 +N개월"
+if (mem && (mem.plan === 'premium' || mem.plan === 'premium_plus')) {
+  // KST: 기존 만료일 다음날 00:00
+  const prevEnd = mem.current_period_end ? new Date(mem.current_period_end) : new Date();
+  const kstBase = new Date(prevEnd.getTime() + 9 * 3600 * 1000); // KST 보정
+  kstBase.setUTCHours(0, 0, 0, 0);                // 해당 날짜 KST 00:00
+  const startAtKST = new Date(kstBase.getTime() + 24 * 3600 * 1000); // 다음날 00:00
+  const expireAtKST = new Date(startAtKST);
+  expireAtKST.setMonth(expireAtKST.getMonth() + months);
 
-      // 예약 블록(기존 형식 유지)
-      meta.scheduled_change = {
-        type: "to_fixed",
-        plan: planName,          // 'premium3' | 'premium6'
-        termMonths: months,
-        effective_at,            // 만료일에 고정제 시작
-        requested_at: nowISO
-      };
+  // 메타 갱신
+  meta.last_purchase = purchase;
+  meta.purchases = Array.isArray(meta.purchases) ? meta.purchases : [];
+  meta.purchases.push(purchase);
+  if (meta.scheduled_change) delete meta.scheduled_change; // 예약 잔재 제거
+  meta.provider = 'kakao';
+  meta.kind = 'fixed';
 
-      // 마지막 구매/구매내역 누적
-      meta.last_purchase = purchase;
-      meta.purchases = Array.isArray(meta.purchases) ? meta.purchases : [];
-      meta.purchases.push(purchase);
+  const { data: upd, error: upErr } = await supabase
+    .from("memberships")
+    .update({
+      plan: planName,                 // 'premium3' | 'premium6' 로 즉시 전환
+      status: 'active',
+      provider: 'kakao',
+      cancel_at_period_end: true,     // 고정제는 기간 끝에 자동 종료
+      cancel_effective_at: expireAtKST.toISOString(),
+      current_period_end:  expireAtKST.toISOString(),
+      metadata: meta,                 // jsonb: 객체 그대로
+      updated_at: nowISO,
+    })
+    .eq("id", mem.id)
+    .select()
+    .maybeSingle();
 
-      // (선택) 프런트 확인용 힌트
-      meta.prepaid_fixed = {
-        ...purchase,
-        provider: 'kakao',
-        start_at: effective_at
-      };
+  if (upErr) return res.status(400).json({ error: 'DB_UPDATE_FAILED', detail: upErr.message });
 
-      const { data: upd, error: upErr } = await supabase
-        .from("memberships")
-        .update({
-          cancel_at_period_end: true,           // 정기는 주기 끝에 종료
-          updated_at: nowISO,
-          metadata: meta,                       // jsonb 컬럼: 객체 그대로
-        })
-        .eq("id", mem.id)
-        .select()
-        .maybeSingle();
+  // (선택) 프로필 보조 동기화 — 트리거가 처리하면 생략 가능
+  try {
+    await supabase.from("profiles").update({
+      grade: planName,                // 등급 정책에 맞게 매핑한다면 여기서 'premium' 으로 바꿔도 됨
+      daily_limit: 60,
+      updated_at: nowISO
+    }).eq("user_id", user_id);
+  } catch (_) {}
 
-      if (upErr) return res.status(400).json({ error: 'DB_UPDATE_FAILED', detail: upErr.message });
+  return res.status(200).json({
+    ok: true,
+    mode: "fixed_activated_immediately",
+    message: `프리미엄${months}으로 전환 완료. 새 유효기간: ${expireAtKST.toISOString().slice(0,10)} 까지`,
+    membership: upd
+  });
+}
 
-      return res.status(200).json({
-        ok: true,
-        mode: "prepaid_scheduled",
-        message: `결제 완료. 만료일(${effective_at})에 ${planName}로 자동 전환됩니다.`,
-        membership: upd
-      });
-    }
 
     // 4) 그 외(미보유/선결제 상태 등): 즉시 활성화 (기존 로직 유지)
     const start = new Date();             // 즉시 시작
