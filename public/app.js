@@ -319,7 +319,7 @@ async function updateAuthUI(session) {
     // ✅ 프로필에서 role과 grade를 함께 가져온다 (라벨은 grade 기준!)
     const { data: profile } = await window.supabaseClient
       .from("profiles")
-      .select("role, grade, nickname, created_at, daily_limit, daily_usage_count")
+      .select("role, grade, nickname, created_at, daily_limit")
       .eq("user_id", user.id)
       .single();
 
@@ -508,12 +508,43 @@ async function buildGateFromDb(userId, profile) {
 //오늘의 카운트 증가 갱신
 
 // 화면 갱신은 이 함수로만!
-function updateCountDisplayFromGate(gate) {
+// 기존 함수 덮어쓰기 (비동기로 변경)
+async function updateCountDisplayFromGate(gate) {
   const el = document.getElementById("count-display");
   if (!el) return;
 
   const total = Number(gate?.totalCount) || 0;
 
+  // 1) DB에서 오늘 사용/리밋을 직접 가져와서 계산 (진실 소스)
+  try {
+    const { data: { user } } = await window.supabaseClient.auth.getUser();
+    if (user) {
+      const { data: prof } = await window.supabaseClient
+        .from('profiles')
+        .select('daily_usage_count, daily_limit')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (prof) {
+        const used  = Math.max(0, Number(prof.daily_usage_count ?? 0));
+        const limit = Number(prof.daily_limit ?? 0);
+
+        if (!Number.isFinite(limit) || limit <= 0) {
+          el.textContent = `오늘 남은 횟수 (∞/∞) / 누적 총 ${total}회`;
+          return;
+        }
+
+        const remain = Math.max(0, limit - used);
+        el.textContent = `오늘 남은 횟수 (${remain}/${limit}) / 누적 총 ${total}회`;
+        return; // ✅ DB 기준으로 끝
+      }
+    }
+  } catch (e) {
+    // DB 조회 실패 시 아래 게이트 값으로 폴백
+    console.warn('[usage display] fallback to gate values:', e);
+  }
+
+  // 2) 폴백: 기존 gate 값 사용(예전 동작 유지)
   if (gate?.limit === Infinity || gate?.remaining === Infinity) {
     el.textContent = `오늘 남은 횟수 (∞/∞) / 누적 총 ${total}회`;
     return;
@@ -2309,7 +2340,7 @@ if (formDate === todayKey && window.lastOutputData) {
     // ✅ 반드시 풀프로필 확보 (정책 필드 포함)
  let { data: profile, error: pErr } = await window.supabaseClient
    .from("profiles")
-   .select("role, created_at, daily_limit, , daily_usage_count, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
+   .select("role, created_at, daily_limit, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
    .eq("user_id", userId)
    .maybeSingle();   // ← 행이 없으면 null을 주고, throw 안 함
 
@@ -5078,7 +5109,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // 프로필에 daily_limit 포함
       const { data: profile, error: profErr } = await window.supabaseClient
         .from("profiles")
-        .select("role, created_at, daily_limit, daily_usage_count, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
+        .select("role, created_at, daily_limit, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
         .eq("user_id", session.user.id)
         .single();
 
@@ -5175,7 +5206,7 @@ if (!profErr && profile) {
     // 최신 프로필 로드 (에러/누락 시 안전 폴백)
     const { data: profile, error: pErr } = await window.supabaseClient
       .from("profiles")
-      .select("role, created_at, daily_limit, special_assigned_at, daily_usage_count")
+      .select("role, created_at, daily_limit, special_assigned_at")
       .eq("user_id", userId)
       .single();
 
