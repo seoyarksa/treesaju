@@ -319,7 +319,7 @@ async function updateAuthUI(session) {
     // ✅ 프로필에서 role과 grade를 함께 가져온다 (라벨은 grade 기준!)
     const { data: profile } = await window.supabaseClient
       .from("profiles")
-      .select("role, grade, nickname, created_at, daily_limit")
+      .select("role, grade, nickname, created_at, daily_limit, daily_usage_count")
       .eq("user_id", user.id)
       .single();
 
@@ -2309,7 +2309,7 @@ if (formDate === todayKey && window.lastOutputData) {
     // ✅ 반드시 풀프로필 확보 (정책 필드 포함)
  let { data: profile, error: pErr } = await window.supabaseClient
    .from("profiles")
-   .select("role, created_at, daily_limit, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
+   .select("role, created_at, daily_limit, , daily_usage_count, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
    .eq("user_id", userId)
    .maybeSingle();   // ← 행이 없으면 null을 주고, throw 안 함
 
@@ -5078,7 +5078,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // 프로필에 daily_limit 포함
       const { data: profile, error: profErr } = await window.supabaseClient
         .from("profiles")
-        .select("role, created_at, daily_limit, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
+        .select("role, created_at, daily_limit, daily_usage_count, special_assigned_at, has_ever_premium, premium_assigned_at, premium_first_assigned_at")
         .eq("user_id", session.user.id)
         .single();
 
@@ -5175,7 +5175,7 @@ if (!profErr && profile) {
     // 최신 프로필 로드 (에러/누락 시 안전 폴백)
     const { data: profile, error: pErr } = await window.supabaseClient
       .from("profiles")
-      .select("role, created_at, daily_limit, special_assigned_at")
+      .select("role, created_at, daily_limit, special_assigned_at, daily_usage_count")
       .eq("user_id", userId)
       .single();
 
