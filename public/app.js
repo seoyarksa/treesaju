@@ -114,9 +114,6 @@ import { renderSinsalTable,
 
 console.log('🔥 app.js loaded');
 
-window.__IMP_CODE__ = window.__IMP_CODE__ 
-  || (document.querySelector('[data-imp-code]')?.getAttribute('data-imp-code'))
-  || "imp81444885"; // ← 임시 기본값, 실제 imp 코드로 교체
 // =========================================
 // 출력 제한 로직 (비로그인 사용자 하루 3회 제한)
 // =========================================
@@ -993,9 +990,6 @@ if (typeof window.openSubscriptionModal === "function") {
 
 
 // ✅ 카카오 정기결제창 (V1 기준, 통합 API 버전)
-// PortOne(아임포트) imp 코드: 서버에서 data-속성으로 주입했다면 우선 사용
-
-
 // tier: 'basic' | 'plus'  (기본값: 'basic')
 window.startKakaoSubscription = async function(tier = 'basic') {
   try {
@@ -1011,7 +1005,7 @@ window.startKakaoSubscription = async function(tier = 'basic') {
     const sel = PLAN[tier] || PLAN.basic;
 
     const IMP = window.IMP;
-    IMP.init(window.__IMP_CODE__); // ✅ 아임포트 V1 고객사 식별코드
+    IMP.init("imp81444885"); // ✅ 아임포트 V1 고객사 식별코드
 
     const userId = user.id;
     // ⚠️ 동시에 두 플랜을 운용할 수도 있으니 tier를 붙여 UID를 구분(권장)
@@ -1088,7 +1082,7 @@ async function startFixedTermPay({ months, amount, productId, dailyLimit = 60 })
 
   // 2) Iamport 초기화
   const IMP = window.IMP;
-  IMP.init(window.__IMP_CODE__); // 아임포트 V1 고객사 식별코드 (정기결제와 동일)
+  IMP.init("imp81444885"); // 아임포트 V1 고객사 식별코드 (정기결제와 동일)
 
   // 3) 주문번호 생성
   const merchantUid = `order_fixed_${months}m_${Date.now()}`;
@@ -1151,90 +1145,11 @@ window.startSixMonthPlan = function () {
 
 
 // 결제수단 선택 모달
-(function () {
-  const ID = "gatewayChooser";
-  let lock = false;
 
-  function ensureChooser() {
-    let el = document.getElementById(ID);
-    if (el) return el;
-    el = document.createElement("div");
-    el.id = ID;
-    el.style.cssText = `
-      position:fixed; inset:0; display:none; align-items:center; justify-content:center;
-      background:rgba(0,0,0,.45); z-index:9999; padding:16px;
-    `;
-    el.innerHTML = `
-      <div role="dialog" aria-modal="true" class="panel" style="
-        background:#fff; border-radius:12px; max-width:420px; width:100%;
-        box-shadow:0 10px 30px rgba(0,0,0,.2); overflow:hidden; font-family:system-ui, sans-serif;">
-        <div style="padding:16px 16px 8px; border-bottom:1px solid #f0f0f0;">
-          <div id="gwTitle" style="font-size:18px; font-weight:700;">결제수단 선택</div>
-          <div id="gwDesc"  style="margin-top:6px; font-size:13px; color:#666;">
-            원하는 결제 방식을 선택하세요.
-          </div>
-        </div>
-        <div style="padding:14px; display:grid; gap:10px;">
-          <button id="gwBtnKakao"  class="btn gw" style="padding:12px; border-radius:10px; border:1px solid #eee; background:#111; color:#fff; font-weight:700;">
-            카카오페이 (앱/QR · 카드/계좌 간편결제)
-          </button>
-          <button id="gwBtnInicis" class="btn gw" style="padding:12px; border-radius:10px; border:1px solid #ddd; background:#fff; font-weight:700;">
-            일반 카드결제 (번호 직접 입력 · 이니시스)
-          </button>
-          <button id="gwBtnClose"  style="padding:10px; border-radius:8px; border:1px solid #eee; background:#fafafa;">
-            닫기
-          </button>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(el);
-
-    // 바깥 클릭/ESC 닫기
-    el.addEventListener("mousedown", (e) => {
-      const panel = el.querySelector(".panel");
-      if (panel && !panel.contains(e.target)) closeChooser();
-    });
-    window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeChooser(); });
-
-    el.querySelector("#gwBtnClose").addEventListener("click", closeChooser);
-    return el;
-  }
-
-  function closeChooser() {
-    const el = document.getElementById(ID);
-    if (!el) return;
-    el.style.display = "none";
-    lock = false;
-  }
-
-  // 공개 API: 결제수단 선택 열기
-  // options: { title, desc, onKakao, onInicis }
-  window.openGatewayChooser = function (options = {}) {
-    if (lock) return;
-    lock = true;
-
-    const el = ensureChooser();
-    el.style.display = "flex";
-
-    // 텍스트 커스터마이즈
-    el.querySelector("#gwTitle").textContent = options.title || "결제수단 선택";
-    el.querySelector("#gwDesc").textContent  = options.desc  || "원하는 결제 방식을 선택하세요.";
-
-    // 클릭 핸들러 바인딩(매번 최신 콜백으로)
-    const kakaoBtn  = el.querySelector("#gwBtnKakao");
-    const inicisBtn = el.querySelector("#gwBtnInicis");
-
-    kakaoBtn.onclick = async () => {
-      try { typeof options.onKakao === "function" && await options.onKakao(); }
-      finally { closeChooser(); }
-    };
-    inicisBtn.onclick = async () => {
-      try { typeof options.onInicis === "function" && await options.onInicis(); }
-      finally { closeChooser(); }
-    };
-  };
-})();
-
+// ───────────────────────────────────────────────
+// 카카오 진입 지점만 선택창을 중간에 끼우는 최소 패치
+// (기존 버튼/화면은 손대지 않음)
+// ───────────────────────────────────────────────
 
 
 
@@ -1266,12 +1181,12 @@ window.startSixMonthPlan = function () {
   const PG_ONETIME_PROD   = "html5_inicis.MOI9890153";    // 일반(예시)
   const PG_RECURRING_PROD = "html5_inicis.<운영_빌링MID>"; // 정기(빌링) MID 입력
 
-const PG = {
-  onetime:   USE_TEST ? PG_ONETIME_TEST   : PG_ONETIME_PROD,
-  recurring: USE_TEST ? PG_RECURRING_TEST : PG_RECURRING_PROD,
-};
+  const PG = {
+    onetime:   USE_TEST ? PG_ONETIME_TEST   : PG_ONETIME_PROD,
+    recurring: USE_TEST ? PG_RECURRING_TEST : PG_RECURRING_PROD,
+  };
 
-
+  const IMP_CODE = "imp81444885"; // ← 본인 프로젝트 imp 코드로 교체
 
   // 중복 클릭 방지
   let __inicisLock = false;
@@ -1290,7 +1205,7 @@ const PG = {
       throw new Error("IMP not loaded");
     }
     const IMP = window.IMP;
-    try { IMP.init(window.__IMP_CODE__); } catch (_) {}
+    try { IMP.init(IMP_CODE); } catch (_) {}
     return IMP;
   }
 
@@ -1470,7 +1385,6 @@ const PG = {
 
 window.__subModalTimer = window.__subModalTimer || null;
 
-
 window.openSubscriptionModal = async function () {
   const { data: { user } } = await window.supabaseClient.auth.getUser();
   if (!user) return alert("로그인이 필요합니다.");
@@ -1542,6 +1456,99 @@ window.openSubscriptionModal = async function () {
     window.__subEscBound = true;
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // [NEW] 결제수단 선택 미니 모달 생성/열기/닫기
+  function ensureGatewayChooser() {
+    if (document.getElementById("gwChooser")) return;
+    const wrap = document.createElement("div");
+    wrap.id = "gwChooser";
+    wrap.style.cssText = `
+      display:none; position:fixed; inset:0; z-index:9999;
+      background:rgba(0,0,0,0.35);
+      align-items:center; justify-content:center;
+    `;
+    wrap.innerHTML = `
+      <div class="gw-card" style="background:#fff; border-radius:10px; padding:16px; width:min(360px, 92vw); box-shadow:0 10px 30px rgba(0,0,0,.15);">
+        <h4 style="margin:0 0 8px; font-size:18px;">결제수단 선택</h4>
+        <p id="gwDesc" style="margin:0 0 12px; font-size:13px; color:#555;"></p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="gwBtnInicis" class="btn-outline" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:8px 12px;">이니시스 (카드/계좌)</button>
+          <button id="gwBtnKakao"  class="btn-success" style="border-radius:6px; padding:8px 12px;">카카오페이 간편결제</button>
+          <button id="gwBtnClose"  class="btn-ghost"   style="border:1px solid #eee; background:#f5f5f5; border-radius:6px; padding:8px 12px;">취소</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(wrap);
+
+    // 닫기
+    wrap.addEventListener("mousedown", (e) => {
+      const card = wrap.querySelector(".gw-card");
+      if (card && !card.contains(e.target)) closeGatewayChooser();
+    });
+    document.getElementById("gwBtnClose").addEventListener("click", closeGatewayChooser);
+
+    // 이니시스 분기
+    // 이니시스 버튼 클릭 시: 라우트 호출(x) → PortOne 함수 직접 호출(o)
+document.getElementById("gwBtnInicis").addEventListener("click", () => {
+  if (!__pendingChoice) return;
+  const key = __pendingChoice.planKey;
+
+  try {
+    switch (key) {
+      case "3m":
+        (window.startInicisThreeMonthPlan || startInicisThreeMonthPlan)();
+        break;
+      case "6m":
+        (window.startInicisSixMonthPlan || startInicisSixMonthPlan)();
+        break;
+      case "rb":
+        (window.startInicisSubscriptionBasic || startInicisSubscriptionBasic)();
+        break;
+      case "rp":
+        (window.startInicisSubscriptionPlus || startInicisSubscriptionPlus)();
+        break;
+      default:
+        alert("선택한 플랜을 찾을 수 없습니다.");
+    }
+  } finally {
+    closeGatewayChooser();
+  }
+});
+
+
+    // 카카오 분기(기존 함수 재사용)
+    document.getElementById("gwBtnKakao").addEventListener("click", async () => {
+      if (!__pendingChoice) return;
+      const { planKey } = __pendingChoice;
+      try {
+        if (planKey === "3m") {
+          (window.startThreeMonthPlan || startThreeMonthPlan)();
+        } else if (planKey === "6m") {
+          (window.startSixMonthPlan || startSixMonthPlan)();
+        } else if (planKey === "rb") {
+          (window.startKakaoSubscriptionBasic || startKakaoSubscriptionBasic)();
+        } else if (planKey === "rp") {
+          (window.startKakaoSubscriptionPlus || startKakaoSubscriptionPlus)();
+        }
+      } finally {
+        closeGatewayChooser();
+      }
+    });
+  }
+  function openGatewayChooser(planKey) {
+    ensureGatewayChooser();
+    __pendingChoice = { planKey };
+    const meta = PLANS[planKey];
+    const desc = document.getElementById("gwDesc");
+    if (desc) desc.textContent = `${meta.label} - 결제수단을 선택하세요.`;
+    const layer = document.getElementById("gwChooser");
+    if (layer) layer.style.display = "flex";
+  }
+  function closeGatewayChooser() {
+    __pendingChoice = null;
+    const layer = document.getElementById("gwChooser");
+    if (layer) layer.style.display = "none";
+  }
   // ─────────────────────────────────────────────────────────────
 
   function renderPurchaseChoices() {
