@@ -1145,90 +1145,11 @@ window.startSixMonthPlan = function () {
 
 
 // 결제수단 선택 모달
-(function () {
-  const ID = "gatewayChooser";
-  let lock = false;
 
-  function ensureChooser() {
-    let el = document.getElementById(ID);
-    if (el) return el;
-    el = document.createElement("div");
-    el.id = ID;
-    el.style.cssText = `
-      position:fixed; inset:0; display:none; align-items:center; justify-content:center;
-      background:rgba(0,0,0,.45); z-index:9999; padding:16px;
-    `;
-    el.innerHTML = `
-      <div role="dialog" aria-modal="true" class="panel" style="
-        background:#fff; border-radius:12px; max-width:420px; width:100%;
-        box-shadow:0 10px 30px rgba(0,0,0,.2); overflow:hidden; font-family:system-ui, sans-serif;">
-        <div style="padding:16px 16px 8px; border-bottom:1px solid #f0f0f0;">
-          <div id="gwTitle" style="font-size:18px; font-weight:700;">결제수단 선택</div>
-          <div id="gwDesc"  style="margin-top:6px; font-size:13px; color:#666;">
-            원하는 결제 방식을 선택하세요.
-          </div>
-        </div>
-        <div style="padding:14px; display:grid; gap:10px;">
-          <button id="gwBtnKakao"  class="btn gw" style="padding:12px; border-radius:10px; border:1px solid #eee; background:#111; color:#fff; font-weight:700;">
-            카카오페이 (앱/QR · 카드·계좌 간편결제)
-          </button>
-          <button id="gwBtnInicis" class="btn gw" style="padding:12px; border-radius:10px; border:1px solid #ddd; background:#fff; font-weight:700;">
-            일반 카드결제 (번호 입력 · 이니시스)
-          </button>
-          <button id="gwBtnClose"  style="padding:10px; border-radius:8px; border:1px solid #eee; background:#fafafa;">
-            닫기
-          </button>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(el);
-
-    // 바깥 클릭/ESC 닫기
-    el.addEventListener("mousedown", (e) => {
-      const panel = el.querySelector(".panel");
-      if (panel && !panel.contains(e.target)) closeChooser();
-    });
-    window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeChooser(); });
-
-    el.querySelector("#gwBtnClose").addEventListener("click", closeChooser);
-    return el;
-  }
-
-  function closeChooser() {
-    const el = document.getElementById(ID);
-    if (!el) return;
-    el.style.display = "none";
-    lock = false;
-  }
-
-  // 공개 API: 결제수단 선택 열기
-  // options: { title, desc, onKakao, onInicis }
-  window.openGatewayChooser = function (options = {}) {
-    if (lock) return;
-    lock = true;
-
-    const el = ensureChooser();
-    el.style.display = "flex";
-
-    // 텍스트 커스터마이즈
-    el.querySelector("#gwTitle").textContent = options.title || "결제수단 선택";
-    el.querySelector("#gwDesc").textContent  = options.desc  || "원하는 결제 방식을 선택하세요.";
-
-    // 클릭 핸들러 바인딩(매번 최신 콜백으로)
-    const kakaoBtn  = el.querySelector("#gwBtnKakao");
-    const inicisBtn = el.querySelector("#gwBtnInicis");
-
-    kakaoBtn.onclick = async () => {
-      try { typeof options.onKakao === "function" && await options.onKakao(); }
-      finally { closeChooser(); }
-    };
-    inicisBtn.onclick = async () => {
-      try { typeof options.onInicis === "function" && await options.onInicis(); }
-      finally { closeChooser(); }
-    };
-  };
-})();
-
+// ───────────────────────────────────────────────
+// 카카오 진입 지점만 선택창을 중간에 끼우는 최소 패치
+// (기존 버튼/화면은 손대지 않음)
+// ───────────────────────────────────────────────
 
 
 
