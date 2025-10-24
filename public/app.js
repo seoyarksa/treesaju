@@ -508,43 +508,12 @@ async function buildGateFromDb(userId, profile) {
 //오늘의 카운트 증가 갱신
 
 // 화면 갱신은 이 함수로만!
-// 기존 함수 덮어쓰기 (비동기로 변경)
-async function updateCountDisplayFromGate(gate) {
+function updateCountDisplayFromGate(gate) {
   const el = document.getElementById("count-display");
   if (!el) return;
 
   const total = Number(gate?.totalCount) || 0;
 
-  // 1) DB에서 오늘 사용/리밋을 직접 가져와서 계산 (진실 소스)
-  try {
-    const { data: { user } } = await window.supabaseClient.auth.getUser();
-    if (user) {
-      const { data: prof } = await window.supabaseClient
-        .from('profiles')
-        .select('daily_usage_count, daily_limit')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (prof) {
-        const used  = Math.max(0, Number(prof.daily_usage_count ?? 0));
-        const limit = Number(prof.daily_limit ?? 0);
-
-        if (!Number.isFinite(limit) || limit <= 0) {
-          el.textContent = `오늘 남은 횟수 (∞/∞) / 누적 총 ${total}회`;
-          return;
-        }
-
-        const remain = Math.max(0, limit - used);
-        el.textContent = `오늘 남은 횟수 (${remain}/${limit}) / 누적 총 ${total}회`;
-        return; // ✅ DB 기준으로 끝
-      }
-    }
-  } catch (e) {
-    // DB 조회 실패 시 아래 게이트 값으로 폴백
-    console.warn('[usage display] fallback to gate values:', e);
-  }
-
-  // 2) 폴백: 기존 gate 값 사용(예전 동작 유지)
   if (gate?.limit === Infinity || gate?.remaining === Infinity) {
     el.textContent = `오늘 남은 횟수 (∞/∞) / 누적 총 ${total}회`;
     return;
@@ -553,7 +522,6 @@ async function updateCountDisplayFromGate(gate) {
   const limit  = Number(gate?.limit) || 0;
   el.textContent = `오늘 남은 횟수 (${remain}/${limit}) / 누적 총 ${total}회`;
 }
-
 
 
 
