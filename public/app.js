@@ -1150,6 +1150,12 @@ window.startSixMonthPlan = function () {
 //  - 선결제(3/6개월): startInicisThreeMonthPlan(), startInicisSixMonthPlan()
 // ───────────────────────────────────────────────────────────
 
+// ───────────────────────────────────────────────────────────
+// INICIS(이니시스) - PortOne(아임포트) 결제 모듈 (라우트 불필요)
+//  - 정기결제: startInicisSubscription('basic'|'plus')
+//  - 선결제(3/6개월): startInicisThreeMonthPlan(), startInicisSixMonthPlan()
+//  - 변경점: 결제 성공 시 서버로 receipt_hint(영수증 힌트) 함께 전달
+// ───────────────────────────────────────────────────────────
 (function () {
   // ====== 환경 스위치 ======
   const USE_TEST = true; // ← 운영 전환 시 false 로 변경
@@ -1158,7 +1164,7 @@ window.startSixMonthPlan = function () {
   const PG_ONETIME_TEST   = "html5_inicis.INIpayTest"; // 단건(일반)
   const PG_RECURRING_TEST = "html5_inicis.INIBillTst"; // 정기(빌링)
 
-  // 운영 MID (알려진 값/받은 값으로 교체)
+  // 운영 MID (필요 시 교체)
   const PG_ONETIME_PROD   = "html5_inicis.MOI9890153";    // 일반(예시)
   const PG_RECURRING_PROD = "html5_inicis.<운영_빌링MID>"; // 정기(빌링) MID 입력
 
@@ -1167,9 +1173,9 @@ window.startSixMonthPlan = function () {
     recurring: USE_TEST ? PG_RECURRING_TEST : PG_RECURRING_PROD,
   };
 
-  const IMP_CODE = "imp81444885"; // ← 네 프로젝트의 imp 코드로 교체 필요
+  const IMP_CODE = "imp81444885"; // ← 본인 프로젝트 imp 코드로 교체
 
-  // 중복 클릭 방지용 락
+  // 중복 클릭 방지
   let __inicisLock = false;
   function withLock(fn) {
     return async (...args) => {
@@ -1186,7 +1192,7 @@ window.startSixMonthPlan = function () {
       throw new Error("IMP not loaded");
     }
     const IMP = window.IMP;
-    try { IMP.init(IMP_CODE); } catch (e) {}
+    try { IMP.init(IMP_CODE); } catch (_) {}
     return IMP;
   }
 
@@ -1206,14 +1212,17 @@ window.startSixMonthPlan = function () {
     return { ok: res.ok, status: res.status, data };
   }
 
-  // 공통 결제 요청
+  /**
+   * 공통 결제 요청
+   * - PortOne 콜백(rsp)에서 가능한 한 많은 필드를 수집해 receipt_hint로 반환
+   */
   async function requestPayInicis({ name, amount, merchant_uid, customer_uid }) {
     const { data: { user } } = await window.supabaseClient.auth.getUser();
     if (!user) throw new Error("로그인이 필요합니다.");
 
     const IMP = ensureIMP();
 
-    // customer_uid 존재 ⇢ 정기결제(빌링) 채널 / 없으면 단건 채널
+    // customer_uid 있으면 정기(빌링), 없으면 단건
     const pgToUse = customer_uid ? PG.recurring : PG.onetime;
     console.log(`[INICIS] MODE=${USE_TEST ? "TEST" : "PROD"} PG=${pgToUse}`);
 
@@ -1233,13 +1242,32 @@ window.startSixMonthPlan = function () {
     return new Promise((resolve) => {
       IMP.request_pay(payload, (rsp) => {
         console.log("[INICIS rsp]", rsp);
-        if (rsp.success) resolve({ ok: true, rsp });
-        else resolve({ ok: false, error: rsp.error_msg || "결제 실패", rsp });
+        if (!rsp || !rsp.success) {
+          return resolve({ ok: false, error: rsp?.error_msg || "결제 실패", rsp });
+        }
+
+        // 프론트에서 알고 있는 최소/안전값 수집 (서버 검증으로 최종 확정)
+        const receipt_hint = {
+          provider: "inicis",
+          kind: customer_uid ? "recurring_start" : "fixed",
+          amount: Number(rsp.paid_amount ?? payload.amount),
+          price: Number(rsp.paid_amount ?? payload.amount),
+          imp_uid: rsp.imp_uid || null,
+          merchant_uid: rsp.merchant_uid || merchant_uid || null,
+          customer_uid: customer_uid || null,
+          pay_method: rsp.pay_method || "card",
+          pg_provider: rsp.pg_provider || "inicis",
+          pg_tid: rsp.pg_tid || rsp.apply_num || null,   // 없을 수도 있음
+          paid_at_unix: typeof rsp.paid_at === "number" ? rsp.paid_at : null, // 없으면 서버 검증에서 보완
+          at: new Date().toISOString(),
+        };
+
+        resolve({ ok: true, rsp, receipt_hint });
       });
     });
   }
 
-  // ───────── 정기결제 ─────────
+  // ───────── 정기결제 시작 ─────────
   async function _startInicisSubscription(tier = "basic") {
     const { data: { user } } = await window.supabaseClient.auth.getUser();
     if (!user) return alert("로그인이 필요합니다.");
@@ -1263,6 +1291,7 @@ window.startSixMonthPlan = function () {
     if (!res.ok) return alert("❌ 결제 실패: " + res.error);
     alert("결제 성공 🎉\n결제번호: " + res.rsp.imp_uid);
 
+    // 서버에 등록(+ receipt_hint 전달)
     const r = await postJSON("/api/payment/manage-subscription?action=register", {
       provider: "inicis",
       imp_uid: res.rsp.imp_uid,
@@ -1272,8 +1301,10 @@ window.startSixMonthPlan = function () {
       planId: sel.planId,
       price: sel.amount,
       daily_limit: sel.daily_limit,
+      receipt_hint: res.receipt_hint || null, // ★ 추가
     });
     if (!r.ok) return alert("❌ 서버 등록 실패: " + (r.data.error || r.status));
+
     alert("✅ 정기결제 등록 및 프리미엄 등급 적용 완료");
     setTimeout(() => location.reload(), 300);
   }
@@ -1297,6 +1328,7 @@ window.startSixMonthPlan = function () {
 
     if (!res.ok) return alert("❌ 결제 실패: " + res.error);
 
+    // 서버 활성화(+ receipt_hint 전달)
     const r = await postJSON("/api/payment/manage-subscription?action=activate_fixed", {
       provider: "inicis",
       imp_uid: res.rsp.imp_uid,
@@ -1306,6 +1338,7 @@ window.startSixMonthPlan = function () {
       termMonths: months,
       dailyLimit,
       price: amount,
+      receipt_hint: res.receipt_hint || null, // ★ 추가
     });
     if (!r.ok) return alert("❌ 서버 처리 실패: " + (r.data.error || r.status));
 
@@ -1320,7 +1353,6 @@ window.startSixMonthPlan = function () {
     _startInicisFixedTermPay({ months: 6, amount: 100000, productId: "sub_6m_60_100000", dailyLimit: 60 })
   );
 })();
-
 
 
 
