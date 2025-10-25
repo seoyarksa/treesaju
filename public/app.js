@@ -5487,15 +5487,16 @@ function bindAuthPipelines() {
 
   window.supabaseClient.auth.onAuthStateChange(async (event, session) => {
     try {
-      if (event === "SIGNED_IN" && session?.user?.id) {
+      if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session?.user?.id) {
         const userId = session.user.id;
-        const sessionId = session.access_token;
+         // ✅ 다른 기기 세션만 즉시 무효화 (현재 기기는 유지)
+       await window.supabaseClient.auth.signOut({ scope: "others" });
 
-        // 1) 기존 로그인 세션 전부 종료 (다른 기기 즉시 무효화 상태로)
-        await postJSON("/api/terminate-other-sessions", { user_id: userId });
++       // (선택) 위 줄로 이미 해결되므로, 자체 API는 불필요합니다.
++       // 꼭 쓰고 싶다면 service_role로 리프레시 토큰 무효화 로직을 구현해야 합니다.
 
-        // 2) 현재 세션을 active_sessions에 기록 (Realtime 트리거 포인트)
-        await postJSON("/api/update-session", { user_id: userId, session_id: sessionId });
+  +       // (선택) 기록을 계속 쓰려면 'access_token'이 아니라 'session.refresh_token'을 쓰세요.
++       // await postJSON("/api/update-session", { user_id: userId, refresh_token: session.refresh_to
 
         // 3) 실시간 감시 시작 (한 번만 구독)
         await initRealtimeWatcher();
