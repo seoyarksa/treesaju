@@ -2445,7 +2445,7 @@ for (let i = 0; i < window.allStemList.length; i++) {
 }
 
 const jihapStr = jihapResult.length
-  ? [...new Set(jihapResult)].join(", ")
+  ? [...new Set(jihapResult)].join("/ ")
   : "<span style='color:red;'>X</span>";
 
 
