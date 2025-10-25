@@ -850,7 +850,77 @@ function openSignupModal() {
 }
 
 
+
+
 // ─── 전화 인증 모달 ───────────────────────────────────────────
+// === 최소 추가 JS (HTML 안 바꿔도 동작) =========================
+
+// 필요시 바꾸세요
+const PHONE_TABLE = "profiles";   // 전화번호가 저장된 테이블
+const PHONE_COLUMN = "phone";  // 전화번호 컬럼명
+
+// 숫자만 남기고 한국번호를 +82 포맷으로 변환 (010-1234-5678 -> +821012345678)
+function toE164Kr(raw) {
+  if (!raw) return "";
+  let d = String(raw).replace(/\D+/g, "");
+  // 국제/국내 입력 혼용 보정
+  if (d.startsWith("82")) d = d.replace(/^82/, "");
+  if (!d.startsWith("0")) d = "0" + d;
+  return "+82" + d.slice(1);
+}
+
+// 중복 확인
+async function isPhoneDuplicated(e164Phone) {
+  const { count, error } = await window.supabaseClient
+    .from(PHONE_TABLE)
+    .select("id", { count: "exact", head: true })
+    .eq(PHONE_COLUMN, e164Phone);
+
+  if (error) throw error;
+  return (count || 0) > 0;
+}
+
+// 버튼 클릭 처리
+document.getElementById("otp-send")?.addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  const input = document.getElementById("otp-phone");
+  const raw = input?.value || "";
+  const phone = toE164Kr(raw);
+
+  if (!phone || phone.length < 10) {
+    alert("전화번호를 올바르게 입력해주세요.");
+    input?.focus();
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "확인 중...";
+  try {
+    const duplicated = await isPhoneDuplicated(phone);
+    if (duplicated) {
+      alert("이미 등록된 전화번호입니다. 다른 번호를 사용해주세요.");
+      btn.textContent = "코드 받기";
+      btn.disabled = false;
+      return; // 중단
+    }
+
+    // ⬇️ 여기서부터 기존 OTP 전송 로직 호출
+    // 예) await sendOtp(phone);
+    // 또는 Naver SENS, Twilio 등 사용
+    console.log("중복 아님 → OTP 전송:", phone);
+    btn.textContent = "전송됨";
+
+  } catch (err) {
+    console.error("전화번호 중복 확인 오류:", err);
+    alert("잠시 후 다시 시도해주세요.");
+    btn.textContent = "코드 받기";
+    btn.disabled = false;
+  }
+});
+
+// (선택) 닫기 버튼은 기존대로 쓰면 됩니다.
+
+
 function openPhoneOtpModal() {
   if (document.getElementById("phone-otp-modal")) {
     document.getElementById("phone-otp-modal").style.display = "block";
