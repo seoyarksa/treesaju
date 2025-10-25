@@ -904,8 +904,8 @@ ${sinsalRowsGanji}
 
 return tableA1 + tableA2 + tableB + `
 <div class="note-box" style="text-align:center">
-  ※ 일간,일지,일주 / 년간,년지,년주 / 대운,세운 칸들은 각각 노랑, 파랑, 초록 색깔로 구분함. <br>
-  일반적으로 기준간지[<span style="color:red;">빨강</span>]를 기준으로 신살적용됨. 특정 간,지가 기준[<span style="color:red;">빨강</span>]인 경우 해당칸에 기준을 표기하였음.
+  ※ 일간,일지,일주 / 년간,년지,년주 / 대운,세운 칸의 셀들은 각각 노랑, 파랑, 초록 바탕색으로 구분하였음. <br>
+  기본적으로 기준은 위의 표에서 [<span style="color:red;">빨강</span>]색으로 구분하였고, 특정 간지가 기준[<span style="color:red;">빨강색</span>]인 경우 해당칸에 따로 "기준"을 표기하였음.
 </div>
 `;
 

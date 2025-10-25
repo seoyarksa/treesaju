@@ -675,6 +675,7 @@ async function loadSajuHistory(userId, page = 1, search = "") {
         <tr>
           <th>이름</th>
           <th>생년월일</th>
+           <th>달력</th> <!-- ✅ 추가: 음력/양력 -->
           <th>성별</th>
           <th>등록일</th>
           <th>비고</th> <!-- ✅ 마지막 열 제목 -->
@@ -686,26 +687,40 @@ async function loadSajuHistory(userId, page = 1, search = "") {
 
   const tbody = tableContainer.querySelector("tbody");
 
-  data.forEach((record) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>
-<span class="saju-record-link"
-      data-id="${record.id}"
-      data-json='${JSON.stringify(record.input_json)}'
-      style="cursor:pointer; color:blue; text-decoration:underline;">
-  ${record.name}
-</span>
+data.forEach((record) => {
+  // ✅ 달력 표기 추출 (DB/JSON 어디에 있든 최대한 받아줌)
+  const calTypeRaw =
+    record.calendar_type ??
+    record.calendar ??
+    (typeof record.is_lunar === "boolean" ? (record.is_lunar ? "lunar" : "solar") : null) ??
+    (record.input_json?.calendar ??
+     record.input_json?.calendarType ??
+     (record.input_json?.isLunar ? "lunar" :
+      (record.input_json?.isSolar ? "solar" : null)));
 
+  const calLabel =
+    calTypeRaw === "lunar" || calTypeRaw === "음력" || calTypeRaw === "L" ? "음력" :
+    calTypeRaw === "solar" || calTypeRaw === "양력" || calTypeRaw === "S" ? "양력" :
+    ""; // 모르면 빈칸
 
-      </td>
-      <td>${record.birth_date}</td>
-      <td>${record.gender}</td>
-      <td>${new Date(record.created_at).toLocaleDateString()}</td>
-      <td><button class="delete-record-btn" data-id="${record.id}">삭제</button></td>
-    `;
-    tbody.appendChild(tr);
-  });
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td>
+      <span class="saju-record-link"
+            data-id="${record.id}"
+            data-json='${JSON.stringify(record.input_json)}'
+            style="cursor:pointer; color:blue; text-decoration:underline;">
+        ${record.name}
+      </span>
+    </td>
+    <td>${record.birth_date}</td>
+    <td>${calLabel}</td> <!-- ✅ 추가된 칼럼 값 -->
+    <td>${record.gender}</td>
+    <td>${new Date(record.created_at).toLocaleDateString()}</td>
+    <td><button class="delete-record-btn" data-id="${record.id}">삭제</button></td>
+  `;
+  tbody.appendChild(tr);
+});
 
 // ✅ 페이지네이션 계산
 const { count } = await window.supabaseClient
