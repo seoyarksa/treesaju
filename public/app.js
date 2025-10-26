@@ -1438,7 +1438,9 @@ window.__subModalTimer = window.__subModalTimer || null;
 window.openSubscriptionModal = async function () {
   const { data: { user } } = await window.supabaseClient.auth.getUser();
   if (!user) return alert("로그인이 필요합니다.");
-
+  // ★ 추가: 결제 모달 열기 전, 휴대폰 인증 유효성 검사
+  const ok = await ensurePhoneVerifiedForPayment(3); // 3일 유효
+  if (!ok) return; // 인증 미통과면 결제 모달을 열지 않음
   // ─────────────────────────────────────────────────────────────
   // [NEW] 플랜 메타: 타입(onetime/subs), 코드, 금액
   const PLANS = {
@@ -1648,10 +1650,31 @@ document.getElementById("gwBtnInicis").addEventListener("click", () => {
     `;
 
     // [변경점] 카카오 직행 → 결제수단 선택으로 변경
-    document.getElementById("btn3m")?.addEventListener("click", () => openGatewayChooser("3m"));
-    document.getElementById("btn6m")?.addEventListener("click", () => openGatewayChooser("6m"));
-    document.getElementById("btnRecurringBasic")?.addEventListener("click", () => openGatewayChooser("rb"));
-    document.getElementById("btnRecurringPlus")?.addEventListener("click", () => openGatewayChooser("rp"));
+// 결제 모달 렌더 이후 바인딩 부분만 수정
+document.getElementById("btn3m")?.addEventListener("click", async () => {
+  const ok = await requirePhoneVerificationIfNeeded();
+  if (!ok) return;                 // 인증 완료 전엔 진행 X
+  openGatewayChooser("3m");        // 기존 흐름
+});
+
+document.getElementById("btn6m")?.addEventListener("click", async () => {
+  const ok = await requirePhoneVerificationIfNeeded();
+  if (!ok) return;
+  openGatewayChooser("6m");
+});
+
+document.getElementById("btnRecurringBasic")?.addEventListener("click", async () => {
+  const ok = await requirePhoneVerificationIfNeeded();
+  if (!ok) return;
+  openGatewayChooser("rb");
+});
+
+document.getElementById("btnRecurringPlus")?.addEventListener("click", async () => {
+  const ok = await requirePhoneVerificationIfNeeded();
+  if (!ok) return;
+  openGatewayChooser("rp");
+});
+
     document.getElementById("subCloseBtn")?.addEventListener("click", close);
   }
 
@@ -2114,39 +2137,40 @@ document.getElementById("gwBtnInicis").addEventListener("click", () => {
 
 
 // ─── 로그인된 유저가 전화 인증 필요하면 모달을 띄우는 검사 ───
-// 결제 모달 진입 시에만 인증을 요구하는 가드
-async function ensurePhoneVerifiedForPayment(daysValid = 3) {
+// 기존 함수 덮어쓰기(리턴값 추가: true/false)
+async function requirePhoneVerificationIfNeeded() {
   const { data: { session } } = await window.supabaseClient.auth.getSession();
   if (!session?.user) { alert("로그인 후 이용 가능합니다."); return false; }
 
   try {
     const { data, error } = await window.supabaseClient
       .from("profiles")
-      .select("phone_verified_at")
+      .select("phone_verified, phone_verified_at")
       .eq("user_id", session.user.id)
       .maybeSingle();
 
     if (error) console.warn("[profiles maybeSingle] warn:", error);
 
-    // 기록 없음 → 인증 필요
+    // 인증 기록 없으면 → 모달 띄우고 false
     if (!data?.phone_verified_at) {
-      openPhoneOtpModal();   // ← 모달만 띄우고
-      return false;          // 진입 차단
-    }
-
-    // 유효기간 체크
-    const last = new Date(data.phone_verified_at);
-    const diffDays = (Date.now() - last.getTime()) / 86400000;
-
-    if (diffDays > daysValid) {
-      console.log("[ensurePhoneVerifiedForPayment] 인증 만료:", diffDays.toFixed(2), "일 경과");
       openPhoneOtpModal();
       return false;
     }
 
-    return true; // 통과
+    // 3일 유효기간
+    const lastVerified = new Date(data.phone_verified_at);
+    const diffDays = (Date.now() - lastVerified.getTime()) / 86400000;
+
+    if (diffDays > 3) {
+      console.log("[requirePhoneVerificationIfNeeded] 인증 만료:", diffDays, "일 경과");
+      openPhoneOtpModal();            // 모달 띄우고
+      return false;                   // 진행 중단
+    }
+
+    console.log("[requirePhoneVerificationIfNeeded] 인증 유효:", diffDays, "일 경과");
+    return true;                      // 통과
   } catch (e) {
-    console.warn("[ensurePhoneVerifiedForPayment] 조회 실패:", e);
+    console.warn("[requirePhoneVerificationIfNeeded] 조회 실패:", e);
     openPhoneOtpModal();
     return false;
   }
@@ -5062,7 +5086,7 @@ async function renderUserProfile() {
   const { data: { user } } = await window.supabaseClient.auth.getUser();
   if (!user) return;
 
-  // ✅ 정기구독 버튼
+  // ✅ 정기구독 및 결제 버튼
   const subscribeBtn = document.getElementById("subscribeBtn");
   if (subscribeBtn) {
     // 중복 이벤트 방지
@@ -5070,24 +5094,8 @@ async function renderUserProfile() {
     subscribeBtn._bound = async (e) => {
       e.preventDefault();
       try {
-        // ✅ profiles 테이블에서 전화 인증 여부 확인
-        const { data: profile, error: profErr } = await window.supabaseClient
-          .from("profiles")
-          .select("phone_verified")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (profErr) console.warn("[profiles maybeSingle] warn:", profErr);
-
-        // ✅ 전화 인증 안 되어 있으면 OTP 모달 오픈
-        if (!profile || !profile.phone_verified) {
-          openPhoneOtpModal();
-          return;
-        }
-
-        // ✅ 인증 완료 → 구독 상태에 따라 결제창 or 결제정보 표시
-        await openSubscriptionModal(); // <-- 🔥 새로 만든 함수 실행
-
+        // 🔁 여기서는 전화인증 체크하지 않음 — 그냥 결제 모달만 열기
+        await openSubscriptionModal();
       } catch (err) {
         console.error("[subscribeBtn] error:", err);
         alert(err?.message || "처리 중 오류가 발생했습니다.");
