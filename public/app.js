@@ -2114,41 +2114,41 @@ document.getElementById("gwBtnInicis").addEventListener("click", () => {
 
 
 // ─── 로그인된 유저가 전화 인증 필요하면 모달을 띄우는 검사 ───
-async function requirePhoneVerificationIfNeeded() {
+// 결제 모달 진입 시에만 인증을 요구하는 가드
+async function ensurePhoneVerifiedForPayment(daysValid = 3) {
   const { data: { session } } = await window.supabaseClient.auth.getSession();
-  if (!session?.user) return alert("로그인 후 이용 가능합니다.");
+  if (!session?.user) { alert("로그인 후 이용 가능합니다."); return false; }
 
   try {
     const { data, error } = await window.supabaseClient
       .from("profiles")
-      .select("phone_verified, phone_verified_at")
+      .select("phone_verified_at")
       .eq("user_id", session.user.id)
       .maybeSingle();
 
     if (error) console.warn("[profiles maybeSingle] warn:", error);
 
-    // 인증 기록 없으면 바로 인증 요구
+    // 기록 없음 → 인증 필요
     if (!data?.phone_verified_at) {
+      openPhoneOtpModal();   // ← 모달만 띄우고
+      return false;          // 진입 차단
+    }
+
+    // 유효기간 체크
+    const last = new Date(data.phone_verified_at);
+    const diffDays = (Date.now() - last.getTime()) / 86400000;
+
+    if (diffDays > daysValid) {
+      console.log("[ensurePhoneVerifiedForPayment] 인증 만료:", diffDays.toFixed(2), "일 경과");
       openPhoneOtpModal();
-      return;
+      return false;
     }
 
-    // 3일 유효기간 계산
-    const lastVerified = new Date(data.phone_verified_at);
-    const now = new Date();
-    const diffDays = (now - lastVerified) / (1000 * 60 * 60 * 24);
-
-    if (diffDays > 3) {
-      console.log("[requirePhoneVerificationIfNeeded] 인증 만료:", diffDays, "일 경과");
-      openPhoneOtpModal(); // 3일 초과 → 다시 인증
-      return;
-    }
-
-    // 유효기간 이내면 통과
-    console.log("[requirePhoneVerificationIfNeeded] 인증 유효:", diffDays, "일 경과");
+    return true; // 통과
   } catch (e) {
-    console.warn("[requirePhoneVerificationIfNeeded] 조회 실패:", e);
-    openPhoneOtpModal(); // 조회 실패 시 안전하게 인증 요구
+    console.warn("[ensurePhoneVerifiedForPayment] 조회 실패:", e);
+    openPhoneOtpModal();
+    return false;
   }
 }
 
@@ -5489,15 +5489,18 @@ function bindAuthPipelines() {
     try {
       if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session?.user?.id) {
         const userId = session.user.id;
-         // ✅ 다른 기기 세션만 즉시 무효화 (현재 기기는 유지)
-       await window.supabaseClient.auth.signOut({ scope: "others" });
+        const sessionId = session.access_token; // (표시용) 현재 기기 식별
 
-+       // (선택) 위 줄로 이미 해결되므로, 자체 API는 불필요합니다.
-+       // 꼭 쓰고 싶다면 service_role로 리프레시 토큰 무효화 로직을 구현해야 합니다.
+        // 1) 기존 로그인 세션 전부 종료 (다른 기기 즉시 무효화 상태로)
+        await window.supabaseClient.auth.signOut({ scope: "others" });
 
-  +       // (선택) 기록을 계속 쓰려면 'access_token'이 아니라 'session.refresh_token'을 쓰세요.
-+       // await postJSON("/api/update-session", { user_id: userId, refresh_token: session.refresh_to
+        // 2) 현재 세션을 active_sessions에 기록 (Realtime 트리거 포인트)
+        await postJSON("/api/update-session", { user_id: userId, session_id: sessionId });
 
+        // ✅ 2-1) 다른 기기들에게 "지금 당장 나가라" 브로드캐스트
+       window.supabaseClient
+         .channel(`user:${userId}`)
+         .send({ type: "broadcast", event: "force-logout", payload: { except: sessionId } });
         // 3) 실시간 감시 시작 (한 번만 구독)
         await initRealtimeWatcher();
 
@@ -5518,36 +5521,80 @@ function bindAuthPipelines() {
 }
 
 /***** ✅ 실시간 세션 변경 감시 (다른 기기 로그인 시 자동 로그아웃) *****/
+// ✅ active_sessions 테이블에 "현재 세션"이 바뀌면, 이 기기 즉시 로그아웃
+//    - 가능한 한 refresh_token(=session.refresh_token)을 기준으로 비교합니다.
+//    - 만약 DB에 access_token을 저장 중이라면 기존 컬럼(session_id)도 함께 비교합니다.
+//    - active_sessions 테이블 컬럼 예시:
+//        user_id uuid
+//        session_rt text   -- (권장) 현재 세션의 refresh_token
+//        session_id text   -- (호환) 기존에 쓰던 access_token
+
+
+let __FORCE_LOGOUT_FIRED__ = false;
+
 async function initRealtimeWatcher() {
   if (__REALTIME_SET__) return;
+
   const { data: u } = await window.supabaseClient.auth.getUser();
   const user = u?.user;
   if (!user) return;
 
-  __REALTIME_SET__ = true;
+  // 현재 세션 토큰(둘 다 확보: refresh 우선, access 보조)
+  async function getCurrentTokens() {
+    const { data: s } = await window.supabaseClient.auth.getSession();
+    return {
+      access: s?.session?.access_token || null,
+      refresh: s?.session?.refresh_token || null,
+    };
+  }
 
-  window.supabaseClient
-    .channel("realtime:active_sessions")
+  // 동일 사용자 행만 수신하도록 필터
+  const channel = window.supabaseClient
+    .channel(`realtime:active_sessions:${user.id}`)
     .on(
       "postgres_changes",
-      { event: "*", schema: "public", table: "active_sessions" }, // INSERT/UPDATE 모두 감시
+      {
+        event: "*",
+        schema: "public",
+        table: "active_sessions",
+        filter: `user_id=eq.${user.id}`,
+      },
       async (payload) => {
-        if (payload?.new?.user_id !== user.id) return;
+        // 이미 처리된 강제 로그아웃이면 중복 방지
+        if (__FORCE_LOGOUT_FIRED__) return;
 
-        const { data: s } = await window.supabaseClient.auth.getSession();
-        const current = s?.session?.access_token;
-        const latest  = payload?.new?.session_id;
+        // 현재 기기의 세션 토큰(실시간 비교용)
+        const current = await getCurrentTokens();
 
-        if (current && latest && current !== latest) {
+        // DB에서 최신으로 기록된 토큰(가급적 refresh 기준)
+        const latestRefresh = payload?.new?.session_rt || null;
+        const latestAccess  = payload?.new?.session_id || null;
+
+        // 1) refresh_token 기준 비교 (권장 & 안정적)
+        if (latestRefresh && current.refresh && latestRefresh !== current.refresh) {
+          __FORCE_LOGOUT_FIRED__ = true;
           alert("다른 기기에서 로그인되어 자동 로그아웃됩니다.");
           await window.supabaseClient.auth.signOut();
           updateAuthUI(null);
+          return;
+        }
+
+        // 2) (호환) access_token 기준 비교
+        //    주의: access_token은 주기적으로 갱신되므로 오탐 가능. refresh 정비 전 임시용으로만 사용.
+        if (!latestRefresh && latestAccess && current.access && latestAccess !== current.access) {
+          __FORCE_LOGOUT_FIRED__ = true;
+          alert("다른 기기에서 로그인되어 자동 로그아웃됩니다.");
+          await window.supabaseClient.auth.signOut();
+          updateAuthUI(null);
+          return;
         }
       }
     )
     .subscribe((status) => {
       console.log("[realtime] active_sessions:", status);
     });
+
+  __REALTIME_SET__ = true;
 }
 
 // ✅ 최초 로드 시: 이미 로그인된 상태여도 즉시 구독 + 세션 기록 (중요!)
