@@ -1425,46 +1425,47 @@ window.startSixMonthPlan = function () {
 // ─── 로그인된 유저가 전화 인증 필요하면 모달을 띄우는 검사 ───
 // 기존 함수 덮어쓰기(리턴값 추가: true/false)
 // ✅ 전화인증 가드: 인증 OK면 true, 모달 띄우면 false 반환
+// ✅ 전화인증 가드: 인증 OK면 true, 모달 띄우면 false
+// daysValid: 인증 유효일수(기본 3일). 테스트로 항상 모달 띄우려면 daysValid=0 로 호출.
 window.requirePhoneVerificationIfNeeded = async function(daysValid = 3) {
   try {
     const { data: { user } } = await window.supabaseClient.auth.getUser();
     if (!user) {
-      // 로그인 안 된 상태도 인증 요구
-      if (typeof openPhoneOtpModal === "function") openPhoneOtpModal();
-      else alert("전화 인증 모달 함수를 찾을 수 없습니다.");
+      typeof openPhoneOtpModal === "function" ? openPhoneOtpModal() : alert("전화 인증이 필요합니다.");
       return false;
     }
 
     const { data: prof, error } = await window.supabaseClient
       .from("profiles")
-      .select("phone_verified_at")
+      .select("phone_verified, phone_verified_at")
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (error) {
       console.warn("[requirePhoneVerificationIfNeeded] profiles 조회 오류:", error);
-      if (typeof openPhoneOtpModal === "function") openPhoneOtpModal();
+      typeof openPhoneOtpModal === "function" ? openPhoneOtpModal() : alert("전화 인증이 필요합니다.");
       return false;
     }
 
-    // 기록이 없거나, 유효기간(기본 3일) 초과면 인증 요구
+    const isFlagTrue = prof?.phone_verified === true; // ✅ 플래그 반드시 true여야 함
     const ts = prof?.phone_verified_at ? new Date(prof.phone_verified_at).getTime() : 0;
     const validMs = daysValid * 24 * 60 * 60 * 1000;
-    const ok = ts > 0 && (Date.now() - ts) <= validMs;
+    const isWithinWindow = daysValid <= 0 ? false : (ts > 0 && (Date.now() - ts) <= validMs);
+
+    const ok = isFlagTrue && isWithinWindow;
 
     if (!ok) {
-      if (typeof openPhoneOtpModal === "function") openPhoneOtpModal();
-      else alert("전화 인증이 필요합니다.");
+      typeof openPhoneOtpModal === "function" ? openPhoneOtpModal() : alert("전화 인증이 필요합니다.");
       return false;
     }
-
     return true;
   } catch (e) {
     console.warn("[requirePhoneVerificationIfNeeded] 예외:", e);
-    if (typeof openPhoneOtpModal === "function") openPhoneOtpModal();
+    typeof openPhoneOtpModal === "function" ? openPhoneOtpModal() : alert("전화 인증이 필요합니다.");
     return false;
   }
 };
+
 
 
 
