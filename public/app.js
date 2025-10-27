@@ -1858,6 +1858,10 @@ document.getElementById("btnRecurringPlus")?.addEventListener("click", async () 
 
     // ✅ 변경 버튼(전환/새구매 전체 가드)
     document.getElementById("changePlanBtn")?.addEventListener("click", async () => {
+
+   // ✅ 결제/플랜변경 진입 가드: 전화인증 미통과 시 모달 먼저 띄우고 중단
+   const ok = await requirePhoneVerificationIfNeeded();  // (또는 ensurePhoneVerifiedForPayment())
+   if (!ok) return;
       if (!guardSwitch()) return;
       const curPlan = plan;
 
