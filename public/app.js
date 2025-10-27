@@ -1036,66 +1036,140 @@ if (typeof window.openSubscriptionModal === "function") {
 }   
 
 // ✅ 전화인증 모달 열릴 때 DB 전화번호 자동 채우기 (드롭인 패치)
+// ✅ 전화인증 모달: DB 전화번호 자동 채우기(견고 버전)
+// - 모달 DOM 렌더 타이밍 이슈 대응 (MutationObserver + 타임아웃 폴백)
+// - 셀렉터 여러개 트라이
+// - 이미 패치된 경우 중복 방지
 (function () {
-  // 이미 래핑했다면 중복 방지
-  if (window.__otpPrefillPatched) return;
-  window.__otpPrefillPatched = true;
+  if (window.__otpPrefillPatched2) return;
+  window.__otpPrefillPatched2 = true;
 
-  const originalOpen = window.openPhoneOtpModal;
+  // ── 유틸: 숫자만 추출 + 보기 좋은 포맷(11자리면 010-0000-0000)
+  function formatPhone(raw) {
+    const only = String(raw || "").replace(/\D+/g, "");
+    if (only.length === 11) return `${only.slice(0,3)}-${only.slice(3,7)}-${only.slice(7)}`;
+    return only;
+  }
 
-  window.openPhoneOtpModal = async function (...args) {
-    // 1) 기존 모달 먼저 열기
-    const ret = typeof originalOpen === "function"
-      ? originalOpen.apply(this, args)
-      : undefined;
-
+  async function fetchUserPhone() {
     try {
-      // 2) 유저/프로필에서 전화번호 가져오기
       const { data: { user } } = await window.supabaseClient.auth.getUser();
-      if (!user) return ret;
-
-      // profiles.phone 우선, 없으면 user.user_metadata.phone 폴백
+      if (!user) return "";
+      // profiles.phone 우선
       const { data: prof } = await window.supabaseClient
         .from("profiles")
         .select("phone")
         .eq("user_id", user.id)
         .maybeSingle();
+      return prof?.phone || user.user_metadata?.phone || "";
+    } catch (e) {
+      console.warn("[otp prefill] fetchUserPhone error:", e);
+      return "";
+    }
+  }
 
-      let raw = prof?.phone || user.user_metadata?.phone || "";
-      raw = String(raw || "").trim();
-      if (!raw) return ret;
+  // ── 입력칸 찾기 시도 (모달 내부 렌더 완료를 기다리며)
+  function findPhoneInput() {
+    const CANDIDATES = [
+      "#otpPhoneInput",
+      'input[name="phone"]',
+      'input[type="tel"]',
+      '.otp-phone input',
+      '.phone-input input',
+      '.phone input',
+    ];
+    for (const sel of CANDIDATES) {
+      const el = document.querySelector(sel);
+      if (el) return el;
+    }
+    return null;
+  }
 
-      // 숫자만 남기고 11자리면 010-0000-0000 형식으로 보기 좋게
-      const only = raw.replace(/\D+/g, "");
-      const formatted = (only.length === 11)
-        ? `${only.slice(0,3)}-${only.slice(3,7)}-${only.slice(7)}`
-        : only;
+  async function prefillWhenReady(value) {
+    // 1) 즉시 시도
+    let input = findPhoneInput();
+    if (input) {
+      input.value = value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      try { input.selectionStart = input.selectionEnd = input.value.length; } catch {}
+      return true;
+    }
 
-      // 3) 모달 DOM이 그려질 시간을 한 틱 줌
-      await new Promise(r => setTimeout(r, 0));
+    // 2) MutationObserver로 3초 동안 기다리기
+    const done = await new Promise((resolve) => {
+      let resolved = false;
+      const obs = new MutationObserver(() => {
+        const el = findPhoneInput();
+        if (el) {
+          el.value = value;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+          try { el.selectionStart = el.selectionEnd = el.value.length; } catch {}
+          resolved = true;
+          obs.disconnect();
+          resolve(true);
+        }
+      });
+      obs.observe(document.documentElement, { childList: true, subtree: true });
 
-      // 4) 입력칸 찾기: 너희 모달의 실제 셀렉터 순서대로 나열
-      const input =
-        document.querySelector("#otpPhoneInput") ||
-        document.querySelector('input[name="phone"]') ||
-        document.querySelector('input[type="tel"]');
+      // 3초 타임아웃 폴백
+      setTimeout(() => {
+        if (!resolved) {
+          obs.disconnect();
+          resolve(false);
+        }
+      }, 3000);
+    });
 
-      if (input) {
-        input.value = formatted;
-        // 프레임워크 바인딩용 이벤트들 발화
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-        input.dispatchEvent(new Event("change", { bubbles: true }));
-
-        // 커서 끝으로
-        try { input.selectionStart = input.selectionEnd = input.value.length; } catch {}
+    // 3) 폴백: 0.5초 간격 2초 추가 폴링
+    if (!done) {
+      const end = Date.now() + 2000;
+      while (Date.now() < end) {
+        await new Promise(r => setTimeout(r, 500));
+        const el = findPhoneInput();
+        if (el) {
+          el.value = value;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+          try { el.selectionStart = el.selectionEnd = el.value.length; } catch {}
+          return true;
+        }
       }
+    }
+    return false;
+  }
+
+  // ── 원본 래핑
+  const originalOpen = window.openPhoneOtpModal;
+  window.openPhoneOtpModal = async function (...args) {
+    // 원본 먼저 호출(모달 열림)
+    const ret = typeof originalOpen === "function" ? originalOpen.apply(this, args) : undefined;
+
+    try {
+      const raw = await fetchUserPhone();
+      const formatted = formatPhone(raw);
+      if (!formatted) return ret;
+
+      // 모달 DOM이 그려질 시간을 한 틱 줌
+      await new Promise(r => setTimeout(r, 0));
+      const ok = await prefillWhenReady(formatted);
+      if (!ok) console.warn("[otp prefill] 입력칸을 찾지 못했습니다. 셀렉터 확인 필요");
     } catch (e) {
       console.warn("[otp prefill] failed:", e);
     }
-
     return ret;
   };
+
+  // 수동 테스트용(원할 때 호출)
+  window.__testOtpPrefill = async () => {
+    const raw = await fetchUserPhone();
+    const formatted = formatPhone(raw);
+    const ok = await prefillWhenReady(formatted);
+    console.log("[__testOtpPrefill]", { raw, formatted, ok });
+  };
 })();
+
 
 
 
