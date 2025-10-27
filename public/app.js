@@ -1761,32 +1761,39 @@ document.getElementById("btnRecurringPlus")?.addEventListener("click", async () 
   }
 
   // ── 헬퍼: 정기 전환 전에 빌링키 보장 (tier: 'basic' | 'plus')
-  async function ensureBillingKeyForTier(tier) {
-    const existing = await readCustomerUid().catch(() => null);
-    if (existing) return true;
+async function ensureBillingKeyForTier(tier) {
+  const existing = await readCustomerUid().catch(() => null);
+  if (existing) return true;
 
-    if (!confirm("정기 결제를 위해 카드 등록(빌링키)이 필요합니다. 지금 등록하시겠어요?")) {
-      return false;
-    }
-
-    // 등록 플로우 시작(카카오 쪽 기존 로직 재사용)
-    if (tier === "plus") {
-      (window.startKakaoSubscriptionPlus || startKakaoSubscriptionPlus)();
-    } else {
-      (window.startKakaoSubscriptionBasic || startKakaoSubscriptionBasic)();
-    }
-
-    // 등록 완료 폴링(최대 60초, 2초 간격)
-    const timeoutMs = 60000;
-    const started = Date.now();
-    while (Date.now() - started < timeoutMs) {
-      await new Promise(r => setTimeout(r, 2000));
-      const uid = await readCustomerUid().catch(() => null);
-      if (uid) return true;
-    }
-    alert("카드 등록이 확인되지 않았습니다. 등록을 마친 후 다시 시도해 주세요.");
+  if (!confirm("정기 결제를 위해 카드(빌링키) 등록이 필요합니다. 지금 등록하시겠어요?")) {
     return false;
   }
+
+  // ✅ 카카오/이니시스 선택창을 먼저 띄움
+  // tier === 'basic' → 'rb', tier === 'plus' → 'rp'
+  const planKey = (tier === 'plus') ? 'rp' : 'rb';
+  if (typeof openGatewayChooser === 'function') {
+    openGatewayChooser(planKey);
+  } else {
+    // (혹시 함수 스코프 문제로 접근 못할 때를 위한 안전장치)
+    const opener = window.openGatewayChooser || openGatewayChooser;
+    if (typeof opener === 'function') opener(planKey);
+  }
+
+  // ✅ 사용자가 결제수단 선택 후(카카오/이니시스 중 하나로 빌링 등록), 빌링키 생성될 때까지 폴링
+  const timeoutMs = 60000;
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    await new Promise(r => setTimeout(r, 2000));
+    const uid = await readCustomerUid().catch(() => null);
+    if (uid) return true;
+  }
+  alert("카드 등록이 확인되지 않았습니다. 등록을 마친 후 다시 시도해 주세요.");
+  return false;
+}
+
+
+
 
   try {
     const { data, error } = await window.supabaseClient
