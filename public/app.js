@@ -1035,6 +1035,67 @@ if (typeof window.openSubscriptionModal === "function") {
 }; // ← 여기서 onclick 핸들러를 세미콜론으로 닫아야 함
 }   
 
+// ✅ 전화인증 모달 열릴 때 DB 전화번호 자동 채우기 (드롭인 패치)
+(function () {
+  // 이미 래핑했다면 중복 방지
+  if (window.__otpPrefillPatched) return;
+  window.__otpPrefillPatched = true;
+
+  const originalOpen = window.openPhoneOtpModal;
+
+  window.openPhoneOtpModal = async function (...args) {
+    // 1) 기존 모달 먼저 열기
+    const ret = typeof originalOpen === "function"
+      ? originalOpen.apply(this, args)
+      : undefined;
+
+    try {
+      // 2) 유저/프로필에서 전화번호 가져오기
+      const { data: { user } } = await window.supabaseClient.auth.getUser();
+      if (!user) return ret;
+
+      // profiles.phone 우선, 없으면 user.user_metadata.phone 폴백
+      const { data: prof } = await window.supabaseClient
+        .from("profiles")
+        .select("phone")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      let raw = prof?.phone || user.user_metadata?.phone || "";
+      raw = String(raw || "").trim();
+      if (!raw) return ret;
+
+      // 숫자만 남기고 11자리면 010-0000-0000 형식으로 보기 좋게
+      const only = raw.replace(/\D+/g, "");
+      const formatted = (only.length === 11)
+        ? `${only.slice(0,3)}-${only.slice(3,7)}-${only.slice(7)}`
+        : only;
+
+      // 3) 모달 DOM이 그려질 시간을 한 틱 줌
+      await new Promise(r => setTimeout(r, 0));
+
+      // 4) 입력칸 찾기: 너희 모달의 실제 셀렉터 순서대로 나열
+      const input =
+        document.querySelector("#otpPhoneInput") ||
+        document.querySelector('input[name="phone"]') ||
+        document.querySelector('input[type="tel"]');
+
+      if (input) {
+        input.value = formatted;
+        // 프레임워크 바인딩용 이벤트들 발화
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+
+        // 커서 끝으로
+        try { input.selectionStart = input.selectionEnd = input.value.length; } catch {}
+      }
+    } catch (e) {
+      console.warn("[otp prefill] failed:", e);
+    }
+
+    return ret;
+  };
+})();
 
 
 
