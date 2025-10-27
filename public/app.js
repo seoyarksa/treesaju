@@ -897,6 +897,19 @@ async function openPhoneOtpModal() {
     el.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
+  // +82, 공백/하이픈 섞인 입력 → 국내 하이픈 포맷으로
+function toKRNational(raw) {
+  let n = String(raw || "").replace(/\D+/g, ""); // 숫자만
+  if (n.startsWith("82")) n = "0" + n.slice(2);  // +82 → 0
+  // 11자리(010 모바일) → 3-4-4
+  if (n.length === 11) return `${n.slice(0,3)}-${n.slice(3,7)}-${n.slice(7)}`;
+  // 10자리: 서울(02)은 2-4-4, 그 외 3-3-4
+  if (n.length === 10 && n.startsWith("02")) return `${n.slice(0,2)}-${n.slice(2,6)}-${n.slice(6)}`;
+  if (n.length === 10) return `${n.slice(0,3)}-${n.slice(3,6)}-${n.slice(6)}`;
+  return n; // 그 외는 원본 숫자열 반환
+}
+
+
   // ── 모달이 이미 있으면: 보여주고 → ★ 자동 채움도 시도
   if (document.getElementById("phone-otp-modal")) {
     document.getElementById("phone-otp-modal").style.display = "block";
@@ -952,7 +965,9 @@ async function openPhoneOtpModal() {
 
   // 코드 받기
   document.getElementById("otp-send").onclick = async () => {
-    const raw = document.getElementById("otp-phone").value.trim();
+    const raw = prof?.phone || user.user_metadata?.phone || "";
+document.getElementById("otp-phone").value = toKRNational(raw);
+
     if (!raw) return alert("전화번호를 입력하세요.");
     const phone = window.normalizePhoneKR ? window.normalizePhoneKR(raw, "intl") : raw;
 
