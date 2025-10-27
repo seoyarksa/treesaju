@@ -885,13 +885,8 @@ async function openPhoneOtpModal() {
     if (el.value && el.value.trim() !== "") return;
     const raw = await __fetchProfilePhone();
     if (!raw) return;
-    // +82 같은 국제포맷이 저장된 경우 normalizePhoneKR 있으면 국내형식으로 변환
-    let val = raw;
-    if (typeof window.normalizePhoneKR === "function") {
-      try { val = window.normalizePhoneKR(raw, "national"); } catch {}
-    } else {
-      val = __formatKR(raw);
-    }
+ // 항상 toKRNational로 국내 하이픈 포맷화(+82 → 0 변환 포함)
+ const val = toKRNational(raw);
     el.value = val;
     el.dispatchEvent(new Event("input", { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
@@ -965,11 +960,23 @@ function toKRNational(raw) {
 
   // 코드 받기
   document.getElementById("otp-send").onclick = async () => {
-    const raw = prof?.phone || user.user_metadata?.phone || "";
-document.getElementById("otp-phone").value = toKRNational(raw);
-
-    if (!raw) return alert("전화번호를 입력하세요.");
-    const phone = window.normalizePhoneKR ? window.normalizePhoneKR(raw, "intl") : raw;
+  // 1) 입력칸에서 먼저 가져오고, 없으면 프로필에서 끌어와 자동 채움
+  let raw = (document.getElementById("otp-phone").value || "").trim();
+  if (!raw) {
+    raw = await __fetchProfilePhone();
+    if (raw) {
+      const nat = toKRNational(raw);
+      document.getElementById("otp-phone").value = nat;
+     raw = nat;
+    }
+ }
+  if (!raw) return alert("전화번호를 입력하세요.");
+  // 2) 서버에는 국제 포맷으로 전송
+  const digits = raw.replace(/\D+/g, "");
+  const phoneIntl = digits.startsWith("0") ? `+82${digits.slice(1)}` :
+                    digits.startsWith("82") ? `+${digits}` :
+                    raw; // 최후 보정
+  const phone = phoneIntl;
 
     try {
       const res = await fetch("/api/otp?action=send", {
