@@ -1439,8 +1439,7 @@ window.openSubscriptionModal = async function () {
   const { data: { user } } = await window.supabaseClient.auth.getUser();
   if (!user) return alert("로그인이 필요합니다.");
   // ★ 추가: 결제 모달 열기 전, 휴대폰 인증 유효성 검사
-  const ok = await ensurePhoneVerifiedForPayment(3); // 3일 유효
-  if (!ok) return; // 인증 미통과면 결제 모달을 열지 않음
+
   // ─────────────────────────────────────────────────────────────
   // [NEW] 플랜 메타: 타입(onetime/subs), 코드, 금액
   const PLANS = {
