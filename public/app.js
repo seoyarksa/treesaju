@@ -1598,7 +1598,8 @@ window.startSixMonthPlan = function () {
 // ✅ 전화인증 가드: 인증 OK면 true, 모달 띄우면 false 반환
 // ✅ 전화인증 가드: 인증 OK면 true, 모달 띄우면 false
 // daysValid: 인증 유효일수(기본 3일). 테스트로 항상 모달 띄우려면 daysValid=0 로 호출.
-window.requirePhoneVerificationIfNeeded = async function(daysValid = 3) {
+// ✅ 전화번호 인증 유효기간: 시간 단위 (기본 1시간)
+window.requirePhoneVerificationIfNeeded = async function(hoursValid = 1) {
   try {
     const { data: { user } } = await window.supabaseClient.auth.getUser();
     if (!user) {
@@ -1620,8 +1621,10 @@ window.requirePhoneVerificationIfNeeded = async function(daysValid = 3) {
 
     const isFlagTrue = prof?.phone_verified === true; // ✅ 플래그 반드시 true여야 함
     const ts = prof?.phone_verified_at ? new Date(prof.phone_verified_at).getTime() : 0;
-    const validMs = daysValid * 24 * 60 * 60 * 1000;
-    const isWithinWindow = daysValid <= 0 ? false : (ts > 0 && (Date.now() - ts) <= validMs);
+
+    // ⏱ 유효기간: hoursValid 시간
+    const validMs = Math.max(0, Number(hoursValid)) * 60 * 60 * 1000;
+    const isWithinWindow = hoursValid <= 0 ? false : (ts > 0 && (Date.now() - ts) <= validMs);
 
     const ok = isFlagTrue && isWithinWindow;
 
@@ -1668,22 +1671,31 @@ window.openSubscriptionModal = async function () {
     if (!endDate) return Infinity;
     return Math.max(0, new Date(endDate).getTime() - Date.now());
   }
-  function formatRemaining(endDate) {
-    const ms = msLeftUntil(endDate);
-    if (ms === Infinity) return '-';
-    const ONE_DAY = 24 * 60 * 60 * 1000;
-    if (ms > ONE_DAY) {
-      const days = Math.ceil(ms / ONE_DAY);
-      return `${days}일`;
-    } else {
-      const totalMins = Math.ceil(ms / 60000);
-      const hours = Math.floor(totalMins / 60);
-      const mins = totalMins % 60;
-      if (hours <= 0) return `${totalMins}분`;
-      if (mins === 0)  return `${hours}시간`;
-      return `${hours}시간 ${mins}분`;
-    }
+function formatRemaining(endDate) {
+  const ms = msLeftUntil(endDate);
+  if (!Number.isFinite(ms)) return '-';
+  if (ms <= 0) return '만료';
+
+  const ONE_DAY = 24 * 60 * 60 * 1000;
+
+  // 일 단위 표기는 기존 로직 유지 (반올림은 그대로)
+  if (ms >= ONE_DAY) {
+    const days = Math.ceil(ms / ONE_DAY);
+    return `${days}일`;
   }
+
+  // ⏱ 분/시간 계산: floor로 정확히 자르고, 1분 미만은 별도 표기
+  const totalMins = Math.floor(ms / 60000);
+  if (totalMins <= 0) return '1분 미만';
+
+  const hours = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
+
+  if (hours === 0) return `${totalMins}분`;
+  if (mins === 0)  return `${hours}시간`;
+  return `${hours}시간 ${mins}분`;
+}
+
   function formatKSTDate(dateLike) {
     const d = new Date(dateLike);
     if (Number.isNaN(d.getTime())) return '-';
