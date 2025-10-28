@@ -1671,22 +1671,31 @@ window.openSubscriptionModal = async function () {
     if (!endDate) return Infinity;
     return Math.max(0, new Date(endDate).getTime() - Date.now());
   }
-  function formatRemaining(endDate) {
-    const ms = msLeftUntil(endDate);
-    if (ms === Infinity) return '-';
-    const ONE_DAY = 24 * 60 * 60 * 1000;
-    if (ms > ONE_DAY) {
-      const days = Math.ceil(ms / ONE_DAY);
-      return `${days}일`;
-    } else {
-      const totalMins = Math.ceil(ms / 60000);
-      const hours = Math.floor(totalMins / 60);
-      const mins = totalMins % 60;
-      if (hours <= 0) return `${totalMins}분`;
-      if (mins === 0)  return `${hours}시간`;
-      return `${hours}시간 ${mins}분`;
-    }
+function formatRemaining(endDate) {
+  const ms = msLeftUntil(endDate);
+  if (!Number.isFinite(ms)) return '-';
+  if (ms <= 0) return '만료';
+
+  const ONE_DAY = 24 * 60 * 60 * 1000;
+
+  // 일 단위 표기는 기존 로직 유지 (반올림은 그대로)
+  if (ms >= ONE_DAY) {
+    const days = Math.ceil(ms / ONE_DAY);
+    return `${days}일`;
   }
+
+  // ⏱ 분/시간 계산: floor로 정확히 자르고, 1분 미만은 별도 표기
+  const totalMins = Math.floor(ms / 60000);
+  if (totalMins <= 0) return '1분 미만';
+
+  const hours = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
+
+  if (hours === 0) return `${totalMins}분`;
+  if (mins === 0)  return `${hours}시간`;
+  return `${hours}시간 ${mins}분`;
+}
+
   function formatKSTDate(dateLike) {
     const d = new Date(dateLike);
     if (Number.isNaN(d.getTime())) return '-';
