@@ -857,6 +857,76 @@
     <br />
     <button id="send-email-button" style="margin-top: 10px; padding: 10px 20px;">보내기 (이메일)</button>
   </div>
+
+<!-- 질문하기 박스 아래에 그대로 붙여넣기 -->
+<div id="biz-info" itemscope itemtype="https://schema.org/Organization"
+     style="margin-top: 40px; padding: 20px; border-top: 1px solid #ccc; font-size: 14px; line-height: 1.6;">
+  <h3 style="margin: 0 0 12px 0; font-size: 16px;">사업자 정보</h3>
+
+  <!-- 그리드 -->
+  <div style="
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px 16px;
+    ">
+    <div style="display:flex; gap:8px;">
+      <div style="min-width: 110px; color:#666;">상호명</div>
+      <div itemprop="name"><strong>트리사주</strong></div>
+    </div>
+
+    <div style="display:flex; gap:8px;">
+      <div style="min-width: 110px; color:#666;">대표자명</div>
+      <div itemprop="founder">유섬근</div>
+    </div>
+
+    <div style="display:flex; gap:8px;">
+      <div style="min-width: 110px; color:#666;">사업장주소</div>
+      <div itemprop="address" itemscope itemtype="https://schema.org/PostalAddress">
+        서울시 송파구 법원로4길 10 힐스테이트에코문정 1125
+        <span itemprop="streetAddress"></span>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:8px;">
+      <div style="min-width: 110px; color:#666;">사업자등록번호</div>
+      <div>795-40-01592</div>
+    </div>
+
+    <div style="display:flex; gap:8px;">
+      <div style="min-width: 110px; color:#666;">대표전화번호</div>
+      <div>
+          010-4749-2139
+        </a>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:8px;">
+      <div style="min-width: 110px; color:#666;">대표이메일</div>
+      <div>
+        <a href="mailto:" itemprop="email" style="color:inherit; text-decoration:underline;">
+          yyulss@naver.com
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 가로선 & 안내 -->
+  <div style="margin-top: 12px; border-top: 1px dashed #ddd; padding-top: 8px; color:#888;">
+    ※ 본 페이지의 모든 문의는 상단 ‘질문하기’를 이용해 주세요.
+  </div>
+</div>
+
+<!-- 반응형(넓은 화면에서 2열) — 인라인 스타일만 쓰고 싶다면 아래 <style>은 생략 가능 -->
+<style>
+  @media (min-width: 768px) {
+    #biz-info > div[style*="display: grid"] {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+</style>
+
+
+
 </div>
 
   <div id="container"></div>  <!-- ✅ 여기에 출력 -->
