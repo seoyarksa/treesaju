@@ -2,56 +2,52 @@
 import crypto from 'crypto';
 
 // --- Kakao 알림톡 전송(네이버 클라우드 SENS) ---
-async function sendAlimtalk(rawPhone, code) {
-  // 1) NCP는 숫자만 허용 (하이픈/문자 제거)
-  const to = String(rawPhone || '').replace(/\D/g, '');
-  if (!to) throw new Error('invalid phone');
+// 상단 어딘가에 이미 있다면 중복 import 제거
+import crypto from 'crypto';
 
-  // 2) 환경변수 필수
-  const serviceId    = process.env.NCP_SENS_SERVICE_ID; // 예: ncp:kkobizmsg:kr:123456789012:myservice
+async function sendAlimtalk(rawPhone, code) {
+  // 1) 번호 정규화 (숫자만, 010 → 8210)
+  const to82 = String(rawPhone || '')
+    .replace(/\D+/g, '')
+    .replace(/^0/, '82'); // 010xxxx → 8210xxxx
+  if (!to82) throw new Error('invalid phone');
+
+  // 2) 환경변수
+  const serviceId    = process.env.NCP_SENS_SERVICE_ID; // ncp:kkobizmsg:...
   const accessKey    = process.env.NCP_ACCESS_KEY;
   const secretKey    = process.env.NCP_SECRET_KEY;
-  const plusFriendId = process.env.NCP_PLUS_FRIEND_ID;  // 예: @트리만세력  (활성 상태)
-  const templateCode = process.env.NCP_TEMPLATE_CODE;   // 예: VERIFYCODE  (승인된 템플릿)
+  const plusFriendId = process.env.NCP_PLUS_FRIEND_ID;  // 예: @트리만세력
+  const templateCode = process.env.NCP_TEMPLATE_CODE;   // 예: VERIFYCODE
 
   if (!serviceId || !accessKey || !secretKey || !plusFriendId || !templateCode) {
     throw new Error('Missing NCP envs');
   }
 
-  // 3) 서명 준비
-  const { createHmac } = await import('node:crypto');
-  const host = 'https://sens.apigw.ntruss.com';
-  const path = `/alimtalk/v2/services/${serviceId}/messages`;
-  const ts   = Date.now().toString();
+  // 3) 본문(템플릿과 100% 동일해야 함: 개행/공백/마침표 포함)
+  const OTP_TTL_SEC = Number(process.env.OTP_TTL_SEC || 300);
+  const minutes = Math.max(1, Math.ceil(OTP_TTL_SEC / 60));
+  const content = [
+    `[트리만세력] 본인확인 인증번호는 ${code} 입니다.`,
+    `유효시간 ${minutes}분 내에 입력해 주세요.`,
+    `(타인 노출 주의)`
+  ].join('\n');
 
-  const sigMsg = `POST ${path}\n${ts}\n${accessKey}`;
-  const sig    = createHmac('sha256', secretKey).update(sigMsg).digest('base64');
-
-  // 4) ✅ 템플릿과 "문자 하나까지" 동일한 content 구성
-  //    승인 문구: "인증 번호는 #{code} 입니다."
-  //    → 전송 문구: "인증 번호는 123456 입니다."
- // 기존
-// const content = `인증 번호는 ${code} 입니다.`; // 공백/마침표 위치 주의!
-
-// 교체
-const minutes = Math.max(1, Math.ceil(Number(OTP_TTL_SEC || 300) / 60));
-const content = [
-  `[트리만세력] 본인확인 인증번호는 ${code} 입니다.`,
-  `유효시간 ${minutes}분 내에 입력해 주세요.`,
-  `(타인 노출 주의)`
-].join('\n');
-
-
+  // 4) 페이로드 (content 방식, plusFriendId만 사용)
   const body = {
-    plusFriendId,
     templateCode,
-    messages: [
-      { to, content } // variables/templateParameter 사용하지 않음
-    ],
+    plusFriendId,
+    messages: [{ to: to82, content }]
   };
 
   // 5) 호출
-  const res  = await fetch(`${host}${path}`, {
+  const host = 'https://sens.apigw.ntruss.com';
+  const path = `/alimtalk/v2/services/${serviceId}/messages`;
+  const ts   = String(Date.now());
+  const sig  = crypto.createHmac('sha256', secretKey)
+    .update(`POST ${path}\n${ts}\n${accessKey}`)
+    .digest('base64');
+
+  const res = await fetch(`${host}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
@@ -63,8 +59,21 @@ const content = [
   });
 
   const text = await res.text();
-  if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
-  return true;
+  let json = null; try { json = JSON.parse(text); } catch {}
+
+  if (!res.ok) {
+    const msg = (json && (json.error?.message || json.message)) || text || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+
+  // 6) 요청 ID/상태 반환 (콘솔 발송 이력 추적용)
+  return {
+    ok: true,
+    sens: {
+      requestId: (json && (json.requestId || json.request_id)) || null,
+      statusCode: (json && (json.statusCode || json.status)) || null,
+    }
+  };
 }
 
 
