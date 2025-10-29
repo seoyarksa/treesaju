@@ -1400,7 +1400,7 @@ window.startSixMonthPlan = function () {
 
   // 운영 MID (필요 시 교체)
   const PG_ONETIME_PROD   = "html5_inicis.MOI9890153";    // 일반(예시)
-  const PG_RECURRING_PROD = "html5_inicis.<운영_빌링MID>"; // 정기(빌링) MID 입력
+  const PG_RECURRING_PROD = "html5_inicis.MOI0760015"; // 정기(빌링) MID 입력
 
   const PG = {
     onetime:   USE_TEST ? PG_ONETIME_TEST   : PG_ONETIME_PROD,
@@ -1674,7 +1674,7 @@ window.openSubscriptionModal = async function () {
 function formatRemaining(endDate) {
   const ms = msLeftUntil(endDate);
   if (!Number.isFinite(ms)) return '-';
-  if (ms <= 0) return '만료';
+  if (ms <= 0) return '0';
 
   const ONE_DAY = 24 * 60 * 60 * 1000;
 

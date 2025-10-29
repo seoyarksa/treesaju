@@ -483,70 +483,80 @@ async function attemptPayment(customer_uid, token) {
 //  - cancel_effective_at: null
 //  - status: 'active' 로 복구
 //
+// 재구독(해지 예약 해제) - 멤버십이 진실, 프로필은 DB 트리거로 동기화
 async function resumeSubscription(req, res) {
   const { user_id } = req.body || {};
   if (!user_id) return res.status(400).json({ error: "Missing user_id" });
 
   try {
-    // 현재 멤버십 조회
-    const { data: membership, error: fetchErr } = await supabase
+    // 1) 현재 멤버십 조회
+    const { data: m, error: fetchErr } = await supabase
       .from("memberships")
-      .select("id, user_id, plan, status, cancel_at_period_end, current_period_end")
+      .select("id, user_id, plan, status, cancel_at_period_end, cancel_effective_at, current_period_end, updated_at")
       .eq("user_id", user_id)
       .maybeSingle();
-
     if (fetchErr) throw fetchErr;
-    if (!membership) return res.status(404).json({ error: "Membership not found" });
+    if (!m) return res.status(404).json({ error: "Membership not found" });
 
-    // ⚠️ 선결제(premium3/premium6)는 '재구독' 개념이 아니라 '재구매'
-    if (membership.plan === "premium3" || membership.plan === "premium6") {
-      return res.status(400).json({ error: "FIXED_TERM_PLAN", message: "선결제 플랜은 재구독이 아닌 재구매가 필요합니다." });
+    // 2) 고정 기간(선결제) 플랜은 재구독 개념 없음
+    if (m.plan === "premium3" || m.plan === "premium6") {
+      return res.status(400).json({
+        error: "FIXED_TERM_PLAN",
+        message: "선결제 플랜은 재구독이 아닌 재구매가 필요합니다."
+      });
     }
 
-    const nowIso = new Date().toISOString();
+    // 3) 만료 여부 계산 (cancel_effective_at 우선)
+    const now = Date.now();
+    const expireAt = new Date(m.cancel_effective_at ?? m.current_period_end ?? 0).getTime() || null;
+    const isExpired = expireAt !== null && now >= expireAt;
 
-    // 정기 플랜(예: premium / premium_plus) → 해지 예약만 해제
-    const { data, error } = await supabase
+    // 만료에 도달했으면 해지예약 해제만으로는 복구 불가 → 결제/재구매 필요
+    if (isExpired || m.status === "inactive") {
+      return res.status(409).json({
+        error: "EXPIRED_SUBSCRIPTION",
+        message: "구독이 이미 만료되었습니다. 결제 후 재개가 가능합니다."
+      });
+    }
+
+    // 4) 이미 해지 예약이 아닌 경우 → 멱등 OK
+    if (m.cancel_at_period_end === false && m.cancel_effective_at == null) {
+      return res.status(200).json({
+        ok: true,
+        message: "이미 활성 상태입니다. (해지 예약 없음)",
+        membership: m
+      });
+    }
+
+    // 5) 정기 플랜: 해지 예약 해제 (멱등한 조건부 업데이트)
+    const nowIso = new Date().toISOString();
+    const { data: upd, error: updErr } = await supabase
       .from("memberships")
       .update({
         cancel_at_period_end: false,
         cancel_effective_at: null,
-        status: "active",
-        updated_at: nowIso,
+        status: "active",           // 정책상 재개 시 active 유지
+        updated_at: nowIso
       })
       .eq("user_id", user_id)
+      .eq("cancel_at_period_end", true) // 멱등/경합 방지: 해지예약 상태였던 경우에만 변경
       .select()
       .maybeSingle();
 
-    if (error) throw error;
+    if (updErr) throw updErr;
 
-    // (선택) 프로필 등급 복구: 현재 플랜명을 그대로 grade에 반영
-    //   - 너희 정책상 grade 값이 'premium' 또는 'premium_plus' 라면 아래 그대로 사용
-    const planGrade = (membership.plan === "premium_plus") ? "premium_plus" : "premium";
-    const { error: profileErr } = await supabase
-      .from("profiles")
-      .update({
-        grade: planGrade,
-        updated_at: nowIso,
-      })
-      .eq("user_id", user_id);
-
-    if (profileErr) {
-      console.warn("[resumeSubscription] profile update warn:", profileErr);
-      // 프로필 실패는 치명적이지 않으니 200은 유지, 필요하면 400으로 바꿔도 됨
-    }
-
+    // 해지예약이 이미 해제되어 있었던 경우(경합 중)에도 OK 처리
     return res.status(200).json({
       ok: true,
-      message: "재구독이 완료되었습니다.",
-      membership: data,
+      message: "재구독(해지 예약 해제)이 완료되었습니다.",
+      membership: upd || m
     });
+
   } catch (err) {
     console.error("[resumeSubscription] error:", err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 }
-
 
 // 하단에 함수 추가 플랜변경
 // /api/payment/manage-subscription.js 내부
