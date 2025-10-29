@@ -27,18 +27,33 @@ async function sendAlimtalk(rawPhone, code) {
   const sigMsg = `POST ${path}\n${ts}\n${accessKey}`;
   const sig    = createHmac('sha256', secretKey).update(sigMsg).digest('base64');
 
-  // 4) ✅ 템플릿과 "문자 하나까지" 동일한 content 구성
-  //    승인 문구: "인증 번호는 #{code} 입니다."
-  //    → 전송 문구: "인증 번호는 123456 입니다."
-  const content = `인증 번호는 ${code} 입니다.`; // 공백/마침표 위치 주의!
+// ✓ 템플릿 치환 방식만 사용 (content 제거)
+// - 템플릿 변수: #{code}, #{minutes} 기준
+// - senderKey가 있으면 senderKey 사용, 없으면 plusFriendId 사용
+// - SMS 대체발송을 쓰려면 KAKAO_FALLBACK_SENDER 환경변수(승인된 발신번호) 설정
+const body = {
+  templateCode,
+  messages: [{
+    to,                  // "82..." 숫자 형태 권장 (예: +8210 → 8210)
+    countryCode: "82",
+    templateParameter: {
+      code: String(code),
+      minutes: String(Math.ceil(OTP_TTL_SEC / 60)),
+    },
+    // (옵션) SMS 대체발송
+    ...(process.env.KAKAO_FALLBACK_SENDER ? {
+      useSmsFailover: true,
+      failoverConfig: {
+        type: "SMS",
+        from: process.env.KAKAO_FALLBACK_SENDER, // 예: 01047492139
+        subject: "[트리사주] 인증번호",
+        content: `[트리사주] 인증번호 ${code} (유효 ${Math.ceil(OTP_TTL_SEC/60)}분)`,
+      }
+    } : {})
+  }],
+  ...(senderKey ? { senderKey } : { plusFriendId }),
+};
 
-  const body = {
-    plusFriendId,
-    templateCode,
-    messages: [
-      { to, content } // variables/templateParameter 사용하지 않음
-    ],
-  };
 
   // 5) 호출
   const res  = await fetch(`${host}${path}`, {
