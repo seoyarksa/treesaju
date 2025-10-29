@@ -249,116 +249,91 @@ async function cancelSubscription(req, res) {
 // 만료 도달 시 처리:
 // 1) memberships.metadata.scheduled_next 가 있으면 그 계획으로 전환
 // 2) 없으면 기존 로직대로 inactive 처리 + profile 등급 basic 복귀
+// /api/payment/manage-subscription?action=autoCancel 에서 호출
 async function autoCancelExpired(req, res) {
   try {
     const now = new Date();
     const nowIso = now.toISOString();
 
-    // 해지 신청(true) + 기간 종료 도달 + 진행 중인 구독만
+    // 1) 후보 조회: 해지예약 true + 진행중 상태
+    //    만료 여부는 앱에서 coalesce(cancel_effective_at, current_period_end)로 판정
     const { data: targets, error } = await supabase
       .from("memberships")
-      .select("user_id, plan, status, current_period_end, metadata")
+      .select("user_id, plan, status, cancel_at_period_end, cancel_effective_at, current_period_end, metadata")
       .eq("cancel_at_period_end", true)
-      .lte("current_period_end", nowIso)
       .in("status", ["active", "past_due"]);
-
     if (error) throw error;
 
     if (!targets?.length) {
-      return res.status(200).json({ ok: true, message: "해지/전환 대상 없음", count: 0 });
+      return res.status(200).json({ ok: true, message: "대상 없음", count: 0 });
     }
 
-    let switched = 0; // 예약 전환 수
-    let canceled = 0; // 비활성 처리 수
+    let switched = 0;  // 예약 전환 처리 건수
+    let canceled = 0;  // 해지(inactive) 처리 건수
 
-    // 안전 파서 (문자열 2중 직렬화 대비)
     const safeParse = (raw) => {
       if (!raw) return null;
       try {
         const a = typeof raw === "string" ? JSON.parse(raw) : raw;
-        // 어떤 경우엔 문자열 안에 또 JSON이 들어있을 수 있음
-        if (typeof a === "string") {
-          try { return JSON.parse(a); } catch { return a; }
-        }
+        if (typeof a === "string") try { return JSON.parse(a); } catch { return a; }
         return a;
-      } catch {
-        return null;
-      }
+      } catch { return null; }
     };
 
     for (const t of targets) {
       const meta = safeParse(t.metadata) || {};
       const scheduled = meta?.scheduled_next;
-      const end = t.current_period_end ? new Date(t.current_period_end) : null;
 
-      // 방어: 정말로 만료를 지났는지 재확인
-      if (!end || now < end) continue;
+      // 만료 기준 시각
+      const end = (t.cancel_effective_at ?? t.current_period_end) ? new Date(t.cancel_effective_at ?? t.current_period_end) : null;
+      if (!end || now < end) continue; // 아직 만료 전이면 스킵
 
-      // ① 예약 전환이 있는 경우 (예: 고정→정기 전환)
+      // ① 예약 전환(recurring) 있는 경우: plan 전환 + 다음 주기 종료일 = 기존 end 기준 +1개월
       if (scheduled?.kind === "recurring") {
-        // next plan 결정
         const nextPlan = scheduled.plan === "premium_plus" ? "premium_plus" : "premium";
 
-        // 다음 주기 종료일(간단히 +1개월)
-        const nextEnd = new Date();
+        // 기존 만료일에서 +1개월 (공백/중복 방지)
+        const nextEnd = new Date(end.getTime());
         nextEnd.setMonth(nextEnd.getMonth() + 1);
 
-        // metadata에서 예약 정보 제거(원하면 history에 남겨도 좋음)
         try { delete meta.scheduled_next; } catch {}
 
-        // 멤버십 전환
         const { error: upErr } = await supabase
           .from("memberships")
           .update({
             plan: nextPlan,
             status: "active",
             cancel_at_period_end: false,
+            cancel_effective_at: null,
             current_period_end: nextEnd.toISOString(),
             updated_at: nowIso,
             metadata: JSON.stringify(meta),
           })
-          .eq("user_id", t.user_id);
-
+          .eq("user_id", t.user_id)
+          .eq("cancel_at_period_end", true)          // 멱등: 여전히 예약 상태였던 것만
+          .in("status", ["active", "past_due"]);     // 경합 방지
         if (upErr) throw upErr;
 
-        // 프로필 등급도 맞춰 반영
-        const { error: profErr } = await supabase
-          .from("profiles")
-          .update({
-            grade: nextPlan,            // 'premium' | 'premium_plus'
-            updated_at: nowIso,
-          })
-          .eq("user_id", t.user_id);
-
-        if (profErr) throw profErr;
-
+        // ⚠️ profiles.grade는 DB 트리거가 plan을 보고 자동 반영 (여기서 업데이트 하지 않음)
         switched++;
-        console.log(`[🔁 예약 전환 완료] user_id=${t.user_id}, plan=${nextPlan}`);
         continue;
       }
 
-      // ② 예약 전환이 없으면 기존대로 비활성 처리
+      // ② 전환 없으면 해지(inactive)로 전환
       const { error: upErr } = await supabase
         .from("memberships")
         .update({
           status: "inactive",
-          cancel_at_period_end: false,
+          cancel_at_period_end: false,   // 예약 플래그 해제
           updated_at: nowIso,
         })
-        .eq("user_id", t.user_id);
+        .eq("user_id", t.user_id)
+        .eq("cancel_at_period_end", true)          // 멱등
+        .in("status", ["active", "past_due"]);     // 경합 방지
       if (upErr) throw upErr;
 
-      const { error: profErr } = await supabase
-        .from("profiles")
-        .update({
-          grade: "basic",
-          updated_at: nowIso,
-        })
-        .eq("user_id", t.user_id);
-      if (profErr) throw profErr;
-
+      // ⚠️ plan=basic 보정 및 profiles.grade 동기화는 DB 트리거에 맡김
       canceled++;
-      console.log(`[✅ 해지 완료] user_id=${t.user_id}`);
     }
 
     return res.status(200).json({
@@ -366,13 +341,15 @@ async function autoCancelExpired(req, res) {
       message: `처리 완료: 예약 전환 ${switched}건, 해지 ${canceled}건`,
       switched,
       canceled,
-      count: (switched + canceled),
+      count: switched + canceled,
     });
+
   } catch (err) {
     console.error("[autoCancelExpired] error:", err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 }
+
 
 //
 // ✅ 4️⃣ 자동 과금 (charge-billing 기능 통합)
