@@ -55,6 +55,30 @@
     background-color: #f8f8f8;
   }
 
+    /* 사주트리나무 그림 */
+
+.landing-wrap{
+  display:flex; gap:24px; align-items:flex-start; margin-top:8px;
+}
+.hero-left{
+  flex:1; position:sticky; top:12px; /* 스크롤해도 살짝 고정되어 보이게 */
+}
+.hero-right{
+  flex:1.25; min-width:360px;
+}
+.hero-left img{
+  display:block; width:100%; height:auto;
+  border-radius:14px; box-shadow:0 10px 24px rgba(0,0,0,.08);
+}
+@media (max-width: 900px){
+  .landing-wrap{ display:block; }
+  .hero-left{ position:static; margin-bottom:16px; }
+}
+
+
+
+
+
   /* 덩굴 테두리 컨테이너 전체 감싸기 */
 .vine-border-container {
   position: relative;
@@ -476,7 +500,19 @@
 
 
 
-
+<!-- 첫 <table> 바로 위에 추가 -->
+<div class="landing-wrap">
+  <div class="hero-left">
+    <picture>
+      <source srcset="/images/tree-hero.webp" type="image/webp" />
+      <img src="/images/tree-hero.jpg"
+           alt="손 위에 뿌리를 내린 나무"
+           width="900" height="700"
+           loading="lazy" decoding="async"
+           style="max-width:100%;height:auto;" />
+    </picture>
+  </div>
+  <div class="hero-right">
 
 
 
@@ -820,6 +856,32 @@
 
 
 </div>
+
+
+
+
+  </div><!-- /.hero-right -->
+</div><!-- /.landing-wrap -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- 이하 사주데이터 출력부 -->
 <div id="result" style="display:none;">
 
 <!-- 공통 (항상 표시) -->
