@@ -4689,14 +4689,18 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
 
 </div>
 
+
+  <div id="basic-daeyun-table" class="basic-daeyun-container"></div>
+  <div id="basic-yearly-ganji-container"></div>
+
+
 `;
 
 
     document.getElementById('basic-section').innerHTML = `
 
 <!-- 당령 표시용 영역 -->
-  <div id="basic-daeyun-table" class="basic-daeyun-container"></div>
-  <div id="basic-yearly-ganji-container"></div>
+
 <div style="margin-top: 1rem; margin-left: 20px;">
 
   <table class="dangryeong-table" style="
