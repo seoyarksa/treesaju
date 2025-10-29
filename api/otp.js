@@ -1,29 +1,23 @@
 // api/otp.js — 단일 파일, send / verify / diag (안전판: update-only)
 import crypto from 'crypto';
 
-// --- Kakao 알림톡 전송(네이버 클라우드 SENS) ---
-// 상단 어딘가에 이미 있다면 중복 import 제거
-import crypto from 'crypto';
-
 async function sendAlimtalk(rawPhone, code) {
-  // 1) 번호 정규화 (숫자만, 010 → 8210)
-  const to82 = String(rawPhone || '')
-    .replace(/\D+/g, '')
-    .replace(/^0/, '82'); // 010xxxx → 8210xxxx
+  // 번호 정규화: 010 → 8210, + 제거
+  const to82 = String(rawPhone || '').replace(/\D+/g, '').replace(/^0/, '82');
   if (!to82) throw new Error('invalid phone');
 
-  // 2) 환경변수
+  // ENV 로드
   const serviceId    = process.env.NCP_SENS_SERVICE_ID; // ncp:kkobizmsg:...
   const accessKey    = process.env.NCP_ACCESS_KEY;
   const secretKey    = process.env.NCP_SECRET_KEY;
-  const plusFriendId = process.env.NCP_PLUS_FRIEND_ID;  // 예: @트리만세력
-  const templateCode = process.env.NCP_TEMPLATE_CODE;   // 예: VERIFYCODE
+  const plusFriendId = process.env.NCP_PLUS_FRIEND_ID;  // @트리사주
+  const templateCode = process.env.NCP_TEMPLATE_CODE;   // VERIFYCODE1 등
 
   if (!serviceId || !accessKey || !secretKey || !plusFriendId || !templateCode) {
     throw new Error('Missing NCP envs');
   }
 
-  // 3) 본문(템플릿과 100% 동일해야 함: 개행/공백/마침표 포함)
+  // 템플릿 본문(승인 문구와 100% 동일, 개행 포함)
   const OTP_TTL_SEC = Number(process.env.OTP_TTL_SEC || 300);
   const minutes = Math.max(1, Math.ceil(OTP_TTL_SEC / 60));
   const content = [
@@ -32,14 +26,14 @@ async function sendAlimtalk(rawPhone, code) {
     `(타인 노출 주의)`
   ].join('\n');
 
-  // 4) 페이로드 (content 방식, plusFriendId만 사용)
+  // payload (content 방식, templateParameter 사용하지 않음)
   const body = {
     templateCode,
     plusFriendId,
     messages: [{ to: to82, content }]
   };
 
-  // 5) 호출
+  // 요청 서명
   const host = 'https://sens.apigw.ntruss.com';
   const path = `/alimtalk/v2/services/${serviceId}/messages`;
   const ts   = String(Date.now());
@@ -47,7 +41,8 @@ async function sendAlimtalk(rawPhone, code) {
     .update(`POST ${path}\n${ts}\n${accessKey}`)
     .digest('base64');
 
-  const res = await fetch(`${host}${path}`, {
+  // 호출
+  const res  = await fetch(`${host}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
@@ -66,7 +61,6 @@ async function sendAlimtalk(rawPhone, code) {
     throw new Error(msg);
   }
 
-  // 6) 요청 ID/상태 반환 (콘솔 발송 이력 추적용)
   return {
     ok: true,
     sens: {
@@ -75,6 +69,7 @@ async function sendAlimtalk(rawPhone, code) {
     }
   };
 }
+
 
 
 
@@ -130,60 +125,60 @@ export default async function handler(req, res) {
 
     // ── send ─────────────────────────────────────────────────────────────
 if (action === 'send') {
-  const phone = (body?.phone || '').trim();
-  if (!phone) return json(400, { ok:false, error:'phone required' });
+  const rawPhone = String(body?.phone || '').trim();
+  if (!rawPhone) return res.status(400).json({ ok:false, error:'phone required' });
 
-  // ENV 사전 점검
-  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!sbUrl || !serviceKey) {
-    return json(500, {
-      ok: false,
-      where: 'env',
-      hasUrl: !!sbUrl,
-      hasKey: !!serviceKey,
-      hint: 'Vercel > Project > Settings > Environment Variables (Production) 확인'
-    });
+  // 1) DB에 코드 저장 (여기 기존 코드 그대로)
+  const code = String(Math.floor(Math.random()*900000) + 100000);
+  const ins = await supabase.from('otp_codes')
+    .insert({ phone: rawPhone, code, created_at: new Date().toISOString() });
+  if (ins.error) {
+    return res.status(500).json({ ok:false, where:'db-insert', details:ins.error.message });
   }
 
+  // 2) 알림톡 전송 시도 + 진단 정보 풍부하게
   try {
-    const supabase = await getSb();
-    const code = String(Math.floor(Math.random()*900000) + 100000);
+    const envs = {
+      NODE_ENV: process.env.NODE_ENV,
+      OTP_DEBUG: String(process.env.OTP_DEBUG || ''),
+      has_SERVICE_ID: !!process.env.NCP_SENS_SERVICE_ID,
+      has_ACCESS_KEY: !!process.env.NCP_ACCESS_KEY,
+      has_SECRET_KEY: !!process.env.NCP_SECRET_KEY,
+      has_PLUS_ID:    !!process.env.NCP_PLUS_FRIEND_ID,
+      has_TEMPLATE:   !!process.env.NCP_TEMPLATE_CODE,
+      serviceId_prefix: (process.env.NCP_SENS_SERVICE_ID || '').split(':').slice(0,2).join(':') // ncp:kkobizmsg 확인
+    };
 
-    const { error } = await supabase
-      .from('otp_codes')
-      .insert({ phone, code, created_at: new Date().toISOString() });
+    // 실제 전송 함수 호출
+    const sendResult = await sendAlimtalk(rawPhone, code);
 
-    if (error) {
-      return json(500, {
-        ok: false,
-        where: 'db-insert',
-        details: error.message,
-        hint: '테이블/권한/컬럼타입 확인'
-      });
-    }
-
-    // 🔔 운영에서만 알림톡 발송(실패해도 흐름은 계속)
-    try {
-      if (process.env.NODE_ENV === 'production') {
-        await sendAlimtalk(phone, code);
-      }
-    } catch (e) {
-      console.warn('[alimtalk] send fail:', e?.message || e);
-    }
-
-    // 개발 중에만 code 노출 → 지금은 임시로 항상 반환
-    return json(200, { ok:true, code });
-
+    return res.status(200).json({
+      ok: true,
+      code: (process.env.OTP_DEBUG ? code : undefined),
+      envs,
+      sens: sendResult?.sens || null
+    });
   } catch (e) {
-    return json(500, {
-      ok: false,
-      where: 'send-try',
-      details: String(e?.message || e),
-      hint: 'supabase-js import/런타임/바디파싱 확인'
+    // ← 여기서 모든 예외를 정보와 함께 돌려보냄
+    return res.status(500).json({
+      ok:false,
+      where:'sendAlimtalk',
+      message: String(e?.message || e),
+      stack: e?.stack?.slice(0,1000),
+      envs: {
+        NODE_ENV: process.env.NODE_ENV,
+        OTP_DEBUG: String(process.env.OTP_DEBUG || ''),
+        has_SERVICE_ID: !!process.env.NCP_SENS_SERVICE_ID,
+        has_ACCESS_KEY: !!process.env.NCP_ACCESS_KEY,
+        has_SECRET_KEY: !!process.env.NCP_SECRET_KEY,
+        has_PLUS_ID:    !!process.env.NCP_PLUS_FRIEND_ID,
+        has_TEMPLATE:   !!process.env.NCP_TEMPLATE_CODE,
+        serviceId_prefix: (process.env.NCP_SENS_SERVICE_ID || '').split(':').slice(0,2).join(':')
+      }
     });
   }
 }
+
 
 
     // ── verify (update-only 안정판) ──────────────────────────────────────
