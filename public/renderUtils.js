@@ -207,8 +207,10 @@ export function renderBasicDaeyunTable({
           ${ganjiReversed.map(({ stem, branch }, idx) => {
             const tenGod = tenGodBaseStem ? getTenGod(tenGodBaseStem, stem) : "";
             return `
-              <td onclick="handleBasicDaeyunClick(${idx}, '${stem}', '${branch}')" 
-                  class="daeyun-cell">
+   <td onclick="handleBasicDaeyunClick(${idx}, '${stem}', '${branch}')"
+       class="daeyun-cell"
+       data-stem="${stem}"
+       data-branch="${branch}">
                 <div>${colorize(stem)}</div>
                 ${tenGod ? `<div style="font-size:0.75rem; color:#999;">(${tenGod})</div>` : ""}
                 <div>${colorize(branch)}</div>
@@ -505,6 +507,7 @@ export function highlightInitialDaeyun() {
 
     // ✅ 클릭 이벤트로 연동
     cell.click();
+    setTimeout(() => window.renderSinsalNow?.(), 0);
   } else {
     console.warn("⚠️ highlightInitialDaeyun: 표시할 셀 없음", displayIndex);
   }
