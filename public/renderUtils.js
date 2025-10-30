@@ -83,12 +83,46 @@ export const elementColors = {
 
 
 // 전역 saju → 배열 변환 (시/일/월/년)
-window.getSajuArrays = function getSajuArrays() {
+// ── 응급 핫픽스: 신살표 즉시 갱신 안전 호출 (전역 saju 사용)
+window.getSajuArrays ||= function getSajuArrays() {
   const s = window.saju || {};
   const sajuGanArr   = [s.hourGan, s.dayGan, s.monthGan, s.yearGan].map(v => v || '');
   const sajuJijiArr  = [s.hourBranch, s.dayBranch, s.monthBranch, s.yearBranch].map(v => v || '');
   const sajuGanjiArr = sajuGanArr.map((g,i)=> (g && sajuJijiArr[i]) ? g + sajuJijiArr[i] : '');
   return { sajuGanArr, sajuJijiArr, sajuGanjiArr };
+};
+
+window.renderSinsalNow ||= function renderSinsalNow(extraCtx = {}) {
+  try {
+    const renderer = globalThis.renderEtcSinsalTable;        // 전역 등록된 렌더러
+    if (typeof renderer !== 'function') {
+      console.warn('[renderSinsalNow] renderEtcSinsalTable 미로딩');
+      return;
+    }
+    const { sajuGanArr, sajuJijiArr, sajuGanjiArr } = window.getSajuArrays();
+
+    // 사주 4칸이 비면 그리기 보류 (대운/세운만 뜨는 현상 방지)
+    if (!sajuGanArr.every(Boolean) || !sajuJijiArr.every(Boolean)) {
+      console.warn('[renderSinsalNow] 사주 4칸 미완성 → 렌더 보류');
+      return;
+    }
+
+    const html = renderer({
+      sajuGanArr,
+      sajuJijiArr,
+      sajuGanjiArr,
+      context: {
+        daeyun: window.selectedDaewoon || null,
+        sewoon: window.selectedSewoon  || null,
+        gender: window.gender,
+        ...extraCtx,
+      }
+    });
+
+    document.querySelector('#etc-sinsal-box')?.(function(el){ el.innerHTML = html; return el; })(document.querySelector('#etc-sinsal-box'));
+  } catch (e) {
+    console.warn('[renderSinsalNow] 실패:', e);
+  }
 };
 
 
@@ -366,8 +400,7 @@ function updateBasicSewoonCells(sewoonReversed) {
   // simpleTable 렌더링
   updateSimpleTable();
 
-  document.querySelector("#etc-sinsal-box").innerHTML = renderEtcSinsalTable();
-
+ window.renderSinsalNow();
 }
 
 
@@ -412,8 +445,7 @@ if (!window.selectedSewoon && window.sewoonList?.length > 0) {
 
 
    // 신살표 즉시 갱신 (대운/세운 클릭 이후 공용)
-  document.querySelector("#etc-sinsal-box").innerHTML = renderEtcSinsalTable();
-
+window.renderSinsalNow();
 }
 
 
