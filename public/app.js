@@ -1685,6 +1685,12 @@ window.requirePhoneVerificationIfNeeded = async function(daysValid = 3) {
     }
 
     const isFlagTrue = prof?.phone_verified === true;     // 플래그 우선
+    if (isFlagTrue) return true;          // ✅ 전화인증 플래그가 true면 기간 무시하고 바로 통과
+// ✅ 플래그가 false면 기간과 무관하게 즉시 모달
+if (!isFlagTrue) {
+  typeof openPhoneOtpModal === "function" ? openPhoneOtpModal() : alert("전화 인증이 필요합니다.");
+  return false;
+}
     const ts = prof?.phone_verified_at ? new Date(prof.phone_verified_at).getTime() : 0;
     const validMs = Math.max(0, daysValid) * 24 * 60 * 60 * 1000;
     const isWithinWindow = daysValid > 0 && ts > 0 && (Date.now() - ts) <= validMs;
