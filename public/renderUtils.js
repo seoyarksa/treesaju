@@ -119,7 +119,13 @@ window.renderSinsalNow ||= function renderSinsalNow(extraCtx = {}) {
       }
     });
 
-    document.querySelector('#etc-sinsal-box')?.(function(el){ el.innerHTML = html; return el; })(document.querySelector('#etc-sinsal-box'));
+    const box = document.querySelector('#etc-sinsal-box');
+if (!box) {
+  console.warn('[renderSinsalNow] 컨테이너 #etc-sinsal-box 없음');
+  return;
+}
+box.innerHTML = html;
+
   } catch (e) {
     console.warn('[renderSinsalNow] 실패:', e);
   }
