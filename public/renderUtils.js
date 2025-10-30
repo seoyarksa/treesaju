@@ -88,6 +88,76 @@ export const elementColors = {
 
 
 
+// [전역 유틸] 사주 4주 배열 강건화: [시, 일, 월, 년] 4칸 보장
+globalThis.__getSajuArraysSafe ??= function __getSajuArraysSafe() {
+  // 1) 준비된 전역 배열이 있으면 그대로 사용
+  if (Array.isArray(window?.sajuGanArr) &&
+      Array.isArray(window?.sajuJijiArr) &&
+      Array.isArray(window?.sajuGanjiArr) &&
+      window.sajuGanArr.length === 4 &&
+      window.sajuJijiArr.length === 4 &&
+      window.sajuGanjiArr.length === 4) {
+    return {
+      gan:   window.sajuGanArr.slice(0, 4),
+      jiji:  window.sajuJijiArr.slice(0, 4),
+      ganji: window.sajuGanjiArr.slice(0, 4),
+    };
+  }
+
+  // 2) window.saju 객체에서 구성
+  const s = window?.saju || null;
+  if (s) {
+    const safeStem = v => (v && typeof v === 'object') ? (v.stem || '') : (v || '');
+    const safeJiji = v => {
+      if (!v) return '';
+      if (typeof v === 'object') return v.branch || v.jiji || '';
+      return v;
+    };
+
+    const gan = [
+      safeStem(s.sigan),   // 시간
+      safeStem(s.ilgan),   // 일간
+      safeStem(s.wolgan),  // 월간
+      safeStem(s.nyeongan) // 년간
+    ];
+    const jiji = [
+      safeJiji(s.siji),    // 시지
+      safeJiji(s.ilji),    // 일지
+      safeJiji(s.wolji),   // 월지
+      safeJiji(s.nyeonji)  // 년지
+    ];
+    const ganji = gan.map((g, i) => (g || '') + (jiji[i] || ''));
+
+    if (gan.every(Boolean) && jiji.every(Boolean)) {
+      return { gan, jiji, ganji };
+    }
+  }
+
+  // 3) DOM 폴백 (프로젝트에 맞게 selector 필요시 수정)
+  const pickText = selList => {
+    for (const sel of selList) {
+      const el = document.querySelector(sel);
+      if (el && el.textContent) return el.textContent.trim();
+    }
+    return '';
+  };
+
+  const gan = [
+    pickText(['[data-role="sigan-gan"]',   '#sigan-gan',   '.sigan .gan',   '.saju-time .gan']),
+    pickText(['[data-role="ilgan-gan"]',   '#ilgan-gan',   '.ilgan .gan',   '.saju-day .gan']),
+    pickText(['[data-role="wolgan-gan"]',  '#wolgan-gan',  '.wolgan .gan',  '.saju-month .gan']),
+    pickText(['[data-role="nyeongan-gan"]','#nyeongan-gan','.nyeongan .gan','.saju-year .gan']),
+  ];
+  const jiji = [
+    pickText(['[data-role="siji"]',    '#siji',    '.sigan .ji',   '.saju-time .ji']),
+    pickText(['[data-role="ilji"]',    '#ilji',    '.ilgan .ji',   '.saju-day .ji']),
+    pickText(['[data-role="wolji"]',   '#wolji',   '.wolgan .ji',  '.saju-month .ji']),
+    pickText(['[data-role="nyeonji"]', '#nyeonji', '.nyeongan .ji','.saju-year .ji']),
+  ];
+  const ganji = gan.map((g, i) => (g || '') + (jiji[i] || ''));
+
+  return { gan, jiji, ganji };
+};
 
 
 
@@ -603,7 +673,8 @@ window.rerenderEtcSinsal = function rerenderEtcSinsal() {
     }
 
     // 사주 기본 4주 배열 확보
- const { gan: sajuGanArr, jiji: sajuJijiArr, ganji: sajuGanjiArr } = globalThis.__getSajuArraysSafe();
+const { gan: sajuGanArr, jiji: sajuJijiArr, ganji: sajuGanjiArr } = globalThis.__getSajuArraysSafe();
+
     const gender = window?.gender;
 
     // ★ 여기서만 호출
