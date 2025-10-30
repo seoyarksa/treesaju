@@ -507,6 +507,48 @@ export function highlightInitialSewoon() {
 
 
 
+// 전역 신살 리렌더러
+window.rerenderEtcSinsal = function rerenderEtcSinsal() {
+  try {
+    // 사주 4주 배열: 있으면 그대로, 없으면 window.saju에서 보강
+    const sajuGanArr  = window?.sajuGanArr  ?? (window?.saju
+      ? [window.saju.sigan?.stem, window.saju.ilgan?.stem, window.saju.wolgan?.stem, window.saju.nyeongan?.stem].map(v => v || '')
+      : []);
+    const sajuJijiArr = window?.sajuJijiArr ?? (window?.saju
+      ? [window.saju.siji, window.saju.ilji, window.saju.wolji, window.saju.nyeonji].map(v => (v && v.branch) ? v.branch : (v || ''))
+      : []);
+    const sajuGanjiArr = window?.sajuGanjiArr ?? (
+      (sajuGanArr.length === 4 && sajuJijiArr.length === 4)
+        ? sajuGanArr.map((g, i) => (g || '') + (sajuJijiArr[i] || ''))
+        : []
+    );
+
+    // 성별 등 컨텍스트
+    const gender = window?.gender;
+
+    // 신살 표 렌더
+    const html = renderEtcSinsalTable({
+      sajuGanArr,
+      sajuJijiArr,
+      sajuGanjiArr,
+      context: {
+        daeyun: window?.selectedDaewoon || null,
+        sewoon: window?.selectedSewoon || null,
+        gender,
+      },
+    });
+
+    // 실제 컨테이너 ID로 교체하세요 (#etc-sinsal 가정)
+    const box = document.querySelector('#etc-sinsal-box'); // ★ 여기!
+    if (box) {
+      box.innerHTML = html;
+    } else {
+      console.warn('[rerenderEtcSinsal] 컨테이너 #etc-sinsal-box 를 찾지 못했습니다.');
+    }
+  } catch (e) {
+    console.warn('[rerenderEtcSinsal] 렌더 실패:', e);
+  }
+};
 
 
 
