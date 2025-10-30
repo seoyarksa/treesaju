@@ -4320,13 +4320,16 @@ window.handleDaeyunClick = handleDaeyunClick;
   font-size: clamp(11px, 1.6vw, 14px);
   line-height: 1.35;
   min-width: 720px;                        /* 좁은 화면에서 가로 스크롤 */
+  hyphens: auto;                           /* 길고 연속된 라틴 텍스트 자동 하이픈 */
 }
 
 .Etcsinsal-tables .responsive-table th,
 .Etcsinsal-tables .responsive-table td {
   padding: 6px 8px;
-  word-break: keep-all;
-  white-space: nowrap;                     /* 천간/지지 줄바꿈 방지 */
+  /* ↓↓↓ 핵심 수정: 셀 밖으로 넘치지 않도록 줄바꿈 허용 */
+  white-space: normal;                     /* 줄바꿈 허용 */
+  overflow-wrap: anywhere;                 /* 너무 긴 단어/토큰도 강제 줄바꿈 */
+  word-break: keep-all;                    /* 한글/한자는 단어 단위로 */
   border: 1px solid #ddd;
 }
 
@@ -4344,7 +4347,6 @@ window.handleDaeyunClick = handleDaeyunClick;
   position: sticky;
   top: 0;
   z-index: 3;
-  /* 필요 시 헤더 배경색 명시 (각 테이블 컬러 유지) */
 }
 
 /* 모바일 추가 축소 */
