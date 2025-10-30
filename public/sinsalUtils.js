@@ -52,20 +52,15 @@ export function getSipsin(dayGan, targetGan) {
 // samhapKey: getSamhapKeyByJiji(saju.yearBranch) 등에서 추출
 
 
-// 기준 천간과 지지 하나로 12운성 구하기 (전역 유틸이 있으면 활용)
-function __getUnseongSafe(stem, branch, toHanStem, toHanBranch) {
-  const S = stem ? (typeof toHanStem === 'function' ? toHanStem(stem) : String(stem)) : '';
-  const B = branch ? (typeof toHanBranch === 'function' ? toHanBranch(branch) : String(branch)) : '';
-  if (!S || !B) return '';
-  if (typeof window.get12Unseong === 'function') {
-    try { return window.get12Unseong(S, B) || ''; } catch {}
-  }
-  const M = window.UNSEONG_MAP;
-  if (M && M[S] && M[S][B]) return M[S][B];
-  return '';
-}
 
-// 새 대운/세운 표에서 선택된 지지 폴백
+
+
+
+//천간별 12운성 구하기 시작////////////////////////////
+// 고정: 子 → 亥 순서
+const BRANCH_ORDER = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+
+// 새 대운/세운 표에서 선택된 지지 폴백 (그대로 유지)
 function __getSelectedDaeyunBranch(toHanBranch) {
   if (window?.selectedDaewoon?.branch) return toHanBranch ? toHanBranch(window.selectedDaewoon.branch) : window.selectedDaewoon.branch;
   const d = document.querySelector('#basic-daeyun-table .daeyun-cell.selected');
@@ -89,48 +84,69 @@ function __getSelectedSewoonBranch(toHanBranch) {
   return '';
 }
 
-// 12운성 표 1개 렌더러: 기준 천간(baseStem) vs [시·일·월·년·대운·세운] 지지
-function renderUnseongByBranches({ baseStem, caption = '12운성(일간 기준)' }) {
-  // 전역 변환 유틸(없으면 그대로)
-  const toHanStem   = (typeof window.toHanStem === 'function')   ? window.toHanStem   : (v => v);
+// 기준 선택: '시간' | '일간' | '월간' | '년간'
+function __getBaseStemByMode(mode = '일간') {
+  const s = window.saju || {};
+  if (mode === '시간') return s.hourGan;
+  if (mode === '일간') return s.dayGan;
+  if (mode === '월간') return s.monthGan;
+  if (mode === '년간') return s.yearGan;
+  return s.dayGan;
+}
+
+// ★ 핵심: 맵 인덱싱으로 바로 12운성 반환
+function __unseongOf(baseStem, branch) {
+  const stem = typeof window.toHanStem === 'function' ? window.toHanStem(baseStem) : String(baseStem || '');
+  const br   = typeof window.toHanBranch === 'function' ? window.toHanBranch(branch) : String(branch || '');
+  if (!stem || !br) return '';
+  const seq = unseongMap12[stem];              // 이미 import된 맵 사용
+  if (!seq) return '';                          // (注) 戊/己는 맵에 없으면 빈값
+  const idx = BRANCH_ORDER.indexOf(br);
+  return idx >= 0 ? (seq[idx] || '') : '';
+}
+
+// 12운성 표 1개 렌더러: 기준(mode) vs [시·일·월·년·대운·세운] 지지
+function renderUnseongByBranches({ mode = '일간', caption } = {}) {
   const toHanBranch = (typeof window.toHanBranch === 'function') ? window.toHanBranch : (v => v);
+  const toHanStem   = (typeof window.toHanStem   === 'function') ? window.toHanStem   : (v => v);
 
   const s = window.saju || {};
+  const baseStem = __getBaseStemByMode(mode);
+  const bStemHan = baseStem ? toHanStem(baseStem) : '';
+
+  const labels   = ['시', '일', '월', '년', '대운', '세운'];
   const branches = [
     s.hourBranch, s.dayBranch, s.monthBranch, s.yearBranch,
     __getSelectedDaeyunBranch(toHanBranch),
     __getSelectedSewoonBranch(toHanBranch)
   ].map(v => v ? toHanBranch(v) : '');
 
-  const labels = ['시', '일', '월', '년', '대운', '세운'];
-  const bStem  = baseStem ? toHanStem(baseStem) : '';
-
-  // 한 줄짜리 표로 출력: 지지와 (운성)를 함께
   const tds = branches.map((br, i) => {
-    if (!br || !bStem) return `<td style="min-width:60px; padding:6px; text-align:center;">—</td>`;
-    const u = __getUnseongSafe(bStem, br, toHanStem, toHanBranch);
+    const u = (bStemHan && br) ? __unseongOf(bStemHan, br) : '';
     return `
       <td style="min-width:60px; padding:6px; text-align:center;">
         <div>${labels[i]}</div>
-        <div>${br}</div>
+        <div>${br || '-'}</div>
         <div style="font-size:.85em; opacity:.85;">${u || '-'}</div>
       </td>`;
   }).join('');
+
+  const title = caption || `12운성 (${mode} 기준) · 기준 천간: <span style="color:#1976d2">${bStemHan || '-'}</span>`;
 
   return `
     <table class="sinsal-bottom unseong-table" border="1"
            style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px;">
       <thead>
-        <tr><th colspan="6" style="padding:6px; background:#f5fbff;">
-          ${caption} · 기준 천간: <span style="color:#1976d2">${bStem || '-'}</span>
-        </th></tr>
+        <tr><th colspan="6" style="padding:6px; background:#f5fbff;">${title}</th></tr>
       </thead>
-      <tbody>
-        <tr>${tds}</tr>
-      </tbody>
+      <tbody><tr>${tds}</tr></tbody>
     </table>
   `;
 }
+
+
+//천간별 12운성 구하기 끝////////////////////////////
+
 
 
 export function renderSinsalTable({ sajuGanArr, samhapKey, sajuJijiArr }) {
