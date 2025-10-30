@@ -4282,19 +4282,75 @@ window.handleDaeyunClick = handleDaeyunClick;
 }
 
 
-.sinsal-table {
-  table-layout: fixed;
-  width: 100%;
-  word-wrap: break-word;
-  white-space: normal;   /* 줄바꿈 허용 */
+/* 컨테이너와 스크롤 래퍼 */
+.sinsal-tables {
+  display: grid;
+  gap: 16px;
+}
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.06) inset;
 }
 
-.sinsal-table td, 
-.sinsal-table th {
-  max-width: 80px;       /* 셀 최대 폭 제한 */
-  overflow: hidden;      /* 넘치면 숨김 */
-  text-overflow: ellipsis; /* ... 처리 */
+/* 테이블 기본 반응형 설정 */
+.responsive-table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;           /* 셀 너비 균등 분배 */
+  font-size: clamp(11px, 1.6vw, 14px);
+  line-height: 1.35;
 }
+
+.responsive-table th,
+.responsive-table td {
+  padding: 6px 8px;
+  word-break: keep-all;
+  white-space: nowrap;           /* 천간/지지 줄바꿈 방지 */
+  border: 1px solid #ddd;
+}
+
+/* 작은 화면에서 가로 스크롤을 확보하기 위한 최소 폭 */
+.responsive-table {
+  min-width: 720px;              /* 필요 시 조절: 칼럼 많은 표면 720~840 추천 */
+}
+
+/* 첫 번째 열(신살류) 고정 - 스크롤해도 라벨이 보이게 */
+.responsive-table th[rowspan],
+.responsive-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;              /* 배경색을 지정해야 겹침 문제 방지 */
+}
+
+/* 헤더들은 스크롤 위로 */
+.responsive-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+/* 아주 작은 화면에서는 패딩/폰트 더 줄이기 */
+@media (max-width: 480px) {
+  .responsive-table {
+    min-width: 600px;
+    font-size: clamp(10px, 3.2vw, 12px);
+  }
+  .responsive-table th,
+  .responsive-table td {
+    padding: 4px 6px;
+  }
+}
+
+/* 표 안의 (기준) 같은 보조 텍스트는 더 작게 */
+.responsive-table .note,
+.responsive-table span[style*="color:red;"] small {
+  font-size: 0.85em;
+}
+
 
 
 .sewoon-cell.selected {
