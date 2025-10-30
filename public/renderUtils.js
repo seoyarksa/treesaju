@@ -377,7 +377,7 @@ function updateBasicSewoonCells(sewoonReversed) {
   const daeyunRow = document.querySelector("#basic-daeyun-table .daeyun-row");
   if (!daeyunRow) return;
 
-  // 기존 세운 셀 삭제
+  // 기존 세운 셀 삭제 (대운 10칸 이후 제거)
   while (daeyunRow.children.length > 10) {
     daeyunRow.removeChild(daeyunRow.lastChild);
   }
@@ -400,35 +400,39 @@ function updateBasicSewoonCells(sewoonReversed) {
     console.log("✔ updateBasicSewoonCells: 십성 기준 일간 =", tenGodBaseStem);
   }
 
-  // 새로운 세운 셀 추가
- // ✅ 반드시 루프 “안”에서 구조분해한 stem/branch 사용
- sewoonReversed.forEach(({ stem, branch, year }) => {
-   const tenGod = tenGodBaseStem ? getTenGod(tenGodBaseStem, stem) : "";
+  // ✅ 세운 셀 추가 (루프 “안”에서만 stem/branch/year 사용)
+  sewoonReversed.forEach(({ stem, branch, year }) => {
+    const tenGod = tenGodBaseStem ? getTenGod(tenGodBaseStem, stem) : "";
 
-   const td = document.createElement("td");
-   td.classList.add("sewoon-cell");
-   td.dataset.year = String(year);
-   td.dataset.stem = String(stem);
-   td.dataset.branch = String(branch);
-   td.style.textAlign = "center";
-   td.style.verticalAlign = "middle";
+    const td = document.createElement("td");
+    td.classList.add("sewoon-cell");
+    td.dataset.year = String(year);
+    td.dataset.stem = String(stem);
+    td.dataset.branch = String(branch);
+    td.style.textAlign = "center";
+    td.style.verticalAlign = "middle";
 
-   td.innerHTML = `
-    <div>${colorize(stem)}</div>
-     ${tenGod ? `<div style="font-size:0.75rem; color:#999;">(${tenGod})</div>` : ""}
-     <div>${colorize(branch)}</div>
-   `;
+    td.innerHTML = `
+      <div>${colorize(stem)}</div>
+      ${tenGod ? `<div style="font-size:0.75rem; color:#999;">(${tenGod})</div>` : ""}
+      <div>${colorize(branch)}</div>
+    `;
 
-   td.addEventListener("click", () => basicSewoonClick(td, stem, branch, year));
-   daeyunRow.appendChild(td);
- });
+    // ✅ 클릭 핸들러
+    td.addEventListener("click", () => basicSewoonClick(td, stem, branch, year));
+    daeyunRow.appendChild(td);
+  });
 
-  // 나머지 UI 갱신 부분은 그대로 유지
-  document.querySelector("#dangryeong-cell").innerHTML = makeSajuInfoTable();
+  // ✅ 나머지 UI 갱신 (null 가드)
+  const dang = document.querySelector("#dangryeong-cell");
+  if (dang) dang.innerHTML = makeSajuInfoTable();
   renderDangryeongHeesinGisin();
 
-  document.querySelector("#johuyongsin-cell").innerHTML = renderJohuCell();
-  document.querySelector("#hapshin-box").innerHTML = renderhapshinTable();
+  const johu = document.querySelector("#johuyongsin-cell");
+  if (johu) johu.innerHTML = renderJohuCell();
+
+  const hap = document.querySelector("#hapshin-box");
+  if (hap) hap.innerHTML = renderhapshinTable();
 
   // ✅ selectedSewoon 초기화
   if (!window.selectedSewoon && window.sewoonList?.length > 0) {
@@ -438,14 +442,18 @@ function updateBasicSewoonCells(sewoonReversed) {
   // simpleTable 렌더링
   updateSimpleTable();
 
+  // ★ 신살 즉시 갱신 (안전 호출)
+  globalThis.rerenderEtcSinsal?.();
 
-   // ★ 신살 즉시 갱신
-window.rerenderEtcSinsal?.();
- // (옵션) 외부 구독용 이벤트
- window.dispatchEvent(new CustomEvent("fortune:sewoonChanged", {
-   detail: { stem, branch, year }
- }));
+  // ★ 외부 구독 이벤트 (루프 밖 변수 참조 금지 → 전역 선택값이 있을 때만 내보냄)
+  if (window.selectedSewoon) {
+    const { stem, branch, year } = window.selectedSewoon;
+    window.dispatchEvent(new CustomEvent("fortune:sewoonChanged", {
+      detail: { stem, branch, year }
+    }));
+  }
 }
+
 
 
 
