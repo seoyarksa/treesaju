@@ -168,108 +168,146 @@ const sinsalRow  = `<tr id="sinsal-row"><th>12신살</th>${jijiArr.map(() => `<t
 <table class="sinsal-bottom sinsal-extra-7x17" border="1"
        style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px;">
   <tbody>
-    ${(() => {
-      // 전역 saju에서 간/지 (시,일,월,년 순)
-      const s = window.saju || {};
-      const toStr = v => (v ?? '').toString();
+${(() => {
+  // 전역 saju
+  const s = window.saju || {};
+  const toStr = v => (v ?? '').toString();
 
-      // 한자 정규화 유틸(있으면 사용)
-      const _toHanStem   = (typeof toHanStem === 'function')   ? toHanStem   : (v => toStr(v));
-      const _toHanBranch = (typeof toHanBranch === 'function') ? toHanBranch : (v => toStr(v));
+  // 한자 정규화(있으면 사용)
+  const _toHanStem   = (typeof toHanStem === 'function')   ? toHanStem   : (v => toStr(v));
+  const _toHanBranch = (typeof toHanBranch === 'function') ? toHanBranch : (v => toStr(v));
 
-      const stems = [
-        _toHanStem(s.hourGan),   // 시간
-        _toHanStem(s.dayGan),    // 일간
-        _toHanStem(s.monthGan),  // 월간
-        _toHanStem(s.yearGan)    // 년간
-      ];
-      const branches = [
-        _toHanBranch(s.hourBranch),  // 시지
-        _toHanBranch(s.dayBranch),   // 일지
-        _toHanBranch(s.monthBranch), // 월지
-        _toHanBranch(s.yearBranch)   // 년지
-      ];
+  // [시, 일, 월, 년]
+  const stems = [
+    _toHanStem(s.hourGan), _toHanStem(s.dayGan),
+    _toHanStem(s.monthGan), _toHanStem(s.yearGan)
+  ];
+  const branches = [
+    _toHanBranch(s.hourBranch), _toHanBranch(s.dayBranch),
+    _toHanBranch(s.monthBranch), _toHanBranch(s.yearBranch)
+  ];
 
-      // 지장간 추출
-      const getHiddenStems = (ji) => {
-        const map = (window.jijiToSibganMap || window.jiji_to_sibgan_map || {});
-        const key = _toHanBranch(ji);
-        const raw = map?.[key];
-        if (!raw) return [];
-        if (Array.isArray(raw)) {
-          return raw
-            .map(x => (typeof x === 'string') ? x : (x?.stem || x?.gan || ''))
-            .filter(Boolean);
-        }
-        if (typeof raw === 'object') {
-          const arr = [
-            raw.stem, raw.gan, raw.jang, raw.middle, raw.joong, raw.cheongan
-          ].filter(Boolean);
-          return arr;
-        }
-        return [];
-      };
+  // ✅ DOM 폴백: 새 대운/세운표에서 선택된 지지 추출
+  const getSelectedDaeyunBranch = () => {
+    // 우선 전역
+    if (window?.selectedDaewoon?.branch) return _toHanBranch(window.selectedDaewoon.branch);
 
-      // 12운성 계산 (우선 get12Unseong → 맵)
-      const getUnseong = (stem, branch) => {
-        const a = stem ? _toHanStem(stem) : '';
-        const b = branch ? _toHanBranch(branch) : '';
-        if (!a || !b) return '';
-        if (typeof window.get12Unseong === 'function') {
-          try { return window.get12Unseong(a, b) || ''; } catch {}
-        }
-        const m = window.UNSEONG_MAP;
-        if (m && m[a] && m[a][b]) return m[a][b];
-        return '';
-      };
+    // #basic-daeyun-table 에서 선택셀
+    const d = document.querySelector('#basic-daeyun-table .daeyun-cell.selected');
+    if (d?.dataset?.branch) return _toHanBranch(d.dataset.branch);
 
-      // 1행(0행) 2번째 칸부터 넣을 값: [시 간, 시 지장, 일 간, 일 지장, 월 간, 월 지장, 년 간, 년 지장]
-      const firstRowSeq = [];
-      for (let i = 0; i < 4; i++) {
-        firstRowSeq.push(stems[i] || '');
-        const hs = getHiddenStems(branches[i] || '');
-        firstRowSeq.push(hs.length ? hs.join('/') : '');
+    // 텍스트 파싱(간 / (십성) / 지 구조)
+    if (d?.innerText) {
+      const lines = d.innerText.trim().split('\n').map(x => x.trim()).filter(Boolean);
+      const maybe = lines[2] || lines[1] || '';
+      if (maybe) return _toHanBranch(maybe);
+    }
+    return '';
+  };
+  const getSelectedSewoonBranch = () => {
+    if (window?.selectedSewoon?.branch) return _toHanBranch(window.selectedSewoon.branch);
+    const s = document.querySelector('#basic-daeyun-table .sewoon-cell.selected');
+    if (s?.dataset?.branch) return _toHanBranch(s.dataset.branch);
+    if (s?.innerText) {
+      const lines = s.innerText.trim().split('\n').map(x => x.trim()).filter(Boolean);
+      const maybe = lines[2] || lines[1] || '';
+      if (maybe) return _toHanBranch(maybe);
+    }
+    return '';
+  };
+
+  // ✅ 지장간 추출(문자/객체 혼재 + 중기 표기)
+  const getHiddenStems = (ji) => {
+    const map = (window.jijiToSibganMap || window.jiji_to_sibgan_map || {});
+    const key = _toHanBranch(ji);
+    const raw = map?.[key];
+    if (!raw) return [];
+
+    const extract = (item) => {
+      if (typeof item === 'string') return item;
+      if (!item || typeof item !== 'object') return '';
+      const stem = item.stem || item.gan || '';
+      if (!stem) return '';
+      // 중기 표시
+      return item.isMiddle ? `${stem}(중)` : stem;
+    };
+
+    if (Array.isArray(raw)) {
+      return raw.map(extract).filter(Boolean);
+    }
+    // 객체 한 개 형태도 처리(필드 다양성 대응)
+    const candidates = [raw.stem, raw.gan, raw.jang, raw.middle, raw.joong, raw.cheongan]
+      .filter(Boolean)
+      .map(v => (typeof v === 'string' ? v : extract(v)));
+    return candidates.filter(Boolean);
+  };
+
+  // 12운성 계산 (기준: 일간)
+  const getUnseong = (stem, branch) => {
+    const a = stem ? _toHanStem(stem) : '';
+    const b = branch ? _toHanBranch(branch) : '';
+    if (!a || !b) return '';
+    if (typeof window.get12Unseong === 'function') {
+      try { return window.get12Unseong(a, b) || ''; } catch {}
+    }
+    const m = window.UNSEONG_MAP;
+    if (m?.[a]?.[b]) return m[a][b];
+    return '';
+  };
+
+  // ① 1행(0행) 2번째 칸부터: [시 간, 시 지장, 일 간, 일 지장, 월 간, 월 지장, 년 간, 년 지장]
+  const firstRowSeq = [];
+  for (let i = 0; i < 4; i++) {
+    const gan = stems[i] || '';
+    const hs  = getHiddenStems(branches[i] || '');
+    // 지장간 없으면 '—' 표기로 공백 느낌 제거
+    const hsCell = hs.length ? hs.join('/') : '—';
+    firstRowSeq.push(gan || '—');
+    firstRowSeq.push(hsCell);
+  }
+
+  // ② 1열(0열) 2행부터: [시지, 일지, 월지, 년지, 대운지, 세운지] (+ 12운성: 일간 기준)
+  const baseStem = stems[1] || _toHanStem(s.dayGan); // 일간
+  const daewoonBranch = getSelectedDaeyunBranch();
+  const sewoonBranch  = getSelectedSewoonBranch();
+
+  const firstColSeq = [
+    branches[0] || '', branches[1] || '', branches[2] || '', branches[3] || '',
+    daewoonBranch, sewoonBranch
+  ];
+
+  // 7×17 구성
+  let html = '';
+  for (let r = 0; r < 7; r++) {
+    html += '<tr>';
+    for (let c = 0; c < 17; c++) {
+      let content = '&nbsp;';
+
+      // 첫 줄: 2번째 칸부터 시퀀스
+      if (r === 0 && c >= 1) {
+        const idx = c - 1;
+        if (idx < firstRowSeq.length) content = firstRowSeq[idx] || '—';
       }
 
-      // 1열(0열) 2행부터: [시지, 일지, 월지, 년지, 대운지, 세운지] (+ 12운성: 일간 기준)
-      const baseStem = stems[1] || _toHanStem(s.dayGan); // 일간
-      const daewoonBranch = _toHanBranch(window?.selectedDaewoon?.branch || '');
-      const sewoonBranch  = _toHanBranch(window?.selectedSewoon?.branch  || '');
-      const firstColSeq = [
-        branches[0] || '', branches[1] || '', branches[2] || '', branches[3] || '',
-        daewoonBranch, sewoonBranch
-      ];
-
-      let html = '';
-      for (let r = 0; r < 7; r++) {
-        html += '<tr>';
-        for (let c = 0; c < 17; c++) {
-          let content = '&nbsp;';
-
-          // 규칙 ①: 첫 줄(0행) → 2번째 칸(1열)부터 시퀀스 배치
-          if (r === 0 && c >= 1) {
-            const idx = c - 1;
-            if (idx < firstRowSeq.length && firstRowSeq[idx]) {
-              content = firstRowSeq[idx];
-            }
-          }
-
-          // 규칙 ②: 첫 칸(0열) → 2번째 줄(1행)부터 지지(+ 12운성) 배치
-          if (c === 0 && r >= 1) {
-            const idx = r - 1;
-            const br = firstColSeq[idx] || '';
-            if (br) {
-              const us = getUnseong(baseStem, br);
-              content = us ? `${br}<br><span class="unseong-tag">(${us})</span>` : br;
-            }
-          }
-
-          html += `<td data-r="${r}" data-c="${c}" style="padding:6px; min-width:38px; text-align:center;">${content}</td>`;
+      // 첫 칸: 2행부터 지지(+12운성)
+      if (c === 0 && r >= 1) {
+        const idx = r - 1;
+        const br = firstColSeq[idx] || '';
+        if (br) {
+          const us = getUnseong(baseStem, br);
+          content = us ? `${br}<br><span class="unseong-tag">(${us})</span>` : br;
+        } else {
+          content = '—';
         }
-        html += '</tr>';
       }
-      return html;
-    })()}
+
+      html += `<td data-r="${r}" data-c="${c}" style="padding:6px; min-width:38px; text-align:center;">${content}</td>`;
+    }
+    html += '</tr>';
+  }
+  return html;
+})()}
+
   </tbody>
 </table>
 
