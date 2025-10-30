@@ -970,7 +970,13 @@ ${sinsalRowsGanji}
 </table>
 `;
 
-return tableA1 + tableA2 + tableB + `
+ return `
+ <div class="sinsal-tables">
+   <div class="table-scroll">${tableA1}</div>
+   <div class="table-scroll">${tableA2}</div>
+   <div class="table-scroll">${tableB}</div>
+ </div>
+ ` + `
 <div class="note-box" style="text-align:center">
   ※ 일간,일지,일주 / 년간,년지,년주 / 대운,세운 칸의 셀들은 각각 노랑, 파랑, 초록 바탕색으로 구분하였음. <br>
   기본적으로 기준은 위의 표에서 [<span style="color:red;">빨강</span>]색으로 구분하였고, 특정 간지가 기준[<span style="color:red;">빨강색</span>]인 경우 해당칸에 따로 "기준"을 표기하였음.
