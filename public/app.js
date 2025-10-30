@@ -1932,8 +1932,8 @@ document.getElementById("gwBtnInicis").addEventListener("click", () => {
 
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button class="btn-success" id="btn3m">3개월 일반 결제</button>
-          <button class="btn-success" id="btn6m">6개월 일반 결제</button>
-          <button class="btn-success" id="btnRecurringBasic">프리미엄 정기구독 결제</button>
+          <button class="btn-success" id="btn6m">6개월 일반 결제</button> <br>
+          <button class="btn-success" id="btnRecurringBasic">프리미엄 정기구독 결제</button> 
           <button class="btn-success" id="btnRecurringPlus">프리미엄+ 정기구독 결제</button>
           <button id="subCloseBtn" style="border:1px solid #ddd; background:#f5f5f5; border-radius:6px; padding:6px 10px;">닫기</button>
         </div>
