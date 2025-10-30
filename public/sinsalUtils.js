@@ -269,6 +269,37 @@ export function renderEtcSinsalTable({ sajuGanArr, sajuJijiArr, sajuGanjiArr, co
   const MONTH_INDEX = 2;
   const monthJiji = sajuJijiArr?.[MONTH_INDEX];
 
+// --- 사주 4칸(시/일/월/년) 안전 확보 + 한자 정규화 ---
+const pickStem = v => (v && typeof v === 'object') ? (v.stem || '') : (v || '');
+const pickBranch = v => (v && typeof v === 'object') ? (v.branch || v.jiji || '') : (v || '');
+
+// 1) 우선 전달받은 배열로 시도
+let _gan  = Array.isArray(sajuGanArr)  ? sajuGanArr.slice(0,4)  : [];
+let _jiji = Array.isArray(sajuJijiArr) ? sajuJijiArr.slice(0,4) : [];
+let _ganji= Array.isArray(sajuGanjiArr)? sajuGanjiArr.slice(0,4): [];
+
+// 2) 부족/빈 값이 있으면 window.saju에서 보충
+if (_gan.length < 4 || _jiji.length < 4 || _gan.some(x=>!x) || _jiji.some(x=>!x)) {
+  const s = window?.saju || {};
+  _gan  = [pickStem(s.sigan), pickStem(s.ilgan), pickStem(s.wolgan), pickStem(s.nyeongan)];
+  _jiji = [pickBranch(s.siji), pickBranch(s.ilji), pickBranch(s.wolji), pickBranch(s.nyeonji)];
+}
+
+// 3) 한자로 정규화
+_gan  = _gan.map(x => toHanStem(String(x || '')));
+_jiji = _jiji.map(x => toHanBranch(String(x || '')));
+
+// 4) 간지 배열이 없거나 빈 값이 있으면 (천간+지지)로 생성
+if (_ganji.length < 4 || _ganji.some(x=>!x)) {
+  _ganji = _gan.map((g,i) => (g && _jiji[i]) ? (g + _jiji[i]) : '');
+}
+
+// ▶ 이후 로직에서 원래 변수명을 그대로 쓰도록 교체
+sajuGanArr   = _gan;
+sajuJijiArr  = _jiji;
+sajuGanjiArr = _ganji;
+
+
 // 2글자 간지 안전 분리
 function splitGanjiSafe(gj) {
   const s = (gj || '').trim();
@@ -896,8 +927,7 @@ const tableA1 = `
   <!-- 천간칸: 천간만 빨강 -->
   ${extGanjiArr.map(gj => {
   const { stem, branch, ok } = splitGanjiSafe(gj);
-  return ok
-    ? `<td style="background:#efcffd;">${stem}<br><span style="color:red;">${branch}</span></td>`
+ return ok ? `<td style="background:#cfebfd;"><span style="color:red;">${stem}</span><br>${branch}</td>`
     : `<td style="background:#efcffd;">-</td>`;
   }).join('')}
 </tr>
@@ -982,9 +1012,35 @@ return tableA1 + tableA2 + tableB + `
 
 }
 
-// 전역 등록 (중복 안전)
+// 전역 노출 (혹시 모듈이면 export 유지 + 전역도 등록)
 window.renderEtcSinsalTable = window.renderEtcSinsalTable || renderEtcSinsalTable;
 
+// 전역 saju에서 배열 뽑아 호출 → #etc-sinsal-box에 꽂기
+window.renderEtcSinsalTableFromGlobal = function renderEtcSinsalTableFromGlobal(extraCtx = {}) {
+  const s = window.saju || {};
+
+  // 전역 saju → 간/지 추출 (문자/객체 모두 대응)
+  const pickStem   = v => (v && typeof v === 'object') ? (v.stem || '') : (v || '');
+  const pickBranch = v => (v && typeof v === 'object') ? (v.branch || v.jiji || '') : (v || '');
+
+  const sajuGanArr  = [pickStem(s.sigan), pickStem(s.ilgan), pickStem(s.wolgan), pickStem(s.nyeongan)];
+  const sajuJijiArr = [pickBranch(s.siji), pickBranch(s.ilji), pickBranch(s.wolji), pickBranch(s.nyeonji)];
+  const sajuGanjiArr = sajuGanArr.map((g,i)=> (g && sajuJijiArr[i]) ? g + sajuJijiArr[i] : '');
+
+  const html = window.renderEtcSinsalTable({
+    sajuGanArr,
+    sajuJijiArr,
+    sajuGanjiArr,
+    context: {
+      daeyun: window.selectedDaewoon || null,
+      sewoon: window.selectedSewoon  || null,
+      gender: window.gender,
+      ...extraCtx,
+    },
+  });
+
+  document.querySelector('#etc-sinsal-box')?.innerHTML = html;
+};
 
 
 
