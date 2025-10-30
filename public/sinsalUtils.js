@@ -58,19 +58,24 @@ export function getSipsin(dayGan, targetGan) {
 
 //천간별 12운성 구하기 시작////////////////////////////
 // 고정: 子 → 亥 순서 (없으면 선언)
-const BRANCH_ORDER = window.BRANCH_ORDER || ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+// 子→亥 고정 순서 (중복 선언 방지)
+window.BRANCH_ORDER = window.BRANCH_ORDER || ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
 
-// 맵 인덱싱으로 12운성 반환
-function __unseongOf(stem, branch) {
-  const toHanStem   = (typeof window.toHanStem   === 'function') ? window.toHanStem   : (v => String(v || ''));
-  const toHanBranch = (typeof window.toHanBranch === 'function') ? window.toHanBranch : (v => String(v || ''));
-  const S = toHanStem(stem);
-  const B = toHanBranch(branch);
-  const seq = (window.unseongMap12 || unseongMap12)?.[S];
-  if (!seq) return '';
-  const idx = BRANCH_ORDER.indexOf(B);
-  return idx >= 0 ? (seq[idx] || '') : '';
-}
+// 맵 인덱싱 12운성 계산기 (전역 등록)
+(function initUnseongCalc(){
+  if (window.__unseongOf) return;
+  const getStem = (typeof window.toHanStem   === 'function') ? window.toHanStem   : (v => String(v || ''));
+  const getBr   = (typeof window.toHanBranch === 'function') ? window.toHanBranch : (v => String(v || ''));
+  window.__unseongOf = function __unseongOf(stem, branch) {
+    const S = getStem(stem);
+    const B = getBr(branch);
+    const M = (window.unseongMap12 || unseongMap12) || {};
+    const seq = M[S];
+    if (!seq) return ''; // (주의) 戊/己 등 매핑 없으면 공란
+    const idx = window.BRANCH_ORDER.indexOf(B);
+    return idx >= 0 ? (seq[idx] || '') : '';
+  };
+})();
 
 // ✅ 전달받은 baseStem(시간/일간/월간/년간)을 기준으로,
 //    [시·일·월·년·대운·세운] 지지에 대한 12운성을 표로 출력
