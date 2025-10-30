@@ -1667,13 +1667,10 @@ window.startSixMonthPlan = function () {
 // ✅ 전화인증 가드: 인증 OK면 true, 모달 띄우면 false
 // daysValid: 인증 유효일수(기본 3일). 테스트로 항상 모달 띄우려면 daysValid=0 로 호출.
 // ✅ 전화번호 인증 유효기간: 시간 단위 (기본 1시간)
-window.requirePhoneVerificationIfNeeded = async function(hoursValid = 1) {
+window.requirePhoneVerificationIfNeeded = async function(daysValid = 3) {
   try {
     const { data: { user } } = await window.supabaseClient.auth.getUser();
-    if (!user) {
-      typeof openPhoneOtpModal === "function" ? openPhoneOtpModal() : alert("전화 인증이 필요합니다.");
-      return false;
-    }
+    if (!user) { openPhoneOtpModal?.(); return false; }
 
     const { data: prof, error } = await window.supabaseClient
       .from("profiles")
@@ -1682,31 +1679,32 @@ window.requirePhoneVerificationIfNeeded = async function(hoursValid = 1) {
       .maybeSingle();
 
     if (error) {
-      console.warn("[requirePhoneVerificationIfNeeded] profiles 조회 오류:", error);
-      typeof openPhoneOtpModal === "function" ? openPhoneOtpModal() : alert("전화 인증이 필요합니다.");
+      console.warn("[requirePhoneVerificationIfNeeded] profiles 조회 오류:", error); // ← 여기 꼭 찍어보세요
+      openPhoneOtpModal?.();
       return false;
     }
 
-    const isFlagTrue = prof?.phone_verified === true; // ✅ 플래그 반드시 true여야 함
+    const isFlagTrue = prof?.phone_verified === true;     // 플래그 우선
+    if (isFlagTrue) return true;          // ✅ 전화인증 플래그가 true면 기간 무시하고 바로 통과
+// ✅ 플래그가 false면 기간과 무관하게 즉시 모달
+if (!isFlagTrue) {
+  typeof openPhoneOtpModal === "function" ? openPhoneOtpModal() : alert("전화 인증이 필요합니다.");
+  return false;
+}
     const ts = prof?.phone_verified_at ? new Date(prof.phone_verified_at).getTime() : 0;
+    const validMs = Math.max(0, daysValid) * 24 * 60 * 60 * 1000;
+    const isWithinWindow = daysValid > 0 && ts > 0 && (Date.now() - ts) <= validMs;
 
-    // ⏱ 유효기간: hoursValid 시간
-    const validMs = Math.max(0, Number(hoursValid)) * 60 * 60 * 1000;
-    const isWithinWindow = hoursValid <= 0 ? false : (ts > 0 && (Date.now() - ts) <= validMs);
-
-    const ok = isFlagTrue && isWithinWindow;
-
-    if (!ok) {
-      typeof openPhoneOtpModal === "function" ? openPhoneOtpModal() : alert("전화 인증이 필요합니다.");
-      return false;
-    }
+    const ok = isFlagTrue || isWithinWindow;
+    if (!ok) { openPhoneOtpModal?.(); return false; }
     return true;
   } catch (e) {
     console.warn("[requirePhoneVerificationIfNeeded] 예외:", e);
-    typeof openPhoneOtpModal === "function" ? openPhoneOtpModal() : alert("전화 인증이 필요합니다.");
+    openPhoneOtpModal?.();
     return false;
   }
 };
+
 
 
 
@@ -1921,22 +1919,22 @@ document.getElementById("gwBtnInicis").addEventListener("click", () => {
       </style>
       <div class="modal-panel">
         <h3>구독 결제</h3>
-        <p>전화번호 인증이 완료되었습니다. 상품을 선택해 결제하세요.</p>
+        <p>전화번호 인증이 완료되었습니다. 상품을 선택하여 결제하세요.</p>
 
         <div class="plan">
           <ul>
-            <li><strong>3개월 구독</strong>: 1일 60회 · <strong>3개월간 60,000원</strong></li>
-            <li><strong>6개월 구독</strong>: 1일 60회 · <strong>6개월간 100,000원</strong></li>
-            <li><strong>정기구독</strong> (기본): 1일 60회 · <strong>월 11,000원</strong></li>
-            <li><strong>정기구독+</strong> (플러스): 1일 150회 · <strong>월 16,500원</strong></li>
+            <li><strong>3개월 일반 결제</strong>: 1일 60회 · <strong>3개월간 60,000원[일시불]</strong></li>
+            <li><strong>6개월 일반 결제</strong>: 1일 60회 · <strong>6개월간 100,000원[일시불]</strong></li>
+            <li><strong>프리미엄 정기구독 결제</strong> (기본): 1일 60회 · <strong>월 11,000원</strong></li>
+            <li><strong>프리미엄+ 정기구독 결제</strong> (플러스): 1일 150회 · <strong>월 16,500원</strong></li>
           </ul>
         </div>
 
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <button class="btn-success" id="btn3m">3개월 구독 결제</button>
-          <button class="btn-success" id="btn6m">6개월 구독 결제</button>
-          <button class="btn-success" id="btnRecurringBasic">정기구독 결제</button>
-          <button class="btn-success" id="btnRecurringPlus">정기구독+ 결제</button>
+          <button class="btn-success" id="btn3m">3개월 일반 결제</button>
+          <button class="btn-success" id="btn6m">6개월 일반 결제</button> <br>
+          <button class="btn-success" id="btnRecurringBasic">프리미엄 정기구독 결제</button> 
+          <button class="btn-success" id="btnRecurringPlus">프리미엄+ 정기구독 결제</button>
           <button id="subCloseBtn" style="border:1px solid #ddd; background:#f5f5f5; border-radius:6px; padding:6px 10px;">닫기</button>
         </div>
       </div>
@@ -4299,6 +4297,73 @@ window.handleDaeyunClick = handleDaeyunClick;
 }
 
 
+
+
+/* 컨테이너 & 스크롤 래퍼 */
+.Etcsinsal-tables {
+  display: grid;
+  gap: 16px;
+}
+.Etcsinsal-tables .table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.06) inset;
+}
+
+/* 기본 반응형 테이블 설정 */
+.Etcsinsal-tables .responsive-table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;                     /* 균등 분배 */
+  font-size: clamp(11px, 1.6vw, 14px);
+  line-height: 1.35;
+  min-width: 720px;                        /* 좁은 화면에서 가로 스크롤 */
+  hyphens: auto;                           /* 길고 연속된 라틴 텍스트 자동 하이픈 */
+}
+
+.Etcsinsal-tables .responsive-table th,
+.Etcsinsal-tables .responsive-table td {
+  padding: 6px 8px;
+  /* ↓↓↓ 핵심 수정: 셀 밖으로 넘치지 않도록 줄바꿈 허용 */
+  white-space: normal;                     /* 줄바꿈 허용 */
+  overflow-wrap: anywhere;                 /* 너무 긴 단어/토큰도 강제 줄바꿈 */
+  word-break: keep-all;                    /* 한글/한자는 단어 단위로 */
+  border: 1px solid #ddd;
+}
+
+/* 첫 번째 열(신살류) sticky */
+.Etcsinsal-tables .responsive-table th[rowspan],
+.Etcsinsal-tables .responsive-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+}
+
+/* 헤더 sticky */
+.Etcsinsal-tables .responsive-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+/* 모바일 추가 축소 */
+@media (max-width: 480px) {
+  .Etcsinsal-tables .responsive-table {
+    min-width: 600px;
+    font-size: clamp(10px, 3.2vw, 12px);
+  }
+  .Etcsinsal-tables .responsive-table th,
+  .Etcsinsal-tables .responsive-table td {
+    padding: 4px 6px;
+  }
+}
+
+
+
+
 .sewoon-cell.selected {
   background-color: #ffeaa7 !important;
   border: 2px solid #fdcb6e !important;
@@ -4689,14 +4754,18 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
 
 </div>
 
+
+  <div id="basic-daeyun-table" class="basic-daeyun-container"></div>
+  <div id="basic-yearly-ganji-container"></div>
+
+
 `;
 
 
     document.getElementById('basic-section').innerHTML = `
 
 <!-- 당령 표시용 영역 -->
-  <div id="basic-daeyun-table" class="basic-daeyun-container"></div>
-  <div id="basic-yearly-ganji-container"></div>
+
 <div style="margin-top: 1rem; margin-left: 20px;">
 
   <table class="dangryeong-table" style="
@@ -4745,7 +4814,11 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
 </td>
 </tr>
 
-
+  <tr>
+    <td colspan="2">
+      <div id="etc-sinsal-box"></div>
+    </td>
+  </tr>
 
     </tbody>
   </table>
@@ -4767,20 +4840,12 @@ document.getElementById('sinsal-section').innerHTML = `
 
 <table class="layout-table">
   <tr>
-    <td style="width:50%;">
-      <div class="daeyun-table-container"></div>
-      <div id="yearly-series" style="margin-top: 1rem;"></div>
-      <div id="yearly-ganji-container" style="margin-top: 20px;"></div>
-    </td>
+
     <td style="width:50%;">
       <div id="sinsal-box"></div>
     </td>
   </tr>
-  <tr>
-    <td colspan="2">
-      <div id="etc-sinsal-box"></div>
-    </td>
-  </tr>
+
 </table>
 
 
@@ -5184,7 +5249,42 @@ window.rerenderSinsal = rerenderSinsal;
 
 
 
+
+
+
+
+
 /////////////////12신살,12운성출력 끝 /////////////////////////////////////
+
+
+
+
+
+// 기본 대운/세운표에서 현재 선택값을 읽는 최소 헬퍼
+window.__readBasicFortune = {
+  daeyun(){
+    // 1) renderBasicDaeyunTable이 남겨둔 전역(있다면)
+    if (window.basicDaeyunSelected?.stem && window.basicDaeyunSelected?.branch)
+      return window.basicDaeyunSelected;
+
+    // 2) fortuneState(이미 쓰고 있다면)
+    if (window.fortuneState?.daeyun?.stem && window.fortuneState?.daeyun?.branch)
+      return window.fortuneState.daeyun;
+
+    // 3) DOM(기본표 컨테이너 기준)
+    const td = document.querySelector('#daeyun-basic .daeyun-selected');
+    return td ? { stem: td.dataset.stem?.trim(), branch: td.dataset.branch?.trim() } : {};
+  },
+  sewoon(){
+    if (window.basicSewoonSelected?.stem && window.basicSewoonSelected?.branch)
+      return window.basicSewoonSelected;
+    if (window.fortuneState?.sewoon?.stem && window.fortuneState?.sewoon?.branch)
+      return window.fortuneState.sewoon;
+    const cell = document.querySelector('#sewoon-basic .sewoon-cell.selected');
+    return cell ? { stem: cell.dataset.stem?.trim(), branch: cell.dataset.branch?.trim() } : {};
+  }
+};
+
 
 // ✅ 여기서 대운 테이블을 동적으로 렌더링!
 // ✅ 대운 테이블 렌더

@@ -269,6 +269,17 @@ export function renderEtcSinsalTable({ sajuGanArr, sajuJijiArr, sajuGanjiArr, co
   const MONTH_INDEX = 2;
   const monthJiji = sajuJijiArr?.[MONTH_INDEX];
 
+// 2글자 간지 안전 분리
+function splitGanjiSafe(gj) {
+  const s = (gj || '').trim();
+  const stem = s[0];
+  const branch = s[1];
+  const isStem = /[甲乙丙丁戊己庚辛壬癸]/.test(stem || '');
+  const isBranch = /[子丑寅卯辰巳午未申酉戌亥]/.test(branch || '');
+  return { stem: isStem ? stem : '', branch: isBranch ? branch : '', ok: isStem && isBranch };
+}
+
+
   // ① 폴백 맵
   const KOR_HAN_STEM   = { 갑:'甲', 을:'乙', 병:'丙', 정:'丁', 무:'戊', 기:'己', 경:'庚', 신:'辛', 임:'壬', 계:'癸' };
   const KOR_HAN_BRANCH = { 자:'子', 축:'丑', 인:'寅', 묘:'卯', 진:'辰', 사:'巳', 오:'午', 미:'未', 신:'申', 유:'酉', 술:'戌', 해:'亥' };
@@ -288,53 +299,103 @@ export function renderEtcSinsalTable({ sajuGanArr, sajuJijiArr, sajuGanjiArr, co
     return KOR_HAN_BRANCH[v] || '';
   };
 
-  // ---------- 대운 ----------
-  let dGan = (context.daeyun?.stem || '').trim();
-  let dJiji = (context.daeyun?.branch || '').trim();
+// ---------- 대운 ----------
+let dGan  = (context.daeyun?.stem   || '').trim();
+let dJiji = (context.daeyun?.branch || '').trim();
 
-  if (!dGan || !dJiji) {
-    if (window.daeyunPairs && Number.isInteger(window.currentDaeyunIndex)) {
-      const pair = window.daeyunPairs[window.currentDaeyunIndex] || {};
+// 1) 전역 선택값(새 표에서 클릭 시 세팅됨)
+if ((!dGan || !dJiji) && window?.selectedDaewoon) {
+  dGan  = dGan  || (window.selectedDaewoon.stem   || '');
+  dJiji = dJiji || (window.selectedDaewoon.branch || '');
+}
+
+// 2) 새 대운표 DOM 폴백: #basic-daeyun-table
+if (!dGan || !dJiji) {
+  const sel = document.querySelector('#basic-daeyun-table .daeyun-cell.selected');
+  if (sel) {
+    // data-*가 있으면 우선 사용
+    const dsGan  = sel.dataset?.stem   || '';
+    const dsJiji = sel.dataset?.branch || '';
+    if (dsGan && dsJiji) {
+      dGan  = dGan  || dsGan;
+      dJiji = dJiji || dsJiji;
+    } else {
+      // 없으면 텍스트(줄바꿈 기준)에서 간/지 분리
+      const lines = (sel.innerText || '').trim().split('\n').map(s => s.trim());
+      // 예상: [간, (십성), 지] 또는 [간, 지]
+      const maybeGan = lines[0] || '';
+      const maybeJi  = lines[2] || lines[1] || '';
+      dGan  = dGan  || maybeGan.replace(/\s+/g, '');
+      dJiji = dJiji || maybeJi.replace(/\s+/g, '');
+    }
+  }
+}
+
+// 3) (구) 구조 폴백: window.daeyunPairs / 구 DOM
+if (!dGan || !dJiji) {
+  if (window.daeyunPairs && Number.isInteger(window.currentDaeyunIndex)) {
+    const pair = window.daeyunPairs[window.currentDaeyunIndex] || {};
+    dGan  = dGan  || (pair.stem   || '');
+    dJiji = dJiji || (pair.branch || '');
+  } else {
+    const tds = document.querySelectorAll('.daeyun-table-container .daeyun-table tbody tr:nth-child(2) td');
+    const selTd = Array.from(tds).find(td => td.classList.contains('daeyun-selected'));
+    if (selTd && window.daeyunPairs?.length) {
+      const idx = Array.from(tds).indexOf(selTd);
+      const trueIdx = tds.length - 1 - idx;
+      const pair = window.daeyunPairs[trueIdx] || {};
       dGan  = dGan  || (pair.stem   || '');
       dJiji = dJiji || (pair.branch || '');
-      
-    } else {
-      const tds = document.querySelectorAll('.daeyun-table-container .daeyun-table tbody tr:nth-child(2) td');
-      const selTd = Array.from(tds).find(td => td.classList.contains('daeyun-selected'));
-      if (selTd && window.daeyunPairs?.length) {
-        const idx = Array.from(tds).indexOf(selTd);
-        const trueIdx = tds.length - 1 - idx;
-        const pair = window.daeyunPairs[trueIdx] || {};
-        dGan  = dGan  || (pair.stem   || '');
-        dJiji = dJiji || (pair.branch || '');
-        //console.log('[신살] 대운 from DOM:', { idx, trueIdx, dGan, dJiji });
-      } else {
-        //console.warn('[신살] 대운 미확정: context/window/DOM 모두 값 없음');
-      }
     }
-  } else {
-   
   }
+}
 
- // ---------- 세운 ----------
-let sGan = (context.sewoon?.stem || '').trim();
+// ---------- 세운 ----------
+let sGan  = (context.sewoon?.stem   || '').trim();
 let sJiji = (context.sewoon?.branch || '').trim();
 
-if (!sGan || !sJiji) {
-  let seSel = document.querySelector('.sewoon-cell.selected');
+// 1) 전역 선택값(새 표에서 클릭 시 세팅됨)
+if ((!sGan || !sJiji) && window?.selectedSewoon) {
+  sGan  = sGan  || (window.selectedSewoon.stem   || '');
+  sJiji = sJiji || (window.selectedSewoon.branch || '');
+}
 
+// 2) 새 세운표 DOM 폴백: #basic-daeyun-table
+if (!sGan || !sJiji) {
+  const seSel = document.querySelector('#basic-daeyun-table .sewoon-cell.selected');
   if (seSel) {
-    sGan  = sGan  || seSel.dataset.stem   || '';
-    sJiji = sJiji || seSel.dataset.branch || '';
-   
-  } else {
-    // 🔹 선택된 세운이 없으면 무조건 '無'
-    sGan = '無';
-    sJiji = '無';
-    
+    sGan  = sGan  || seSel.dataset?.stem   || '';
+    sJiji = sJiji || seSel.dataset?.branch || '';
+    if ((!sGan || !sJiji) && seSel.innerText) {
+      const lines = seSel.innerText.trim().split('\n').map(s => s.trim());
+      const maybeGan = lines[0] || '';
+      const maybeJi  = lines[2] || lines[1] || '';
+      sGan  = sGan  || maybeGan.replace(/\s+/g, '');
+      sJiji = sJiji || maybeJi.replace(/\s+/g, '');
+    }
   }
-} else {
-  
+}
+
+// 3) (구) 구조 폴백: .sewoon-cell.selected (구 표)
+if (!sGan || !sJiji) {
+  const oldSel = document.querySelector('.sewoon-cell.selected');
+  if (oldSel) {
+    sGan  = sGan  || oldSel.dataset?.stem   || '';
+    sJiji = sJiji || oldSel.dataset?.branch || '';
+    if ((!sGan || !sJiji) && oldSel.innerText) {
+      const lines = oldSel.innerText.trim().split('\n').map(s => s.trim());
+      const maybeGan = lines[0] || '';
+      const maybeJi  = lines[2] || lines[1] || '';
+      sGan  = sGan  || maybeGan.replace(/\s+/g, '');
+      sJiji = sJiji || maybeJi.replace(/\s+/g, '');
+    }
+  }
+}
+
+// 최종 폴백: 無
+if (!sGan || !sJiji) {
+  sGan  = '無';
+  sJiji = '無';
 }
 
 // ---------- 한자 정규화 ----------
@@ -834,8 +895,10 @@ const tableA1 = `
 <td style="background:#efefef; color:red;">기준간지<br>(빨강색)</td>
   <!-- 천간칸: 천간만 빨강 -->
   ${extGanjiArr.map(gj => {
-    if (!gj) return `<td style="background:#cfebfd;">-</td>`;
-    return `<td style="background:#cfebfd;"><span style="color:red;">${gj[0]}</span><br>${gj[1]}</td>`;
+  const { stem, branch, ok } = splitGanjiSafe(gj);
+  return ok
+    ? `<td style="background:#cfebfd;"><span style="color:red;">${stem}</span><br>${branch}</td>`
+    : `<td style="background:#efcffd;">-</td>`;
   }).join('')}
 </tr>
 
@@ -863,8 +926,10 @@ const tableA2 = `
 <td style="background:#efefef; color:red;">기준간지<br>(빨강색)</td>
   <!-- 지지칸: 지지만 빨강 -->
   ${extGanjiArr.map(gj => {
-    if (!gj) return `<td style="background:#efcffd;">-</td>`;
-    return `<td style="background:#efcffd;">${gj[0]}<br><span style="color:red;">${gj[1]}</span></td>`;
+  const { stem, branch, ok } = splitGanjiSafe(gj);
+  return ok
+    ? `<td style="background:#efcffd;">${stem}<br><span style="color:red;">${branch}</span></td>`
+    : `<td style="background:#efcffd;">-</td>`;
   }).join('')}
 </tr>
 
@@ -892,9 +957,12 @@ const tableB = `
 <td style="background:#efefef; color:red;">기준간지<br>(빨강색)</td>
   <!-- 간지칸: 천간+지지 모두 빨강 -->
   ${extGanjiArr.map(gj =>
-    gj
-      ? `<td style="background:#fdebcf;"><span style="color:red;">${gj[0]}</span><br><span style="color:red;">${gj[1]}</span></td>`
-      : `<td style="background:#fdebcf;">-</td>`
+  (() => {
+    const { stem, branch, ok } = splitGanjiSafe(gj);
+    return ok
+      ? `<td style="background:#fdebcf;"><span style="color:red;">${stem}</span><br><span style="color:red;">${branch}</span></td>`
+      : `<td style="background:#fdebcf;">-</td>`;
+  })()
   ).join('')}
 </tr>
 
@@ -902,7 +970,13 @@ ${sinsalRowsGanji}
 </table>
 `;
 
-return tableA1 + tableA2 + tableB + `
+ return `
+ <div class="Etcsinsal-tables">
+   <div class="table-scroll">${tableA1}</div>
+   <div class="table-scroll">${tableA2}</div>
+   <div class="table-scroll">${tableB}</div>
+ </div>
+ ` + `
 <div class="note-box" style="text-align:center">
   ※ 일간,일지,일주 / 년간,년지,년주 / 대운,세운 칸의 셀들은 각각 노랑, 파랑, 초록 바탕색으로 구분하였음. <br>
   기본적으로 기준은 위의 표에서 [<span style="color:red;">빨강</span>]색으로 구분하였고, 특정 간지가 기준[<span style="color:red;">빨강색</span>]인 경우 해당칸에 따로 "기준"을 표기하였음.
@@ -914,9 +988,8 @@ return tableA1 + tableA2 + tableB + `
 
 }
 
-
-
-
+// 전역 등록 (중복 안전)
+window.renderEtcSinsalTable = window.renderEtcSinsalTable || renderEtcSinsalTable;
 
 
 
