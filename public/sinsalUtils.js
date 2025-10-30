@@ -79,8 +79,9 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
   const toHanBranch = (typeof window.toHanBranch === 'function') ? window.toHanBranch : (v => String(v || ''));
 
   const s = window.saju || {};
-  const bStem = toHanStem(baseStem); // ← 각 표에서 넘겨준 기준 천간만 사용
-
+ const bStem = toHanStem(baseStem);
+ const UNMAP = (window.unseongMap12 || unseongMap12) || {};
+ const bStemValid = !!UNMAP[bStem];    // (注) 戊/己 등 매핑 없는 경우가 있음
   // ⭐ 대운/세운은 "Etc 신살"과 동일 로직 공용 헬퍼로 통일
   const { daeyunBranchHan, sewoonBranchHan } = (window.__getCurrentDaeyunSewoonHan?.() || {});
 
@@ -97,7 +98,7 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
  const branches = branchesRaw.map(v => toHanBranch(v));
 
   const tds = branches.map((br, i) => {
-    const u = (bStem && br) ? __unseongOf(bStem, br) : '';
+    const u = (bStemValid && br) ? __unseongOf(bStem, br) : '';
     return `
       <td style="min-width:60px; padding:6px; text-align:center;">
         <div>${labels[i]}</div>
