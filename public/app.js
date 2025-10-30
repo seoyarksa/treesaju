@@ -1667,7 +1667,7 @@ window.startSixMonthPlan = function () {
 // ✅ 전화인증 가드: 인증 OK면 true, 모달 띄우면 false
 // daysValid: 인증 유효일수(기본 3일). 테스트로 항상 모달 띄우려면 daysValid=0 로 호출.
 // ✅ 전화번호 인증 유효기간: 시간 단위 (기본 1시간)
-window.requirePhoneVerificationIfNeeded = async function(hoursValid = 1) {
+window.requirePhoneVerificationIfNeeded = async function(daysValid = 3) {
   try {
     const { data: { user } } = await window.supabaseClient.auth.getUser();
     if (!user) {
@@ -1687,14 +1687,12 @@ window.requirePhoneVerificationIfNeeded = async function(hoursValid = 1) {
       return false;
     }
 
-    const isFlagTrue = prof?.phone_verified === true; // ✅ 플래그 반드시 true여야 함
+    const isFlagTrue = prof?.phone_verified === true;              // ✅ 1순위: 플래그
     const ts = prof?.phone_verified_at ? new Date(prof.phone_verified_at).getTime() : 0;
+    const validMs = Math.max(0, daysValid) * 24 * 60 * 60 * 1000;
+    const isWithinWindow = (daysValid > 0) && ts > 0 && (Date.now() - ts) <= validMs; // 보조: 기간
 
-    // ⏱ 유효기간: hoursValid 시간
-    const validMs = Math.max(0, Number(hoursValid)) * 60 * 60 * 1000;
-    const isWithinWindow = hoursValid <= 0 ? false : (ts > 0 && (Date.now() - ts) <= validMs);
-
-    const ok = isFlagTrue && isWithinWindow;
+    const ok = isFlagTrue || isWithinWindow;                       // ✅ 플래그 우선 + 기간 보조
 
     if (!ok) {
       typeof openPhoneOtpModal === "function" ? openPhoneOtpModal() : alert("전화 인증이 필요합니다.");
@@ -1707,6 +1705,7 @@ window.requirePhoneVerificationIfNeeded = async function(hoursValid = 1) {
     return false;
   }
 };
+
 
 
 
