@@ -269,6 +269,17 @@ export function renderEtcSinsalTable({ sajuGanArr, sajuJijiArr, sajuGanjiArr, co
   const MONTH_INDEX = 2;
   const monthJiji = sajuJijiArr?.[MONTH_INDEX];
 
+// 2글자 간지 안전 분리
+function splitGanjiSafe(gj) {
+  const s = (gj || '').trim();
+  const stem = s[0];
+  const branch = s[1];
+  const isStem = /[甲乙丙丁戊己庚辛壬癸]/.test(stem || '');
+  const isBranch = /[子丑寅卯辰巳午未申酉戌亥]/.test(branch || '');
+  return { stem: isStem ? stem : '', branch: isBranch ? branch : '', ok: isStem && isBranch };
+}
+
+
   // ① 폴백 맵
   const KOR_HAN_STEM   = { 갑:'甲', 을:'乙', 병:'丙', 정:'丁', 무:'戊', 기:'己', 경:'庚', 신:'辛', 임:'壬', 계:'癸' };
   const KOR_HAN_BRANCH = { 자:'子', 축:'丑', 인:'寅', 묘:'卯', 진:'辰', 사:'巳', 오:'午', 미:'未', 신:'申', 유:'酉', 술:'戌', 해:'亥' };
@@ -884,8 +895,10 @@ const tableA1 = `
 <td style="background:#efefef; color:red;">기준간지<br>(빨강색)</td>
   <!-- 천간칸: 천간만 빨강 -->
   ${extGanjiArr.map(gj => {
-    if (!gj) return `<td style="background:#cfebfd;">-</td>`;
-    return `<td style="background:#cfebfd;"><span style="color:red;">${gj[0]}</span><br>${gj[1]}</td>`;
+  const { stem, branch, ok } = splitGanjiSafe(gj);
+  return ok
+    ? `<td style="background:#efcffd;">${stem}<br><span style="color:red;">${branch}</span></td>`
+    : `<td style="background:#efcffd;">-</td>`;
   }).join('')}
 </tr>
 
@@ -913,8 +926,10 @@ const tableA2 = `
 <td style="background:#efefef; color:red;">기준간지<br>(빨강색)</td>
   <!-- 지지칸: 지지만 빨강 -->
   ${extGanjiArr.map(gj => {
-    if (!gj) return `<td style="background:#efcffd;">-</td>`;
-    return `<td style="background:#efcffd;">${gj[0]}<br><span style="color:red;">${gj[1]}</span></td>`;
+  const { stem, branch, ok } = splitGanjiSafe(gj);
+  return ok
+    ? `<td style="background:#efcffd;">${stem}<br><span style="color:red;">${branch}</span></td>`
+    : `<td style="background:#efcffd;">-</td>`;
   }).join('')}
 </tr>
 
@@ -942,9 +957,12 @@ const tableB = `
 <td style="background:#efefef; color:red;">기준간지<br>(빨강색)</td>
   <!-- 간지칸: 천간+지지 모두 빨강 -->
   ${extGanjiArr.map(gj =>
-    gj
-      ? `<td style="background:#fdebcf;"><span style="color:red;">${gj[0]}</span><br><span style="color:red;">${gj[1]}</span></td>`
-      : `<td style="background:#fdebcf;">-</td>`
+  (() => {
+    const { stem, branch, ok } = splitGanjiSafe(gj);
+    return ok
+      ? `<td style="background:#fdebcf;"><span style="color:red;">${stem}</span><br><span style="color:red;">${branch}</span></td>`
+      : `<td style="background:#fdebcf;">-</td>`;
+  })()
   ).join('')}
 </tr>
 
