@@ -331,29 +331,27 @@ function updateBasicSewoonCells(sewoonReversed) {
   }
 
   // 새로운 세운 셀 추가
-  sewoonReversed.forEach(({ stem, branch, year }) => {
-    // ✅ 월간 기준 → 일간 기준으로 변경
-    const tenGod = tenGodBaseStem ? getTenGod(tenGodBaseStem, stem) : "";
+ // ✅ 반드시 루프 “안”에서 구조분해한 stem/branch 사용
+ sewoonReversed.forEach(({ stem, branch, year }) => {
+   const tenGod = tenGodBaseStem ? getTenGod(tenGodBaseStem, stem) : "";
 
-    const td = document.createElement("td");
-    td.classList.add("sewoon-cell");
-    td.setAttribute("data-year", year);
-   td.setAttribute("data-stem", stem);    // ★ 추가
-   td.setAttribute("data-branch", branch); // ★ 추가
-    td.style.textAlign = "center";
-    td.style.verticalAlign = "middle";
+   const td = document.createElement("td");
+   td.classList.add("sewoon-cell");
+   td.dataset.year = String(year);
+   td.dataset.stem = String(stem);
+   td.dataset.branch = String(branch);
+   td.style.textAlign = "center";
+   td.style.verticalAlign = "middle";
 
-    td.innerHTML = `
-      <div>${colorize(stem)}</div>
-      ${tenGod ? `<div style="font-size:0.75rem; color:#999;">(${tenGod})</div>` : ""}
-      <div>${colorize(branch)}</div>
-    `;
+   td.innerHTML = `
+    <div>${colorize(stem)}</div>
+     ${tenGod ? `<div style="font-size:0.75rem; color:#999;">(${tenGod})</div>` : ""}
+     <div>${colorize(branch)}</div>
+   `;
 
-    // ✅ 세운 클릭 처리
-    td.addEventListener("click", () => basicSewoonClick(td, stem, branch, year));
-
-    daeyunRow.appendChild(td);
-  });
+   td.addEventListener("click", () => basicSewoonClick(td, stem, branch, year));
+   daeyunRow.appendChild(td);
+ });
 
   // 나머지 UI 갱신 부분은 그대로 유지
   document.querySelector("#dangryeong-cell").innerHTML = makeSajuInfoTable();
@@ -605,7 +603,7 @@ window.rerenderEtcSinsal = function rerenderEtcSinsal() {
     }
 
     // 사주 기본 4주 배열 확보
-const { gan: sajuGanArr, jiji: sajuJijiArr, ganji: sajuGanjiArr } = __getSajuArra
+ const { gan: sajuGanArr, jiji: sajuJijiArr, ganji: sajuGanjiArr } = globalThis.__getSajuArraysSafe();
     const gender = window?.gender;
 
     // ★ 여기서만 호출
