@@ -52,6 +52,13 @@ import { renderhapshinTable
         
       } from './gyeokUtils.js';
 
+import { renderSinsalTable, 
+         getUnseong, 
+         getSinsal, 
+         getSamhapKeyByJiji, 
+         renderEtcSinsalTable
+      } from './sinsalUtils.js';
+
 
 
 const stemOrder = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
@@ -516,9 +523,17 @@ export function highlightInitialSewoon() {
 
 
 // 전역 신살 리렌더러
+// 전역 신살 리렌더러 (컨테이너: #etc-sinsal-box)
 window.rerenderEtcSinsal = function rerenderEtcSinsal() {
   try {
-    // 사주 4주 배열: 있으면 그대로, 없으면 window.saju에서 보강
+    // ★ 전역에서 안전하게 참조 (식별자 직접 호출 금지)
+    const renderer = (typeof globalThis !== 'undefined') ? globalThis.renderEtcSinsalTable : null;
+    if (typeof renderer !== 'function') {
+      console.warn('[rerenderEtcSinsal] renderEtcSinsalTable 미로딩. 스크립트 순서/전역등록 확인 필요');
+      return;
+    }
+
+    // 사주 기본 4주 배열 확보
     const sajuGanArr  = window?.sajuGanArr  ?? (window?.saju
       ? [window.saju.sigan?.stem, window.saju.ilgan?.stem, window.saju.wolgan?.stem, window.saju.nyeongan?.stem].map(v => v || '')
       : []);
@@ -531,11 +546,10 @@ window.rerenderEtcSinsal = function rerenderEtcSinsal() {
         : []
     );
 
-    // 성별 등 컨텍스트
     const gender = window?.gender;
 
-    // 신살 표 렌더
-    const html = renderEtcSinsalTable({
+    // ★ 여기서만 호출
+    const html = renderer({
       sajuGanArr,
       sajuJijiArr,
       sajuGanjiArr,
@@ -546,13 +560,9 @@ window.rerenderEtcSinsal = function rerenderEtcSinsal() {
       },
     });
 
-    // 실제 컨테이너 ID로 교체하세요 (#etc-sinsal 가정)
-    const box = document.querySelector('#etc-sinsal-box'); // ★ 여기!
-    if (box) {
-      box.innerHTML = html;
-    } else {
-      console.warn('[rerenderEtcSinsal] 컨테이너 #etc-sinsal-box 를 찾지 못했습니다.');
-    }
+    const box = document.querySelector('#etc-sinsal-box');
+    if (box) box.innerHTML = html;
+    else console.warn('[rerenderEtcSinsal] 컨테이너 #etc-sinsal-box 없음');
   } catch (e) {
     console.warn('[rerenderEtcSinsal] 렌더 실패:', e);
   }

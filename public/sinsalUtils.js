@@ -964,7 +964,7 @@ return tableA1 + tableA2 + tableB + `
 
 }
 
-
+globalThis.renderEtcSinsalTable ??= renderEtcSinsalTable;  // ★ 전역 노출
 
 
 
