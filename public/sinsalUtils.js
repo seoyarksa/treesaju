@@ -897,7 +897,7 @@ const tableA1 = `
   ${extGanjiArr.map(gj => {
   const { stem, branch, ok } = splitGanjiSafe(gj);
   return ok
-    ? `<td style="background:#efcffd;">${stem}<br><span style="color:red;">${branch}</span></td>`
+    ? `<td style="background:#cfebfd;"><span style="color:red;">${stem}</span><br>${branch}</td>`
     : `<td style="background:#efcffd;">-</td>`;
   }).join('')}
 </tr>
