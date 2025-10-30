@@ -93,6 +93,7 @@ window.getSajuArrays ||= function getSajuArrays() {
 };
 
 window.renderSinsalNow ||= function renderSinsalNow(extraCtx = {}) {
+  
   try {
     const renderer = globalThis.renderEtcSinsalTable;        // 전역 등록된 렌더러
     if (typeof renderer !== 'function') {
@@ -105,6 +106,7 @@ window.renderSinsalNow ||= function renderSinsalNow(extraCtx = {}) {
     if (!sajuGanArr.every(Boolean) || !sajuJijiArr.every(Boolean)) {
       console.warn('[renderSinsalNow] 사주 4칸 미완성 → 렌더 보류');
       return;
+  
     }
 
     const html = renderer({

@@ -108,34 +108,52 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
   const toHanBranch = (typeof window.toHanBranch === 'function') ? window.toHanBranch : (v => String(v || ''));
 
   const s = window.saju || {};
- const bStem = toHanStem(baseStem);
- const UNMAP = (window.unseongMap12 || unseongMap12) || {};
- const bStemValid = !!UNMAP[bStem];    // (注) 戊/己 등 매핑 없는 경우가 있음
-  // ⭐ 대운/세운은 "Etc 신살"과 동일 로직 공용 헬퍼로 통일
-  const { daeyunBranchHan, sewoonBranchHan } = (window.__getCurrentDaeyunSewoonHan?.() || {});
 
-  const labels   = ['시','일','월','년','대운','세운'];
+  // 1) 기준천간 한자화 + 맵 유효성
+  const bStem = toHanStem(baseStem);
+  const UNMAP = (window.unseongMap12 || unseongMap12) || {};
+  const bStemValid = !!UNMAP[bStem];    // (注) 戊/己 등 맵 없는 경우가 있음
+
+  // 2) 대운/세운 "원본" 가져오기 (Etc 신살과 동일 헬퍼)
+  const pick = (window.__getCurrentDaeyunSewoonHan?.() || {});
+  const dyRaw = pick.daeyunBranchHan || '';
+  const syRaw = pick.sewoonBranchHan || '';
+
+  // 3) 지지 원본 배열 (시/일/월/년 + 대운/세운)
   const branchesRaw = [
-    toHanBranch(s.hourBranch || ''),
-    toHanBranch(s.dayBranch  || ''),
-    toHanBranch(s.monthBranch|| ''),
-    toHanBranch(s.yearBranch || ''),
-    daeyunBranchHan || '',
-    sewoonBranchHan || ''
+    (s.hourBranch || ''),
+    (s.dayBranch  || ''),
+    (s.monthBranch|| ''),
+    (s.yearBranch || ''),
+    dyRaw,
+    syRaw
   ];
- // ★ 여기서만 정규화 (최종 계산 직전 단 한 번)
- const branches = branchesRaw.map(v => toHanBranch(v));
 
+  // 4) 최종 시점에 "한 번만" 정규화
+  const branches = branchesRaw.map(v => toHanBranch(v));
+  const labels   = ['시','일','월','년','대운','세운'];
+
+  // ── 🔎 디버그 로그: 한 번에 흐름 확인
+  console.groupCollapsed('%c[UNSEONG] render', 'color:#ff0');
+  console.log('caption:', caption);
+  console.log('baseStem(raw):', baseStem, '→ bStem(han):', bStem, 'valid:', bStemValid);
+  console.log('pick(raw)  :', pick);                 // { daeyunBranchHan, sewoonBranchHan } 원본
+  console.log('branchesRaw:', branchesRaw);          // 정규화 전(원본)
+  console.log('branches(han):', branches);           // 정규화 후(표에 찍힐 값)
+  console.groupEnd();
+
+  // 5) 셀 생성
   const tds = branches.map((br, i) => {
     const u = (bStemValid && br) ? __unseongOf(bStem, br) : '';
     return `
       <td style="min-width:60px; padding:6px; text-align:center;">
         <div>${labels[i]}</div>
         <div>${br || '-'}</div>
-        <div class="unseong-tag" style="font-size:.9em;">${u || '-'}</div>
+        <div class="unseong-tag" style="font-size:.9em; color:#c21;">${u || '-'}</div>
       </td>`;
   }).join('');
 
+  // 6) 표 반환
   return `
     <table class="sinsal-bottom unseong-table" border="1"
            style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px;">
