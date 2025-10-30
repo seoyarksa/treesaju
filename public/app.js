@@ -1923,10 +1923,10 @@ document.getElementById("gwBtnInicis").addEventListener("click", () => {
 
         <div class="plan">
           <ul>
-            <li><strong>3개월 구독</strong>: 1일 60회 · <strong>3개월간 60,000원</strong></li>
-            <li><strong>6개월 구독</strong>: 1일 60회 · <strong>6개월간 100,000원</strong></li>
-            <li><strong>정기구독</strong> (기본): 1일 60회 · <strong>월 11,000원</strong></li>
-            <li><strong>정기구독+</strong> (플러스): 1일 150회 · <strong>월 16,500원</strong></li>
+            <li><strong>3개월 일반 결제</strong>: 1일 60회 · <strong>3개월간 60,000원[일시불]</strong></li>
+            <li><strong>6개월 일반 결제</strong>: 1일 60회 · <strong>6개월간 100,000원[일시불]</strong></li>
+            <li><strong>프리미엄 정기구독 결제</strong> (기본): 1일 60회 · <strong>월 11,000원</strong></li>
+            <li><strong>프리미엄+ 정기구독 결제</strong> (플러스): 1일 150회 · <strong>월 16,500원</strong></li>
           </ul>
         </div>
 
