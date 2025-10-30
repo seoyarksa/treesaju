@@ -163,22 +163,116 @@ const sinsalRow  = `<tr id="sinsal-row"><th>12신살</th>${jijiArr.map(() => `<t
       </tbody>
     </table>
 
-<!-- 추가: 7줄 × 17칸 빈 그리드 -->
-* 천간별 12운성표
-  <table class="sinsal-bottom sinsal-extra-7x17" border="1"
-         style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px;">
-    <tbody>
-      ${
-        Array.from({ length: 7 }, (_, r) => `
-          <tr>
-            ${Array.from({ length: 17 }, (_, c) =>
-              `<td data-r="${r}" data-c="${c}" style="padding:6px; min-width:38px; text-align:center;">&nbsp;</td>`
-            ).join('')}
-          </tr>
-        `).join('')
+<!-- 추가: 7줄 × 17칸 (자동 채움) -->
+<br> * 천간별 12운성표
+<table class="sinsal-bottom sinsal-extra-7x17" border="1"
+       style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px;">
+  <tbody>
+    ${(() => {
+      // 전역 saju에서 간/지 (시,일,월,년 순)
+      const s = window.saju || {};
+      const toStr = v => (v ?? '').toString();
+
+      // 한자 정규화 유틸(있으면 사용)
+      const _toHanStem   = (typeof toHanStem === 'function')   ? toHanStem   : (v => toStr(v));
+      const _toHanBranch = (typeof toHanBranch === 'function') ? toHanBranch : (v => toStr(v));
+
+      const stems = [
+        _toHanStem(s.hourGan),   // 시간
+        _toHanStem(s.dayGan),    // 일간
+        _toHanStem(s.monthGan),  // 월간
+        _toHanStem(s.yearGan)    // 년간
+      ];
+      const branches = [
+        _toHanBranch(s.hourBranch),  // 시지
+        _toHanBranch(s.dayBranch),   // 일지
+        _toHanBranch(s.monthBranch), // 월지
+        _toHanBranch(s.yearBranch)   // 년지
+      ];
+
+      // 지장간 추출
+      const getHiddenStems = (ji) => {
+        const map = (window.jijiToSibganMap || window.jiji_to_sibgan_map || {});
+        const key = _toHanBranch(ji);
+        const raw = map?.[key];
+        if (!raw) return [];
+        if (Array.isArray(raw)) {
+          return raw
+            .map(x => (typeof x === 'string') ? x : (x?.stem || x?.gan || ''))
+            .filter(Boolean);
+        }
+        if (typeof raw === 'object') {
+          const arr = [
+            raw.stem, raw.gan, raw.jang, raw.middle, raw.joong, raw.cheongan
+          ].filter(Boolean);
+          return arr;
+        }
+        return [];
+      };
+
+      // 12운성 계산 (우선 get12Unseong → 맵)
+      const getUnseong = (stem, branch) => {
+        const a = stem ? _toHanStem(stem) : '';
+        const b = branch ? _toHanBranch(branch) : '';
+        if (!a || !b) return '';
+        if (typeof window.get12Unseong === 'function') {
+          try { return window.get12Unseong(a, b) || ''; } catch {}
+        }
+        const m = window.UNSEONG_MAP;
+        if (m && m[a] && m[a][b]) return m[a][b];
+        return '';
+      };
+
+      // 1행(0행) 2번째 칸부터 넣을 값: [시 간, 시 지장, 일 간, 일 지장, 월 간, 월 지장, 년 간, 년 지장]
+      const firstRowSeq = [];
+      for (let i = 0; i < 4; i++) {
+        firstRowSeq.push(stems[i] || '');
+        const hs = getHiddenStems(branches[i] || '');
+        firstRowSeq.push(hs.length ? hs.join('/') : '');
       }
-    </tbody>
-  </table>
+
+      // 1열(0열) 2행부터: [시지, 일지, 월지, 년지, 대운지, 세운지] (+ 12운성: 일간 기준)
+      const baseStem = stems[1] || _toHanStem(s.dayGan); // 일간
+      const daewoonBranch = _toHanBranch(window?.selectedDaewoon?.branch || '');
+      const sewoonBranch  = _toHanBranch(window?.selectedSewoon?.branch  || '');
+      const firstColSeq = [
+        branches[0] || '', branches[1] || '', branches[2] || '', branches[3] || '',
+        daewoonBranch, sewoonBranch
+      ];
+
+      let html = '';
+      for (let r = 0; r < 7; r++) {
+        html += '<tr>';
+        for (let c = 0; c < 17; c++) {
+          let content = '&nbsp;';
+
+          // 규칙 ①: 첫 줄(0행) → 2번째 칸(1열)부터 시퀀스 배치
+          if (r === 0 && c >= 1) {
+            const idx = c - 1;
+            if (idx < firstRowSeq.length && firstRowSeq[idx]) {
+              content = firstRowSeq[idx];
+            }
+          }
+
+          // 규칙 ②: 첫 칸(0열) → 2번째 줄(1행)부터 지지(+ 12운성) 배치
+          if (c === 0 && r >= 1) {
+            const idx = r - 1;
+            const br = firstColSeq[idx] || '';
+            if (br) {
+              const us = getUnseong(baseStem, br);
+              content = us ? `${br}<br><span class="unseong-tag">(${us})</span>` : br;
+            }
+          }
+
+          html += `<td data-r="${r}" data-c="${c}" style="padding:6px; min-width:38px; text-align:center;">${content}</td>`;
+        }
+        html += '</tr>';
+      }
+      return html;
+    })()}
+  </tbody>
+</table>
+
 
   `;
 }
