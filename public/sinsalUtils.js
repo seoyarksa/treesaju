@@ -57,6 +57,30 @@ export function getSipsin(dayGan, targetGan) {
 
 
 //천간별 12운성 구하기 시작////////////////////////////
+// ── Han converter polyfills (idempotent)
+(function ensureHanConverters(){
+  if (typeof window.toHanStem !== 'function'){
+    const H = '甲乙丙丁戊己庚辛壬癸';
+    const K2H = {갑:'甲', 을:'乙', 병:'丙', 정:'丁', 무:'戊', 기:'己', 경:'庚', 신:'辛', 임:'壬', 계:'癸'};
+    window.toHanStem = v => {
+      const s = String(v ?? '').trim();
+      if (!s) return '';
+      if (H.includes(s[0])) return s[0];     // 이미 한자
+      return K2H[s] || '';
+    };
+  }
+  if (typeof window.toHanBranch !== 'function'){
+    const H = '子丑寅卯辰巳午未申酉戌亥';
+    const K2H = {자:'子', 축:'丑', 인:'寅', 묘:'卯', 진:'辰', 사:'巳', 오:'午', 미:'未', 신:'申', 유:'酉', 술:'戌', 해:'亥'};
+    window.toHanBranch = v => {
+      const s = String(v ?? '').trim();
+      if (!s) return '';
+      if (H.includes(s[0])) return s[0];     // 이미 한자
+      return K2H[s] || '';
+    };
+  }
+})();
+
 // 고정: 子 → 亥 순서 (없으면 선언)
 // 子→亥 고정 순서 (중복 선언 방지)
 window.BRANCH_ORDER = window.BRANCH_ORDER || ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
