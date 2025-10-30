@@ -4749,7 +4749,11 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
 </td>
 </tr>
 
-
+  <tr>
+    <td colspan="2">
+      <div id="etc-sinsal-box"></div>
+    </td>
+  </tr>
 
     </tbody>
   </table>
@@ -4771,20 +4775,12 @@ document.getElementById('sinsal-section').innerHTML = `
 
 <table class="layout-table">
   <tr>
-    <td style="width:50%;">
-      <div class="daeyun-table-container"></div>
-      <div id="yearly-series" style="margin-top: 1rem;"></div>
-      <div id="yearly-ganji-container" style="margin-top: 20px;"></div>
-    </td>
+
     <td style="width:50%;">
       <div id="sinsal-box"></div>
     </td>
   </tr>
-  <tr>
-    <td colspan="2">
-      <div id="etc-sinsal-box"></div>
-    </td>
-  </tr>
+
 </table>
 
 
