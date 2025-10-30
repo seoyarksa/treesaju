@@ -57,92 +57,82 @@ export function getSipsin(dayGan, targetGan) {
 
 
 //천간별 12운성 구하기 시작////////////////////////////
-// 고정: 子 → 亥 순서
-const BRANCH_ORDER = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+// 고정: 子 → 亥 순서 (없으면 선언)
+const BRANCH_ORDER = window.BRANCH_ORDER || ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
 
-// 새 대운/세운 표에서 선택된 지지 폴백 (그대로 유지)
-function __getSelectedDaeyunBranch(toHanBranch) {
-  if (window?.selectedDaewoon?.branch) return toHanBranch ? toHanBranch(window.selectedDaewoon.branch) : window.selectedDaewoon.branch;
-  const d = document.querySelector('#basic-daeyun-table .daeyun-cell.selected');
-  if (d?.dataset?.branch) return toHanBranch ? toHanBranch(d.dataset.branch) : d.dataset.branch;
-  if (d?.innerText) {
-    const lines = d.innerText.trim().split('\n').map(s=>s.trim());
-    const maybe = lines[2] || lines[1] || '';
-    return toHanBranch ? toHanBranch(maybe) : maybe;
-  }
-  return '';
-}
-function __getSelectedSewoonBranch(toHanBranch) {
-  if (window?.selectedSewoon?.branch) return toHanBranch ? toHanBranch(window.selectedSewoon.branch) : window.selectedSewoon.branch;
-  const s = document.querySelector('#basic-daeyun-table .sewoon-cell.selected');
-  if (s?.dataset?.branch) return toHanBranch ? toHanBranch(s.dataset.branch) : s.dataset.branch;
-  if (s?.innerText) {
-    const lines = s.innerText.trim().split('\n').map(s=>s.trim());
-    const maybe = lines[2] || lines[1] || '';
-    return toHanBranch ? toHanBranch(maybe) : maybe;
-  }
-  return '';
-}
-
-// 기준 선택: '시간' | '일간' | '월간' | '년간'
-function __getBaseStemByMode(mode = '일간') {
-  const s = window.saju || {};
-  if (mode === '시간') return s.hourGan;
-  if (mode === '일간') return s.dayGan;
-  if (mode === '월간') return s.monthGan;
-  if (mode === '년간') return s.yearGan;
-  return s.dayGan;
-}
-
-// ★ 핵심: 맵 인덱싱으로 바로 12운성 반환
-function __unseongOf(baseStem, branch) {
-  const stem = typeof window.toHanStem === 'function' ? window.toHanStem(baseStem) : String(baseStem || '');
-  const br   = typeof window.toHanBranch === 'function' ? window.toHanBranch(branch) : String(branch || '');
-  if (!stem || !br) return '';
-  const seq = unseongMap12[stem];              // 이미 import된 맵 사용
-  if (!seq) return '';                          // (注) 戊/己는 맵에 없으면 빈값
-  const idx = BRANCH_ORDER.indexOf(br);
+// 12운성 맵 인덱싱 (한자 정규화는 있으면 사용)
+function __unseongOf(stem, branch) {
+  const toHanStem   = (typeof window.toHanStem   === 'function') ? window.toHanStem   : (v => String(v || ''));
+  const toHanBranch = (typeof window.toHanBranch === 'function') ? window.toHanBranch : (v => String(v || ''));
+  const S = toHanStem(stem);
+  const B = toHanBranch(branch);
+  const seq = (window.unseongMap12 || unseongMap12)?.[S];
+  if (!seq) return ''; // (注) 戊/己 등 맵에 없으면 빈값
+  const idx = BRANCH_ORDER.indexOf(B);
   return idx >= 0 ? (seq[idx] || '') : '';
 }
 
-// 12운성 표 1개 렌더러: 기준(mode) vs [시·일·월·년·대운·세운] 지지
-function renderUnseongByBranches({ mode = '일간', caption } = {}) {
+// 새 대운/세운 표에서 선택된 지지 폴백(그대로 유지)
+function __getSelectedDaeyunBranch() {
   const toHanBranch = (typeof window.toHanBranch === 'function') ? window.toHanBranch : (v => v);
-  const toHanStem   = (typeof window.toHanStem   === 'function') ? window.toHanStem   : (v => v);
+  if (window?.selectedDaewoon?.branch) return toHanBranch(window.selectedDaewoon.branch);
+  const d = document.querySelector('#basic-daeyun-table .daeyun-cell.selected');
+  if (d?.dataset?.branch) return toHanBranch(d.dataset.branch);
+  if (d?.innerText) {
+    const lines = d.innerText.trim().split('\n').map(s=>s.trim());
+    return toHanBranch(lines[2] || lines[1] || '');
+  }
+  return '';
+}
+function __getSelectedSewoonBranch() {
+  const toHanBranch = (typeof window.toHanBranch === 'function') ? window.toHanBranch : (v => v);
+  if (window?.selectedSewoon?.branch) return toHanBranch(window.selectedSewoon.branch);
+  const s = document.querySelector('#basic-daeyun-table .sewoon-cell.selected');
+  if (s?.dataset?.branch) return toHanBranch(s.dataset.branch);
+  if (s?.innerText) {
+    const lines = s.innerText.trim().split('\n').map(s=>s.trim());
+    return toHanBranch(lines[2] || lines[1] || '');
+  }
+  return '';
+}
+
+// ✅ 핵심: 전달받은 baseStem '그대로' 기준으로 테이블 렌더
+function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
+  const toHanStem   = (typeof window.toHanStem   === 'function') ? window.toHanStem   : (v => String(v || ''));
+  const toHanBranch = (typeof window.toHanBranch === 'function') ? window.toHanBranch : (v => String(v || ''));
 
   const s = window.saju || {};
-  const baseStem = __getBaseStemByMode(mode);
-  const bStemHan = baseStem ? toHanStem(baseStem) : '';
+  const bStem = toHanStem(baseStem); // ← 전달받은 기준 천간만 사용(디폴트/모드 없음)
 
-  const labels   = ['시', '일', '월', '년', '대운', '세운'];
+  const labels   = ['시','일','월','년','대운','세운'];
   const branches = [
     s.hourBranch, s.dayBranch, s.monthBranch, s.yearBranch,
-    __getSelectedDaeyunBranch(toHanBranch),
-    __getSelectedSewoonBranch(toHanBranch)
-  ].map(v => v ? toHanBranch(v) : '');
+    __getSelectedDaeyunBranch(), __getSelectedSewoonBranch()
+  ].map(toHanBranch);
 
   const tds = branches.map((br, i) => {
-    const u = (bStemHan && br) ? __unseongOf(bStemHan, br) : '';
+    const u = (bStem && br) ? __unseongOf(bStem, br) : '';
     return `
       <td style="min-width:60px; padding:6px; text-align:center;">
         <div>${labels[i]}</div>
         <div>${br || '-'}</div>
-        <div style="font-size:.85em; opacity:.85;">${u || '-'}</div>
+        <div class="unseong-tag" style="font-size:.9em;">${u || '-'}</div>
       </td>`;
   }).join('');
-
-  const title = caption || `12운성 (${mode} 기준) · 기준 천간: <span style="color:#1976d2">${bStemHan || '-'}</span>`;
 
   return `
     <table class="sinsal-bottom unseong-table" border="1"
            style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px;">
       <thead>
-        <tr><th colspan="6" style="padding:6px; background:#f5fbff;">${title}</th></tr>
+        <tr><th colspan="6" style="padding:6px; background:#f5fbff;">
+          ${caption} · 기준 천간: <span style="color:#1976d2">${bStem || '-'}</span>
+        </th></tr>
       </thead>
       <tbody><tr>${tds}</tr></tbody>
     </table>
   `;
 }
+
 
 
 //천간별 12운성 구하기 끝////////////////////////////
@@ -240,6 +230,11 @@ const sinsalRow  = `<tr id="sinsal-row"><th>12신살</th>${jijiArr.map(() => `<t
 
 
       ${colCss} /* 🔸 동적으로 생성된 열 강조 CSS */
+
+        .unseong-tag { color:#d00000 !important; font-weight:700; 
+        }
+
+
     </style>
   `;
 
@@ -262,15 +257,16 @@ const sinsalRow  = `<tr id="sinsal-row"><th>12신살</th>${jijiArr.map(() => `<t
     </table>
 
 <!-- 추가: 7줄 × 17칸 (자동 채움) -->
-<br> * 천간별 12운성표
+<br> * 천간별 12운성표 [위의 표에서는 원하는 천간의 지지별 12운성(신살)을 바로 확인할 수 있습니다.]
 <table class="sinsal-bottom sinsal-extra-7x17" border="1"
        style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px;">
   <tbody>
 
-${renderUnseongByBranches({ baseStem: window.saju?.hourGan,  caption:'12운성 (시간 기준)' })}
-${renderUnseongByBranches({baseStem: (window.saju?.dayGan || ''),  caption: '12운성 (일간 기준 · 지지별/대운·세운 포함)'})}
-${renderUnseongByBranches({ baseStem: window.saju?.monthGan, caption:'12운성 (월간 기준)' })}
-${renderUnseongByBranches({ baseStem: window.saju?.yearGan,  caption:'12운성 (년간 기준)' })}
+${renderUnseongByBranches({ baseStem: window.saju?.hourGan,  caption:'12운성 (시간 기준 · 지지별/대운·세운 포함)' })}
+${renderUnseongByBranches({ baseStem: window.saju?.dayGan  , caption:'12운성 (일간 기준 · 지지별/대운·세운 포함)' })}
+${renderUnseongByBranches({ baseStem: window.saju?.monthGan, caption:'12운성 (월간 기준 · 지지별/대운·세운 포함)' })}
+${renderUnseongByBranches({ baseStem: window.saju?.yearGan , caption:'12운성 (년간 기준 · 지지별/대운·세운 포함)' })}
+
 
   </tbody>
 </table>
