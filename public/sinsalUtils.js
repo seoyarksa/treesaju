@@ -162,6 +162,23 @@ const sinsalRow  = `<tr id="sinsal-row"><th>12신살</th>${jijiArr.map(() => `<t
         <tr id="mini-unseong-row" style="display:none;"><td colspan="13" style="padding:6px;"></td></tr>
       </tbody>
     </table>
+
+<!-- 추가: 7줄 × 17칸 빈 그리드 -->
+  <table class="sinsal-bottom sinsal-extra-7x17" border="1"
+         style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px;">
+    <tbody>
+      ${
+        Array.from({ length: 7 }, (_, r) => `
+          <tr>
+            ${Array.from({ length: 17 }, (_, c) =>
+              `<td data-r="${r}" data-c="${c}" style="padding:6px; min-width:38px; text-align:center;">&nbsp;</td>`
+            ).join('')}
+          </tr>
+        `).join('')
+      }
+    </tbody>
+  </table>
+
   `;
 }
 
