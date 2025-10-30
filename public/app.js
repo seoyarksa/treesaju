@@ -5188,7 +5188,42 @@ window.rerenderSinsal = rerenderSinsal;
 
 
 
+
+
+
+
+
 /////////////////12신살,12운성출력 끝 /////////////////////////////////////
+
+
+
+
+
+// 기본 대운/세운표에서 현재 선택값을 읽는 최소 헬퍼
+window.__readBasicFortune = {
+  daeyun(){
+    // 1) renderBasicDaeyunTable이 남겨둔 전역(있다면)
+    if (window.basicDaeyunSelected?.stem && window.basicDaeyunSelected?.branch)
+      return window.basicDaeyunSelected;
+
+    // 2) fortuneState(이미 쓰고 있다면)
+    if (window.fortuneState?.daeyun?.stem && window.fortuneState?.daeyun?.branch)
+      return window.fortuneState.daeyun;
+
+    // 3) DOM(기본표 컨테이너 기준)
+    const td = document.querySelector('#daeyun-basic .daeyun-selected');
+    return td ? { stem: td.dataset.stem?.trim(), branch: td.dataset.branch?.trim() } : {};
+  },
+  sewoon(){
+    if (window.basicSewoonSelected?.stem && window.basicSewoonSelected?.branch)
+      return window.basicSewoonSelected;
+    if (window.fortuneState?.sewoon?.stem && window.fortuneState?.sewoon?.branch)
+      return window.fortuneState.sewoon;
+    const cell = document.querySelector('#sewoon-basic .sewoon-cell.selected');
+    return cell ? { stem: cell.dataset.stem?.trim(), branch: cell.dataset.branch?.trim() } : {};
+  }
+};
+
 
 // ✅ 여기서 대운 테이블을 동적으로 렌더링!
 // ✅ 대운 테이블 렌더

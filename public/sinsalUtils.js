@@ -288,54 +288,48 @@ export function renderEtcSinsalTable({ sajuGanArr, sajuJijiArr, sajuGanjiArr, co
     return KOR_HAN_BRANCH[v] || '';
   };
 
-  // ---------- 대운 ----------
-  let dGan = (context.daeyun?.stem || '').trim();
-  let dJiji = (context.daeyun?.branch || '').trim();
+// ---------- 대운 ----------
+let dGan  = (context.daeyun?.stem   || '').trim();
+let dJiji = (context.daeyun?.branch || '').trim();
 
-  if (!dGan || !dJiji) {
-    if (window.daeyunPairs && Number.isInteger(window.currentDaeyunIndex)) {
-      const pair = window.daeyunPairs[window.currentDaeyunIndex] || {};
-      dGan  = dGan  || (pair.stem   || '');
-      dJiji = dJiji || (pair.branch || '');
-      
-    } else {
-      const tds = document.querySelectorAll('.daeyun-table-container .daeyun-table tbody tr:nth-child(2) td');
-      const selTd = Array.from(tds).find(td => td.classList.contains('daeyun-selected'));
-      if (selTd && window.daeyunPairs?.length) {
-        const idx = Array.from(tds).indexOf(selTd);
-        const trueIdx = tds.length - 1 - idx;
-        const pair = window.daeyunPairs[trueIdx] || {};
-        dGan  = dGan  || (pair.stem   || '');
-        dJiji = dJiji || (pair.branch || '');
-        //console.log('[신살] 대운 from DOM:', { idx, trueIdx, dGan, dJiji });
-      } else {
-        //console.warn('[신살] 대운 미확정: context/window/DOM 모두 값 없음');
-      }
-    }
+if (!dGan || !dJiji) {
+  // 1) renderBasicDaeyunTable이 남겨둔 전역(있다면) 우선
+  if (window.basicDaeyunSelected?.stem && window.basicDaeyunSelected?.branch) {
+    dGan  = dGan  || window.basicDaeyunSelected.stem;
+    dJiji = dJiji || window.basicDaeyunSelected.branch;
   } else {
-   
+    // 2) 기본 대운표 DOM에서 현재 선택 읽기
+    const selTd = document.querySelector('#daeyun-basic .daeyun-selected');
+    if (selTd) {
+      dGan  = dGan  || (selTd.dataset.stem   || '').trim();
+      dJiji = dJiji || (selTd.dataset.branch || '').trim();
+    }
   }
+}
 
- // ---------- 세운 ----------
-let sGan = (context.sewoon?.stem || '').trim();
+// ---------- 세운 ----------
+let sGan  = (context.sewoon?.stem   || '').trim();
 let sJiji = (context.sewoon?.branch || '').trim();
 
 if (!sGan || !sJiji) {
-  let seSel = document.querySelector('.sewoon-cell.selected');
-
-  if (seSel) {
-    sGan  = sGan  || seSel.dataset.stem   || '';
-    sJiji = sJiji || seSel.dataset.branch || '';
-   
+  // 1) 기본 세운표 전역(있다면)
+  if (window.basicSewoonSelected?.stem && window.basicSewoonSelected?.branch) {
+    sGan  = sGan  || window.basicSewoonSelected.stem;
+    sJiji = sJiji || window.basicSewoonSelected.branch;
   } else {
-    // 🔹 선택된 세운이 없으면 무조건 '無'
-    sGan = '無';
-    sJiji = '無';
-    
+    // 2) 기본 세운표 DOM에서 현재 선택 읽기
+    const seSel = document.querySelector('#sewoon-basic .sewoon-cell.selected');
+    if (seSel) {
+      sGan  = sGan  || (seSel.dataset.stem   || '').trim();
+      sJiji = sJiji || (seSel.dataset.branch || '').trim();
+    } else {
+      // 선택 없으면 '無'
+      sGan  = '無';
+      sJiji = '無';
+    }
   }
-} else {
-  
 }
+
 
 // ---------- 한자 정규화 ----------
 const dGanHan  = toHanStem(dGan);
