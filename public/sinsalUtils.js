@@ -164,6 +164,7 @@ const sinsalRow  = `<tr id="sinsal-row"><th>12신살</th>${jijiArr.map(() => `<t
     </table>
 
 <!-- 추가: 7줄 × 17칸 빈 그리드 -->
+* 천간별 12운성표
   <table class="sinsal-bottom sinsal-extra-7x17" border="1"
          style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px;">
     <tbody>
