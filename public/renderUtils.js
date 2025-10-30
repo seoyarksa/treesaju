@@ -283,6 +283,12 @@ export function handleBasicDaeyunClick(idx, stem, branch) {
   // === 세운 셀 갱신 ===
   updateBasicSewoonCells(sewoonReversed);
 
+ // ★ 신살 즉시 갱신
+ rerenderEtcSinsal();
+ // (옵션) 외부 구독용 이벤트
+ window.dispatchEvent(new CustomEvent("fortune:daeyunChanged", {
+   detail: { stem, branch }
+ }));
 
 }
 
@@ -325,6 +331,8 @@ function updateBasicSewoonCells(sewoonReversed) {
     const td = document.createElement("td");
     td.classList.add("sewoon-cell");
     td.setAttribute("data-year", year);
+   td.setAttribute("data-stem", stem);    // ★ 추가
+   td.setAttribute("data-branch", branch); // ★ 추가
     td.style.textAlign = "center";
     td.style.verticalAlign = "middle";
 
@@ -395,6 +403,13 @@ if (!window.selectedSewoon && window.sewoonList?.length > 0) {
 }
 
   updateSimpleTable();
+
+ // ★ 신살 즉시 갱신
+ rerenderEtcSinsal();
+ // (옵션) 외부 구독용 이벤트
+ window.dispatchEvent(new CustomEvent("fortune:sewoonChanged", {
+   detail: { stem, branch, year }
+ }));
 
 }
 

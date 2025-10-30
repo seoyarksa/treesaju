@@ -4791,6 +4791,32 @@ document.getElementById('sinsal-section').innerHTML = `
 `;
 
 
+// 어디 공용 util 영역에 배치
+function rerenderEtcSinsal() {
+  try {
+    // 사주 4주 배열은 기존 사용하던 값을 그대로 사용
+    const sajuGanArr   = window?.sajuGanArr   || [];
+    const sajuJijiArr  = window?.sajuJijiArr  || [];
+    const sajuGanjiArr = window?.sajuGanjiArr || [];
+    const gender       = window?.gender;
+
+    const html = renderEtcSinsalTable({
+      sajuGanArr,
+      sajuJijiArr,
+      sajuGanjiArr,
+      context: {
+        daeyun: window?.selectedDaewoon || null,
+        sewoon: window?.selectedSewoon || null,
+        gender,
+      },
+    });
+
+    const box = document.querySelector("etc-sinsal-box");
+    if (box) box.innerHTML = html;
+  } catch (e) {
+    console.warn("[rerenderEtcSinsal] 실패:", e);
+  }
+}
 
 
 //console.log('renderDaeyunTable pairsToRender:', pairsToRender.map(p => p.stem + p.branch));

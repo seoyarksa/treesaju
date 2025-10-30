@@ -292,17 +292,49 @@ export function renderEtcSinsalTable({ sajuGanArr, sajuJijiArr, sajuGanjiArr, co
 let dGan  = (context.daeyun?.stem   || '').trim();
 let dJiji = (context.daeyun?.branch || '').trim();
 
+// 1) 전역 선택값(새 표에서 클릭 시 세팅됨)
+if ((!dGan || !dJiji) && window?.selectedDaewoon) {
+  dGan  = dGan  || (window.selectedDaewoon.stem   || '');
+  dJiji = dJiji || (window.selectedDaewoon.branch || '');
+}
+
+// 2) 새 대운표 DOM 폴백: #basic-daeyun-table
 if (!dGan || !dJiji) {
-  // 1) renderBasicDaeyunTable이 남겨둔 전역(있다면) 우선
-  if (window.basicDaeyunSelected?.stem && window.basicDaeyunSelected?.branch) {
-    dGan  = dGan  || window.basicDaeyunSelected.stem;
-    dJiji = dJiji || window.basicDaeyunSelected.branch;
+  const sel = document.querySelector('#basic-daeyun-table .daeyun-cell.selected');
+  if (sel) {
+    // data-*가 있으면 우선 사용
+    const dsGan  = sel.dataset?.stem   || '';
+    const dsJiji = sel.dataset?.branch || '';
+    if (dsGan && dsJiji) {
+      dGan  = dGan  || dsGan;
+      dJiji = dJiji || dsJiji;
+    } else {
+      // 없으면 텍스트(줄바꿈 기준)에서 간/지 분리
+      const lines = (sel.innerText || '').trim().split('\n').map(s => s.trim());
+      // 예상: [간, (십성), 지] 또는 [간, 지]
+      const maybeGan = lines[0] || '';
+      const maybeJi  = lines[2] || lines[1] || '';
+      dGan  = dGan  || maybeGan.replace(/\s+/g, '');
+      dJiji = dJiji || maybeJi.replace(/\s+/g, '');
+    }
+  }
+}
+
+// 3) (구) 구조 폴백: window.daeyunPairs / 구 DOM
+if (!dGan || !dJiji) {
+  if (window.daeyunPairs && Number.isInteger(window.currentDaeyunIndex)) {
+    const pair = window.daeyunPairs[window.currentDaeyunIndex] || {};
+    dGan  = dGan  || (pair.stem   || '');
+    dJiji = dJiji || (pair.branch || '');
   } else {
-    // 2) 기본 대운표 DOM에서 현재 선택 읽기
-    const selTd = document.querySelector('#daeyun-basic .daeyun-selected');
-    if (selTd) {
-      dGan  = dGan  || (selTd.dataset.stem   || '').trim();
-      dJiji = dJiji || (selTd.dataset.branch || '').trim();
+    const tds = document.querySelectorAll('.daeyun-table-container .daeyun-table tbody tr:nth-child(2) td');
+    const selTd = Array.from(tds).find(td => td.classList.contains('daeyun-selected'));
+    if (selTd && window.daeyunPairs?.length) {
+      const idx = Array.from(tds).indexOf(selTd);
+      const trueIdx = tds.length - 1 - idx;
+      const pair = window.daeyunPairs[trueIdx] || {};
+      dGan  = dGan  || (pair.stem   || '');
+      dJiji = dJiji || (pair.branch || '');
     }
   }
 }
@@ -311,25 +343,49 @@ if (!dGan || !dJiji) {
 let sGan  = (context.sewoon?.stem   || '').trim();
 let sJiji = (context.sewoon?.branch || '').trim();
 
+// 1) 전역 선택값(새 표에서 클릭 시 세팅됨)
+if ((!sGan || !sJiji) && window?.selectedSewoon) {
+  sGan  = sGan  || (window.selectedSewoon.stem   || '');
+  sJiji = sJiji || (window.selectedSewoon.branch || '');
+}
+
+// 2) 새 세운표 DOM 폴백: #basic-daeyun-table
 if (!sGan || !sJiji) {
-  // 1) 기본 세운표 전역(있다면)
-  if (window.basicSewoonSelected?.stem && window.basicSewoonSelected?.branch) {
-    sGan  = sGan  || window.basicSewoonSelected.stem;
-    sJiji = sJiji || window.basicSewoonSelected.branch;
-  } else {
-    // 2) 기본 세운표 DOM에서 현재 선택 읽기
-    const seSel = document.querySelector('#sewoon-basic .sewoon-cell.selected');
-    if (seSel) {
-      sGan  = sGan  || (seSel.dataset.stem   || '').trim();
-      sJiji = sJiji || (seSel.dataset.branch || '').trim();
-    } else {
-      // 선택 없으면 '無'
-      sGan  = '無';
-      sJiji = '無';
+  const seSel = document.querySelector('#basic-daeyun-table .sewoon-cell.selected');
+  if (seSel) {
+    sGan  = sGan  || seSel.dataset?.stem   || '';
+    sJiji = sJiji || seSel.dataset?.branch || '';
+    if ((!sGan || !sJiji) && seSel.innerText) {
+      const lines = seSel.innerText.trim().split('\n').map(s => s.trim());
+      const maybeGan = lines[0] || '';
+      const maybeJi  = lines[2] || lines[1] || '';
+      sGan  = sGan  || maybeGan.replace(/\s+/g, '');
+      sJiji = sJiji || maybeJi.replace(/\s+/g, '');
     }
   }
 }
 
+// 3) (구) 구조 폴백: .sewoon-cell.selected (구 표)
+if (!sGan || !sJiji) {
+  const oldSel = document.querySelector('.sewoon-cell.selected');
+  if (oldSel) {
+    sGan  = sGan  || oldSel.dataset?.stem   || '';
+    sJiji = sJiji || oldSel.dataset?.branch || '';
+    if ((!sGan || !sJiji) && oldSel.innerText) {
+      const lines = oldSel.innerText.trim().split('\n').map(s => s.trim());
+      const maybeGan = lines[0] || '';
+      const maybeJi  = lines[2] || lines[1] || '';
+      sGan  = sGan  || maybeGan.replace(/\s+/g, '');
+      sJiji = sJiji || maybeJi.replace(/\s+/g, '');
+    }
+  }
+}
+
+// 최종 폴백: 無
+if (!sGan || !sJiji) {
+  sGan  = '無';
+  sJiji = '無';
+}
 
 // ---------- 한자 정규화 ----------
 const dGanHan  = toHanStem(dGan);
