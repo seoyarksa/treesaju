@@ -4297,6 +4297,71 @@ window.handleDaeyunClick = handleDaeyunClick;
 }
 
 
+
+
+/* 컨테이너 & 스크롤 래퍼 */
+.Etcsinsal-tables {
+  display: grid;
+  gap: 16px;
+}
+.Etcsinsal-tables .table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.06) inset;
+}
+
+/* 기본 반응형 테이블 설정 */
+.Etcsinsal-tables .responsive-table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;                     /* 균등 분배 */
+  font-size: clamp(11px, 1.6vw, 14px);
+  line-height: 1.35;
+  min-width: 720px;                        /* 좁은 화면에서 가로 스크롤 */
+}
+
+.Etcsinsal-tables .responsive-table th,
+.Etcsinsal-tables .responsive-table td {
+  padding: 6px 8px;
+  word-break: keep-all;
+  white-space: nowrap;                     /* 천간/지지 줄바꿈 방지 */
+  border: 1px solid #ddd;
+}
+
+/* 첫 번째 열(신살류) sticky */
+.Etcsinsal-tables .responsive-table th[rowspan],
+.Etcsinsal-tables .responsive-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+}
+
+/* 헤더 sticky */
+.Etcsinsal-tables .responsive-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  /* 필요 시 헤더 배경색 명시 (각 테이블 컬러 유지) */
+}
+
+/* 모바일 추가 축소 */
+@media (max-width: 480px) {
+  .Etcsinsal-tables .responsive-table {
+    min-width: 600px;
+    font-size: clamp(10px, 3.2vw, 12px);
+  }
+  .Etcsinsal-tables .responsive-table th,
+  .Etcsinsal-tables .responsive-table td {
+    padding: 4px 6px;
+  }
+}
+
+
+
+
 .sewoon-cell.selected {
   background-color: #ffeaa7 !important;
   border: 2px solid #fdcb6e !important;

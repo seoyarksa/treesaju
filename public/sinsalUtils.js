@@ -971,7 +971,7 @@ ${sinsalRowsGanji}
 `;
 
  return `
- <div class="sinsal-tables">
+ <div class="Etcsinsal-tables">
    <div class="table-scroll">${tableA1}</div>
    <div class="table-scroll">${tableA2}</div>
    <div class="table-scroll">${tableB}</div>
