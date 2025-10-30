@@ -85,7 +85,7 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
   const { daeyunBranchHan, sewoonBranchHan } = (window.__getCurrentDaeyunSewoonHan?.() || {});
 
   const labels   = ['시','일','월','년','대운','세운'];
-  const branches = [
+  const branchesRaw = [
     toHanBranch(s.hourBranch || ''),
     toHanBranch(s.dayBranch  || ''),
     toHanBranch(s.monthBranch|| ''),
@@ -93,6 +93,8 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
     daeyunBranchHan || '',
     sewoonBranchHan || ''
   ];
+ // ★ 여기서만 정규화 (최종 계산 직전 단 한 번)
+ const branches = branchesRaw.map(v => toHanBranch(v));
 
   const tds = branches.map((br, i) => {
     const u = (bStem && br) ? __unseongOf(bStem, br) : '';
@@ -360,22 +362,23 @@ export function getSamhapKeyByJiji(jiji) {
 (function initSharedDaeyunSewoonGetter(){
   if (window.__getCurrentDaeyunSewoonHan) return; // 중복 방지
 
-  const toHanBranch = (typeof window.toHanBranch === 'function') ? window.toHanBranch : (v=>v);
-
+  // ⚠️ 여기서는 절대 변환하지 않음(원본 그대로 반환)
   function fromNewDaeyunDOM() {
     const el = document.querySelector('#basic-daeyun-table .daeyun-cell.selected');
     if (!el) return '';
-    if (el.dataset?.branch) return toHanBranch(el.dataset.branch);
-    const lines = el.innerText?.trim().split('\n').map(s=>s.trim()) || [];
-    return toHanBranch(lines[2] || lines[1] || '');
+    if (el.dataset?.branch) return el.dataset.branch; // 원본
+    const lines = el.innerText?.trim().split('\n').map(s => s.trim()) || [];
+    return (lines[2] || lines[1] || '');              // 원본
   }
+
   function fromNewSewoonDOM() {
     const el = document.querySelector('#basic-daeyun-table .sewoon-cell.selected');
     if (!el) return '';
-    if (el.dataset?.branch) return toHanBranch(el.dataset.branch);
-    const lines = el.innerText?.trim().split('\n').map(s=>s.trim()) || [];
-    return toHanBranch(lines[2] || lines[1] || '');
+    if (el.dataset?.branch) return el.dataset.branch; // 원본
+    const lines = el.innerText?.trim().split('\n').map(s => s.trim()) || [];
+    return (lines[2] || lines[1] || '');              // 원본
   }
+
   function fromLegacyDaeyunDOM() {
     // 구 대운 표: .daeyun-table-container .daeyun-table tbody tr:nth-child(2) td
     const tds = document.querySelectorAll('.daeyun-table-container .daeyun-table tbody tr:nth-child(2) td');
@@ -386,24 +389,25 @@ export function getSamhapKeyByJiji(jiji) {
       const idx = Array.from(tds).indexOf(sel);
       const trueIdx = tds.length - 1 - idx;
       const pair = window.daeyunPairs[trueIdx] || {};
-      return toHanBranch(pair.branch || '');
+      return (pair.branch || '');                    // 원본
     }
-    const lines = sel.innerText?.trim().split('\n').map(s=>s.trim()) || [];
-    return toHanBranch(lines[2] || lines[1] || '');
+    const lines = sel.innerText?.trim().split('\n').map(s => s.trim()) || [];
+    return (lines[2] || lines[1] || '');             // 원본
   }
 
   window.__getCurrentDaeyunSewoonHan = function() {
-    // 1) 전역 선택 우선
-    const dJ = window?.selectedDaewoon?.branch ? toHanBranch(window.selectedDaewoon.branch) : '';
-    const sJ = window?.selectedSewoon?.branch  ? toHanBranch(window.selectedSewoon.branch)  : '';
+    // 1) 전역 선택 우선 (원본)
+    const dJ = window?.selectedDaewoon?.branch || '';
+    const sJ = window?.selectedSewoon?.branch  || '';
 
-    // 2) 새 표 DOM 폴백
+    // 2) 새 표 DOM 폴백 (원본)
     const dJ2 = dJ || fromNewDaeyunDOM();
     const sJ2 = sJ || fromNewSewoonDOM();
 
-    // 3) 구 표 DOM 폴백
+    // 3) 구 표 DOM 폴백 (원본)
     const dJ3 = dJ2 || fromLegacyDaeyunDOM();
 
+    // ⚠️ 속성명은 기존과 동일하게 유지(하위 코드 호환)
     return {
       daeyunBranchHan: dJ3 || '',
       sewoonBranchHan: sJ2 || ''
