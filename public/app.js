@@ -1670,10 +1670,7 @@ window.startSixMonthPlan = function () {
 window.requirePhoneVerificationIfNeeded = async function(daysValid = 3) {
   try {
     const { data: { user } } = await window.supabaseClient.auth.getUser();
-    if (!user) {
-      typeof openPhoneOtpModal === "function" ? openPhoneOtpModal() : alert("전화 인증이 필요합니다.");
-      return false;
-    }
+    if (!user) { openPhoneOtpModal?.(); return false; }
 
     const { data: prof, error } = await window.supabaseClient
       .from("profiles")
@@ -1682,26 +1679,22 @@ window.requirePhoneVerificationIfNeeded = async function(daysValid = 3) {
       .maybeSingle();
 
     if (error) {
-      console.warn("[requirePhoneVerificationIfNeeded] profiles 조회 오류:", error);
-      typeof openPhoneOtpModal === "function" ? openPhoneOtpModal() : alert("전화 인증이 필요합니다.");
+      console.warn("[requirePhoneVerificationIfNeeded] profiles 조회 오류:", error); // ← 여기 꼭 찍어보세요
+      openPhoneOtpModal?.();
       return false;
     }
 
-    const isFlagTrue = prof?.phone_verified === true;              // ✅ 1순위: 플래그
+    const isFlagTrue = prof?.phone_verified === true;     // 플래그 우선
     const ts = prof?.phone_verified_at ? new Date(prof.phone_verified_at).getTime() : 0;
     const validMs = Math.max(0, daysValid) * 24 * 60 * 60 * 1000;
-    const isWithinWindow = (daysValid > 0) && ts > 0 && (Date.now() - ts) <= validMs; // 보조: 기간
+    const isWithinWindow = daysValid > 0 && ts > 0 && (Date.now() - ts) <= validMs;
 
-    const ok = isFlagTrue || isWithinWindow;                       // ✅ 플래그 우선 + 기간 보조
-
-    if (!ok) {
-      typeof openPhoneOtpModal === "function" ? openPhoneOtpModal() : alert("전화 인증이 필요합니다.");
-      return false;
-    }
+    const ok = isFlagTrue || isWithinWindow;
+    if (!ok) { openPhoneOtpModal?.(); return false; }
     return true;
   } catch (e) {
     console.warn("[requirePhoneVerificationIfNeeded] 예외:", e);
-    typeof openPhoneOtpModal === "function" ? openPhoneOtpModal() : alert("전화 인증이 필요합니다.");
+    openPhoneOtpModal?.();
     return false;
   }
 };
