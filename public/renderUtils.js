@@ -356,6 +356,8 @@ function updateBasicSewoonCells(sewoonReversed) {
   document.querySelector("#johuyongsin-cell").innerHTML = renderJohuCell();
   document.querySelector("#hapshin-box").innerHTML = renderhapshinTable();
 
+  
+
   // ✅ selectedSewoon 초기화
   if (!window.selectedSewoon && window.sewoonList?.length > 0) {
     window.selectedSewoon = window.sewoonList[0];
@@ -364,30 +366,7 @@ function updateBasicSewoonCells(sewoonReversed) {
   // simpleTable 렌더링
   updateSimpleTable();
 
- // 신살표 즉시 갱신 (대운/세운 클릭 이후 공용)
- try {
-   const s = window.saju || {};
-   const getStem = v => (v && typeof v === 'object') ? (v.stem || '') : (v || '');
-   const getJiji = v => (v && typeof v === 'object') ? (v.branch || v.jiji || '') : (v || '');
-   const sajuGanArr  = [getStem(s.sigan), getStem(s.ilgan), getStem(s.wolgan), getStem(s.nyeongan)];
-   const sajuJijiArr = [getJiji(s.siji),  getJiji(s.ilji),  getJiji(s.wolji),  getJiji(s.nyeonji)];
-  const sajuGanjiArr = sajuGanArr.map((g,i)=>(g||'')+(sajuJijiArr[i]||''));
-
-   const html = renderEtcSinsalTable({
-     sajuGanArr,
-    sajuJijiArr,
-     sajuGanjiArr,
-     context: {
-       daeyun: window.selectedDaewoon || null,
-      sewoon: window.selectedSewoon  || null,
-       gender: window.gender
-     },
-   });
-   const box = document.querySelector('#etc-sinsal-box');
-   if (box) box.innerHTML = html;
- } catch (e) {
-   console.warn('[renderEtcSinsalTable] render 실패:', e);
- }
+  document.querySelector("#etc-sinsal-box").innerHTML = renderEtcSinsalTable();
 
 }
 
@@ -433,29 +412,7 @@ if (!window.selectedSewoon && window.sewoonList?.length > 0) {
 
 
    // 신살표 즉시 갱신 (대운/세운 클릭 이후 공용)
- try {
-   const s = window.saju || {};
-   const getStem = v => (v && typeof v === 'object') ? (v.stem || '') : (v || '');
-   const getJiji = v => (v && typeof v === 'object') ? (v.branch || v.jiji || '') : (v || '');
-   const sajuGanArr  = [getStem(s.sigan), getStem(s.ilgan), getStem(s.wolgan), getStem(s.nyeongan)];
-   const sajuJijiArr = [getJiji(s.siji),  getJiji(s.ilji),  getJiji(s.wolji),  getJiji(s.nyeonji)];
-  const sajuGanjiArr = sajuGanArr.map((g,i)=>(g||'')+(sajuJijiArr[i]||''));
-
-   const html = renderEtcSinsalTable({
-     sajuGanArr,
-    sajuJijiArr,
-     sajuGanjiArr,
-     context: {
-       daeyun: window.selectedDaewoon || null,
-      sewoon: window.selectedSewoon  || null,
-       gender: window.gender
-     },
-   });
-   const box = document.querySelector('#etc-sinsal-box');
-   if (box) box.innerHTML = html;
- } catch (e) {
-   console.warn('[renderEtcSinsalTable] render 실패:', e);
- }
+  document.querySelector("#etc-sinsal-box").innerHTML = renderEtcSinsalTable();
 
 }
 
