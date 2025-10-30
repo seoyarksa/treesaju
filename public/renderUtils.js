@@ -52,13 +52,6 @@ import { renderhapshinTable
         
       } from './gyeokUtils.js';
 
-import { renderSinsalTable, 
-         getUnseong, 
-         getSinsal, 
-         getSamhapKeyByJiji, 
-         renderEtcSinsalTable
-      } from './sinsalUtils.js';
-
 
 
 const stemOrder = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
@@ -88,76 +81,6 @@ export const elementColors = {
 
 
 
-// [전역 유틸] 사주 4주 배열 강건화: [시, 일, 월, 년] 4칸 보장
-globalThis.__getSajuArraysSafe ??= function __getSajuArraysSafe() {
-  // 1) 준비된 전역 배열이 있으면 그대로 사용
-  if (Array.isArray(window?.sajuGanArr) &&
-      Array.isArray(window?.sajuJijiArr) &&
-      Array.isArray(window?.sajuGanjiArr) &&
-      window.sajuGanArr.length === 4 &&
-      window.sajuJijiArr.length === 4 &&
-      window.sajuGanjiArr.length === 4) {
-    return {
-      gan:   window.sajuGanArr.slice(0, 4),
-      jiji:  window.sajuJijiArr.slice(0, 4),
-      ganji: window.sajuGanjiArr.slice(0, 4),
-    };
-  }
-
-  // 2) window.saju 객체에서 구성
-  const s = window?.saju || null;
-  if (s) {
-    const safeStem = v => (v && typeof v === 'object') ? (v.stem || '') : (v || '');
-    const safeJiji = v => {
-      if (!v) return '';
-      if (typeof v === 'object') return v.branch || v.jiji || '';
-      return v;
-    };
-
-    const gan = [
-      safeStem(s.sigan),   // 시간
-      safeStem(s.ilgan),   // 일간
-      safeStem(s.wolgan),  // 월간
-      safeStem(s.nyeongan) // 년간
-    ];
-    const jiji = [
-      safeJiji(s.siji),    // 시지
-      safeJiji(s.ilji),    // 일지
-      safeJiji(s.wolji),   // 월지
-      safeJiji(s.nyeonji)  // 년지
-    ];
-    const ganji = gan.map((g, i) => (g || '') + (jiji[i] || ''));
-
-    if (gan.every(Boolean) && jiji.every(Boolean)) {
-      return { gan, jiji, ganji };
-    }
-  }
-
-  // 3) DOM 폴백 (프로젝트에 맞게 selector 필요시 수정)
-  const pickText = selList => {
-    for (const sel of selList) {
-      const el = document.querySelector(sel);
-      if (el && el.textContent) return el.textContent.trim();
-    }
-    return '';
-  };
-
-  const gan = [
-    pickText(['[data-role="sigan-gan"]',   '#sigan-gan',   '.sigan .gan',   '.saju-time .gan']),
-    pickText(['[data-role="ilgan-gan"]',   '#ilgan-gan',   '.ilgan .gan',   '.saju-day .gan']),
-    pickText(['[data-role="wolgan-gan"]',  '#wolgan-gan',  '.wolgan .gan',  '.saju-month .gan']),
-    pickText(['[data-role="nyeongan-gan"]','#nyeongan-gan','.nyeongan .gan','.saju-year .gan']),
-  ];
-  const jiji = [
-    pickText(['[data-role="siji"]',    '#siji',    '.sigan .ji',   '.saju-time .ji']),
-    pickText(['[data-role="ilji"]',    '#ilji',    '.ilgan .ji',   '.saju-day .ji']),
-    pickText(['[data-role="wolji"]',   '#wolji',   '.wolgan .ji',  '.saju-month .ji']),
-    pickText(['[data-role="nyeonji"]', '#nyeonji', '.nyeongan .ji','.saju-year .ji']),
-  ];
-  const ganji = gan.map((g, i) => (g || '') + (jiji[i] || ''));
-
-  return { gan, jiji, ganji };
-};
 
 
 
@@ -360,12 +283,7 @@ export function handleBasicDaeyunClick(idx, stem, branch) {
   // === 세운 셀 갱신 ===
   updateBasicSewoonCells(sewoonReversed);
 
- // ★ 신살 즉시 갱신
- window.rerenderEtcSinsal?.();
- // (옵션) 외부 구독용 이벤트
- window.dispatchEvent(new CustomEvent("fortune:daeyunChanged", {
-   detail: { stem, branch }
- }));
+
 
 }
 
@@ -377,7 +295,7 @@ function updateBasicSewoonCells(sewoonReversed) {
   const daeyunRow = document.querySelector("#basic-daeyun-table .daeyun-row");
   if (!daeyunRow) return;
 
-  // 기존 세운 셀 삭제 (대운 10칸 이후 제거)
+  // 기존 세운 셀 삭제
   while (daeyunRow.children.length > 10) {
     daeyunRow.removeChild(daeyunRow.lastChild);
   }
@@ -400,15 +318,14 @@ function updateBasicSewoonCells(sewoonReversed) {
     console.log("✔ updateBasicSewoonCells: 십성 기준 일간 =", tenGodBaseStem);
   }
 
-  // ✅ 세운 셀 추가 (루프 “안”에서만 stem/branch/year 사용)
+  // 새로운 세운 셀 추가
   sewoonReversed.forEach(({ stem, branch, year }) => {
+    // ✅ 월간 기준 → 일간 기준으로 변경
     const tenGod = tenGodBaseStem ? getTenGod(tenGodBaseStem, stem) : "";
 
     const td = document.createElement("td");
     td.classList.add("sewoon-cell");
-    td.dataset.year = String(year);
-    td.dataset.stem = String(stem);
-    td.dataset.branch = String(branch);
+    td.setAttribute("data-year", year);
     td.style.textAlign = "center";
     td.style.verticalAlign = "middle";
 
@@ -418,21 +335,18 @@ function updateBasicSewoonCells(sewoonReversed) {
       <div>${colorize(branch)}</div>
     `;
 
-    // ✅ 클릭 핸들러
+    // ✅ 세운 클릭 처리
     td.addEventListener("click", () => basicSewoonClick(td, stem, branch, year));
+
     daeyunRow.appendChild(td);
   });
 
-  // ✅ 나머지 UI 갱신 (null 가드)
-  const dang = document.querySelector("#dangryeong-cell");
-  if (dang) dang.innerHTML = makeSajuInfoTable();
+  // 나머지 UI 갱신 부분은 그대로 유지
+  document.querySelector("#dangryeong-cell").innerHTML = makeSajuInfoTable();
   renderDangryeongHeesinGisin();
 
-  const johu = document.querySelector("#johuyongsin-cell");
-  if (johu) johu.innerHTML = renderJohuCell();
-
-  const hap = document.querySelector("#hapshin-box");
-  if (hap) hap.innerHTML = renderhapshinTable();
+  document.querySelector("#johuyongsin-cell").innerHTML = renderJohuCell();
+  document.querySelector("#hapshin-box").innerHTML = renderhapshinTable();
 
   // ✅ selectedSewoon 초기화
   if (!window.selectedSewoon && window.sewoonList?.length > 0) {
@@ -442,18 +356,32 @@ function updateBasicSewoonCells(sewoonReversed) {
   // simpleTable 렌더링
   updateSimpleTable();
 
-  // ★ 신살 즉시 갱신 (안전 호출)
-  globalThis.rerenderEtcSinsal?.();
+ // 신살표 즉시 갱신 (대운/세운 클릭 이후 공용)
+ try {
+   const s = window.saju || {};
+   const getStem = v => (v && typeof v === 'object') ? (v.stem || '') : (v || '');
+   const getJiji = v => (v && typeof v === 'object') ? (v.branch || v.jiji || '') : (v || '');
+   const sajuGanArr  = [getStem(s.sigan), getStem(s.ilgan), getStem(s.wolgan), getStem(s.nyeongan)];
+   const sajuJijiArr = [getJiji(s.siji),  getJiji(s.ilji),  getJiji(s.wolji),  getJiji(s.nyeonji)];
+  const sajuGanjiArr = sajuGanArr.map((g,i)=>(g||'')+(sajuJijiArr[i]||''));
 
-  // ★ 외부 구독 이벤트 (루프 밖 변수 참조 금지 → 전역 선택값이 있을 때만 내보냄)
-  if (window.selectedSewoon) {
-    const { stem, branch, year } = window.selectedSewoon;
-    window.dispatchEvent(new CustomEvent("fortune:sewoonChanged", {
-      detail: { stem, branch, year }
-    }));
-  }
+   const html = renderEtcSinsalTable({
+     sajuGanArr,
+    sajuJijiArr,
+     sajuGanjiArr,
+     context: {
+       daeyun: window.selectedDaewoon || null,
+      sewoon: window.selectedSewoon  || null,
+       gender: window.gender
+     },
+   });
+   const box = document.querySelector('#etc-sinsal-box');
+   if (box) box.innerHTML = html;
+ } catch (e) {
+   console.warn('[renderEtcSinsalTable] render 실패:', e);
+ }
+
 }
-
 
 
 
@@ -495,12 +423,31 @@ if (!window.selectedSewoon && window.sewoonList?.length > 0) {
 
   updateSimpleTable();
 
- // ★ 신살 즉시 갱신
-window.rerenderEtcSinsal?.();
- // (옵션) 외부 구독용 이벤트
- window.dispatchEvent(new CustomEvent("fortune:sewoonChanged", {
-   detail: { stem, branch, year }
- }));
+
+   // 신살표 즉시 갱신 (대운/세운 클릭 이후 공용)
+ try {
+   const s = window.saju || {};
+   const getStem = v => (v && typeof v === 'object') ? (v.stem || '') : (v || '');
+   const getJiji = v => (v && typeof v === 'object') ? (v.branch || v.jiji || '') : (v || '');
+   const sajuGanArr  = [getStem(s.sigan), getStem(s.ilgan), getStem(s.wolgan), getStem(s.nyeongan)];
+   const sajuJijiArr = [getJiji(s.siji),  getJiji(s.ilji),  getJiji(s.wolji),  getJiji(s.nyeonji)];
+  const sajuGanjiArr = sajuGanArr.map((g,i)=>(g||'')+(sajuJijiArr[i]||''));
+
+   const html = renderEtcSinsalTable({
+     sajuGanArr,
+    sajuJijiArr,
+     sajuGanjiArr,
+     context: {
+       daeyun: window.selectedDaewoon || null,
+      sewoon: window.selectedSewoon  || null,
+       gender: window.gender
+     },
+   });
+   const box = document.querySelector('#etc-sinsal-box');
+   if (box) box.innerHTML = html;
+ } catch (e) {
+   console.warn('[renderEtcSinsalTable] render 실패:', e);
+ }
 
 }
 
@@ -596,114 +543,8 @@ export function highlightInitialSewoon() {
 
 
 
-// 사주 4주 배열 강건화: [시, 일, 월, 년] 순으로 4칸 보장
-function __getSajuArraysSafe() {
-  // 1) 이미 준비된 전역 배열이 있으면 그대로 사용
-  if (Array.isArray(window?.sajuGanArr) &&
-      Array.isArray(window?.sajuJijiArr) &&
-      Array.isArray(window?.sajuGanjiArr) &&
-      window.sajuGanArr.length === 4 &&
-      window.sajuJijiArr.length === 4 &&
-      window.sajuGanjiArr.length === 4) {
-    return {
-      gan:   window.sajuGanArr.slice(0, 4),
-      jiji:  window.sajuJijiArr.slice(0, 4),
-      ganji: window.sajuGanjiArr.slice(0, 4),
-    };
-  }
-
-  // 2) window.saju 객체에서 구성 (당신 프로젝트 구조에 맞춘 키)
-  const s = window?.saju || null;
-  if (s) {
-    // 각 값은 문자 또는 { stem, branch }일 수 있음
-    const safeStem = v => (v && typeof v === 'object') ? (v.stem || '') : (v || '');
-    const safeJiji = v => {
-      if (!v) return '';
-      if (typeof v === 'object') return v.branch || v.jiji || '';
-      return v;
-    };
-
-    const gan = [
-      safeStem(s.sigan),   // 시간
-      safeStem(s.ilgan),   // 일간
-      safeStem(s.wolgan),  // 월간
-      safeStem(s.nyeongan) // 년간
-    ];
-    const jiji = [
-      safeJiji(s.siji),    // 시지
-      safeJiji(s.ilji),    // 일지
-      safeJiji(s.wolji),   // 월지
-      safeJiji(s.nyeonji)  // 년지
-    ];
-    const ganji = gan.map((g, i) => (g || '') + (jiji[i] || ''));
-
-    if (gan.every(Boolean) && jiji.every(Boolean)) {
-      return { gan, jiji, ganji };
-    }
-  }
-
-  // 3) DOM 폴백 (가능한 selector들을 순차 시도)
-  const pickText = selList => {
-    for (const sel of selList) {
-      const el = document.querySelector(sel);
-      if (el && el.textContent) return el.textContent.trim();
-    }
-    return '';
-  };
-
-  const gan = [
-    pickText(['[data-role="sigan-gan"]',   '#sigan-gan',   '.sigan .gan',   '.saju-time .gan']),
-    pickText(['[data-role="ilgan-gan"]',   '#ilgan-gan',   '.ilgan .gan',   '.saju-day .gan']),
-    pickText(['[data-role="wolgan-gan"]',  '#wolgan-gan',  '.wolgan .gan',  '.saju-month .gan']),
-    pickText(['[data-role="nyeongan-gan"]','#nyeongan-gan','.nyeongan .gan','.saju-year .gan']),
-  ];
-  const jiji = [
-    pickText(['[data-role="siji"]',    '#siji',    '.sigan .ji',   '.saju-time .ji']),
-    pickText(['[data-role="ilji"]',    '#ilji',    '.ilgan .ji',   '.saju-day .ji']),
-    pickText(['[data-role="wolji"]',   '#wolji',   '.wolgan .ji',  '.saju-month .ji']),
-    pickText(['[data-role="nyeonji"]', '#nyeonji', '.nyeongan .ji','.saju-year .ji']),
-  ];
-  const ganji = gan.map((g, i) => (g || '') + (jiji[i] || ''));
-
-  return { gan, jiji, ganji };
-}
 
 
-// 전역 신살 리렌더러
-// 전역 신살 리렌더러 (컨테이너: #etc-sinsal-box)
-window.rerenderEtcSinsal = function rerenderEtcSinsal() {
-  try {
-    // ★ 전역에서 안전하게 참조 (식별자 직접 호출 금지)
-    const renderer = (typeof globalThis !== 'undefined') ? globalThis.renderEtcSinsalTable : null;
-    if (typeof renderer !== 'function') {
-      console.warn('[rerenderEtcSinsal] renderEtcSinsalTable 미로딩. 스크립트 순서/전역등록 확인 필요');
-      return;
-    }
-
-    // 사주 기본 4주 배열 확보
-const { gan: sajuGanArr, jiji: sajuJijiArr, ganji: sajuGanjiArr } = globalThis.__getSajuArraysSafe();
-
-    const gender = window?.gender;
-
-    // ★ 여기서만 호출
-    const html = renderer({
-      sajuGanArr,
-      sajuJijiArr,
-      sajuGanjiArr,
-      context: {
-        daeyun: window?.selectedDaewoon || null,
-        sewoon: window?.selectedSewoon || null,
-        gender,
-      },
-    });
-
-    const box = document.querySelector('#etc-sinsal-box');
-    if (box) box.innerHTML = html;
-    else console.warn('[rerenderEtcSinsal] 컨테이너 #etc-sinsal-box 없음');
-  } catch (e) {
-    console.warn('[rerenderEtcSinsal] 렌더 실패:', e);
-  }
-};
 
 
 

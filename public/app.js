@@ -1919,7 +1919,7 @@ document.getElementById("gwBtnInicis").addEventListener("click", () => {
       </style>
       <div class="modal-panel">
         <h3>구독 결제</h3>
-        <p>전화번호 인증이 완료되었습니다. 상품을 선택해 결제하세요.</p>
+        <p>전화번호 인증이 완료되었습니다. 상품을 선택하여 결제하세요.</p>
 
         <div class="plan">
           <ul>

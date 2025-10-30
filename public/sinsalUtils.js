@@ -964,9 +964,8 @@ return tableA1 + tableA2 + tableB + `
 
 }
 
-globalThis.renderEtcSinsalTable ??= renderEtcSinsalTable;  // ★ 전역 노출
-
-
+// 전역 등록 (중복 안전)
+window.renderEtcSinsalTable = window.renderEtcSinsalTable || renderEtcSinsalTable;
 
 
 
