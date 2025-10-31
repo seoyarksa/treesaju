@@ -21,12 +21,7 @@ window.TERM_HELP = TERM_HELP;
 // 2) 툴팁 설치 함수
 import { initTermHelp } from './utils/tooltip.js';
 
-// 3) 문서 준비 후 1회만
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => initTermHelp(), { once: true });
-} else {
-  initTermHelp();
-}
+
 import { 
   elementMap, 
   DANGRYEONGSHIK_MAP,
