@@ -131,12 +131,28 @@ window.BRANCH_ORDER = window.BRANCH_ORDER || ['子','丑','寅','卯','辰','巳
 function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
   console.log('[UNSEONG] ENTER:', caption, 'baseStem(raw)=', baseStem);
 
-  const toHanStem   = (typeof window.toHanStem   === 'function') ? window.toHanStem   : (v => String(v || ''));
-  const toHanBranch = (typeof window.toHanBranch === 'function') ? window.toHanBranch : (v => String(v || ''));
+  // ── 안전 변환 래퍼: 이미 한자면 그대로 통과, 아니면 변환 시도 → 실패해도 원본 유지
+  const _toHanStem   = (typeof window.toHanStem   === 'function') ? window.toHanStem   : null;
+  const _toHanBranch = (typeof window.toHanBranch === 'function') ? window.toHanBranch : null;
+  const safeHanStem = (v) => {
+    const s = String(v ?? '').trim();
+    if (!s) return '';
+    if (/[甲乙丙丁戊己庚辛壬癸]/.test(s)) return s;
+    if (_toHanStem)   { try { const r = _toHanStem(s);   if (r) return r; } catch {} }
+    return s;
+  };
+  const safeHanBranch = (v) => {
+    const s = String(v ?? '').trim();
+    if (!s) return '';
+    if (/[子丑寅卯辰巳午未申酉戌亥]/.test(s)) return s;
+    if (_toHanBranch) { try { const r = _toHanBranch(s); if (r) return r; } catch {} }
+    return s;
+  };
+
   const s = window.saju || {};
 
   // 1) 기준천간 한자화 + 맵 유효성
-  const bStem = toHanStem(baseStem);
+  const bStem = safeHanStem(baseStem);
   const UNMAP = (window.unseongMap12 || unseongMap12) || {};
   const bStemValid = !!UNMAP[bStem];
 
@@ -147,16 +163,16 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
 
   // 3) 지지 원본 배열
   const branchesRaw = [
-    (s.hourBranch || ''),
-    (s.dayBranch  || ''),
-    (s.monthBranch|| ''),
-    (s.yearBranch || ''),
+    s.hourBranch ?? '',
+    s.dayBranch  ?? '',
+    s.monthBranch?? '',
+    s.yearBranch ?? '',
     dyRaw,
     syRaw
   ];
 
-  // 4) 최종 시점 정규화
-  const branches = branchesRaw.map(v => toHanBranch(v));
+  // 4) 최종 시점 정규화 (한 번만)
+  const branches = branchesRaw.map(v => safeHanBranch(v));
   const labels   = ['시','일','월','년','대운','세운'];
 
   // ── 🔎 디테일 로그 (대운/세운만 확대)
@@ -167,13 +183,13 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
     'han[4]/han[5]': [branches[4], branches[5]],
   });
 
-  // 5) 최후 폴백: 혹시 아직 빈값이면 DOM에서 직접 회수
+  // 5) 최후 폴백: 아직 빈값이면 DOM에서 직접 회수
   if (!branches[4]) {
     const el = document.querySelector('#basic-daeyun-table .daeyun-cell.selected');
     if (el) {
       const txt = (el.innerText || '').trim().split('\n').map(s=>s.trim());
       const guessed = el.dataset?.branch || txt[2] || txt[1] || '';
-      branches[4] = toHanBranch(guessed);
+      branches[4] = safeHanBranch(guessed);
       console.warn('[UNSEONG] Fallback DY via DOM ->', branches[4], '(guessed=', guessed, ')');
     }
   }
@@ -182,12 +198,12 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
     if (el) {
       const txt = (el.innerText || '').trim().split('\n').map(s=>s.trim());
       const guessed = el.dataset?.branch || txt[2] || txt[1] || '';
-      branches[5] = toHanBranch(guessed);
+      branches[5] = safeHanBranch(guessed);
       console.warn('[UNSEONG] Fallback SE via DOM ->', branches[5], '(guessed=', guessed, ')');
     }
   }
 
-  // 6) 셀 생성
+  // 6) 셀 생성 (12운성은 빨강)
   const tds = branches.map((br, i) => {
     const u = (bStemValid && br) ? __unseongOf(bStem, br) : '';
     return `
@@ -198,7 +214,7 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
       </td>`;
   }).join('');
 
-  // (옵션) 디버그 푸터(대운/세운 한 번 더 표기 → 나중에 지워도 됨)
+  // (옵션) 디버그 푸터 (필요 없으면 제거 가능)
   const debugFooter = `
     <tr>
       <td colspan="6" style="font:12px/1.4 monospace; color:#666; padding:4px; background:#fafafa;">
