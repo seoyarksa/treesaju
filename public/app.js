@@ -14,7 +14,7 @@
 
 
 // 상수
-
+import { TERM_HELP } from './explain.js';
 import { 
   elementMap, 
   DANGRYEONGSHIK_MAP,
@@ -112,7 +112,9 @@ import { renderSinsalTable,
       } from './sinsalUtils.js';
 
 
-
+// 이미 window에 있으면 덮어쓰지 않고 병합(선택)
+window.TERM_HELP = window.TERM_HELP || {};
+Object.assign(window.TERM_HELP, TERM_HELP);
 console.log('🔥 app.js loaded');
 
 // =========================================
