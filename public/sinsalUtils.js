@@ -215,6 +215,15 @@ function renderUnseongByBranches({ baseStem, caption = '12운성', rows } = {}) 
   ];
   const colLabels = ['시지','일지','월지','년지','대운지지','세운지지'];
 
+
+// ▼ renderUnseongByBranches 함수 내부 최상단 유틸들 아래쪽에 추가
+const dayStemHan = toHanStem(window.saju?.dayGan || ''); // 일간(기준)
+function getTenGodLabel(day, target) {
+  if (!day || !target) return '';
+  const MAP = (window.tenGodMap || (typeof tenGodMap !== 'undefined' ? tenGodMap : null)) || {};
+  return MAP[day]?.[target] || '';
+}
+
   // 유틸: 무/기토면 ‘없음’
   const isMuGi = (stem) => (stem === '戊' || stem === '己');
 
@@ -245,17 +254,29 @@ if (Array.isArray(rows) && rows.length) {
   `;
 
   // 기본(시간/일간/월간/년간 등) 본문
-  const body = rows.map(({ label, baseStem: bs }) => {
-    const bStem = toHanStem(bs || '');
-    const cells = computeRow(bStem);
-    return `
-      <tr>
-        <td>${label || ''}</td>
-        <td>${bStem || '-'}</td>
-        ${cells.map(u => `<td><span class="unseong-tag" style="color:blue">${u}</span></td>`).join('')}
-      </tr>
-    `;
-  }).join('');
+// 기존: const body = rows.map(({ label, baseStem: bs }) => {
+const body = rows.map(({ label, baseStem: bs, _rowspan } = {}) => {
+  const bStem = toHanStem(bs || '');
+  const cells = computeRow(bStem);
+  const tg = getTenGodLabel(dayStemHan, bStem); // ★ 일간 기준 육신
+
+  // (시지/일지… 헤더 합치기용 rowspan이 넘어오는 경우 유지)
+  const labelCell = (typeof _rowspan === 'number' && _rowspan > 1)
+    ? `<td rowspan="${_rowspan}">${label || ''}</td>`
+    : `<td>${label || ''}</td>`;
+
+  return `
+    <tr>
+      ${labelCell}
+      <td>
+        ${bStem || '-'}
+        ${tg ? `<div style="font-size:.85em;color:#666;">(${tg})</div>` : ''}
+      </td>
+      ${cells.map(u => `<td><span class="unseong-tag" style="color:#c21">${u}</span></td>`).join('')}
+    </tr>
+  `;
+}).join('');
+
 
   // ✅ 지장간 맵 (한자 지지 → [지장간...])
   const HiddenMap = (window.HanhiddenStemsMap || (typeof HanhiddenStemsMap !== 'undefined' ? HanhiddenStemsMap : null)) || {};
