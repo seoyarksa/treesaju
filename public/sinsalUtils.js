@@ -325,7 +325,7 @@ for (let col = 0; col < branches.length; col++) {
       <td style="min-width:60px; padding:6px; text-align:center;">
         <div>${labels[i]}</div>
         <div>${br || '-'}</div>
-        <div class="unseong-tag" style="font-size:.9em; color:#c21;">${u || '-'}</div>
+        <div class="unseong-tag" style="font-size:.9em; color:blue;">${u || '-'}</div>
       </td>`;
   }).join('');
 
