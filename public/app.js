@@ -16,7 +16,8 @@
 // 상수
 import { TERM_HELP } from './explain.js';
 window.TERM_HELP = TERM_HELP; // 전역 노출
-import './utils/tooltip.js';  // 위임 핸들러 설치
+//import './utils/tooltip.js';  // 위임 핸들러 설치
+
 import { 
   elementMap, 
   DANGRYEONGSHIK_MAP,
