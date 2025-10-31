@@ -389,7 +389,7 @@ const midHeader = `
             ${idx === 0
   ? `<td rowspan="${hsList.length}">
        <div>${label}</div>
-       <div class="branch-mini">${branches[colIdx] || '-'}</div>
+       <div class="branch-mini">(${branches[colIdx] || '-'})</div>
      </td>`
   : ''
 }
