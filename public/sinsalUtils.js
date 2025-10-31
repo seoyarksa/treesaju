@@ -360,8 +360,8 @@ const midHeader = `
       return `
         <tr>
           <td>${label || ''}</td>
-          <td>${bStem || '-'}${tenToShow ? ` <span class="ten-god" data-term-type="tengod" data-term="${tenToShow}">(${tenToShow})</span>` : ''}</td>
-          ${cells.map(u => `<td><span class="unseong-tag" data-term-type="unseong" data-term="${u}">${u}</span></td>`).join('')}
+          <td>${bStem || '-'}${tenToShow ? ` <span class="ten-god">(${tenToShow})</span>` : ''}</td>
+          ${cells.map(u => `<td><span class="unseong-tag">${u}</span></td>`).join('')}
         </tr>
       `;
     }).join('');
@@ -394,7 +394,7 @@ const midHeader = `
   : ''
 }
 
-            <td>${hs}${tenHidden ? ` <span class="ten-god" data-term-type="tengod" data-term="${tenHidden}">(${tenHidden})</span>` : ''}</td>
+            <td>${hs}${tenHidden ? ` <span class="ten-god">(${tenHidden})</span>` : ''}</td>
             ${cells.map(u => `<td><span class="unseong-tag">${u}</span></td>`).join('')}
           </tr>
         `;
