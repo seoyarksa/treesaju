@@ -484,7 +484,7 @@ const midHeader = `
     <table class="sinsal-bottom unseong-table" border="1"
            style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px;">
       <thead>
-        <tr><th colspan="6" style="padding:6px; background:#f5fbff;">
+        <tr><th colspan="6" style="padding:6px; background:#e9f5ff;">
           ${caption} · 기준 천간: <span style="color:#1976d2">${bStem || '-'}</span>
         </th></tr>
       </thead>
