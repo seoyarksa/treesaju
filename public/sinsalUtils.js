@@ -86,6 +86,29 @@ export function getSipsin(dayGan, targetGan) {
 window.BRANCH_ORDER = window.BRANCH_ORDER || ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
 
 // ── 강력 통합: 현재 선택된 대운/세운 지지(한자) 가져오기
+(function installDYSEGetter(){
+  const toHB = (typeof window.toHanBranch === 'function') ? window.toHanBranch : (v=>String(v||''));
+
+  function pickBranch(sel) {
+    const el = document.querySelector(sel);
+    if (!el) return '';
+    if (el.dataset?.branch) return toHB(el.dataset.branch);
+    const lines = (el.innerText || '').trim().split('\n').map(s=>s.trim());
+    return toHB(lines[2] || lines[1] || '');
+  }
+
+  window.__getCurrentDaeyunSewoonHan = function(){
+    const d1 = window?.selectedDaewoon?.branch || '';
+    const s1 = window?.selectedSewoon?.branch  || '';
+
+    const d2 = d1 || pickBranch('#basic-daeyun-table .daeyun-cell.selected');
+    const s2 = s1 || pickBranch('#basic-daeyun-table .sewoon-cell.selected');
+
+    const out = { daeyunBranchHan: d2 || '', sewoonBranchHan: s2 || '' };
+    console.log('[DY/SE getter]', out);
+    return out;
+  };
+})();
 
 // 맵 인덱싱 12운성 계산기 (전역 등록)
 (function initUnseongCalc(){

@@ -133,29 +133,6 @@ box.innerHTML = html;
   }
 };
 
-(function installDYSEGetter(){
-  const toHB = (typeof window.toHanBranch === 'function') ? window.toHanBranch : (v=>String(v||''));
-
-  function pickBranch(sel) {
-    const el = document.querySelector(sel);
-    if (!el) return '';
-    if (el.dataset?.branch) return toHB(el.dataset.branch);
-    const lines = (el.innerText || '').trim().split('\n').map(s=>s.trim());
-    return toHB(lines[2] || lines[1] || '');
-  }
-
-  window.__getCurrentDaeyunSewoonHan = function(){
-    const d1 = window?.selectedDaewoon?.branch || '';
-    const s1 = window?.selectedSewoon?.branch  || '';
-
-    const d2 = d1 || pickBranch('#basic-daeyun-table .daeyun-cell.selected');
-    const s2 = s1 || pickBranch('#basic-daeyun-table .sewoon-cell.selected');
-
-    const out = { daeyunBranchHan: d2 || '', sewoonBranchHan: s2 || '' };
-    console.log('[DY/SE getter]', out);
-    return out;
-  };
-})();
 
 
 //사주출력쪽 대운테이블
