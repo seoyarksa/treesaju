@@ -6022,7 +6022,7 @@ try {
   const explainMod = await import('./explain.js');
   if (explainMod?.TERM_HELP) {
     window.TERM_HELP = explainMod.TERM_HELP;
-    console.log('[TERM_HELP] loaded keys:', Object.keys(window.TERM_HELP));
+    console.log('[TERM_HELP] loaded groups:', Object.keys(window.TERM_HELP));
   } else {
     console.warn('[TERM_HELP] missing export');
   }
@@ -6030,26 +6030,21 @@ try {
   console.warn('[TERM_HELP] load skipped:', e);
 }
 
-// 2) 툴팁(전역 델리게이트) 설치
+// 2) 툴팁 설치 (initTermHelp 존재 체크 후 호출)
 try {
-  const tipMod = await import('./utils/tooltip.js'); // 또는 new URL('./utils/tooltip.js', import.meta.url)
+  const tipMod = await import('./utils/tooltip.js');
   console.log('[tooltip] module keys:', Object.keys(tipMod || {}));
-
-  // 모든 경우 커버: 네임드, default, 전역 fallback
-  const init =
-    tipMod?.initTermHelp ||
-    tipMod?.default?.initTermHelp ||
-    window.initTermHelp;
-
+  const init = tipMod?.initTermHelp || tipMod?.default?.initTermHelp || window.initTermHelp;
   if (typeof init === 'function') {
     init();
-    console.log('[tooltip] installed via', init.name || 'anonymous');
+    console.log('[tooltip] installed OK');
   } else {
     console.warn('[tooltip] initTermHelp not found');
   }
 } catch (e) {
   console.warn('[tooltip] install failed:', e);
 }
+
 
   } catch (err) {
     console.error("[init] fatal:", err);

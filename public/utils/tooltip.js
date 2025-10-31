@@ -3,13 +3,19 @@
 // 전역 설명 툴팁 설치기
 // 사용처: import { initTermHelp } from './utils/tooltip.js';  initTermHelp();
 
-export function initTermHelp() {
-  if (window.__termHelpInstalled) return;
-  window.__termHelpInstalled = true;
+// utils/tooltip.js
+// 단일 전역 툴팁: .explainable[data-group][data-term] 클릭 시 설명 표시
+// TERM_HELP는 window.TERM_HELP.unseong / .tengod / .sipsal12 형태
 
-  // ─────────────────────────────────────────────────────
-  // 1) 팁 DOM 준비
-  // ─────────────────────────────────────────────────────
+export function initTermHelp() {
+  if (window.__termHelpInstalled) {
+    console.debug('[tooltip] already installed');
+    return;
+  }
+  window.__termHelpInstalled = true;
+  console.debug('[tooltip] initTermHelp() start');
+
+  // 1) 팁 DOM
   let tip = document.getElementById('term-help-pop');
   if (!tip) {
     tip = document.createElement('div');
@@ -18,7 +24,7 @@ export function initTermHelp() {
   }
   Object.assign(tip.style, {
     position: 'fixed',
-    zIndex: '2147483647', // 최상단
+    zIndex: '2147483647',
     display: 'none',
     maxWidth: '320px',
     padding: '10px 12px',
@@ -32,39 +38,41 @@ export function initTermHelp() {
     wordBreak: 'keep-all',
     pointerEvents: 'auto',
   });
+  tip.setAttribute('data-installed', '1');
 
-  // 포인터 힌트
+  // 포인터 힌트(CSS 충돌 최소화)
   const style = document.createElement('style');
+  style.setAttribute('data-tooltip-style', '1');
   style.textContent = `
-    .explainable { cursor: help; }
+    .explainable { cursor: help !important; }
+    #term-help-pop { will-change: transform; }
     #term-help-pop a { color: #8ecbff; text-decoration: underline; }
   `;
   document.head.appendChild(style);
 
-  // ─────────────────────────────────────────────────────
-  // 2) 유틸
-  // ─────────────────────────────────────────────────────
+  // 도우미
   const hide = () => {
-    tip.style.display = 'none';
+    if (tip.style.display !== 'none') {
+      tip.style.display = 'none';
+      console.debug('[tooltip] hide');
+    }
   };
 
   const showNear = (target, html) => {
     tip.innerHTML = html;
-    tip.style.display = 'block'; // 먼저 보여야 offsetWidth 계산 가능
+    tip.style.display = 'block'; // 먼저 보여야 크기 계산됨
 
     const r = target.getBoundingClientRect();
     const gap = 8;
-
-    // 기본 위치(타겟 아래)
     let left = r.left;
     let top  = r.top + window.scrollY + r.height + gap;
 
-    // 오른쪽 경계 보정
+    // 우측/좌측 경계 보정
     const maxLeft = window.innerWidth - tip.offsetWidth - 8;
     if (left > maxLeft) left = maxLeft;
     if (left < 8) left = 8;
 
-    // 하단 경계 보정(화면 하단 넘치면 위쪽에 띄움)
+    // 하단 넘치면 위로
     const bottom = top + tip.offsetHeight;
     const viewportBottom = window.scrollY + window.innerHeight - 8;
     if (bottom > viewportBottom) {
@@ -74,44 +82,48 @@ export function initTermHelp() {
 
     tip.style.left = `${left}px`;
     tip.style.top  = `${top}px`;
+    console.debug('[tooltip] showNear', { left, top, termHtml: html });
   };
 
   const getDesc = (group, term) => {
     const dict = (window.TERM_HELP && window.TERM_HELP[group]) || {};
     const key  = String(term || '').trim();
-    return dict[key] || '설명이 아직 없습니다.';
+    const desc = dict[key] || '설명이 아직 없습니다.';
+    return desc;
   };
 
-  // “방금 열림” 가드: 열자마자 닫히는 현상 방지
+  // 열자마자 닫힘 방지 가드
   let __tipLastShowTs = 0;
 
-  // ─────────────────────────────────────────────────────
-  // 3) 이벤트 바인딩 (전파 차단하지 않음)
-  // ─────────────────────────────────────────────────────
-
-  // A) 캡처 단계: explainable 클릭 시 열기 (전파 차단 X)
+  // A) 캡처 단계: .explainable 클릭 → 열기 (stopPropagation 하지 않음)
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('.explainable');
+    const t = e.target.closest?.('.explainable');
     if (!t) return;
 
     const group = t.getAttribute('data-group') || 'unseong';
     const term  = t.getAttribute('data-term')  || t.textContent.trim();
     const from  = (group === 'tengod') ? '십신' : (group === 'sipsal12' ? '12신살' : '12운성');
+
     const title = `${from} · ${term}`;
     const body  = getDesc(group, term);
 
+    console.debug('[tooltip] HIT', { group, term, title });
+
     showNear(t, `<div style="font-weight:600; margin-bottom:6px;">${title}</div>${body}`);
     __tipLastShowTs = performance.now();
-  }, true); // capture=true
+  }, true); // capture = true
 
-  // B) 버블 단계: 바깥 클릭 시 닫기 (같은 틱 닫힘 방지)
+  // B) 버블 단계: 바깥 클릭 → 닫기 (같은 틱 방지)
   document.addEventListener('click', (e) => {
     // 방금 연 클릭이면 닫지 않음
-    if (performance.now() - __tipLastShowTs < 120) return;
-
-    // 팁 내부나 다른 explainable 재클릭이면 유지
-    if (e.target.closest('#term-help-pop') || e.target.closest('.explainable')) return;
-
+    if (performance.now() - __tipLastShowTs < 150) {
+      // console.debug('[tooltip] skip hide (just opened)');
+      return;
+    }
+    if (e.target.closest?.('#term-help-pop') || e.target.closest?.('.explainable')) {
+      // 팝업 내부/다른 explainable 클릭이면 유지
+      return;
+    }
     hide();
   });
 
@@ -119,16 +131,15 @@ export function initTermHelp() {
   window.addEventListener('resize', hide, { passive: true });
   window.addEventListener('scroll', hide, true);
 
-  // ESC로 닫기 (선택사항)
+  // ESC 닫기
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') hide();
   }, { passive: true });
 
-  // 전역 fallback(동적 import 없이도 접근 가능하게)
+  // 전역 접근성(동적 import Fallback)
   window.initTermHelp = initTermHelp;
 
-  // console.log('[tooltip] installed');
+  console.debug('[tooltip] initTermHelp() installed');
 }
 
-// 기본 export(호환)
 export default { initTermHelp };
