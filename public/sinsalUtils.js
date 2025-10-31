@@ -301,7 +301,7 @@ function renderUnseongByBranches({ baseStem, caption = '12운성', rows } = {}) 
 
     // 1) 헤더
 const header = `
-  <tr>
+  <tr class="thead">
     <th rowspan="2" style="min-width:72px; background:#e9f5ff;">기준</th>
     <th rowspan="2" style="min-width:44px; background:#e9f5ff;">값</th>
     ${colLabels.map(lbl => `<th style="min-width:56px; background:#e9f5ff;">${lbl}</th>`).join('')}
