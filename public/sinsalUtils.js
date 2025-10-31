@@ -134,9 +134,8 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
   const branches = branchesRaw.map(v => toHanBranch(v));
   const labels   = ['시','일','월','년','대운','세운'];
 
-  // ── 🔎 디버그 로그: 한 번에 흐름 확인
- console.log('[UNSEONG] DATA:',
-   { caption, bStem, bStemValid, pick, branchesRaw, branches });
+  // 디버그 로그
+  console.log('[UNSEONG] DATA:', { caption, bStem, bStemValid, pick, branchesRaw, branches });
 
   // 5) 셀 생성
   const tds = branches.map((br, i) => {
@@ -149,8 +148,8 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
       </td>`;
   }).join('');
 
-  // 6) 표 반환
-  return `
+  // 6) 표 반환 (변수에 담고 → 로그 → return)
+  const html = `
     <table class="sinsal-bottom unseong-table" border="1"
            style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px;">
       <thead>
@@ -161,7 +160,14 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
       <tbody><tr>${tds}</tr></tbody>
     </table>
   `;
+
+  console.log('[UNSEONG] EXIT:', caption);
+  return html;
 }
+
+// 이 파일 버전이 실제로 쓰이도록 전역 바인딩(중복 안전)
+window.renderUnseongByBranches = renderUnseongByBranches;
+
 
 
 
