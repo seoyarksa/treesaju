@@ -440,7 +440,7 @@ const midHeader = `
         .unseong-tag{ color:#1976d2; font-weight:600; } /* 12운성 파란색 */
         .twelve-sinsal-tag{ color:#444; font-weight:600; }
         #unseong-block .unseong-table thead th[colspan="6"] {
-                    background: #e9f5ff !important; }
+                    background:rgb(190, 221, 247) !important; }
          .unseong-table .midhead th { background:#fff8d6 !important; }
       </style>
       <table class="sinsal-bottom unseong-table" border="1"
