@@ -256,15 +256,16 @@ function renderUnseongByBranches({ baseStem, caption = '12운성', rows } = {}) 
       const bStem = toHanStem(bs || '');
       const cells = computeRow(bStem);
       const ten = tenOf(bStem); // ✅ 일간 기준 육신
+      const tenToShow = (label === '일간') ? '' : ten;  // ✅ 일간 줄은 육신 숨김
 
-      return `
-        <tr>
-          <td>${label || ''}</td>
-          <td>${bStem || '-'}${ten ? ` <span class="ten-god">(${ten})</span>` : ''}</td>
-          ${cells.map(u => `<td><span class="unseong-tag">${u}</span></td>`).join('')}
-        </tr>
-      `;
-    }).join('');
+  return `
+    <tr>
+      <td>${label || ''}</td>
+      <td>${bStem || '-'}${tenToShow ? ` <span class="ten-god">(${tenToShow})</span>` : ''}</td>
+      ${cells.map(u => `<td><span class="unseong-tag">${u}</span></td>`).join('')}
+    </tr>
+  `;
+}).join('');
 
     // 3) 지장간 묶음(각 지지의 지장간을 개별 행으로 추가, 첫 칸은 rowspan으로 합침)
     const hiddenMap = (window.HanhiddenStemsMap || (typeof HanhiddenStemsMap !== 'undefined' ? HanhiddenStemsMap : null)) || {};
