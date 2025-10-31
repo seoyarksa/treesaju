@@ -12,10 +12,11 @@
 //console.clear();  console.log("🔥 전체 다시 실행됨");  console.log("👉 현재 saju:", JSON.stringify(saju));
 
 
-
+// app.js
 // 상수
 import { TERM_HELP } from './explain.js';
-import './utils/tooltip.js'
+window.TERM_HELP = TERM_HELP; // 전역 노출
+import './utils/tooltip.js';  // 위임 핸들러 설치
 import { 
   elementMap, 
   DANGRYEONGSHIK_MAP,
@@ -112,10 +113,6 @@ import { renderSinsalTable,
          renderEtcSinsalTable
       } from './sinsalUtils.js';
 
-
-// 이미 window에 있으면 덮어쓰지 않고 병합(선택)
-window.TERM_HELP = window.TERM_HELP || {};
-Object.assign(window.TERM_HELP, TERM_HELP);
 
 
 console.log('🔥 app.js loaded');
