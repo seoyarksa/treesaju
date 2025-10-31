@@ -443,6 +443,8 @@ ${renderUnseongByBranches({ baseStem: window.saju?.yearGan , caption:'12운성 (
 
   `;
 }
+// 파일: sinsalTable.js (renderSinsalTable가 정의된 그 파일)
+window.renderSinsalTable = window.renderSinsalTable || renderSinsalTable;
 
 
 /////12운성/신살 장생,제왕, 묘....등 강조//////////////////////////////
