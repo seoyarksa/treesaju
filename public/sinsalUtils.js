@@ -215,14 +215,12 @@ function renderUnseongByBranches({ baseStem, caption = '12운성', rows } = {}) 
   ];
   const colLabels = ['시지','일지','월지','년지','대운지지','세운지지'];
 
-
-// ▼ renderUnseongByBranches 함수 내부 최상단 유틸들 아래쪽에 추가
-const dayStemHan = toHanStem(window.saju?.dayGan || ''); // 일간(기준)
-function getTenGodLabel(day, target) {
-  if (!day || !target) return '';
-  const MAP = (window.tenGodMap || (typeof tenGodMap !== 'undefined' ? tenGodMap : null)) || {};
-  return MAP[day]?.[target] || '';
-}
+  // 🔹 일간(육신 기준) + 십신 맵
+  const dayStemHan = toHanStem(s.dayGan || '');
+  const TEN = (window.tenGodMap || (typeof tenGodMap !== 'undefined' ? tenGodMap : null)) || {};
+  const tenOf = (baseStem) => (dayStemHan && baseStem)
+    ? ((TEN[dayStemHan] || {})[toHanStem(baseStem)] || '')
+    : '';
 
   // 유틸: 무/기토면 ‘없음’
   const isMuGi = (stem) => (stem === '戊' || stem === '己');
@@ -237,95 +235,73 @@ function getTenGodLabel(day, target) {
     });
   }
 
-// =============== 종합표 모드: rows 배열이 주어지면 한 장으로 ===============
-if (Array.isArray(rows) && rows.length) {
-  // --- 공통 준비 ---
-  const dayStemHan = toHanStem(s.dayGan || '');
-  const isMuGi = (stem) => (stem === '戊' || stem === '己');
-
-  // 1) 헤더
-  const header = `
-    <tr>
-      <th rowspan="2" style="min-width:72px;">기준</th>
-      <th rowspan="2" style="min-width:44px;">값</th>
-      ${colLabels.map(lbl => `<th style="min-width:56px;">${lbl}</th>`).join('')}
-    </tr>
-    <tr>
-      ${branches.map((br, i) =>
-        `<th title="${colLabels[i]}" style="min-width:56px;">${br || '-'}</th>`
-      ).join('')}
-    </tr>
-  `;
-
-  // 2) 기존 기준줄 (시간/일간/월간/년간 등)
-  const body = rows.map(({ label, baseStem: bs }) => {
-    const bStem = toHanStem(bs || '');
-    const cells = branches.map(br => {
-      if (!br || br === '無') return '-';
-      if (isMuGi(bStem)) return '없음';
-      return (typeof window.__unseongOf === 'function'
-        ? (window.__unseongOf(bStem, br) || '-')
-        : '-');
-    });
-    // 🔹 일간 기준 십신
-    const ten = (typeof __TEN_MAP__ !== 'undefined' && dayStemHan)
-      ? ((__TEN_MAP__[dayStemHan] || {})[bStem] || '')
-      : '';
-    return `
+  // =============== 종합표 모드: rows 배열이 주어지면 한 장으로 ===============
+  if (Array.isArray(rows) && rows.length) {
+    // 1) 헤더 (지지 라벨 + 실제 지지 값 2단으로)
+    const header = `
       <tr>
-        <td>${label || ''}</td>
-        <td>${bStem || '-'}${ten ? ` <span class="ten-god">(${ten})</span>` : ''}</td>
-        ${cells.map(u => `<td><span class="unseong-tag">${u}</span></td>`).join('')}
+        <th rowspan="2" style="min-width:72px;">기준</th>
+        <th rowspan="2" style="min-width:44px;">값</th>
+        ${colLabels.map(lbl => `<th style="min-width:56px;">${lbl}</th>`).join('')}
+      </tr>
+      <tr>
+        ${branches.map((br, i) =>
+          `<th title="${colLabels[i]}" style="min-width:56px;">${br || '-'}</th>`
+        ).join('')}
       </tr>
     `;
-  }).join('');
 
-  // 3) 🔴 여기: hidden rows “그냥 기존 함수 방식으로 붙이기”
-  //    → 지지 6칸에 대해, 그 지지의 지장간을 뽑아서 위와 똑같이 rows를 한 번씩 더 만드는 것
-  const hiddenMap = (window.HanhiddenStemsMap || (typeof HanhiddenStemsMap !== 'undefined' ? HanhiddenStemsMap : null)) || {};
-  const hiddenRows = branches.map((baseBranch, colIdx) => {
-    if (!baseBranch) return '';                   // 그 칸이 비었으면 스킵
-    const hsList = hiddenMap[baseBranch] || [];   // 그 지지의 지장간들
-    if (!hsList.length) return '';
-
-    const label = colLabels[colIdx];              // 시지/일지/… 라벨
-
-    return hsList.map((hs, idx) => {
-      const cells = branches.map(br => {
-        if (!br || br === '無') return '-';
-        if (isMuGi(hs)) return '없음';
-        return (typeof window.__unseongOf === 'function'
-          ? (window.__unseongOf(hs, br) || '-')
-          : '-');
-      });
-      // 지장간에도 십신 붙이기
-      const ten = (typeof __TEN_MAP__ !== 'undefined' && dayStemHan)
-        ? ((__TEN_MAP__[dayStemHan] || {})[hs] || '')
-        : '';
+    // 2) 기존 기준줄 (시간/일간/월간/년간 등)
+    const body = rows.map(({ label, baseStem: bs }) => {
+      const bStem = toHanStem(bs || '');
+      const cells = computeRow(bStem);
+      const ten = tenOf(bStem); // ✅ 일간 기준 육신
 
       return `
         <tr>
-          ${idx === 0 ? `<td rowspan="${hsList.length}">${label}</td>` : ''}
-          <td>${hs}${ten ? ` <span class="ten-god">(${ten})</span>` : ''}</td>
+          <td>${label || ''}</td>
+          <td>${bStem || '-'}${ten ? ` <span class="ten-god">(${ten})</span>` : ''}</td>
           ${cells.map(u => `<td><span class="unseong-tag">${u}</span></td>`).join('')}
         </tr>
       `;
     }).join('');
-  }).join('');
 
-  // 4) 최종 리턴
-  return `
-    <table class="sinsal-bottom unseong-table" border="1"
-           style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px; table-layout:fixed; width:100%; max-width:960px;">
-      <thead>${header}</thead>
-      <tbody>
-        ${body}
-        ${hiddenRows}
-      </tbody>
-    </table>
-  `;
-}
+    // 3) 지장간 묶음(각 지지의 지장간을 개별 행으로 추가, 첫 칸은 rowspan으로 합침)
+    const hiddenMap = (window.HanhiddenStemsMap || (typeof HanhiddenStemsMap !== 'undefined' ? HanhiddenStemsMap : null)) || {};
+    const hiddenRows = branches.map((baseBranch, colIdx) => {
+      if (!baseBranch) return '';
+      const hsList = hiddenMap[baseBranch] || [];
+      if (!hsList.length) return '';
 
+      const label = colLabels[colIdx];
+
+      return hsList.map((hs, idx) => {
+        const bStem = toHanStem(hs); // 지장간(천간)
+        const cells = computeRow(bStem);
+        const ten = tenOf(bStem);    // ✅ 지장간에도 육신 표시
+
+        return `
+          <tr>
+            ${idx === 0 ? `<td rowspan="${hsList.length}">${label}</td>` : ''}
+            <td>${bStem}${ten ? ` <span class="ten-god">(${ten})</span>` : ''}</td>
+            ${cells.map(u => `<td><span class="unseong-tag">${u}</span></td>`).join('')}
+          </tr>
+        `;
+      }).join('');
+    }).join('');
+
+    // 4) 최종 리턴
+    return `
+      <table class="sinsal-bottom unseong-table" border="1"
+             style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px; table-layout:fixed; width:100%; max-width:960px;">
+        <thead>${header}</thead>
+        <tbody>
+          ${body}
+          ${hiddenRows}
+        </tbody>
+      </table>
+    `;
+  }
 
   // =============== 단일행 모드(기존 동작 그대로) ===============
   const bStem = toHanStem(baseStem);
@@ -348,7 +324,7 @@ if (Array.isArray(rows) && rows.length) {
       <td style="min-width:60px; padding:6px; text-align:center;">
         <div>${labels[i]}</div>
         <div>${br || '-'}</div>
-        <div class="unseong-tag" style="font-size:.9em; ">${u || '-'}</div>
+        <div class="unseong-tag" style="font-size:.9em;">${u || '-'}</div>
       </td>`;
   }).join('');
 
