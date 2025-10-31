@@ -266,24 +266,29 @@ if (Array.isArray(rows) && rows.length) {
   };
 
   // ✅ 각 지지 컬럼(시지~세운지지)의 지장간을 “기준=해당 지지라벨 / 값=지장간”으로 추가
-  let hiddenRows = '';
-  for (let col = 0; col < branches.length; col++) {
-    const br = branches[col];                 // 해당 열의 지지(예: 시지의 子 같은 값)
-    if (!br) continue;
-    const stems = getHiddenStems(br);         // ['壬','癸'] 등
-    if (!stems.length) continue;
+// ✅ 각 지지 컬럼(시지~세운지지)의 지장간을 “기준=해당 지지라벨 / 값=지장간”으로 추가
+let hiddenRows = '';
+for (let col = 0; col < branches.length; col++) {
+  const br = branches[col];                 // 해당 열의 지지(예: 시지의 子 같은 값)
+  if (!br) continue;
+  const stems = getHiddenStems(br);         // ['壬','癸'] 등 (없으면 [])
+  if (!stems.length) continue;
 
-    stems.forEach(hs => {
-      const cells = computeRow(hs);           // 지장간을 기준천간으로 12운성 계산
-      hiddenRows += `
-        <tr>
-          <td>${colLabels[col]}</td>
-          <td>${hs}</td>
-          ${cells.map(u => `<td><span class="unseong-tag" style="color:#c21">${u}</span></td>`).join('')}
-        </tr>
-      `;
-    });
-  }
+  // rowspan: 라벨은 첫 행에만 출력, 나머지 행은 생략
+  const rowspan = stems.length;
+
+  stems.forEach((hs, idx) => {
+    const cells = computeRow(hs);           // 지장간을 기준천간으로 12운성 계산
+    hiddenRows += `
+      <tr>
+        ${idx === 0 ? `<td rowspan="${rowspan}">${colLabels[col]}</td>` : ``}
+        <td>${hs}</td>
+        ${cells.map(u => `<td><span class="unseong-tag" style="color:#c21">${u}</span></td>`).join('')}
+      </tr>
+    `;
+  });
+}
+
 
   // 최종 테이블
   return `
