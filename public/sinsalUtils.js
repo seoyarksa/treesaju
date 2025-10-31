@@ -207,10 +207,10 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
   const UNMAP = (window.unseongMap12 || (typeof unseongMap12 !== 'undefined' ? unseongMap12 : null)) || {};
   const bStemValid = !!UNMAP[bStem];
 
-  // 1) 대운/세운 추출 — “기타신살”과 동일한 우선순위/폴백
+  // 1) 대운/세운 추출 — “기타신살”과 동일한 우선순위/폴백(+ 구표 DOM까지 포함)
   function pickDaeyunSewoon() {
     // ---------- 대운 ----------
-    let dGan  = '';  // 이번 함수에선 간은 쓰지 않지만, 구조 유지
+    let dGan  = '';
     let dJiji = '';
 
     // (1) 전역 선택값
@@ -219,7 +219,7 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
       dJiji = window.selectedDaewoon.branch || dJiji;
     }
 
-    // (2) 새 대운표 DOM 폴백
+    // (2) 새 대운표 DOM (#basic-daeyun-table)
     if (!dGan || !dJiji) {
       const sel = document.querySelector('#basic-daeyun-table .daeyun-cell.selected');
       if (sel) {
@@ -238,6 +238,27 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
       }
     }
 
+    // (3) 구 대운표 DOM (.daeyun-table-container …)
+    if (!dGan || !dJiji) {
+      const tds = document.querySelectorAll('.daeyun-table-container .daeyun-table tbody tr:nth-child(2) td');
+      const selTd = Array.from(tds).find(td => td.classList.contains('daeyun-selected'));
+      if (selTd) {
+        if (window.daeyunPairs?.length) {
+          const idx = Array.from(tds).indexOf(selTd);
+          const trueIdx = tds.length - 1 - idx;
+          const pair = window.daeyunPairs[trueIdx] || {};
+          dGan  = dGan  || (pair.stem   || '');
+          dJiji = dJiji || (pair.branch || '');
+        } else {
+          const lines = (selTd.innerText || '').trim().split('\n').map(s => s.trim());
+          const maybeGan = lines[0] || '';
+          const maybeJi  = lines[2] || lines[1] || '';
+          dGan  = dGan  || maybeGan.replace(/\s+/g, '');
+          dJiji = dJiji || maybeJi.replace(/\s+/g, '');
+        }
+      }
+    }
+
     // ---------- 세운 ----------
     let sGan  = '';
     let sJiji = '';
@@ -248,7 +269,7 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
       sJiji = window.selectedSewoon.branch || sJiji;
     }
 
-    // (2) 새 세운표 DOM 폴백
+    // (2) 새 세운표 DOM (#basic-daeyun-table)
     if (!sGan || !sJiji) {
       const seSel = document.querySelector('#basic-daeyun-table .sewoon-cell.selected');
       if (seSel) {
@@ -267,7 +288,26 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
       }
     }
 
-    // (3) 최종 폴백: 세운은 無 허용
+    // (3) 구 세운표 DOM (있다면 호환)
+    if (!sGan || !sJiji) {
+      const oldSel = document.querySelector('.sewoon-cell.selected');
+      if (oldSel) {
+        const dsGan  = oldSel.dataset?.stem   || '';
+        const dsJiji = oldSel.dataset?.branch || '';
+        if (dsGan && dsJiji) {
+          sGan  = sGan  || dsGan;
+          sJiji = sJiji || dsJiji;
+        } else {
+          const lines = (oldSel.innerText || '').trim().split('\n').map(s => s.trim());
+          const maybeGan = lines[0] || '';
+          const maybeJi  = lines[2] || lines[1] || '';
+          sGan  = sGan  || maybeGan.replace(/\s+/g, '');
+          sJiji = sJiji || maybeJi.replace(/\s+/g, '');
+        }
+      }
+    }
+
+    // (4) 최종 폴백: 세운은 無 허용
     if (!sGan || !sJiji) {
       sGan  = '無';
       sJiji = '無';
