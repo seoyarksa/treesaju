@@ -176,6 +176,45 @@ window.BRANCH_ORDER = window.BRANCH_ORDER || ['子','丑','寅','卯','辰','巳
   };
 })();
 
+
+// ===== 12신살 계산 유틸 (삼합 + 12지 순서 기반) : 1회 설치 =====
+(function installGet12SinsalOnce(){
+  if (typeof window.get12Sinsal === 'function') return; // 이미 있으면 그대로 사용
+
+  // 표준 12지 순서
+  const JI_ORDER = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+
+  // 삼합 그룹 키 매핑 (한 글자 지지 → 삼합 문자열 키)
+  const SAMHAP_KEY_OF = {
+    '亥':'亥卯未','卯':'亥卯未','未':'亥卯未',
+    '寅':'寅午戌','午':'寅午戌','戌':'寅午戌',
+    '巳':'巳酉丑','酉':'巳酉丑','丑':'巳酉丑',
+    '申':'申子辰','子':'申子辰','辰':'申子辰',
+  };
+
+  // 외부에서 주입한 표(네가 준 그 표). 전역/모듈 어디에든 선언돼 있으면 사용
+  const SINSAL_TABLE =
+    (window.sinsalMap12 || (typeof sinsalMap12 !== 'undefined' ? sinsalMap12 : null)) || {};
+
+  // 핵심: 기준지지 baseBranch 가 속한 삼합키를 찾고,
+  // 대상지지 targetBranch 의 12지 index 를 사용해 해당 그룹 배열에서 꺼냄
+  window.get12Sinsal = function get12Sinsal(baseBranch, targetBranch) {
+    const b = String(baseBranch || '').trim();
+    const t = String(targetBranch || '').trim();
+    if (!b || !t) return '';
+
+    const gKey = SAMHAP_KEY_OF[b];
+    if (!gKey) return '';             // 삼합 매핑 실패
+    const groupArr = SINSAL_TABLE[gKey];
+    if (!groupArr || groupArr.length !== 12) return '';
+
+    const idx = JI_ORDER.indexOf(t);
+    if (idx < 0) return '';
+
+    return groupArr[idx] || '';
+  };
+})();
+
 // ✅ 전달받은 baseStem(시간/일간/월간/년간)을 기준으로,
 //    [시·일·월·년·대운·세운] 지지에 대한 12운성을 표로 출력
 // ▼▼ 교체: 기존 renderUnseongByBranches 전부 이걸로 바꿔 붙이세요 ▼▼
@@ -373,9 +412,9 @@ function renderUnseongByBranches({ baseStem, caption = '12운성', rows } = {}) 
       </tr>
     `;
     const sinsal12Rows = [
-      build12SinsalRow('년지(12신살)',   yearBranchHan),
-      build12SinsalRow('대운지지(12신살)', dBranchHan),
-      build12SinsalRow('세운지지(12신살)', sBranchHan),
+      build12SinsalRow('년지',   yearBranchHan),
+      build12SinsalRow('대운지지', dBranchHan),
+      build12SinsalRow('세운지지', sBranchHan),
     ].join('');
 
     // 4) 최종 리턴
@@ -563,7 +602,7 @@ const sinsalRow  = `<tr id="sinsal-row"><th>12신살</th>${jijiArr.map(() => `<t
 
 <div style="text-align:center; margin:8px 0;">
 [위의 표에서는 원하는 천간의 지지별 12운성(신살)을 바로 확인할 수 있습니다.]<br><br>
-  * 천간별 12운성표 
+  * 천간별 12운성표 + 12신살표 
 </div>
 
 <div id="unseong-block"></div>
