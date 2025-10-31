@@ -19,7 +19,7 @@ import { TERM_HELP } from './explain.js';
 window.TERM_HELP = TERM_HELP;
 
 // 2) 툴팁 설치 함수
-import { initTermHelp } from './utils/tooltip.js';
+//import { initTermHelp } from './utils/tooltip.js';
 
 
 import { 
