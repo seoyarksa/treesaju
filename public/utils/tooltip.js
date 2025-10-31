@@ -5,7 +5,7 @@ export function initTermHelp() {
   if (window.__termHelpInstalled) return;
   window.__termHelpInstalled = true;
 
-  // 1) 팁 DOM 준비
+  // 1) 팁 DOM
   let tip = document.getElementById('term-help-pop');
   if (!tip) {
     tip = document.createElement('div');
@@ -14,7 +14,7 @@ export function initTermHelp() {
   }
   Object.assign(tip.style, {
     position: 'fixed',
-    zIndex: '2147483647',        // 최상단
+    zIndex: '2147483647',
     display: 'none',
     maxWidth: '320px',
     padding: '10px 12px',
@@ -31,8 +31,7 @@ export function initTermHelp() {
   const hide = () => { tip.style.display = 'none'; };
   const showNear = (target, html) => {
     tip.innerHTML = html;
-    tip.style.display = 'block';
-    // 먼저 보이게 -> width 계산
+    tip.style.display = 'block'; // 먼저 보여서 width 계산
     const r = target.getBoundingClientRect();
     const gap = 8;
     const left = Math.min(window.innerWidth - tip.offsetWidth - 8, Math.max(8, r.left));
@@ -47,9 +46,10 @@ export function initTermHelp() {
     return dict[key] || '설명이 아직 없습니다.';
   };
 
-  // 2) 전역 위임 핸들러(캡처 단계, 키 이벤트 간섭 없음)
-  document.addEventListener('click', (e) => {
-    const t = e.target.closest('.explainable');
+  // === 이벤트 ===
+  // ✅ show: 리렌더/버블에 영향 안 받도록 pointerdown + capture
+  document.addEventListener('pointerdown', (e) => {
+    const t = e.target.closest?.('.explainable');
     if (!t) return;
     const group = t.getAttribute('data-group') || 'unseong';
     const term  = t.getAttribute('data-term')  || t.textContent.trim();
@@ -57,20 +57,24 @@ export function initTermHelp() {
     const title = `${from} · ${term}`;
     const body  = getDesc(group, term);
     showNear(t, `<div style="font-weight:600; margin-bottom:6px;">${title}</div>${body}`);
-  }, true); // capture=true
+  }, true);
 
-  // 3) 바깥 클릭/스크롤/리사이즈 → 숨김
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('#term-help-pop') && !e.target.closest('.explainable')) hide();
-  });
+  // ✅ hide: 정말 바깥을 누른 경우만 (composedPath로 안정 판별)
+  document.addEventListener('pointerdown', (e) => {
+    const path = e.composedPath ? e.composedPath() : [];
+    const isInside = path.some(el =>
+      el && (el.id === 'term-help-pop' || (el.classList && el.classList.contains('explainable')))
+    );
+    if (!isInside) hide();
+  }, false);
+
+  // 스크롤/리사이즈 시 숨김
   window.addEventListener('resize', hide, { passive: true });
   window.addEventListener('scroll', hide, true);
 
-  // 4) 포인터 힌트(선택)
+  // 포인터 힌트
   const style = document.createElement('style');
-  style.textContent = `
-    .explainable { cursor: help; }
-  `;
+  style.textContent = `.explainable{cursor:help;}`;
   document.head.appendChild(style);
 
   console.log('[tooltip] installed');
