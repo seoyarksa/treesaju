@@ -14,7 +14,8 @@
 
 // app.js
 // 상수
-
+import { TERM_HELP } from './explain.js';
+window.TERM_HELP = TERM_HELP;
 import { 
   elementMap, 
   DANGRYEONGSHIK_MAP,
