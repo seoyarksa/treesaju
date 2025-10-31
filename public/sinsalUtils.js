@@ -272,7 +272,7 @@ const body = rows.map(({ label, baseStem: bs, _rowspan } = {}) => {
         ${bStem || '-'}
         ${tg ? `<div style="font-size:.85em;color:#666;">(${tg})</div>` : ''}
       </td>
-      ${cells.map(u => `<td><span class="unseong-tag" style="color:#c21">${u}</span></td>`).join('')}
+      ${cells.map(u => `<td><span class="unseong-tag" ">${u}</span></td>`).join('')}
     </tr>
   `;
 }).join('');
@@ -304,7 +304,7 @@ for (let col = 0; col < branches.length; col++) {
       <tr>
         ${idx === 0 ? `<td rowspan="${rowspan}">${colLabels[col]}</td>` : ``}
         <td>${hs}</td>
-        ${cells.map(u => `<td><span class="unseong-tag" style="color:blue">${u}</span></td>`).join('')}
+        ${cells.map(u => `<td><span class="unseong-tag" >${u}</span></td>`).join('')}
       </tr>
     `;
   });
@@ -346,7 +346,7 @@ for (let col = 0; col < branches.length; col++) {
       <td style="min-width:60px; padding:6px; text-align:center;">
         <div>${labels[i]}</div>
         <div>${br || '-'}</div>
-        <div class="unseong-tag" style="font-size:.9em; color:blue;">${u || '-'}</div>
+        <div class="unseong-tag" style="font-size:.9em; ">${u || '-'}</div>
       </td>`;
   }).join('');
 
@@ -462,7 +462,7 @@ const sinsalRow  = `<tr id="sinsal-row"><th>12신살</th>${jijiArr.map(() => `<t
 
       ${colCss} /* 🔸 동적으로 생성된 열 강조 CSS */
 
-        .unseong-tag { color:#d00000 !important; font-weight:700; 
+        .unseong-tag { color:#1976d2 !important; font-weight:700; 
         }
 
 
