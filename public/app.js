@@ -6032,7 +6032,7 @@ try {
 
 // 2) 툴팁(전역 델리게이트) 설치
 try {
-  const tipMod = await import('/utils/tooltip.js');
+  const tipMod = await import('./utils/tooltip.js');
   console.log('[tooltip] module keys:', Object.keys(tipMod || {}));
   if (typeof tipMod?.initTermHelp === 'function') {
     tipMod.initTermHelp();
