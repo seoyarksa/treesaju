@@ -228,43 +228,76 @@ function renderUnseongByBranches({ baseStem, caption = '12운성', rows } = {}) 
     });
   }
 
-  // =============== 종합표 모드: rows 배열이 주어지면 한 장으로 ===============
-  if (Array.isArray(rows) && rows.length) {
-    // 2단 헤더(1행: 라벨, 2행: 실제 지지 값)
-    const header = `
+// =============== 종합표 모드: rows 배열이 주어지면 한 장으로 ===============
+if (Array.isArray(rows) && rows.length) {
+  // 지지 컬럼 라벨 + 지지 값 헤더(2단)
+  const header = `
+    <tr>
+      <th rowspan="2" style="min-width:72px;">기준</th>
+      <th rowspan="2" style="min-width:44px;">값</th>
+      ${colLabels.map(lbl => `<th style="min-width:56px;">${lbl}</th>`).join('')}
+    </tr>
+    <tr>
+      ${branches.map((br, i) => `
+        <th title="${colLabels[i]}" style="min-width:56px;">${br || '-'}</th>
+      `).join('')}
+    </tr>
+  `;
+
+  // 기본(시간/일간/월간/년간 등) 본문
+  const body = rows.map(({ label, baseStem: bs }) => {
+    const bStem = toHanStem(bs || '');
+    const cells = computeRow(bStem);
+    return `
       <tr>
-        <th rowspan="2" style="min-width:72px;">기준</th>
-        <th rowspan="2" style="min-width:44px;">값</th>
-        ${colLabels.map(lbl => `<th style="min-width:56px;">${lbl}</th>`).join('')}
-      </tr>
-      <tr>
-        ${branches.map((br, i) => `
-          <th title="${colLabels[i]}" style="min-width:56px;">${br || '-'}</th>
-        `).join('')}
+        <td>${label || ''}</td>
+        <td>${bStem || '-'}</td>
+        ${cells.map(u => `<td><span class="unseong-tag" style="color:#c21">${u}</span></td>`).join('')}
       </tr>
     `;
+  }).join('');
 
-    // 바디(각 기준 라인)
-    const body = rows.map(({ label, baseStem: bs }) => {
-      const bStem = toHanStem(bs || '');
-      const cells = computeRow(bStem);
-      return `
+  // ✅ 지장간 맵 (한자 지지 → [지장간...])
+  const HiddenMap = (window.HanhiddenStemsMap || (typeof HanhiddenStemsMap !== 'undefined' ? HanhiddenStemsMap : null)) || {};
+  const getHiddenStems = (br) => {
+    const key = toHanBranch(br || '');
+    const arr = HiddenMap[key];
+    return Array.isArray(arr) ? arr.map(toHanStem).filter(Boolean) : [];
+  };
+
+  // ✅ 각 지지 컬럼(시지~세운지지)의 지장간을 “기준=해당 지지라벨 / 값=지장간”으로 추가
+  let hiddenRows = '';
+  for (let col = 0; col < branches.length; col++) {
+    const br = branches[col];                 // 해당 열의 지지(예: 시지의 子 같은 값)
+    if (!br) continue;
+    const stems = getHiddenStems(br);         // ['壬','癸'] 등
+    if (!stems.length) continue;
+
+    stems.forEach(hs => {
+      const cells = computeRow(hs);           // 지장간을 기준천간으로 12운성 계산
+      hiddenRows += `
         <tr>
-          <td>${label || ''}</td>
-          <td>${bStem || '-'}</td>
+          <td>${colLabels[col]}</td>
+          <td>${hs}</td>
           ${cells.map(u => `<td><span class="unseong-tag" style="color:#c21">${u}</span></td>`).join('')}
         </tr>
       `;
-    }).join('');
-
-    return `
-      <table class="sinsal-bottom unseong-table" border="1"
-             style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px; table-layout:fixed; width:100%; max-width:960px;">
-        <thead>${header}</thead>
-        <tbody>${body}</tbody>
-      </table>
-    `;
+    });
   }
+
+  // 최종 테이블
+  return `
+    <table class="sinsal-bottom unseong-table" border="1"
+           style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px; table-layout:fixed; width:100%; max-width:960px;">
+      <thead>${header}</thead>
+      <tbody>
+        ${body}
+        ${hiddenRows}  <!-- ⬅⬅ 지장간 확장 행들 -->
+      </tbody>
+    </table>
+  `;
+}
+
 
   // =============== 단일행 모드(기존 동작 그대로) ===============
   const bStem = toHanStem(baseStem);
