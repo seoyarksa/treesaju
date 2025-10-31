@@ -378,6 +378,7 @@ function updateBasicSewoonCells(sewoonReversed) {
 
   // 새로운 세운 셀 추가
   // 새로운 세운 셀 추가
+  const sewoonCells = [];
 sewoonReversed.forEach(({ stem, branch, year }) => {
   const tenGod = tenGodBaseStem ? getTenGod(tenGodBaseStem, stem) : "";
 
@@ -400,6 +401,7 @@ sewoonReversed.forEach(({ stem, branch, year }) => {
 
   td.addEventListener("click", () => basicSewoonClick(td, stem, branch, year));
   daeyunRow.appendChild(td);
+  sewoonCells.push(td);
 });
 
 // 나머지 UI 갱신

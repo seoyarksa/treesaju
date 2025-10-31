@@ -179,81 +179,29 @@ window.BRANCH_ORDER = window.BRANCH_ORDER || ['子','丑','寅','卯','辰','巳
 // ✅ 전달받은 baseStem(시간/일간/월간/년간)을 기준으로,
 //    [시·일·월·년·대운·세운] 지지에 대한 12운성을 표로 출력
 function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
-  console.log('[UNSEONG] ENTER:', caption, 'baseStem(raw)=', baseStem);
-
-  // ── 안전 변환 래퍼: 이미 한자면 그대로 통과, 아니면 변환 시도 → 실패해도 원본 유지
-  const _toHanStem   = (typeof window.toHanStem   === 'function') ? window.toHanStem   : null;
-  const _toHanBranch = (typeof window.toHanBranch === 'function') ? window.toHanBranch : null;
-  const safeHanStem = (v) => {
-    const s = String(v ?? '').trim();
-    if (!s) return '';
-    if (/[甲乙丙丁戊己庚辛壬癸]/.test(s)) return s;
-    if (_toHanStem)   { try { const r = _toHanStem(s);   if (r) return r; } catch {} }
-    return s;
-  };
-  const safeHanBranch = (v) => {
-    const s = String(v ?? '').trim();
-    if (!s) return '';
-    if (/[子丑寅卯辰巳午未申酉戌亥]/.test(s)) return s;
-    if (_toHanBranch) { try { const r = _toHanBranch(s); if (r) return r; } catch {} }
-    return s;
-  };
-
+  const toHanStem   = (typeof window.toHanStem   === 'function') ? window.toHanStem   : v => String(v || '');
+  const toHanBranch = (typeof window.toHanBranch === 'function') ? window.toHanBranch : v => String(v || '');
   const s = window.saju || {};
 
-  // 1) 기준천간 한자화 + 맵 유효성
-  const bStem = safeHanStem(baseStem);
+  const bStem = toHanStem(baseStem);
   const UNMAP = (window.unseongMap12 || unseongMap12) || {};
   const bStemValid = !!UNMAP[bStem];
 
-  // 2) 대운/세운 “원본” 가져오기
-  const pick = (window.__getCurrentDaeyunSewoonHan?.() || {});
-  const dyRaw = pick.daeyunBranchHan || '';
-  const syRaw = pick.sewoonBranchHan || '';
+  // ✅ 전역 선택값 직접 사용
+  const dyRaw = window.selectedDaewoon?.branch || '';
+  const syRaw = window.selectedSewoon?.branch  || '';
 
-  // 3) 지지 원본 배열
   const branchesRaw = [
-    s.hourBranch ?? '',
-    s.dayBranch  ?? '',
-    s.monthBranch?? '',
-    s.yearBranch ?? '',
+    s.hourBranch || '',
+    s.dayBranch  || '',
+    s.monthBranch|| '',
+    s.yearBranch || '',
     dyRaw,
     syRaw
   ];
-
-  // 4) 최종 시점 정규화 (한 번만)
-  const branches = branchesRaw.map(v => safeHanBranch(v));
+  const branches = branchesRaw.map(v => toHanBranch(v));
   const labels   = ['시','일','월','년','대운','세운'];
 
-  // ── 🔎 디테일 로그 (대운/세운만 확대)
-  console.log('[UNSEONG] DATA:', {
-    caption, bStem, bStemValid,
-    'pick.daeyun': pick.daeyunBranchHan, 'pick.sewoon': pick.sewoonBranchHan,
-    'raw[4]/raw[5]': [branchesRaw[4], branchesRaw[5]],
-    'han[4]/han[5]': [branches[4], branches[5]],
-  });
-
-  // 5) 최후 폴백: 아직 빈값이면 DOM에서 직접 회수
-  if (!branches[4]) {
-    const el = document.querySelector('#basic-daeyun-table .daeyun-cell.selected');
-    if (el) {
-      const txt = (el.innerText || '').trim().split('\n').map(s=>s.trim());
-      const guessed = el.dataset?.branch || txt[2] || txt[1] || '';
-      branches[4] = safeHanBranch(guessed);
-      console.warn('[UNSEONG] Fallback DY via DOM ->', branches[4], '(guessed=', guessed, ')');
-    }
-  }
-  if (!branches[5]) {
-    const el = document.querySelector('#basic-daeyun-table .sewoon-cell.selected');
-    if (el) {
-      const txt = (el.innerText || '').trim().split('\n').map(s=>s.trim());
-      const guessed = el.dataset?.branch || txt[2] || txt[1] || '';
-      branches[5] = safeHanBranch(guessed);
-      console.warn('[UNSEONG] Fallback SE via DOM ->', branches[5], '(guessed=', guessed, ')');
-    }
-  }
-
-  // 6) 셀 생성 (12운성은 빨강)
   const tds = branches.map((br, i) => {
     const u = (bStemValid && br) ? __unseongOf(bStem, br) : '';
     return `
@@ -264,17 +212,7 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
       </td>`;
   }).join('');
 
-  // (옵션) 디버그 푸터 (필요 없으면 제거 가능)
-  const debugFooter = `
-    <tr>
-      <td colspan="6" style="font:12px/1.4 monospace; color:#666; padding:4px; background:#fafafa;">
-        DY(raw,han)=(${dyRaw || '-'}, ${branches[4] || '-'}) ·
-        SE(raw,han)=(${syRaw || '-'}, ${branches[5] || '-'})
-      </td>
-    </tr>
-  `;
-
-  const html = `
+  return `
     <table class="sinsal-bottom unseong-table" border="1"
            style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px;">
       <thead>
@@ -282,15 +220,9 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
           ${caption} · 기준 천간: <span style="color:#1976d2">${bStem || '-'}</span>
         </th></tr>
       </thead>
-      <tbody>
-        <tr>${tds}</tr>
-        ${debugFooter}
-      </tbody>
+      <tbody><tr>${tds}</tr></tbody>
     </table>
   `;
-
-  console.log('[UNSEONG] EXIT:', caption);
-  return html;
 }
 window.renderUnseongByBranches = renderUnseongByBranches;
 
