@@ -3,6 +3,7 @@
 // utils/tooltip.js
 // utils/tooltip.js
 // utils/tooltip.js
+// utils/tooltip.js
 export function initTermHelp(hostSelectors = ['#unseong-block', '#etc-sinsal-box']) {
   if (window.__termHelpInstalled) return;
   window.__termHelpInstalled = true;
