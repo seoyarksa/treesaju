@@ -148,39 +148,6 @@ window.addEventListener('message', async (e) => {
 });
 
 
-
-// 예: installTermHelp.js (또는 app.js의 초기화 구역)
-(function installTermHelp() {
-  // TERM_HELP는 constants.js에서 window.TERM_HELP로 올려둔 전역 사전
-  const dict = window.TERM_HELP || {};
-
-  // 원하는 컨테이너들(사주/신살 영역) 공통 바인딩
-  const containers = [
-    document.getElementById('saju-output'),
-    document.getElementById('sinsal-box'),
-    document.getElementById('unseong-block'),
-    document.getElementById('etc-sinsal-box'),
-  ].filter(Boolean);
-
-  containers.forEach(root => {
-    root.addEventListener('mouseover', (e) => {
-      const el = e.target.closest('[data-term-type][data-term]');
-      if (!el) return;
-      const type = el.getAttribute('data-term-type'); // 'unseong' | 'tengod' | 'sipsal12' ...
-      const key  = el.getAttribute('data-term');
-      const text = dict?.[type]?.[key];
-      if (!text) return;
-      window.Tip.showNear(el, `<strong>${key}</strong><div class="muted">${type}</div><div>${text}</div>`);
-    });
-    root.addEventListener('mouseout', (e) => {
-      if (e.target.closest('[data-term-type][data-term]')) window.Tip.hide();
-    });
-  });
-})();
-
-
-
-
 let __lastFormKey = null;
 
 // 입력을 안정적으로 키로 만드는 헬퍼
