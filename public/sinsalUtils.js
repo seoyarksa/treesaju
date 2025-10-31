@@ -301,7 +301,7 @@ function renderUnseongByBranches({ baseStem, caption = '12운성', rows } = {}) 
 
     // 1) 헤더
 const header = `
-  <tr class="thead">
+  <tr>
     <th rowspan="2" style="min-width:72px; background:#e9f5ff;">기준</th>
     <th rowspan="2" style="min-width:44px; background:#e9f5ff;">값</th>
     ${colLabels.map(lbl => `<th style="min-width:56px; background:#e9f5ff;">${lbl}</th>`).join('')}
@@ -438,7 +438,7 @@ const midHeader = `
       <style>
         .unseong-tag{ color:#1976d2; font-weight:600; } /* 12운성 파란색 */
         .twelve-sinsal-tag{ color:#444; font-weight:600; }
-          .unseong-table .thead th { background:#e9f5ff !important; }
+          .unseong-table thead th { background:#e9f5ff !important; }
   .unseong-table .midhead th { background:#fff8d6 !important; }
       </style>
       <table class="sinsal-bottom unseong-table" border="1"
