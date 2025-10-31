@@ -12,8 +12,10 @@
 //console.clear();  console.log("🔥 전체 다시 실행됨");  console.log("👉 현재 saju:", JSON.stringify(saju));
 
 
-
+// app.js
 // 상수
+import { TERM_HELP } from './explain.js';
+window.TERM_HELP = TERM_HELP;
 import { 
   elementMap, 
   DANGRYEONGSHIK_MAP,
@@ -6014,6 +6016,40 @@ async function initRealtimeWatcher() {
     renderUserProfile();
 
 wireProfileEditEvents();
+
+// 1) 설명 사전 로드(전역 주입)
+try {
+  const explainMod = await import('./explain.js');
+  if (explainMod?.TERM_HELP) {
+    window.TERM_HELP = explainMod.TERM_HELP;
+    console.log('[TERM_HELP] loaded keys:', Object.keys(window.TERM_HELP));
+  } else {
+    console.warn('[TERM_HELP] missing export');
+  }
+} catch (e) {
+  console.warn('[TERM_HELP] load skipped:', e);
+}
+
+// 2) 툴팁(전역 델리게이트) 설치
+try {
+  const tipMod = await import('./utils/tooltip.js'); // 또는 new URL('./utils/tooltip.js', import.meta.url)
+  console.log('[tooltip] module keys:', Object.keys(tipMod || {}));
+
+  // 모든 경우 커버: 네임드, default, 전역 fallback
+  const init =
+    tipMod?.initTermHelp ||
+    tipMod?.default?.initTermHelp ||
+    window.initTermHelp;
+
+  if (typeof init === 'function') {
+    init();
+    console.log('[tooltip] installed via', init.name || 'anonymous');
+  } else {
+    console.warn('[tooltip] initTermHelp not found');
+  }
+} catch (e) {
+  console.warn('[tooltip] install failed:', e);
+}
 
   } catch (err) {
     console.error("[init] fatal:", err);

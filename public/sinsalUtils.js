@@ -1754,5 +1754,25 @@ window.renderUnseongBlock = function renderUnseongBlock() {
 window.updateUnseongBlock = function updateUnseongBlock() {
   const host = document.getElementById('unseong-block');
   if (!host) return;
-  host.innerHTML = window.renderUnseongBlock();
+
+  try {
+    const html = (typeof window.renderUnseongBlock === 'function')
+      ? window.renderUnseongBlock()
+      : '';
+
+    if (typeof html !== 'string') {
+      console.warn('[updateUnseongBlock] renderUnseongBlock 반환값이 문자열이 아닙니다:', html);
+      return;
+    }
+
+    host.innerHTML = html;
+
+    // 툴팁이 문서 위임(document.addEventListener) 방식이면 재초기화 불필요.
+    // 그래도 최초 설치가 안돼있을 수 있으니 "없을 때만" 초기화
+    if (typeof window.initTermHelp === 'function' && !window.__termHelpInstalled) {
+      window.initTermHelp();
+    }
+  } catch (e) {
+    console.warn('[updateUnseongBlock] 실패:', e);
+  }
 };
