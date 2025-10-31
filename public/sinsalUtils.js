@@ -439,13 +439,7 @@ const midHeader = `
       <style>
         .unseong-tag{ color:#1976d2; font-weight:600; } /* 12운성 파란색 */
         .twelve-sinsal-tag{ color:#444; font-weight:600; }
-/* 상단 헤더 전체 파란 톤 */
-#unseong-block .unseong-table .tophead th { background: #e9f5ff !important; }
 
-/* 중간 헤더(지지 값 라인)는 그대로 노랑 */
-#unseong-block .unseong-table thead tr.midhead th {
-  background: #fff7d6 !important;
-}
 
       </style>
       <table class="sinsal-bottom unseong-table" border="1"
