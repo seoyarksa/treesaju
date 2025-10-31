@@ -231,13 +231,25 @@ function renderUnseongByBranches({ baseStem, caption = '12운성', rows } = {}) 
   // =============== 종합표 모드: rows 배열이 주어지면 한 장으로 ===============
   if (Array.isArray(rows) && rows.length) {
     // 헤더(지지 보여주기)
-    const header = `
-      <tr>
-        <th style="min-width:72px;">기준</th>
-        <th style="min-width:44px;">천간</th>
-        ${branches.map((br,i)=>`<th title="${colLabels[i]}" style="min-width:56px;">${br || '-'}</th>`).join('')}
-      </tr>
-    `;
+// 지지 컬럼 라벨
+const colLabels = ['시지','일지','월지','년지','대운지지','세운지지'];
+
+// 기존 header 변수 교체
+const header = `
+  <tr>
+    <th rowspan="2" style="min-width:72px;">기준</th>
+    <th rowspan="2" style="min-width:44px;">값</th>
+    ${colLabels.map(lbl => `<th style="min-width:56px;">${lbl}</th>`).join('')}
+  </tr>
+  <tr>
+    ${branches.map((br, i) => `
+      <th title="${colLabels[i]}" style="min-width:56px;">
+        ${br || '-'}
+      </th>
+    `).join('')}
+  </tr>
+`;
+
 
     // 바디(각 기준 라인)
     const body = rows.map(({ label, baseStem: bs }) => {
