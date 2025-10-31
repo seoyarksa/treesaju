@@ -104,6 +104,7 @@ window.BRANCH_ORDER = window.BRANCH_ORDER || ['子','丑','寅','卯','辰','巳
 // ✅ 전달받은 baseStem(시간/일간/월간/년간)을 기준으로,
 //    [시·일·월·년·대운·세운] 지지에 대한 12운성을 표로 출력
 function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
+  console.log('[UNSEONG] ENTER:', caption, 'baseStem(raw)=', baseStem);
   const toHanStem   = (typeof window.toHanStem   === 'function') ? window.toHanStem   : (v => String(v || ''));
   const toHanBranch = (typeof window.toHanBranch === 'function') ? window.toHanBranch : (v => String(v || ''));
 
@@ -134,13 +135,8 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
   const labels   = ['시','일','월','년','대운','세운'];
 
   // ── 🔎 디버그 로그: 한 번에 흐름 확인
-  console.groupCollapsed('%c[UNSEONG] render', 'color:#ff0');
-  console.log('caption:', caption);
-  console.log('baseStem(raw):', baseStem, '→ bStem(han):', bStem, 'valid:', bStemValid);
-  console.log('pick(raw)  :', pick);                 // { daeyunBranchHan, sewoonBranchHan } 원본
-  console.log('branchesRaw:', branchesRaw);          // 정규화 전(원본)
-  console.log('branches(han):', branches);           // 정규화 후(표에 찍힐 값)
-  console.groupEnd();
+ console.log('[UNSEONG] DATA:',
+   { caption, bStem, bStemValid, pick, branchesRaw, branches });
 
   // 5) 셀 생성
   const tds = branches.map((br, i) => {
