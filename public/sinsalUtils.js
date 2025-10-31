@@ -57,6 +57,22 @@ export function getSipsin(dayGan, targetGan) {
 
 
 //천간별 12운성 구하기 시작////////////////////////////
+// #unseong-box 컨테이너가 있다고 가정 (원하는 id로 바꿔도 됨)
+window.renderUnseongNow ||= function renderUnseongNow() {
+  if (typeof window.renderUnseongByBranches !== 'function') return;
+  const box = document.querySelector('#unseong-box');
+  if (!box) return;
+
+  const s = window.saju || {};
+  const html =
+    renderUnseongByBranches({ baseStem: s.hourGan,  caption:'12운성 (시간 기준 · 지지별/대운·세운 포함)' }) +
+    renderUnseongByBranches({ baseStem: s.dayGan,   caption:'12운성 (일간 기준 · 지지별/대운·세운 포함)' }) +
+    renderUnseongByBranches({ baseStem: s.monthGan, caption:'12운성 (월간 기준 · 지지별/대운·세운 포함)' }) +
+    renderUnseongByBranches({ baseStem: s.yearGan,  caption:'12운성 (년간 기준 · 지지별/대운·세운 포함)' });
+
+  box.innerHTML = html;
+};
+
 // ── Han converter polyfills (idempotent)
 (function ensureHanConverters(){
   if (typeof window.toHanStem !== 'function'){
