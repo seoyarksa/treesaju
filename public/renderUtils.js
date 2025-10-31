@@ -133,6 +133,30 @@ box.innerHTML = html;
   }
 };
 
+(function installDYSEGetter(){
+  const toHB = (typeof window.toHanBranch === 'function') ? window.toHanBranch : (v=>String(v||''));
+
+  function pickBranch(sel) {
+    const el = document.querySelector(sel);
+    if (!el) return '';
+    if (el.dataset?.branch) return toHB(el.dataset.branch);
+    const lines = (el.innerText || '').trim().split('\n').map(s=>s.trim());
+    return toHB(lines[2] || lines[1] || '');
+  }
+
+  window.__getCurrentDaeyunSewoonHan = function(){
+    const d1 = window?.selectedDaewoon?.branch || '';
+    const s1 = window?.selectedSewoon?.branch  || '';
+
+    const d2 = d1 || pickBranch('#basic-daeyun-table .daeyun-cell.selected');
+    const s2 = s1 || pickBranch('#basic-daeyun-table .sewoon-cell.selected');
+
+    const out = { daeyunBranchHan: d2 || '', sewoonBranchHan: s2 || '' };
+    console.log('[DY/SE getter]', out);
+    return out;
+  };
+})();
+
 
 //사주출력쪽 대운테이블
 // ✅ 사주편 전용 대운 테이블 렌더링
@@ -376,46 +400,48 @@ function updateBasicSewoonCells(sewoonReversed) {
   }
 
   // 새로운 세운 셀 추가
-  sewoonReversed.forEach(({ stem, branch, year }) => {
-    // ✅ 월간 기준 → 일간 기준으로 변경
-    const tenGod = tenGodBaseStem ? getTenGod(tenGodBaseStem, stem) : "";
+  // 새로운 세운 셀 추가
+sewoonReversed.forEach(({ stem, branch, year }) => {
+  const tenGod = tenGodBaseStem ? getTenGod(tenGodBaseStem, stem) : "";
 
-    const td = document.createElement("td");
-    td.classList.add("sewoon-cell");
-    td.setAttribute("data-year", year);
-    td.style.textAlign = "center";
-    td.style.verticalAlign = "middle";
+  const td = document.createElement("td");
+  td.classList.add("sewoon-cell");
 
-    td.innerHTML = `
-      <div>${colorize(stem)}</div>
-      ${tenGod ? `<div style="font-size:0.75rem; color:#999;">(${tenGod})</div>` : ""}
-      <div>${colorize(branch)}</div>
-    `;
+  // ★ dataset 확실히 세팅
+  td.dataset.year   = String(year);
+  td.dataset.stem   = String(stem);
+  td.dataset.branch = String(branch);
 
-    // ✅ 세운 클릭 처리
-    td.addEventListener("click", () => basicSewoonClick(td, stem, branch, year));
+  td.style.textAlign = "center";
+  td.style.verticalAlign = "middle";
 
-    daeyunRow.appendChild(td);
-  });
+  td.innerHTML = `
+    <div>${colorize(stem)}</div>
+    ${tenGod ? `<div style="font-size:0.75rem; color:#999;">(${tenGod})</div>` : ""}
+    <div>${colorize(branch)}</div>
+  `;
 
-  // 나머지 UI 갱신 부분은 그대로 유지
-  document.querySelector("#dangryeong-cell").innerHTML = makeSajuInfoTable();
-  renderDangryeongHeesinGisin();
+  td.addEventListener("click", () => basicSewoonClick(td, stem, branch, year));
+  daeyunRow.appendChild(td);
+});
 
-  document.querySelector("#johuyongsin-cell").innerHTML = renderJohuCell();
-  document.querySelector("#hapshin-box").innerHTML = renderhapshinTable();
+// 나머지 UI 갱신
+document.querySelector("#dangryeong-cell").innerHTML = makeSajuInfoTable();
+renderDangryeongHeesinGisin();
+document.querySelector("#johuyongsin-cell").innerHTML = renderJohuCell();
+document.querySelector("#hapshin-box").innerHTML = renderhapshinTable();
 
-  
+// ✅ selectedSewoon 초기화
+if (!window.selectedSewoon && window.sewoonList?.length > 0) {
+  window.selectedSewoon = window.sewoonList[0];
+}
 
-  // ✅ selectedSewoon 초기화
-  if (!window.selectedSewoon && window.sewoonList?.length > 0) {
-    window.selectedSewoon = window.sewoonList[0];
-  }
+// simpleTable 렌더링
+updateSimpleTable();
 
-  // simpleTable 렌더링
-  updateSimpleTable();
-
- window.renderSinsalNow();
+// ★★★ 순서 중요: (1) 현재년도 세운 자동 선택 → (2) 신살/12운성 렌더
+highlightInitialSewoon();
+window.renderSinsalNow?.();
 }
 
 
