@@ -85,6 +85,32 @@ export function getSipsin(dayGan, targetGan) {
 // 子→亥 고정 순서 (중복 선언 방지)
 window.BRANCH_ORDER = window.BRANCH_ORDER || ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
 
+// ── 강력 통합: 현재 선택된 대운/세운 지지(한자) 가져오기
+(function installDYSEGetter() {
+  const toHB = (typeof window.toHanBranch === 'function') ? window.toHanBranch : (v => String(v || ''));
+
+  function readBranchFromCell(sel) {
+    const el = document.querySelector(sel);
+    if (!el) return '';
+    if (el.dataset?.branch) return toHB(el.dataset.branch);
+    const lines = (el.innerText || '').trim().split('\n').map(s => s.trim());
+    return toHB(lines[2] || lines[1] || '');
+  }
+
+  window.__getCurrentDaeyunSewoonHan = function () {
+    const dRaw = window?.selectedDaewoon?.branch || '';
+    const sRaw = window?.selectedSewoon?.branch  || '';
+
+    // 1순위 전역, 2순위 새 표 DOM, 3순위 그대로 빈값
+    const d = dRaw ? toHB(dRaw) : readBranchFromCell('#basic-daeyun-table .daeyun-cell.selected');
+    const s = sRaw ? toHB(sRaw) : readBranchFromCell('#basic-daeyun-table .sewoon-cell.selected');
+
+    const out = { daeyunBranchHan: d || '', sewoonBranchHan: s || '' };
+    console.log('[DY/SE getter]', out);
+    return out;
+  };
+})();
+
 // 맵 인덱싱 12운성 계산기 (전역 등록)
 (function initUnseongCalc(){
   if (window.__unseongOf) return;
