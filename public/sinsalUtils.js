@@ -633,13 +633,7 @@ const sinsalRow  = `<tr id="sinsal-row"><th>12신살</th>${jijiArr.map(() => `<t
 
 <div id="unseong-block"></div>
 
-<td>
-  <span
-    class="unseong-tag explainable"
-    data-group="unseong"
-    data-term="장생"
-  >장생</span>
-</td>
+
   `;
 }
 // 파일: sinsalTable.js (renderSinsalTable가 정의된 그 파일)
