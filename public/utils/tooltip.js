@@ -1,70 +1,75 @@
-// /utils/tooltip.js
+// utils/tooltip.js
 export function initTermHelp() {
   if (window.__termHelpInstalled) return;
   window.__termHelpInstalled = true;
 
-  const tip = document.createElement('div');
-  tip.id = 'term-help-pop';
-  tip.style.cssText = [
-    'position:fixed;z-index:999999;display:none;',
-    'max-width:280px;padding:10px 12px;border-radius:10px;',
-    'background:#111;color:#fff;font-size:13px;line-height:1.4;',
-    'box-shadow:0 6px 18px rgba(0,0,0,.25)'
-  ].join('');
-  document.body.appendChild(tip);
-
-  const TERM = window.TERM_HELP || {};
-  const getDesc = (group, term) => {
-    const dict = TERM[group] || {};
-    const key = String(term || '').trim();
-    return dict[key] || '설명이 아직 없습니다.';
-  };
+  // 1) 팁 DOM 준비
+  let tip = document.getElementById('term-help-pop');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = 'term-help-pop';
+    document.body.appendChild(tip);
+  }
+  Object.assign(tip.style, {
+    position: 'fixed',
+    zIndex: '2147483647',        // 최상단
+    display: 'none',
+    maxWidth: '320px',
+    padding: '10px 12px',
+    borderRadius: '10px',
+    background: '#111',
+    color: '#fff',
+    fontSize: '13px',
+    lineHeight: '1.5',
+    boxShadow: '0 6px 18px rgba(0,0,0,.25)',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'keep-all',
+  });
 
   const hide = () => { tip.style.display = 'none'; };
   const showNear = (target, html) => {
     tip.innerHTML = html;
     tip.style.display = 'block';
+    // 먼저 보이게 -> width 계산
     const r = target.getBoundingClientRect();
     const gap = 8;
-    // 먼저 표시해서 offsetWidth 확보
     const left = Math.min(window.innerWidth - tip.offsetWidth - 8, Math.max(8, r.left));
     const top  = (r.top + window.scrollY) + r.height + gap;
     tip.style.left = left + 'px';
     tip.style.top  = top  + 'px';
   };
 
-  const CLICK_SELECTOR = '.explainable, .unseong-tag, .ten-god, .twelve-sinsal-tag';
+  const getDesc = (group, term) => {
+    const dict = (window.TERM_HELP && window.TERM_HELP[group]) || {};
+    const key  = String(term || '').trim();
+    return dict[key] || '설명이 아직 없습니다.';
+  };
 
-  // ⬇️ 캡처 단계로 등록(세 번째 인수 또는 옵션 {capture:true})
+  // 2) 전역 위임 핸들러(캡처 단계, 키 이벤트 간섭 없음)
   document.addEventListener('click', (e) => {
-    const t = e.target.closest(CLICK_SELECTOR);
-    if (!t) {
-      if (!e.target.closest('#term-help-pop')) hide();
-      return;
-    }
-    // 디버그 로그
-    console.log('[tooltip] hit:', t, t.className, t.dataset);
-
-    const group =
-      t.getAttribute('data-group') ||
-      (t.classList.contains('ten-god') ? 'tengod'
-       : t.classList.contains('twelve-sinsal-tag') ? 'sipsal12'
-       : 'unseong');
-
-    const termRaw = t.getAttribute('data-term') || t.textContent || '';
-    const term = String(termRaw).trim();
-
-    // 빈값/장식문자 무시 (원하면 제거)
-    if (!term || term === '-' ) { hide(); return; }
-
-    const groupLabel = group === 'tengod' ? '십신' : (group === 'sipsal12' ? '12신살' : '12운성');
-    const title = `<div style="font-weight:600;margin-bottom:6px;">${groupLabel} · ${term}</div>`;
+    const t = e.target.closest('.explainable');
+    if (!t) return;
+    const group = t.getAttribute('data-group') || 'unseong';
+    const term  = t.getAttribute('data-term')  || t.textContent.trim();
+    const from  = (group==='tengod') ? '십신' : (group==='sipsal12' ? '12신살' : '12운성');
+    const title = `${from} · ${term}`;
     const body  = getDesc(group, term);
-    showNear(t, title + body);
-  }, true); // ⬅️ capture=true
+    showNear(t, `<div style="font-weight:600; margin-bottom:6px;">${title}</div>${body}`);
+  }, true); // capture=true
 
+  // 3) 바깥 클릭/스크롤/리사이즈 → 숨김
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#term-help-pop') && !e.target.closest('.explainable')) hide();
+  });
   window.addEventListener('resize', hide, { passive: true });
   window.addEventListener('scroll', hide, true);
 
-  console.log('[tooltip] initTermHelp installed. groups=', Object.keys(TERM));
+  // 4) 포인터 힌트(선택)
+  const style = document.createElement('style');
+  style.textContent = `
+    .explainable { cursor: help; }
+  `;
+  document.head.appendChild(style);
+
+  console.log('[tooltip] installed');
 }
