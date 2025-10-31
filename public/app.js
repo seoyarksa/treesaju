@@ -14,13 +14,6 @@
 
 // app.js
 // 상수
-// 1) 설명 사전 전역
-import { TERM_HELP } from './explain.js';
-window.TERM_HELP = TERM_HELP;
-
-// 2) 툴팁 설치 함수
-//import { initTermHelp } from './utils/tooltip.js';
-
 
 import { 
   elementMap, 
@@ -6022,6 +6015,25 @@ async function initRealtimeWatcher() {
     renderUserProfile();
 
 wireProfileEditEvents();
+
+// 1) 설명 사전 로드(전역 주입)
+try {
+  const explainMod = await import('./explain.js');
+  if (explainMod?.TERM_HELP) {
+    window.TERM_HELP = explainMod.TERM_HELP;
+  }
+} catch (e) {
+  console.warn('[TERM_HELP] load skipped:', e);
+}
+
+// 2) 툴팁(전역 델리게이트) 설치
+try {
+  const tipMod = await import('./utils/tooltip.js');
+  tipMod?.initTermHelp?.();
+  console.log('[tooltip] installed');
+} catch (e) {
+  console.warn('[tooltip] install failed:', e);
+}
 
   } catch (err) {
     console.error("[init] fatal:", err);

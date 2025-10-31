@@ -1,72 +1,58 @@
 // utils/tooltip.js
 export function initTermHelp() {
-  if (window.__termHelpInstalled) return;
-  window.__termHelpInstalled = true;
+  try {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    if (window.__termHelpInstalled) return;
+    window.__termHelpInstalled = true;
 
-  const tip = document.createElement('div');
-  tip.id = 'term-help-pop';
-  Object.assign(tip.style, {
-    position: 'fixed',
-    zIndex: 9999,
-    display: 'none',
-    maxWidth: '280px',
-    padding: '10px 12px',
-    borderRadius: '10px',
-    background: '#111',
-    color: '#fff',
-    fontSize: '13px',
-    lineHeight: 1.4,
-    boxShadow: '0 6px 18px rgba(0,0,0,.25)',
-    pointerEvents: 'auto',
-  });
-  document.body.appendChild(tip);
+    const tip = document.createElement('div');
+    tip.id = 'term-help-pop';
+    tip.style.cssText = [
+      'position:fixed; z-index:9999; display:none',
+      'max-width:280px; padding:10px 12px; border-radius:10px',
+      'background:#111; color:#fff; font-size:13px; line-height:1.4',
+      'box-shadow:0 6px 18px rgba(0,0,0,.25)',
+      'pointer-events:none'   // 포커스/키 이벤트 안 가로채게
+    ].join(';');
+    document.body.appendChild(tip);
 
-  function hide() {
-    tip.style.display = 'none';
+    const hide = () => { tip.style.display = 'none'; };
+    const showNear = (target, html) => {
+      tip.innerHTML = html;
+      tip.style.display = 'block';
+      const r = target.getBoundingClientRect();
+      const gap = 8;
+      const left = Math.min(window.innerWidth - tip.offsetWidth - 8, Math.max(8, r.left));
+      const top  = (r.top + window.scrollY) + r.height + gap;
+      tip.style.left = left + 'px';
+      tip.style.top  = top  + 'px';
+    };
+
+    const getDesc = (group, term) => {
+      const dict = (window.TERM_HELP && window.TERM_HELP[group]) || {};
+      const key  = String(term || '').trim();
+      return dict[key] || '설명이 아직 없습니다.';
+    };
+
+    // 문서 전체 위임 (특정 컨테이너 없어도 작동)
+    document.addEventListener('click', (e) => {
+      const t = e.target.closest?.('.explainable');
+      if (!t) { hide(); return; }
+      const group = t.getAttribute('data-group') || 'unseong';
+      const term  = t.getAttribute('data-term')  || t.textContent;
+      const from  = (group==='tengod') ? '십신' : (group==='sipsal12' ? '12신살' : '12운성');
+      const title = `${from} · ${term}`;
+      const body  = getDesc(group, term);
+      showNear(t, `<div style="font-weight:600; margin-bottom:6px;">${title}</div>${body}`);
+    }, { passive: true });
+
+    window.addEventListener('resize', hide, { passive: true });
+    window.addEventListener('scroll', hide, { passive: true, capture: true });
+  } catch (err) {
+    console.warn('[initTermHelp] failed:', err);
   }
-  function showNear(target, html) {
-    tip.innerHTML = html;
-    tip.style.display = 'block';
-    const r = target.getBoundingClientRect();
-    const gap = 8;
-    // 먼저 붙인 뒤 치수 읽기
-    const width = tip.offsetWidth || 240;
-    const left = Math.min(window.innerWidth - width - 8, Math.max(8, r.left));
-    const top  = (r.top + window.scrollY) + r.height + gap;
-    tip.style.left = left + 'px';
-    tip.style.top  = top  + 'px';
-  }
-  function getDesc(group, term) {
-    const dict = (window.TERM_HELP && window.TERM_HELP[group]) || {};
-    const key  = String(term || '').trim();
-    return dict[key] || '설명이 아직 없습니다.';
-  }
-
-  // ★ 문서 전역 위임: 어떤 영역에 렌더되든 .explainable만 클릭하면 동작
-  document.addEventListener('click', (e) => {
-    const t = e.target.closest('.explainable');
-    if (!t) return; // 키 핸들 등 다른 리스너에 영향 없음
-    const group = t.getAttribute('data-group') || 'unseong';
-    const term  = t.getAttribute('data-term')  || t.textContent.trim();
-    const from  = (group === 'tengod') ? '십신' : (group === 'sipsal12' ? '12신살' : '12운성');
-    const title = `${from} · ${term}`;
-    const body  = getDesc(group, term);
-    showNear(t, `<div style="font-weight:600; margin-bottom:6px;">${title}</div>${body}`);
-  }, false);
-
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('#term-help-pop') && !e.target.closest('.explainable')) hide();
-  }, false);
-  window.addEventListener('resize', hide, { passive: true });
-  window.addEventListener('scroll', hide, true);
-
-  // 전역 API(선택)
-  window.showTermHelp = (group, term, anchorEl) => {
-    const body = getDesc(group, term);
-    showNear(anchorEl || document.body, body);
-  };
-  window.hideTermHelp = hide;
 }
+
 
 
 
