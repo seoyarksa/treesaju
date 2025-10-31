@@ -414,8 +414,8 @@ const sinsalRow  = `<tr id="sinsal-row"><th>12신살</th>${jijiArr.map(() => `<t
   const guide = `
     <tr>
       <td colspan="13" style="font-size:13px; text-align:left; padding:5px;">
-        해당<span style="color:orange;">천간,삼합</span>을 클릭 or 아래 <span style="color:orange;">지지</span> 클릭시 해당 12운성[신살]을 확인가능[
-        <span style="color:red;">戊,己</span>는 제외, <span style="color:blue;">파란색 간지</span>는 내 사주팔자의 간지]
+        원하는 <span style="color:orange;">천간,삼합</span>을 클릭 or 아래 <span style="color:orange;">지지</span> 클릭시 해당 12운성[신살]을 확인가능[
+        <br><span style="color:red;">戊,己</span>는 제외, <span style="color:blue;">파란색 간지</span>는 내 사주팔자의 간지]
       </td>
     </tr>
   `;
