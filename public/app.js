@@ -16,8 +16,13 @@
 // 상수
 import { TERM_HELP } from './explain.js';
 window.TERM_HELP = TERM_HELP; // 전역 노출
-//import './utils/tooltip.js';  // 위임 핸들러 설치
-
+import { initTermHelp } from './utils/tooltip.js';
+// 3) 페이지/앱 초기 렌더 직후에 한 번만 설치
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => initTermHelp(), { once: true });
+} else {
+  initTermHelp();
+}
 import { 
   elementMap, 
   DANGRYEONGSHIK_MAP,
