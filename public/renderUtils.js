@@ -416,18 +416,8 @@ if (!window.selectedSewoon && window.sewoonList?.length > 0) {
 // simpleTable 렌더링
 updateSimpleTable();
 
-// ★★★ 순서 중요: (1) 현재년도 세운 자동 선택 → (2) 신살/12운성 렌더
- // ★ 아직 세운에 .selected 없으면 자동 선택 먼저
- const hasSelected = document.querySelector('#basic-daeyun-table .sewoon-cell.selected');
- if (!hasSelected) {
-   // 현재년도 자동 선택 (네 함수 그대로 활용)
-   try { highlightInitialSewoon(); } catch {}
- }
- // ★ 세운 선택이 생긴 뒤에 렌더를 트리거
- setTimeout(() => {
-   window.renderSinsalNow?.();       // 기타 신살 표 갱신
-   window.renderUnseongNow?.();      // 12운성 표 갱신(아래 2) 참고)
- }, 0);
+ window.renderSinsalNow?.();      // 기타 신살
+ window.renderSinsalMainNow?.();  // 메인 신살
 }
 
 
@@ -473,6 +463,7 @@ if (!window.selectedSewoon && window.sewoonList?.length > 0) {
 
    // 신살표 즉시 갱신 (대운/세운 클릭 이후 공용)
 window.renderSinsalNow();
+window.renderSinsalMainNow?.();  // 메인 신살
 }
 
 
@@ -521,7 +512,10 @@ export function highlightInitialDaeyun() {
 
     // ✅ 클릭 이벤트로 연동
     cell.click();
-    setTimeout(() => window.renderSinsalNow?.(), 0);
+    setTimeout(() => {
+  window.renderSinsalNow?.();
+ window.renderSinsalMainNow?.();
+}, 0);
   } else {
     console.warn("⚠️ highlightInitialDaeyun: 표시할 셀 없음", displayIndex);
   }

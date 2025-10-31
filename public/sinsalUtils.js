@@ -8,6 +8,40 @@ import { branchOrder,samhapGroups, tenGodMap, UNSEONG_LIST, unseongMap12, sinsal
 
 } from './constants.js';
 
+// 사주 4주 → 배열 변환 (이미 있으면 생략)
+window.getSajuArrays ||= function getSajuArrays() {
+  const s = window.saju || {};
+  const sajuGanArr   = [s.hourGan, s.dayGan, s.monthGan, s.yearGan].map(v => v || '');
+  const sajuJijiArr  = [s.hourBranch, s.dayBranch, s.monthBranch, s.yearBranch].map(v => v || '');
+  return { sajuGanArr, sajuJijiArr };
+};
+
+// 메인 신살(12운성/12신살 표) 다시 그리기
+window.renderSinsalMainNow ||= function renderSinsalMainNow(extraCtx = {}) {
+  try {
+    if (typeof window.renderSinsalTable !== 'function') {
+      console.warn('[renderSinsalMainNow] renderSinsalTable 미로딩');
+      return;
+    }
+    const box = document.querySelector('#sinsal-box'); // ← 메인 신살 컨테이너 ID
+    if (!box) {
+      console.warn('[renderSinsalMainNow] 컨테이너 #sinsal-box 없음');
+      return;
+    }
+    const { sajuGanArr, sajuJijiArr } = window.getSajuArrays();
+    // samhapKey는 네가 전역으로 유지하는 값이 있으면 사용
+    const samhapKey =
+      extraCtx.samhapKey ??
+      window.currentSamhapKey ??
+      ''; // 없으면 빈값
+
+    // 메인 신살 렌더
+    const html = window.renderSinsalTable({ sajuGanArr, samhapKey, sajuJijiArr });
+    box.innerHTML = html;
+  } catch (e) {
+    console.warn('[renderSinsalMainNow] 실패:', e);
+  }
+};
 
 
 ///////////기타 신살류 명칭 등록//////////////////
