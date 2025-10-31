@@ -465,20 +465,9 @@ const sinsalRow  = `<tr id="sinsal-row"><th>12신살</th>${jijiArr.map(() => `<t
       </tbody>
     </table>
 
-<!-- 추가: 7줄 × 17칸 (자동 채움) -->
+
 <br> * 천간별 12운성표 [위의 표에서는 원하는 천간의 지지별 12운성(신살)을 바로 확인할 수 있습니다.]
-<table class="sinsal-bottom sinsal-extra-7x17" border="1"
-       style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px;">
-  <tbody>
-
-${renderUnseongByBranches({ baseStem: window.saju?.hourGan,  caption:'12운성 (시간 기준 · 지지별/대운·세운 포함)' })}
-${renderUnseongByBranches({ baseStem: window.saju?.dayGan  , caption:'12운성 (일간 기준 · 지지별/대운·세운 포함)' })}
-${renderUnseongByBranches({ baseStem: window.saju?.monthGan, caption:'12운성 (월간 기준 · 지지별/대운·세운 포함)' })}
-${renderUnseongByBranches({ baseStem: window.saju?.yearGan , caption:'12운성 (년간 기준 · 지지별/대운·세운 포함)' })}
-
-
-  </tbody>
-</table>
+<div id="unseong-block"></div>
 
 
   `;
@@ -1679,3 +1668,22 @@ if (sinsalName === '공망살') {
     return [];
   }
 
+
+
+  // 12운성 4종(시간/일간/월간/년간)을 한 번에 그려서 문자열로 반환
+window.renderUnseongBlock = function renderUnseongBlock() {
+  const s = window.saju || {};
+  return [
+    renderUnseongByBranches({ baseStem: s.hourGan,  caption:'12운성 (시간 기준 · 지지별/대운·세운 포함)' }),
+    renderUnseongByBranches({ baseStem: s.dayGan,   caption:'12운성 (일간 기준 · 지지별/대운·세운 포함)' }),
+    renderUnseongByBranches({ baseStem: s.monthGan, caption:'12운성 (월간 기준 · 지지별/대운·세운 포함)' }),
+    renderUnseongByBranches({ baseStem: s.yearGan,  caption:'12운성 (년간 기준 · 지지별/대운·세운 포함)' }),
+  ].join('');
+};
+
+// 컨테이너에 실제 반영(부분 재로딩용)
+window.updateUnseongBlock = function updateUnseongBlock() {
+  const host = document.getElementById('unseong-block');
+  if (!host) return;
+  host.innerHTML = window.renderUnseongBlock();
+};

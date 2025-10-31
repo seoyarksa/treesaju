@@ -419,7 +419,7 @@ if (!window.selectedSewoon && window.sewoonList?.length > 0) {
 updateSimpleTable();
 
  window.renderSinsalNow?.();      // 기타 신살
- window.renderSinsalMainNow?.();  // 메인 신살
+window.updateUnseongBlock?.();  
 }
 
 
@@ -465,7 +465,7 @@ if (!window.selectedSewoon && window.sewoonList?.length > 0) {
 
    // 신살표 즉시 갱신 (대운/세운 클릭 이후 공용)
 window.renderSinsalNow();
-window.renderSinsalMainNow?.();  // 메인 신살
+window.updateUnseongBlock?.();  
 }
 
 
@@ -516,7 +516,7 @@ export function highlightInitialDaeyun() {
     cell.click();
     setTimeout(() => {
   window.renderSinsalNow?.();
- window.renderSinsalMainNow?.();
+ window.updateUnseongBlock?.();  
 }, 0);
   } else {
     console.warn("⚠️ highlightInitialDaeyun: 표시할 셀 없음", displayIndex);
