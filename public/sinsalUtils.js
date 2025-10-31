@@ -417,11 +417,10 @@ const midHeader = `
         const v = __twelveSinsalOf(base, br);
 return `<td>${
   v
-    ? `<span class="twelve-sinsal-tag"
-              data-term-type="sipsal12"
-              data-term="${v}">${v}</span>`
+    ? `<span class="twelve-sinsal-tag" data-term-type="sipsal12" data-term="${v}">${v}</span>`
     : '-'
 }</td>`;
+
       }).join('');
       return `
         <tr>
