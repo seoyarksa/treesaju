@@ -14,10 +14,14 @@
 
 // app.js
 // 상수
+// 1) 설명 사전 전역
 import { TERM_HELP } from './explain.js';
-window.TERM_HELP = TERM_HELP; // 전역 노출
+window.TERM_HELP = TERM_HELP;
+
+// 2) 툴팁 설치 함수
 import { initTermHelp } from './utils/tooltip.js';
-// 3) 페이지/앱 초기 렌더 직후에 한 번만 설치
+
+// 3) 문서 준비 후 1회만
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => initTermHelp(), { once: true });
 } else {
