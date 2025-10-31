@@ -15,7 +15,7 @@ import {
          HEESIN_BY_DANGRYEONG_POSITION, 
          GISIN_BY_DANGRYEONG_POSITION,
          tenGodMap,jijiToSibganMap2,
-         tenGodMapKor,branchOrder2, 충MAP, 지지십간MAP, 형충회합Map
+         tenGodMapKor,branchOrder2, 충MAP, 지지십간MAP, 형충회합Map,
       } from './constants.js';
 
 import {
@@ -93,6 +93,7 @@ window.getSajuArrays ||= function getSajuArrays() {
 };
 
 window.renderSinsalNow ||= function renderSinsalNow(extraCtx = {}) {
+  
   try {
     const renderer = globalThis.renderEtcSinsalTable;        // 전역 등록된 렌더러
     if (typeof renderer !== 'function') {
@@ -105,6 +106,7 @@ window.renderSinsalNow ||= function renderSinsalNow(extraCtx = {}) {
     if (!sajuGanArr.every(Boolean) || !sajuJijiArr.every(Boolean)) {
       console.warn('[renderSinsalNow] 사주 4칸 미완성 → 렌더 보류');
       return;
+  
     }
 
     const html = renderer({
@@ -130,6 +132,7 @@ box.innerHTML = html;
     console.warn('[renderSinsalNow] 실패:', e);
   }
 };
+
 
 
 //사주출력쪽 대운테이블
@@ -207,8 +210,10 @@ export function renderBasicDaeyunTable({
           ${ganjiReversed.map(({ stem, branch }, idx) => {
             const tenGod = tenGodBaseStem ? getTenGod(tenGodBaseStem, stem) : "";
             return `
-              <td onclick="handleBasicDaeyunClick(${idx}, '${stem}', '${branch}')" 
-                  class="daeyun-cell">
+   <td onclick="handleBasicDaeyunClick(${idx}, '${stem}', '${branch}')"
+       class="daeyun-cell"
+       data-stem="${stem}"
+       data-branch="${branch}">
                 <div>${colorize(stem)}</div>
                 ${tenGod ? `<div style="font-size:0.75rem; color:#999;">(${tenGod})</div>` : ""}
                 <div>${colorize(branch)}</div>
@@ -216,6 +221,11 @@ export function renderBasicDaeyunTable({
             `;
           }).join('')}
         </tr>
+        <tr>
+  <td colspan="20" style="border:1px solid #ccc; padding:4px; color:red;" >
+ * 대운이나 세운을 클릭하면 해당 대운&세운의 작용을 확인할 수 있습니다. 
+</td>
+</tr>
       </tbody>
     </table>
   `;
@@ -367,46 +377,49 @@ function updateBasicSewoonCells(sewoonReversed) {
   }
 
   // 새로운 세운 셀 추가
-  sewoonReversed.forEach(({ stem, branch, year }) => {
-    // ✅ 월간 기준 → 일간 기준으로 변경
-    const tenGod = tenGodBaseStem ? getTenGod(tenGodBaseStem, stem) : "";
+  // 새로운 세운 셀 추가
+  const sewoonCells = [];
+sewoonReversed.forEach(({ stem, branch, year }) => {
+  const tenGod = tenGodBaseStem ? getTenGod(tenGodBaseStem, stem) : "";
 
-    const td = document.createElement("td");
-    td.classList.add("sewoon-cell");
-    td.setAttribute("data-year", year);
-    td.style.textAlign = "center";
-    td.style.verticalAlign = "middle";
+  const td = document.createElement("td");
+  td.classList.add("sewoon-cell");
 
-    td.innerHTML = `
-      <div>${colorize(stem)}</div>
-      ${tenGod ? `<div style="font-size:0.75rem; color:#999;">(${tenGod})</div>` : ""}
-      <div>${colorize(branch)}</div>
-    `;
+  // ★ dataset 확실히 세팅
+  td.dataset.year   = String(year);
+  td.dataset.stem   = String(stem);
+  td.dataset.branch = String(branch);
 
-    // ✅ 세운 클릭 처리
-    td.addEventListener("click", () => basicSewoonClick(td, stem, branch, year));
+  td.style.textAlign = "center";
+  td.style.verticalAlign = "middle";
 
-    daeyunRow.appendChild(td);
-  });
+  td.innerHTML = `
+    <div>${colorize(stem)}</div>
+    ${tenGod ? `<div style="font-size:0.75rem; color:#999;">(${tenGod})</div>` : ""}
+    <div>${colorize(branch)}</div>
+  `;
 
-  // 나머지 UI 갱신 부분은 그대로 유지
-  document.querySelector("#dangryeong-cell").innerHTML = makeSajuInfoTable();
-  renderDangryeongHeesinGisin();
+  td.addEventListener("click", () => basicSewoonClick(td, stem, branch, year));
+  daeyunRow.appendChild(td);
+  sewoonCells.push(td);
+});
 
-  document.querySelector("#johuyongsin-cell").innerHTML = renderJohuCell();
-  document.querySelector("#hapshin-box").innerHTML = renderhapshinTable();
+// 나머지 UI 갱신
+document.querySelector("#dangryeong-cell").innerHTML = makeSajuInfoTable();
+renderDangryeongHeesinGisin();
+document.querySelector("#johuyongsin-cell").innerHTML = renderJohuCell();
+document.querySelector("#hapshin-box").innerHTML = renderhapshinTable();
 
-  
+// ✅ selectedSewoon 초기화
+if (!window.selectedSewoon && window.sewoonList?.length > 0) {
+  window.selectedSewoon = window.sewoonList[0];
+}
 
-  // ✅ selectedSewoon 초기화
-  if (!window.selectedSewoon && window.sewoonList?.length > 0) {
-    window.selectedSewoon = window.sewoonList[0];
-  }
+// simpleTable 렌더링
+updateSimpleTable();
 
-  // simpleTable 렌더링
-  updateSimpleTable();
-
- window.renderSinsalNow();
+ window.renderSinsalNow?.();      // 기타 신살
+window.updateUnseongBlock?.();  
 }
 
 
@@ -452,6 +465,7 @@ if (!window.selectedSewoon && window.sewoonList?.length > 0) {
 
    // 신살표 즉시 갱신 (대운/세운 클릭 이후 공용)
 window.renderSinsalNow();
+window.updateUnseongBlock?.();  
 }
 
 
@@ -500,6 +514,10 @@ export function highlightInitialDaeyun() {
 
     // ✅ 클릭 이벤트로 연동
     cell.click();
+    setTimeout(() => {
+  window.renderSinsalNow?.();
+ window.updateUnseongBlock?.();  
+}, 0);
   } else {
     console.warn("⚠️ highlightInitialDaeyun: 표시할 셀 없음", displayIndex);
   }
