@@ -415,12 +415,7 @@ const midHeader = `
       if (!base) return '';
       const cells = branches.map(br => {
         const v = __twelveSinsalOf(base, br);
-return `<td>${
-  v
-    ? `<span class="twelve-sinsal-tag" data-term-type="sipsal12" data-term="${v}">${v}</span>`
-    : '-'
-}</td>`;
-
+        return `<td><span class="twelve-sinsal-tag">${v || '-'}</span></td>`;
       }).join('');
       return `
         <tr>
