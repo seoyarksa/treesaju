@@ -15,7 +15,7 @@ import {
          HEESIN_BY_DANGRYEONG_POSITION, 
          GISIN_BY_DANGRYEONG_POSITION,
          tenGodMap,jijiToSibganMap2,
-         tenGodMapKor,branchOrder2, 충MAP, 지지십간MAP, 형충회합Map, HanhiddenStemsMap
+         tenGodMapKor,branchOrder2, 충MAP, 지지십간MAP, 형충회합Map,
       } from './constants.js';
 
 import {
