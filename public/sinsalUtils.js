@@ -467,7 +467,10 @@ const sinsalRow  = `<tr id="sinsal-row"><th>12신살</th>${jijiArr.map(() => `<t
     </table>
 
 
-<br> * 천간별 12운성표 [위의 표에서는 원하는 천간의 지지별 12운성(신살)을 바로 확인할 수 있습니다.]
+<div style="text-align:center; margin:8px 0;">
+  * 천간별 12운성표 [위의 표에서는 원하는 천간의 지지별 12운성(신살)을 바로 확인할 수 있습니다.]
+</div>
+
 <div id="unseong-block"></div>
 
 
