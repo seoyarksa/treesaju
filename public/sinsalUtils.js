@@ -252,7 +252,7 @@ if (Array.isArray(rows) && rows.length) {
       <tr>
         <td>${label || ''}</td>
         <td>${bStem || '-'}</td>
-        ${cells.map(u => `<td><span class="unseong-tag" style="color:#c21">${u}</span></td>`).join('')}
+        ${cells.map(u => `<td><span class="unseong-tag" style="color:blue">${u}</span></td>`).join('')}
       </tr>
     `;
   }).join('');
@@ -283,7 +283,7 @@ for (let col = 0; col < branches.length; col++) {
       <tr>
         ${idx === 0 ? `<td rowspan="${rowspan}">${colLabels[col]}</td>` : ``}
         <td>${hs}</td>
-        ${cells.map(u => `<td><span class="unseong-tag" style="color:#c21">${u}</span></td>`).join('')}
+        ${cells.map(u => `<td><span class="unseong-tag" style="color:blue">${u}</span></td>`).join('')}
       </tr>
     `;
   });
