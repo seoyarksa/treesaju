@@ -92,9 +92,6 @@ export function getSipsin(dayGan, targetGan) {
 
 //천간별 12운성 구하기 시작////////////////////////////
 // #unseong-box 컨테이너가 있다고 가정 (원하는 id로 바꿔도 됨)
-// 이미 export 되어 들어온 경우 전역에도 연결
-window.HanhiddenStemsMap = window.HanhiddenStemsMap || HanhiddenStemsMap;
-
 window.renderUnseongNow ||= function renderUnseongNow() {
   if (typeof window.renderUnseongByBranches !== 'function') return;
   const box = document.querySelector('#unseong-box');
@@ -182,20 +179,12 @@ window.BRANCH_ORDER = window.BRANCH_ORDER || ['子','丑','寅','卯','辰','巳
 // ✅ 전달받은 baseStem(시간/일간/월간/년간)을 기준으로,
 //    [시·일·월·년·대운·세운] 지지에 대한 12운성을 표로 출력
 // ▼▼ 교체: 기존 renderUnseongByBranches 전부 이걸로 바꿔 붙이세요 ▼▼
-function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
+function renderUnseongByBranches({ baseStem, caption = '12운성', rows } = {}) {
   const toHanStem   = (typeof window.toHanStem   === 'function') ? window.toHanStem   : v => String(v || '').trim();
   const toHanBranch = (typeof window.toHanBranch === 'function') ? window.toHanBranch : v => String(v || '').trim();
   const s = window.saju || {};
 
-  // 0) 기준 천간 한자화
-  const bStem = toHanStem(baseStem);
-  const UNMAP = (window.unseongMap12 || (typeof unseongMap12 !== 'undefined' ? unseongMap12 : null)) || {};
-  const bStemValid = !!UNMAP[bStem];
-
-  // ✅ 무/기토 여부
-  const isMuGi = (bStem === '戊' || bStem === '己');
-
-  // 1) 대운/세운 추출 (전역 → DOM 폴백)
+  // 공통: 대운/세운(전역 → DOM 폴백)
   function pickDaeyunSewoon() {
     let dJiji = window?.selectedDaewoon?.branch || '';
     let sJiji = window?.selectedSewoon?.branch  || '';
@@ -215,7 +204,7 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
   }
   const { daeyunBranchHan, sewoonBranchHan } = pickDaeyunSewoon();
 
-  // 2) 지지 배열(시/일/월/년 + 대운/세운)
+  // 공통: 지지(시/일/월/년 + 대운/세운)
   const branches = [
     toHanBranch(s.hourBranch || ''),
     toHanBranch(s.dayBranch  || ''),
@@ -224,30 +213,84 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
     daeyunBranchHan || '',
     sewoonBranchHan || ''
   ];
-  const labels = ['시','일','월','년','대운','세운'];
+  const colLabels = ['시지','일지','월지','년지','대운지지','세운지지'];
 
-  // 🚩 지장간 추출 유틸
-// 🚩 지장간 추출 유틸 (HanhiddenStemsMap 사용)
-function getHiddenStems(ji) {
-  const toHanBranch = (typeof window.toHanBranch === 'function') ? window.toHanBranch : v => String(v || '').trim();
-  const key = toHanBranch(ji);
-  const map = window.HanhiddenStemsMap || {};
-  const arr = map[key] || [];
-  // 안전 정규화 + 중복/공백 제거
-  return arr.map(x => String(x || '').trim()).filter(Boolean);
-}
+  // 유틸: 무/기토면 ‘없음’
+  const isMuGi = (stem) => (stem === '戊' || stem === '己');
+
+  // 유틸: 한 기준천간에 대한 12운성 행 생성
+  function computeRow(baseStemHan) {
+    return branches.map(br => {
+      if (!br || br === '無') return '-';
+      if (isMuGi(baseStemHan)) return '없음';
+      try { return (window.__unseongOf && window.__unseongOf(baseStemHan, br)) || '-'; }
+      catch { return '-'; }
+    });
+  }
+
+  // =============== 종합표 모드: rows 배열이 주어지면 한 장으로 ===============
+  if (Array.isArray(rows) && rows.length) {
+    // 헤더(지지 보여주기)
+// 지지 컬럼 라벨
+const colLabels = ['시지','일지','월지','년지','대운지지','세운지지'];
+
+// 기존 header 변수 교체
+const header = `
+  <tr>
+    <th rowspan="2" style="min-width:72px;">기준</th>
+    <th rowspan="2" style="min-width:44px;">값</th>
+    ${colLabels.map(lbl => `<th style="min-width:56px;">${lbl}</th>`).join('')}
+  </tr>
+  <tr>
+    ${branches.map((br, i) => `
+      <th title="${colLabels[i]}" style="min-width:56px;">
+        ${br || '-'}
+      </th>
+    `).join('')}
+  </tr>
+`;
 
 
-  // 3) 본표 한 줄 (기존과 동일: 12운성=빨강, 무/기토면 ‘없음’)
+    // 바디(각 기준 라인)
+    const body = rows.map(({ label, baseStem: bs }) => {
+      const bStem = toHanStem(bs || '');
+      const cells = computeRow(bStem);
+      return `
+        <tr>
+          <td>${label || ''}</td>
+          <td>${bStem || '-'}</td>
+          ${cells.map(u => `<td><span class="unseong-tag" style="color:#c21">${u}</span></td>`).join('')}
+        </tr>
+      `;
+    }).join('');
+
+    // 테이블(기존 클래스 유지)
+    return `
+      <table class="sinsal-bottom unseong-table" border="1"
+             style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px; table-layout:fixed; width:100%; max-width:960px;">
+        <thead>${header}</thead>
+        <tbody>${body}</tbody>
+      </table>
+    `;
+  }
+
+  // =============== 단일행 모드(기존 동작 그대로) ===============
+  const bStem = toHanStem(baseStem);
+  const UNMAP = (window.unseongMap12 || (typeof unseongMap12 !== 'undefined' ? unseongMap12 : null)) || {};
+  const bStemValid = !!UNMAP[bStem];
+
   const tds = branches.map((br, i) => {
     let u = '';
     if (br && br !== '無') {
-      if (isMuGi) {
+      if (isMuGi(bStem)) {
         u = '없음';
-      } else if (bStemValid) {
-        u = __unseongOf(bStem, br) || '';
+      } else if (bStemValid && typeof window.__unseongOf === 'function') {
+        u = window.__unseongOf(bStem, br) || '';
+      } else {
+        u = '';
       }
     }
+    const labels = ['시','일','월','년','대운','세운'];
     return `
       <td style="min-width:60px; padding:6px; text-align:center;">
         <div>${labels[i]}</div>
@@ -256,53 +299,15 @@ function getHiddenStems(ji) {
       </td>`;
   }).join('');
 
-  // 4) ⬇️ 추가: 지장간 12운성 줄 (각 지지의 지장간을 ‘그 지장간’을 기준 천간으로 하여 계산)
-  const hiddenRow = `
-    <tr>
-      <th>지장간</th>
-      <th>—</th>
-      ${
-        branches.map((br) => {
-          if (!br || br === '無') return `<td>-</td>`;
-          const hs = getHiddenStems(br);
-          if (!hs.length) return `<td>-</td>`;
-          const items = hs.map(h => {
-            const hHan = toHanStem(h);
-            const label = (hHan === '戊' || hHan === '己') ? '없음' : (__unseongOf(hHan, br) || '-');
-            return `${hHan} <span class="unseong-tag" style="color:#c21">(${label})</span>`;
-          }).join('<br>');
-          return `<td style="line-height:1.2">${items}</td>`;
-        }).join('')
-      }
-    </tr>
-  `;
-
-  // 5) 헤더(2줄) — 위에서 합의한 라벨/지지 값 표시
-  const colLabels = ['시지','일지','월지','년지','대운지지','세운지지'];
-  const header = `
-    <tr>
-      <th rowspan="2" style="min-width:72px;">기준</th>
-      <th rowspan="2" style="min-width:44px;">값</th>
-      ${colLabels.map(lbl => `<th style="min-width:56px;">${lbl}</th>`).join('')}
-    </tr>
-    <tr>
-      ${branches.map((br,i)=>`<th title="${colLabels[i]}" style="min-width:56px;">${br || '-'}</th>`).join('')}
-    </tr>
-  `;
-
-  // 6) 표 반환 (본표 한 줄 + 지장간 줄)
   return `
     <table class="sinsal-bottom unseong-table" border="1"
            style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px;">
-      <thead>${header}</thead>
-      <tbody>
-        <tr>
-          <th>${caption.replace(/^12운성\s*\(|\)\s*$/g,'')}</th>
-          <th>${bStem || '-'}</th>
-          ${tds}
-        </tr>
-        ${hiddenRow}
-      </tbody>
+      <thead>
+        <tr><th colspan="6" style="padding:6px; background:#f5fbff;">
+          ${caption} · 기준 천간: <span style="color:#1976d2">${bStem || '-'}</span>
+        </th></tr>
+      </thead>
+      <tbody><tr>${tds}</tr></tbody>
     </table>
   `;
 }
