@@ -239,7 +239,11 @@ function getTenGodLabel(day, target) {
 
 // =============== 종합표 모드: rows 배열이 주어지면 한 장으로 ===============
 if (Array.isArray(rows) && rows.length) {
-  // 지지 컬럼 라벨 + 지지 값 헤더(2단)
+  // --- 공통 준비 ---
+  const dayStemHan = toHanStem(s.dayGan || '');
+  const isMuGi = (stem) => (stem === '戊' || stem === '己');
+
+  // 1) 헤더
   const header = `
     <tr>
       <th rowspan="2" style="min-width:72px;">기준</th>
@@ -247,78 +251,76 @@ if (Array.isArray(rows) && rows.length) {
       ${colLabels.map(lbl => `<th style="min-width:56px;">${lbl}</th>`).join('')}
     </tr>
     <tr>
-      ${branches.map((br, i) => `
-        <th title="${colLabels[i]}" style="min-width:56px;">${br || '-'}</th>
-      `).join('')}
+      ${branches.map((br, i) =>
+        `<th title="${colLabels[i]}" style="min-width:56px;">${br || '-'}</th>`
+      ).join('')}
     </tr>
   `;
 
-  // 기본(시간/일간/월간/년간 등) 본문
-// 기존: const body = rows.map(({ label, baseStem: bs }) => {
-const body = rows.map(({ label, baseStem: bs, _rowspan } = {}) => {
-  const bStem = toHanStem(bs || '');
-  const cells = computeRow(bStem);
-  const tg = getTenGodLabel(dayStemHan, bStem); // ★ 일간 기준 육신
-
-  // (시지/일지… 헤더 합치기용 rowspan이 넘어오는 경우 유지)
-  const labelCell = (typeof _rowspan === 'number' && _rowspan > 1)
-    ? `<td rowspan="${_rowspan}">${label || ''}</td>`
-    : `<td>${label || ''}</td>`;
-
-  return `
-    <tr>
-      ${labelCell}
-      <td>
-        ${bStem || '-'}
-        ${tg ? `<div style="font-size:.85em;color:#666;">(${tg})</div>` : ''}
-      </td>
-      ${cells.map(u => `<td><span class="unseong-tag" ">${u}</span></td>`).join('')}
-    </tr>
-  `;
-}).join('');
-
-
-  // ✅ 지장간 맵 (한자 지지 → [지장간...])
-  const HiddenMap = (window.HanhiddenStemsMap || (typeof HanhiddenStemsMap !== 'undefined' ? HanhiddenStemsMap : null)) || {};
-  const getHiddenStems = (br) => {
-    const key = toHanBranch(br || '');
-    const arr = HiddenMap[key];
-    return Array.isArray(arr) ? arr.map(toHanStem).filter(Boolean) : [];
-  };
-
-  // ✅ 각 지지 컬럼(시지~세운지지)의 지장간을 “기준=해당 지지라벨 / 값=지장간”으로 추가
-// ✅ 각 지지 컬럼(시지~세운지지)의 지장간을 “기준=해당 지지라벨 / 값=지장간”으로 추가
-let hiddenRows = '';
-for (let col = 0; col < branches.length; col++) {
-  const br = branches[col];                 // 해당 열의 지지(예: 시지의 子 같은 값)
-  if (!br) continue;
-  const stems = getHiddenStems(br);         // ['壬','癸'] 등 (없으면 [])
-  if (!stems.length) continue;
-
-  // rowspan: 라벨은 첫 행에만 출력, 나머지 행은 생략
-  const rowspan = stems.length;
-
-  stems.forEach((hs, idx) => {
-    const cells = computeRow(hs);           // 지장간을 기준천간으로 12운성 계산
-    hiddenRows += `
+  // 2) 기존 기준줄 (시간/일간/월간/년간 등)
+  const body = rows.map(({ label, baseStem: bs }) => {
+    const bStem = toHanStem(bs || '');
+    const cells = branches.map(br => {
+      if (!br || br === '無') return '-';
+      if (isMuGi(bStem)) return '없음';
+      return (typeof window.__unseongOf === 'function'
+        ? (window.__unseongOf(bStem, br) || '-')
+        : '-');
+    });
+    // 🔹 일간 기준 십신
+    const ten = (typeof __TEN_MAP__ !== 'undefined' && dayStemHan)
+      ? ((__TEN_MAP__[dayStemHan] || {})[bStem] || '')
+      : '';
+    return `
       <tr>
-        ${idx === 0 ? `<td rowspan="${rowspan}">${colLabels[col]}</td>` : ``}
-        <td>${hs}</td>
-        ${cells.map(u => `<td><span class="unseong-tag" >${u}</span></td>`).join('')}
+        <td>${label || ''}</td>
+        <td>${bStem || '-'}${ten ? ` <span class="ten-god">(${ten})</span>` : ''}</td>
+        ${cells.map(u => `<td><span class="unseong-tag">${u}</span></td>`).join('')}
       </tr>
     `;
-  });
-}
+  }).join('');
 
+  // 3) 🔴 여기: hidden rows “그냥 기존 함수 방식으로 붙이기”
+  //    → 지지 6칸에 대해, 그 지지의 지장간을 뽑아서 위와 똑같이 rows를 한 번씩 더 만드는 것
+  const hiddenMap = (window.HanhiddenStemsMap || (typeof HanhiddenStemsMap !== 'undefined' ? HanhiddenStemsMap : null)) || {};
+  const hiddenRows = branches.map((baseBranch, colIdx) => {
+    if (!baseBranch) return '';                   // 그 칸이 비었으면 스킵
+    const hsList = hiddenMap[baseBranch] || [];   // 그 지지의 지장간들
+    if (!hsList.length) return '';
 
-  // 최종 테이블
+    const label = colLabels[colIdx];              // 시지/일지/… 라벨
+
+    return hsList.map((hs, idx) => {
+      const cells = branches.map(br => {
+        if (!br || br === '無') return '-';
+        if (isMuGi(hs)) return '없음';
+        return (typeof window.__unseongOf === 'function'
+          ? (window.__unseongOf(hs, br) || '-')
+          : '-');
+      });
+      // 지장간에도 십신 붙이기
+      const ten = (typeof __TEN_MAP__ !== 'undefined' && dayStemHan)
+        ? ((__TEN_MAP__[dayStemHan] || {})[hs] || '')
+        : '';
+
+      return `
+        <tr>
+          ${idx === 0 ? `<td rowspan="${hsList.length}">${label}</td>` : ''}
+          <td>${hs}${ten ? ` <span class="ten-god">(${ten})</span>` : ''}</td>
+          ${cells.map(u => `<td><span class="unseong-tag">${u}</span></td>`).join('')}
+        </tr>
+      `;
+    }).join('');
+  }).join('');
+
+  // 4) 최종 리턴
   return `
     <table class="sinsal-bottom unseong-table" border="1"
            style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px; table-layout:fixed; width:100%; max-width:960px;">
       <thead>${header}</thead>
       <tbody>
         ${body}
-        ${hiddenRows}  <!-- ⬅⬅ 지장간 확장 행들 -->
+        ${hiddenRows}
       </tbody>
     </table>
   `;
