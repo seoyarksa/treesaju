@@ -6032,11 +6032,18 @@ try {
 
 // 2) 툴팁(전역 델리게이트) 설치
 try {
-  const tipMod = await import('./utils/tooltip.js');
+  const tipMod = await import('./utils/tooltip.js'); // 또는 new URL('./utils/tooltip.js', import.meta.url)
   console.log('[tooltip] module keys:', Object.keys(tipMod || {}));
-  if (typeof tipMod?.initTermHelp === 'function') {
-    tipMod.initTermHelp();
-    console.log('[tooltip] installed');
+
+  // 모든 경우 커버: 네임드, default, 전역 fallback
+  const init =
+    tipMod?.initTermHelp ||
+    tipMod?.default?.initTermHelp ||
+    window.initTermHelp;
+
+  if (typeof init === 'function') {
+    init();
+    console.log('[tooltip] installed via', init.name || 'anonymous');
   } else {
     console.warn('[tooltip] initTermHelp not found');
   }
