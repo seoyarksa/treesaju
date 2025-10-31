@@ -6022,6 +6022,9 @@ try {
   const explainMod = await import('./explain.js');
   if (explainMod?.TERM_HELP) {
     window.TERM_HELP = explainMod.TERM_HELP;
+    console.log('[TERM_HELP] loaded keys:', Object.keys(window.TERM_HELP));
+  } else {
+    console.warn('[TERM_HELP] missing export');
   }
 } catch (e) {
   console.warn('[TERM_HELP] load skipped:', e);
@@ -6030,8 +6033,13 @@ try {
 // 2) 툴팁(전역 델리게이트) 설치
 try {
   const tipMod = await import('./utils/tooltip.js');
-  tipMod?.initTermHelp?.();
-  console.log('[tooltip] installed');
+  console.log('[tooltip] module keys:', Object.keys(tipMod || {}));
+  if (typeof tipMod?.initTermHelp === 'function') {
+    tipMod.initTermHelp();
+    console.log('[tooltip] installed');
+  } else {
+    console.warn('[tooltip] initTermHelp not found');
+  }
 } catch (e) {
   console.warn('[tooltip] install failed:', e);
 }

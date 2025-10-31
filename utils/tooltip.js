@@ -1,4 +1,5 @@
 // utils/tooltip.js
+// utils/tooltip.js
 export function initTermHelp() {
   if (window.__termHelpInstalled) return;
   window.__termHelpInstalled = true;
@@ -12,6 +13,10 @@ export function initTermHelp() {
     'box-shadow:0 6px 18px rgba(0,0,0,.25);'
   ].join('');
   document.body.appendChild(tip);
+
+  const hosts = ['unseong-block', 'etc-sinsal-box']
+    .map(id => document.getElementById(id))
+    .filter(Boolean);
 
   function hide(){ tip.style.display='none'; }
   function showNear(target, html){
@@ -29,10 +34,6 @@ export function initTermHelp() {
     const key  = String(term || '').trim();
     return dict[key] || '설명이 아직 없습니다.';
   }
-
-  const hosts = ['unseong-block', 'etc-sinsal-box']
-    .map(id => document.getElementById(id))
-    .filter(Boolean);
 
   hosts.forEach(host=>{
     host.addEventListener('click', e=>{
@@ -53,6 +54,7 @@ export function initTermHelp() {
   window.addEventListener('resize', hide);
   window.addEventListener('scroll', hide, true);
 }
+
 
 
 
