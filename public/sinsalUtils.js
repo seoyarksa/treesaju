@@ -180,128 +180,36 @@ window.BRANCH_ORDER = window.BRANCH_ORDER || ['子','丑','寅','卯','辰','巳
 //    [시·일·월·년·대운·세운] 지지에 대한 12운성을 표로 출력
 // ▼▼ 교체: 기존 renderUnseongByBranches 전부 이걸로 바꿔 붙이세요 ▼▼
 function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
-  const toHanStem   = (typeof window.toHanStem   === 'function') ? window.toHanStem   : v => String(v || '');
-  const toHanBranch = (typeof window.toHanBranch === 'function') ? window.toHanBranch : v => String(v || '');
+  const toHanStem   = (typeof window.toHanStem   === 'function') ? window.toHanStem   : v => String(v || '').trim();
+  const toHanBranch = (typeof window.toHanBranch === 'function') ? window.toHanBranch : v => String(v || '').trim();
   const s = window.saju || {};
 
-  // 0) 기준 천간 + 맵 유효성
+  // 0) 기준 천간 한자화
   const bStem = toHanStem(baseStem);
   const UNMAP = (window.unseongMap12 || (typeof unseongMap12 !== 'undefined' ? unseongMap12 : null)) || {};
   const bStemValid = !!UNMAP[bStem];
 
-  // 1) 대운/세운 추출 — “기타신살”과 동일한 우선순위/폴백(+ 구표 DOM까지 포함)
+  // ✅ 무/기토 여부
+  const isMuGi = (bStem === '戊' || bStem === '己');
+
+  // 1) 대운/세운 추출 (전역 → DOM 폴백)
   function pickDaeyunSewoon() {
-    // ---------- 대운 ----------
-    let dGan  = '';
-    let dJiji = '';
+    let dJiji = window?.selectedDaewoon?.branch || '';
+    let sJiji = window?.selectedSewoon?.branch  || '';
 
-    // (1) 전역 선택값
-    if (window?.selectedDaewoon) {
-      dGan  = window.selectedDaewoon.stem   || dGan;
-      dJiji = window.selectedDaewoon.branch || dJiji;
+    if (!dJiji) {
+      const el = document.querySelector('#basic-daeyun-table .daeyun-cell.selected');
+      if (el) dJiji = el.dataset?.branch || (el.innerText||'').split('\n').map(t=>t.trim())[2] || '';
     }
-
-    // (2) 새 대운표 DOM (#basic-daeyun-table)
-    if (!dGan || !dJiji) {
-      const sel = document.querySelector('#basic-daeyun-table .daeyun-cell.selected');
-      if (sel) {
-        const dsGan  = sel.dataset?.stem   || '';
-        const dsJiji = sel.dataset?.branch || '';
-        if (dsGan && dsJiji) {
-          dGan  = dGan  || dsGan;
-          dJiji = dJiji || dsJiji;
-        } else {
-          const lines = (sel.innerText || '').trim().split('\n').map(s => s.trim());
-          const maybeGan = lines[0] || '';
-          const maybeJi  = lines[2] || lines[1] || '';
-          dGan  = dGan  || maybeGan.replace(/\s+/g, '');
-          dJiji = dJiji || maybeJi.replace(/\s+/g, '');
-        }
-      }
+    if (!sJiji) {
+      const el = document.querySelector('#basic-daeyun-table .sewoon-cell.selected');
+      if (el) sJiji = el.dataset?.branch || (el.innerText||'').split('\n').map(t=>t.trim())[2] || '';
     }
-
-    // (3) 구 대운표 DOM (.daeyun-table-container …)
-    if (!dGan || !dJiji) {
-      const tds = document.querySelectorAll('.daeyun-table-container .daeyun-table tbody tr:nth-child(2) td');
-      const selTd = Array.from(tds).find(td => td.classList.contains('daeyun-selected'));
-      if (selTd) {
-        if (window.daeyunPairs?.length) {
-          const idx = Array.from(tds).indexOf(selTd);
-          const trueIdx = tds.length - 1 - idx;
-          const pair = window.daeyunPairs[trueIdx] || {};
-          dGan  = dGan  || (pair.stem   || '');
-          dJiji = dJiji || (pair.branch || '');
-        } else {
-          const lines = (selTd.innerText || '').trim().split('\n').map(s => s.trim());
-          const maybeGan = lines[0] || '';
-          const maybeJi  = lines[2] || lines[1] || '';
-          dGan  = dGan  || maybeGan.replace(/\s+/g, '');
-          dJiji = dJiji || maybeJi.replace(/\s+/g, '');
-        }
-      }
-    }
-
-    // ---------- 세운 ----------
-    let sGan  = '';
-    let sJiji = '';
-
-    // (1) 전역 선택값
-    if (window?.selectedSewoon) {
-      sGan  = window.selectedSewoon.stem   || sGan;
-      sJiji = window.selectedSewoon.branch || sJiji;
-    }
-
-    // (2) 새 세운표 DOM (#basic-daeyun-table)
-    if (!sGan || !sJiji) {
-      const seSel = document.querySelector('#basic-daeyun-table .sewoon-cell.selected');
-      if (seSel) {
-        const dsGan  = seSel.dataset?.stem   || '';
-        const dsJiji = seSel.dataset?.branch || '';
-        if (dsGan && dsJiji) {
-          sGan  = sGan  || dsGan;
-          sJiji = sJiji || dsJiji;
-        } else {
-          const lines = (seSel.innerText || '').trim().split('\n').map(s => s.trim());
-          const maybeGan = lines[0] || '';
-          const maybeJi  = lines[2] || lines[1] || '';
-          sGan  = sGan  || maybeGan.replace(/\s+/g, '');
-          sJiji = sJiji || maybeJi.replace(/\s+/g, '');
-        }
-      }
-    }
-
-    // (3) 구 세운표 DOM (있다면 호환)
-    if (!sGan || !sJiji) {
-      const oldSel = document.querySelector('.sewoon-cell.selected');
-      if (oldSel) {
-        const dsGan  = oldSel.dataset?.stem   || '';
-        const dsJiji = oldSel.dataset?.branch || '';
-        if (dsGan && dsJiji) {
-          sGan  = sGan  || dsGan;
-          sJiji = sJiji || dsJiji;
-        } else {
-          const lines = (oldSel.innerText || '').trim().split('\n').map(s => s.trim());
-          const maybeGan = lines[0] || '';
-          const maybeJi  = lines[2] || lines[1] || '';
-          sGan  = sGan  || maybeGan.replace(/\s+/g, '');
-          sJiji = sJiji || maybeJi.replace(/\s+/g, '');
-        }
-      }
-    }
-
-    // (4) 최종 폴백: 세운은 無 허용
-    if (!sGan || !sJiji) {
-      sGan  = '無';
-      sJiji = '無';
-    }
-
-    // 한자 정규화해서 반환(12운성 계산은 지지 중심)
     return {
       daeyunBranchHan: dJiji ? toHanBranch(dJiji) : '',
       sewoonBranchHan: sJiji ? toHanBranch(sJiji) : ''
     };
   }
-
   const { daeyunBranchHan, sewoonBranchHan } = pickDaeyunSewoon();
 
   // 2) 지지 배열(시/일/월/년 + 대운/세운)
@@ -315,9 +223,16 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
   ];
   const labels = ['시','일','월','년','대운','세운'];
 
-  // 3) 셀 생성 (12운성은 빨강)
+  // 3) 셀 생성 (12운성=빨강). ✅ 무/기토면 무조건 '없음'
   const tds = branches.map((br, i) => {
-    const u = (bStemValid && br && br !== '無') ? __unseongOf(bStem, br) : '';
+    let u = '';
+    if (br && br !== '無') {
+      if (isMuGi) {
+        u = '없음';
+      } else if (bStemValid) {
+        u = __unseongOf(bStem, br) || '';
+      }
+    }
     return `
       <td style="min-width:60px; padding:6px; text-align:center;">
         <div>${labels[i]}</div>
@@ -326,7 +241,6 @@ function renderUnseongByBranches({ baseStem, caption = '12운성' }) {
       </td>`;
   }).join('');
 
-  // 4) 표 반환
   return `
     <table class="sinsal-bottom unseong-table" border="1"
            style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px;">
