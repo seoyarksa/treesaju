@@ -386,7 +386,14 @@ const midHeader = `
 
         return `
           <tr>
-            ${idx === 0 ? `<td rowspan="${hsList.length}">${label}</td>` : ''}
+            ${idx === 0
+  ? `<td rowspan="${hsList.length}">
+       <div>${label}</div>
+       <div class="branch-mini">${branches[colIdx] || '-'}</div>
+     </td>`
+  : ''
+}
+
             <td>${hs}${tenHidden ? ` <span class="ten-god">(${tenHidden})</span>` : ''}</td>
             ${cells.map(u => `<td><span class="unseong-tag">${u}</span></td>`).join('')}
           </tr>
