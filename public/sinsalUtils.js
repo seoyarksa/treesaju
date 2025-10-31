@@ -361,7 +361,7 @@ const midHeader = `
         <tr>
           <td>${label || ''}</td>
           <td>${bStem || '-'}${tenToShow ? ` <span class="ten-god">(${tenToShow})</span>` : ''}</td>
-          ${cells.map(u => `<td><span class="unseong-tag explainable" data-group="unseong">${u}</span></td>`).join('')}
+          ${cells.map(u => `<td><span class="unseong-tag explainable" data-group="unseong" data-term="${u}">${u}</span></td>`).join('')}
         </tr>
       `;
     }).join('');
