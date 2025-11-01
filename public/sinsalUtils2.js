@@ -360,7 +360,7 @@ const midHeader = `
         <tr>
           <td>${label || ''}</td>
           <td>${bStem || '-'}${tenToShow ? ` <span class="ten-god">(${tenToShow})</span>` : ''}</td>
-          ${cells.map(u => `<td><span class="unseong-tag">${u}</span></td>`).join('')}
+          ${cells.map(u => `<td><span class="unseong-tag explainable" data-group="unseong" data-term="${u}">${u}</span></td>`).join('')}
         </tr>
       `;
     }).join('');
@@ -386,8 +386,8 @@ const midHeader = `
         return `
           <tr>
             ${idx === 0 ? `<td rowspan="${hsList.length}">${label}</td>` : ''}
-            <td>${hs}${tenHidden ? ` <span class="ten-god">(${tenHidden})</span>` : ''}</td>
-            ${cells.map(u => `<td><span class="unseong-tag">${u}</span></td>`).join('')}
+            <td>${hs}${tenHidden ? ` <span class="ten-god explainable" data-group="tengod" data-term="${tenHidden}">(${tenHidden})</span>` : ''}</td>
+            ${cells.map(u => `<td><span class="unseong-tag explainable" data-group="unseong" data-term="${u}">${u}</span></td>`).join('')}
           </tr>
         `;
       }).join('');
@@ -407,7 +407,13 @@ const midHeader = `
       if (!base) return '';
       const cells = branches.map(br => {
         const v = __twelveSinsalOf(base, br);
-        return `<td><span class="twelve-sinsal-tag">${v || '-'}</span></td>`;
+        return (() => {
+  const term = String(v || '').trim();
+  if (!term || term === '-') {
+    return `<td><span class="twelve-sinsal-tag">-</span></td>`;
+  }
+  return `<td><span class="twelve-sinsal-tag explainable" data-group="sipsal12" data-term="${term}">${term}</span></td>`;
+})();
       }).join('');
       return `
         <tr>

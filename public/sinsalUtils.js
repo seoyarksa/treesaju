@@ -540,14 +540,19 @@ const colCss = [...highlightIdx].map(i => `
     </tr>
     <tr>
       ${ganList.map(gan => {
-  const sipsin = getSipsin(dayGan, gan);  // 천간에 대한 십신명
-  return `<td class="clickable${sajuGanArr.includes(gan) ? ' saju-blue' : ''}" 
-              data-type="unseong" 
-              data-gan="${gan}" 
-              style="cursor:pointer; text-align:center;">
-              <div>${gan}</div>
-              <div style="font-size:0.8em; color:#555;">${sipsin}</div>
-          </td>`;
+const sipsin = getSipsin(dayGan, gan);  // 천간에 대한 십신명
+const sipsinHtml = sipsin
+  ? `<span class="ten-god explainable" data-group="tengod" data-term="${sipsin}">${sipsin}</span>`
+  : '';
+
+return `<td class="clickable${sajuGanArr.includes(gan) ? ' saju-blue' : ''}" 
+            data-type="unseong" 
+            data-gan="${gan}" 
+            style="cursor:pointer; text-align:center;">
+            <div>${gan}</div>
+            <div style="font-size:0.8em; color:#555;">${sipsinHtml}</div>
+        </td>`;
+
 }).join("")}
 
       ${samhapNames.map(key =>
