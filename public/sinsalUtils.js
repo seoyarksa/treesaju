@@ -407,7 +407,13 @@ const midHeader = `
       if (!base) return '';
       const cells = branches.map(br => {
         const v = __twelveSinsalOf(base, br);
-        return `<td><span class="twelve-sinsal-tag">${v || '-'}</span></td>`;
+        return (() => {
+  const term = String(v || '').trim();
+  if (!term || term === '-') {
+    return `<td><span class="twelve-sinsal-tag">-</span></td>`;
+  }
+  return `<td><span class="twelve-sinsal-tag explainable" data-group="sipsal12" data-term="${term}">${term}</span></td>`;
+})();
       }).join('');
       return `
         <tr>
