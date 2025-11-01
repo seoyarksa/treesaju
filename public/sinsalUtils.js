@@ -387,7 +387,7 @@ const midHeader = `
           <tr>
             ${idx === 0 ? `<td rowspan="${hsList.length}">${label}</td>` : ''}
             <td>${hs}${tenHidden ? ` <span class="ten-god">(${tenHidden})</span>` : ''}</td>
-            ${cells.map(u => `<td><span class="unseong-tag">${u}</span></td>`).join('')}
+            ${cells.map(u => `<td><span class="unseong-tag explainable" data-group="unseong" data-term="${u}">${u}</span></td>`).join('')}
           </tr>
         `;
       }).join('');
