@@ -14,7 +14,7 @@ export function initTermHelp() {
   }
   window.__termHelpInstalled = true;
   console.debug('[tooltip] initTermHelp() start');
-
+let __lastOpenAt = 0;
   // 1) 팁 DOM
   let tip = document.getElementById('term-help-pop');
   if (!tip) {
@@ -75,6 +75,7 @@ const hide = () => {
 
 
 const showNear = (target, html) => {
+    __lastOpenAt = Date.now();         // 🔒 열린 시각 기록
   tip.innerHTML = html;
   // ✅ 표시 강제 (어떤 CSS가 덮어써도 이기도록)
   tip.style.setProperty('display', 'block', 'important');
@@ -137,18 +138,13 @@ const showNear = (target, html) => {
   }, true); // capture = true
 
   // B) 버블 단계: 바깥 클릭 → 닫기 (같은 틱 방지)
-  document.addEventListener('click', (e) => {
-    // 방금 연 클릭이면 닫지 않음
-    if (performance.now() - __tipLastShowTs < 150) {
-      // console.debug('[tooltip] skip hide (just opened)');
-      return;
-    }
-    if (e.target.closest?.('#term-help-pop') || e.target.closest?.('.explainable')) {
-      // 팝업 내부/다른 explainable 클릭이면 유지
-      return;
-    }
+document.addEventListener('click', (e) => {
+  // 🔒 열고 150ms 안에는 “바깥 클릭 닫기” 무시
+  if (Date.now() - __lastOpenAt < 150) return;
+  if (!e.target.closest('#term-help-pop') && !e.target.closest('.explainable')) {
     hide();
-  });
+  }
+});
 
   // C) 화면 변경 시 닫기
   window.addEventListener('resize', hide, { passive: true });
