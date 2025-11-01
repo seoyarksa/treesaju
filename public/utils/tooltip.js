@@ -97,38 +97,35 @@ export function initTermHelp() {
     console.debug('[tooltip] hide');
   };
 
-  const showNear = (target, html) => {
-    __lastOpenAt = Date.now();
-    tip.innerHTML = html;
-    forceShow(); // 강제 보이기 (크기 계산을 위해)
+const showNear = (target, html) => {
+  __lastOpenAt = Date.now();
+  tip.innerHTML = html;
+  forceShow(); // display/opacity/visibility -> visible
 
-    // 먼저 보여서 사이즈 계산
-    const r = target.getBoundingClientRect();
-    const gap = 8;
-    let left = r.left;
-    let top  = r.top + window.scrollY + r.height + gap;
+  const r = target.getBoundingClientRect(); // 뷰포트 기준 좌표
+  const gap = 8;
 
-    // 우측 넘침 방지
-    const maxLeft = window.innerWidth - tip.offsetWidth - 8;
-    if (left > maxLeft) left = maxLeft;
-    if (left < 8) left = 8;
+  // 기본 위치: 타깃 아래
+  let left = r.left;
+  let top  = r.bottom + gap;   // ❌ r.top + window.scrollY 사용 금지 (fixed 좌표 아님)
 
-    // 하단 넘침 시 위로
-    const bottom = top + tip.offsetHeight;
-    const viewportBottom = window.scrollY + window.innerHeight - 8;
-    if (bottom > viewportBottom) {
-      top = r.top + window.scrollY - tip.offsetHeight - gap;
-      if (top < window.scrollY + 8) top = window.scrollY + 8;
-    }
+  // 우측 넘침 방지 (뷰포트 기준)
+  const maxLeft = window.innerWidth - tip.offsetWidth - 8;
+  if (left > maxLeft) left = maxLeft;
+  if (left < 8) left = 8;
 
-    tip.style.left = `${left}px`;
-    tip.style.top  = `${top}px`;
+  // 하단 넘침 시 위로
+  const bottom = top + tip.offsetHeight;
+  const viewportBottom = window.innerHeight - 8; // ❌ scrollY 더하지 않음
+  if (bottom > viewportBottom) {
+    top = r.top - tip.offsetHeight - gap;
+    if (top < 8) top = 8;
+  }
 
-    console.debug('[tooltip] showNear', { left, top, termHtml: html });
-    // 디버그용: 실제로 display 계산 확인
-    const rect = tip.getBoundingClientRect();
-    console.debug('[tooltip] rect', rect, 'computed display=', getComputedStyle(tip).display);
-  };
+  tip.style.left = `${left}px`;
+  tip.style.top  = `${top}px`;
+};
+
 
   const getDesc = (group, term) => {
     const dict = (window.TERM_HELP && window.TERM_HELP[group]) || {};
