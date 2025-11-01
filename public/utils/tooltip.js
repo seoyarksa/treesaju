@@ -1,5 +1,4 @@
 // utils/tooltip.js
-// utils/tooltip.js
 export function initTermHelp() {
   if (window.__termHelpInstalled) {
     console.debug('[tooltip] already installed');
