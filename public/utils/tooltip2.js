@@ -1,70 +1,191 @@
-// /utils/tooltip.js
+// utils/tooltip.js
+// utils/tooltip.js
 export function initTermHelp() {
-  if (window.__termHelpInstalled) return;
+  if (window.__termHelpInstalled) {
+    console.debug('[tooltip] already installed');
+    return;
+  }
   window.__termHelpInstalled = true;
+  console.debug('[tooltip] initTermHelp() start');
 
-  const tip = document.createElement('div');
-  tip.id = 'term-help-pop';
-  tip.style.cssText = [
-    'position:fixed;z-index:999999;display:none;',
-    'max-width:280px;padding:10px 12px;border-radius:10px;',
-    'background:#111;color:#fff;font-size:13px;line-height:1.4;',
-    'box-shadow:0 6px 18px rgba(0,0,0,.25)'
-  ].join('');
-  document.body.appendChild(tip);
+  // ─────────────────────────────────────────────────────────
+  // 0) 상단 레이어 스타일(충돌 방지용) 주입
+  // ─────────────────────────────────────────────────────────
+  const style = document.createElement('style');
+  style.setAttribute('data-tooltip-style', '1');
+  style.textContent = `
+    .explainable { cursor: help !important; }
+    #term-help-pop {
+      position: fixed !important;
+      z-index: 2147483647 !important;
+      display: none !important;
+      opacity: 0 !important;
+      visibility: hidden !important;
+      max-width: 320px !important;
+      padding: 10px 12px !important;
+      border-radius: 10px !important;
+      background: #111 !important;
+      color: #fff !important;
+      font-size: 13px !important;
+      line-height: 1.5 !important;
+      box-shadow: 0 6px 18px rgba(0,0,0,.25) !important;
+      white-space: pre-wrap !important;
+      word-break: keep-all !important;
+      pointer-events: auto !important;
+      transform: translateZ(0) !important;
+      will-change: left, top, opacity, visibility !important;
+      /* outline: 2px solid #0ff !important;  */ /* ← 필요하면 눈에 띄게 */
+      /* box-shadow: 0 0 0 2000px rgba(0,0,0,.001) inset !important; */
+    }
+  `;
+  document.head.appendChild(style);
 
-  const TERM = window.TERM_HELP || {};
+  // ─────────────────────────────────────────────────────────
+  // 1) 팁 DOM 준비
+  // ─────────────────────────────────────────────────────────
+  let tip = document.getElementById('term-help-pop');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = 'term-help-pop';
+    tip.setAttribute('role', 'dialog');
+    tip.setAttribute('aria-live', 'polite');
+    tip.setAttribute('data-installed', '1');
+    document.body.appendChild(tip);
+  }
+  // 인라인 스타일도 한 번 더(혹시 모를 우선순위 싸움 방지)
+  Object.assign(tip.style, {
+    position: 'fixed',
+    zIndex: '2147483647',
+    display: 'none',
+    opacity: '0',
+    visibility: 'hidden',
+    maxWidth: '320px',
+    padding: '10px 12px',
+    borderRadius: '10px',
+    background: '#111',
+    color: '#fff',
+    fontSize: '13px',
+    lineHeight: '1.5',
+    boxShadow: '0 6px 18px rgba(0,0,0,.25)',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'keep-all',
+    pointerEvents: 'auto',
+    transform: 'translateZ(0)',
+    willChange: 'left, top, opacity, visibility',
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // 2) 헬퍼
+  // ─────────────────────────────────────────────────────────
+  let __lastOpenAt = 0;
+
+  const forceShow = () => {
+    tip.style.setProperty('display', 'block', 'important');
+    tip.style.setProperty('opacity', '1', 'important');
+    tip.style.setProperty('visibility', 'visible', 'important');
+  };
+  const forceHide = () => {
+    tip.style.setProperty('display', 'none', 'important');
+    tip.style.setProperty('opacity', '0', 'important');
+    tip.style.setProperty('visibility', 'hidden', 'important');
+  };
+
+  const hide = () => {
+    forceHide();
+    console.debug('[tooltip] hide');
+  };
+
+  const showNear = (target, html) => {
+    __lastOpenAt = Date.now();
+    tip.innerHTML = html;
+    forceShow();
+
+    // 먼저 보여서 사이즈 계산
+    const r = target.getBoundingClientRect();
+    const gap = 8;
+    let left = r.left;
+    let top  = r.top + window.scrollY + r.height + gap;
+
+    // 우측 넘침 방지
+    const maxLeft = window.innerWidth - tip.offsetWidth - 8;
+    if (left > maxLeft) left = maxLeft;
+    if (left < 8) left = 8;
+
+    // 하단 넘침 시 위로
+    const bottom = top + tip.offsetHeight;
+    const viewportBottom = window.scrollY + window.innerHeight - 8;
+    if (bottom > viewportBottom) {
+      top = r.top + window.scrollY - tip.offsetHeight - gap;
+      if (top < window.scrollY + 8) top = window.scrollY + 8;
+    }
+
+    tip.style.left = `${left}px`;
+    tip.style.top  = `${top}px`;
+
+    console.debug('[tooltip] showNear', { left, top, termHtml: html });
+    const rect = tip.getBoundingClientRect();
+    console.debug('[tooltip] rect', rect, 'computed display=', getComputedStyle(tip).display);
+  };
+
   const getDesc = (group, term) => {
-    const dict = TERM[group] || {};
-    const key = String(term || '').trim();
+    const dict = (window.TERM_HELP && window.TERM_HELP[group]) || {};
+    const key  = String(term || '').trim();
     return dict[key] || '설명이 아직 없습니다.';
   };
 
-  const hide = () => { tip.style.display = 'none'; };
-  const showNear = (target, html) => {
-    tip.innerHTML = html;
-    tip.style.display = 'block';
-    const r = target.getBoundingClientRect();
-    const gap = 8;
-    // 먼저 표시해서 offsetWidth 확보
-    const left = Math.min(window.innerWidth - tip.offsetWidth - 8, Math.max(8, r.left));
-    const top  = (r.top + window.scrollY) + r.height + gap;
-    tip.style.left = left + 'px';
-    tip.style.top  = top  + 'px';
-  };
-
-  const CLICK_SELECTOR = '.explainable, .unseong-tag, .ten-god, .twelve-sinsal-tag';
-
-  // ⬇️ 캡처 단계로 등록(세 번째 인수 또는 옵션 {capture:true})
+  // ─────────────────────────────────────────────────────────
+  // 3) 이벤트 바인딩
+  // ─────────────────────────────────────────────────────────
+  // A) 캡처 단계: .explainable 클릭 → 열기
   document.addEventListener('click', (e) => {
-    const t = e.target.closest(CLICK_SELECTOR);
-    if (!t) {
-      if (!e.target.closest('#term-help-pop')) hide();
-      return;
-    }
-    // 디버그 로그
-    console.log('[tooltip] hit:', t, t.className, t.dataset);
+    const t = e.target.closest?.('.explainable');
+    if (!t) return;
 
-    const group =
-      t.getAttribute('data-group') ||
-      (t.classList.contains('ten-god') ? 'tengod'
-       : t.classList.contains('twelve-sinsal-tag') ? 'sipsal12'
-       : 'unseong');
-
-    const termRaw = t.getAttribute('data-term') || t.textContent || '';
-    const term = String(termRaw).trim();
-
-    // 빈값/장식문자 무시 (원하면 제거)
-    if (!term || term === '-' ) { hide(); return; }
-
-    const groupLabel = group === 'tengod' ? '십신' : (group === 'sipsal12' ? '12신살' : '12운성');
-    const title = `<div style="font-weight:600;margin-bottom:6px;">${groupLabel} · ${term}</div>`;
+    const group = t.getAttribute('data-group') || 'unseong';
+    const term  = t.getAttribute('data-term')  || t.textContent.trim();
+    const from  = (group === 'tengod') ? '십신' : (group === 'sipsal12' ? '12신살' : '12운성');
+    const title = `${from} · ${term}`;
     const body  = getDesc(group, term);
-    showNear(t, title + body);
-  }, true); // ⬅️ capture=true
 
+    console.debug('[tooltip] HIT', { group, term, title });
+    showNear(t, `<div style="font-weight:600; margin-bottom:6px;">${title}</div>${body}`);
+  }, true); // capture=true (다른 핸들러보다 먼저 잡기)
+
+  // B) 버블 단계: 바깥 클릭 → 닫기 (열고 200ms 이내는 무시)
+  document.addEventListener('click', (e) => {
+    if (Date.now() - __lastOpenAt < 200) return;
+    if (!e.target.closest('#term-help-pop') && !e.target.closest('.explainable')) {
+      hide();
+    }
+  });
+
+  // C) 화면 변경 시 닫기
   window.addEventListener('resize', hide, { passive: true });
   window.addEventListener('scroll', hide, true);
 
-  console.log('[tooltip] initTermHelp installed. groups=', Object.keys(TERM));
+  // ESC 닫기
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') hide();
+  }, { passive: true });
+
+  // D) 디버그 강제 토글: Alt+Shift+H
+  document.addEventListener('keydown', (e) => {
+    if (e.altKey && e.shiftKey && (e.key === 'H' || e.key === 'h')) {
+      const vis = getComputedStyle(tip).display !== 'none';
+      if (vis) {
+        hide();
+      } else {
+        tip.innerHTML = `<div style="font-weight:600; margin-bottom:6px;">디버그 팁</div>이 팁이 보이면 레이어/표시는 정상입니다.`;
+        forceShow();
+        tip.style.left = '20px';
+        tip.style.top  = (window.scrollY + 20) + 'px';
+      }
+    }
+  });
+
+  // 전역 fallback
+  window.initTermHelp = initTermHelp;
+  console.debug('[tooltip] initTermHelp() installed');
 }
+
+export default { initTermHelp };

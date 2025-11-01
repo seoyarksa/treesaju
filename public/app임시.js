@@ -2,7 +2,7 @@
 
 
 // git add .
-// git commit -m "정기결제연동"   
+// git commit -m "결제전환보정"   
 // git push origin main
 // git push
 //강제실행   vercel --prod --force
@@ -12,8 +12,10 @@
 //console.clear();  console.log("🔥 전체 다시 실행됨");  console.log("👉 현재 saju:", JSON.stringify(saju));
 
 
-
+// app.js
 // 상수
+import { TERM_HELP } from './explain.js';
+window.TERM_HELP = TERM_HELP;
 import { 
   elementMap, 
   DANGRYEONGSHIK_MAP,
@@ -179,6 +181,49 @@ async function postJSON(url, data) {
 // 전역 보강 (중복 정의 방지)
 window.postJSON ||= postJSON;
 
+
+// 실패해도 버튼이 반드시 풀리도록 try/finally
+async function withBtnLock(btn, task) {
+  if (!btn) return;
+  if (btn.dataset.locked === '1') return;      // 더블클릭 방지
+  btn.dataset.locked = '1';
+  const prevDisabled = btn.disabled;
+  btn.disabled = true;
+  btn.style.opacity = '0.6';
+  try {
+    await task();
+  } finally {
+    btn.disabled = prevDisabled;
+    btn.style.opacity = '';
+    delete btn.dataset.locked;
+  }
+}
+
+// fetch 안전 래퍼: 네트워크 오류도 잡고, JSON 파싱 실패해도 죽지 않게
+async function safeFetch(url, options) {
+  try {
+    const res = await fetch(url, options);
+    let json = null;
+    try { json = await res.json(); } catch {}
+    return { res, json, error: null };
+  } catch (e) {
+    return { res: null, json: null, error: e };
+  }
+}
+
+
+// 짧은 대기
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+// 에러 메시지를 조금 더 자세히 합성
+function buildErrMsg(json, fallback = '전환 실패') {
+  const bits = [];
+  if (json?.message) bits.push(json.message);
+  if (json?.error && json.error !== json.message) bits.push(json.error);
+  if (json?.detail) bits.push(`상세: ${json.detail}`);
+  if (Number.isFinite(json?.remainingDays)) bits.push(`남은일수: ${json.remainingDays}`);
+  return bits.length ? bits.join('\n') : fallback;
+}
 
 
 function normalizePhoneKR(raw, mode = 'intl') {
@@ -465,12 +510,43 @@ async function buildGateFromDb(userId, profile) {
 //오늘의 카운트 증가 갱신
 
 // 화면 갱신은 이 함수로만!
-function updateCountDisplayFromGate(gate) {
+// 기존 함수 덮어쓰기 (비동기로 변경)
+async function updateCountDisplayFromGate(gate) {
   const el = document.getElementById("count-display");
   if (!el) return;
 
   const total = Number(gate?.totalCount) || 0;
 
+  // 1) DB에서 오늘 사용/리밋을 직접 가져와서 계산 (진실 소스)
+  try {
+    const { data: { user } } = await window.supabaseClient.auth.getUser();
+    if (user) {
+      const { data: prof } = await window.supabaseClient
+        .from('profiles')
+        .select('daily_usage_count, daily_limit')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (prof) {
+        const used  = Math.max(0, Number(prof.daily_usage_count ?? 0));
+        const limit = Number(prof.daily_limit ?? 0);
+
+        if (!Number.isFinite(limit) || limit <= 0) {
+          el.textContent = `오늘 남은 횟수 (∞/∞) / 누적 총 ${total}회`;
+          return;
+        }
+
+        const remain = Math.max(0, limit - used);
+        el.textContent = `오늘 남은 횟수 (${remain}/${limit}) / 누적 총 ${total}회`;
+        return; // ✅ DB 기준으로 끝
+      }
+    }
+  } catch (e) {
+    // DB 조회 실패 시 아래 게이트 값으로 폴백
+    console.warn('[usage display] fallback to gate values:', e);
+  }
+
+  // 2) 폴백: 기존 gate 값 사용(예전 동작 유지)
   if (gate?.limit === Infinity || gate?.remaining === Infinity) {
     el.textContent = `오늘 남은 횟수 (∞/∞) / 누적 총 ${total}회`;
     return;
@@ -601,6 +677,7 @@ async function loadSajuHistory(userId, page = 1, search = "") {
         <tr>
           <th>이름</th>
           <th>생년월일</th>
+           <th>달력</th> <!-- ✅ 추가: 음력/양력 -->
           <th>성별</th>
           <th>등록일</th>
           <th>비고</th> <!-- ✅ 마지막 열 제목 -->
@@ -612,26 +689,40 @@ async function loadSajuHistory(userId, page = 1, search = "") {
 
   const tbody = tableContainer.querySelector("tbody");
 
-  data.forEach((record) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>
-<span class="saju-record-link"
-      data-id="${record.id}"
-      data-json='${JSON.stringify(record.input_json)}'
-      style="cursor:pointer; color:blue; text-decoration:underline;">
-  ${record.name}
-</span>
+data.forEach((record) => {
+  // ✅ 달력 표기 추출 (DB/JSON 어디에 있든 최대한 받아줌)
+  const calTypeRaw =
+    record.calendar_type ??
+    record.calendar ??
+    (typeof record.is_lunar === "boolean" ? (record.is_lunar ? "lunar" : "solar") : null) ??
+    (record.input_json?.calendar ??
+     record.input_json?.calendarType ??
+     (record.input_json?.isLunar ? "lunar" :
+      (record.input_json?.isSolar ? "solar" : null)));
 
+  const calLabel =
+    calTypeRaw === "lunar" || calTypeRaw === "음력" || calTypeRaw === "L" ? "음력" :
+    calTypeRaw === "solar" || calTypeRaw === "양력" || calTypeRaw === "S" ? "양력" :
+    ""; // 모르면 빈칸
 
-      </td>
-      <td>${record.birth_date}</td>
-      <td>${record.gender}</td>
-      <td>${new Date(record.created_at).toLocaleDateString()}</td>
-      <td><button class="delete-record-btn" data-id="${record.id}">삭제</button></td>
-    `;
-    tbody.appendChild(tr);
-  });
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td>
+      <span class="saju-record-link"
+            data-id="${record.id}"
+            data-json='${JSON.stringify(record.input_json)}'
+            style="cursor:pointer; color:blue; text-decoration:underline;">
+        ${record.name}
+      </span>
+    </td>
+    <td>${record.birth_date}</td>
+    <td>${calLabel}</td> <!-- ✅ 추가된 칼럼 값 -->
+    <td>${record.gender}</td>
+    <td>${new Date(record.created_at).toLocaleDateString()}</td>
+    <td><button class="delete-record-btn" data-id="${record.id}">삭제</button></td>
+  `;
+  tbody.appendChild(tr);
+});
 
 // ✅ 페이지네이션 계산
 const { count } = await window.supabaseClient
@@ -761,10 +852,84 @@ function openSignupModal() {
 }
 
 
+
+
 // ─── 전화 인증 모달 ───────────────────────────────────────────
-function openPhoneOtpModal() {
+
+
+async function openPhoneOtpModal() {
+  // ── 내부 유틸: 전화번호 가져오기 + 포맷
+  async function __fetchProfilePhone() {
+    try {
+      const { data: { user } } = await window.supabaseClient.auth.getUser();
+      if (!user) return "";
+      const { data: prof } = await window.supabaseClient
+        .from("profiles")
+        .select("phone")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      return prof?.phone || user.user_metadata?.phone || "";
+    } catch (e) {
+      console.warn("[OTP prefill] fetch error:", e);
+      return "";
+    }
+  }
+  function __formatKR(raw) {
+    const only = String(raw || "").replace(/\D+/g, "");
+    if (only.length === 11) return `${only.slice(0,3)}-${only.slice(3,7)}-${only.slice(7)}`;
+    if (only.length === 10) return `${only.slice(0,3)}-${only.slice(3,6)}-${only.slice(6)}`;
+    return only;
+  }
+  async function __prefillPhoneIntoModal() {
+    const el = document.getElementById("otp-phone");
+    if (!el) return;
+    // 이미 값이 있으면 덮어쓰지 않음
+    if (el.value && el.value.trim() !== "") return;
+    const raw = await __fetchProfilePhone();
+    if (!raw) return;
+ // 항상 toKRNational로 국내 하이픈 포맷화(+82 → 0 변환 포함)
+ const val = toKRNational(raw);
+    el.value = val;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  // +82, 공백/하이픈 섞인 입력 → 국내 하이픈 포맷으로
+function toKRNational(raw) {
+  let n = String(raw || "").replace(/\D+/g, ""); // 숫자만
+  if (n.startsWith("82")) n = "0" + n.slice(2);  // +82 → 0
+  // 11자리(010 모바일) → 3-4-4
+  if (n.length === 11) return `${n.slice(0,3)}-${n.slice(3,7)}-${n.slice(7)}`;
+  // 10자리: 서울(02)은 2-4-4, 그 외 3-3-4
+  if (n.length === 10 && n.startsWith("02")) return `${n.slice(0,2)}-${n.slice(2,6)}-${n.slice(6)}`;
+  if (n.length === 10) return `${n.slice(0,3)}-${n.slice(3,6)}-${n.slice(6)}`;
+  return n; // 그 외는 원본 숫자열 반환
+}
+
+// 파일 상단 util 근처에 추가 (내부 표준화 함수)
+function normalizePhoneKR(input, mode = "intl") {
+  let n = String(input || "").replace(/\D+/g, "");
+  if (mode === "intl") {
+    if (n.startsWith("82")) return `+${n}`;
+    if (n.startsWith("0"))  return `+82${n.slice(1)}`;
+    if (n.startsWith("+"))  return n;
+    return `+${n}`;
+  } else if (mode === "nat") {
+    if (n.startsWith("82")) n = "0" + n.slice(2);
+    if (n.length === 11) return `${n.slice(0,3)}-${n.slice(3,7)}-${n.slice(7)}`;
+    if (n.length === 10 && n.startsWith("02")) return `${n.slice(0,2)}-${n.slice(2,6)}-${n.slice(6)}`;
+    if (n.length === 10) return `${n.slice(0,3)}-${n.slice(3,6)}-${n.slice(6)}`;
+    return n;
+  }
+  return input;
+}
+
+
+  // ── 모달이 이미 있으면: 보여주고 → ★ 자동 채움도 시도
   if (document.getElementById("phone-otp-modal")) {
     document.getElementById("phone-otp-modal").style.display = "block";
+    // ★ [AUTO-PREFILL] 열릴 때마다 채움 시도
+    setTimeout(__prefillPhoneIntoModal, 0);
     return;
   }
 
@@ -805,153 +970,313 @@ function openPhoneOtpModal() {
   modal.appendChild(panel);
   document.body.appendChild(modal);
 
+  // ★ [AUTO-PREFILL] 새 모달 생성 직후에도 자동 채움
+  setTimeout(__prefillPhoneIntoModal, 0);
+
   // 닫기
   document.getElementById("otp-close").onclick = () => {
     modal.style.display = "none";
   };
 
-  // 코드 받기
-// 코드 받기 ✅ 우리 API로 저장 → otp_codes에 insert됨
-document.getElementById("otp-send").onclick = async () => {
-  const raw = document.getElementById("otp-phone").value.trim();
-  if (!raw) return alert("전화번호를 입력하세요.");
-  const phone = window.normalizePhoneKR(raw, "intl"); // +82 국제포맷
+// ───────────────────────────────────────────────
+// 보조 유틸: 한국 번호 → E.164(+82) 표준화
+function toE164KR(raw) {
+  const digits = String(raw || "").replace(/\D+/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("82")) return `+${digits}`;     // 82XXXXXXXXXX
+  if (digits.startsWith("0"))  return `+82${digits.slice(1)}`; // 0XXXXXXXXXX
+  if (digits.startsWith("+"))  return digits;           // 이미 + 포함
+  return `+${digits}`;                                  // 최후 보정
+}
+// ───────────────────────────────────────────────
+
+// 코드 받기
+document.getElementById("otp-send").onclick = async (e) => {
+  const btn = e.currentTarget;
+  if (btn.disabled) return;     // 중복 클릭 방지
+  btn.disabled = true;
 
   try {
+    // 1) 입력칸에서 먼저 가져오고, 없으면 프로필에서 끌어와 자동 채움
+    let raw = (document.getElementById("otp-phone").value || "").trim();
+    if (!raw) {
+      raw = await __fetchProfilePhone();
+      if (raw) {
+        const nat = toKRNational(raw); // 기존 네 함수 유지
+        document.getElementById("otp-phone").value = nat;
+        raw = nat;
+      }
+    }
+    if (!raw) {
+      alert("전화번호를 입력하세요.");
+      return;
+    }
+
+    // 2) 서버에는 국제 포맷(E.164)으로 전송
+    const phone = toE164KR(raw);
+    if (!phone) {
+      alert("유효한 전화번호 형식이 아닙니다.");
+      return;
+    }
+
     const res = await fetch("/api/otp?action=send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone })
     });
-    const txt = await res.text();
-    let data = null; try { data = JSON.parse(txt); } catch {}
+
+    const text = await res.text();
+    let data = null; try { data = JSON.parse(text); } catch {}
+
     if (!res.ok || !data?.ok) {
-      throw new Error(data?.error || data?.details || txt || `HTTP ${res.status}`);
+      const msg = data?.error || data?.details || text || `HTTP ${res.status}`;
+      throw new Error(msg);
     }
 
-    // OTP_DEBUG=true면 code가 함께 옵니다(서버 설정에 따라 다름)
     if (data.code) console.log("[DEV] 인증 코드:", data.code);
     alert("인증 코드가 발송되었습니다. (개발중이면 콘솔에서 코드 확인)");
   } catch (err) {
     console.error("[OTP send] error:", err);
-    alert(err.message || "인증 코드를 보낼 수 없습니다.");
+    alert(err?.message || "인증 코드를 보낼 수 없습니다.");
+  } finally {
+    btn.disabled = false;
   }
 };
 
-
-// ✅ 인증하기 (드롭인 교체)
-document.getElementById("otp-verify").onclick = async () => {
-  const raw  = document.getElementById("otp-phone").value.trim();
-  const token = document.getElementById("otp-code").value.trim();
-  if (!raw || !token) return alert("전화번호와 인증 코드를 입력하세요.");
-
-  // postJSON/normalizePhoneKR 존재 확인(없으면 바로 원인 파악)
-  if (typeof window.postJSON !== "function") {
-    console.error("[OTP verify] postJSON is not defined");
-    return alert("내부 오류: postJSON 미정의");
-  }
-  if (typeof window.normalizePhoneKR !== "function") {
-    console.error("[OTP verify] normalizePhoneKR is not defined");
-    return alert("내부 오류: 전화번호 정규화 함수 미정의");
-  }
-
-  const phone = window.normalizePhoneKR(raw, "intl"); // +82 포맷
+// 인증하기
+document.getElementById("otp-verify").onclick = async (e) => {
+  const btn = e.currentTarget;
+  if (btn.disabled) return;     // 중복 클릭 방지
+  btn.disabled = true;
 
   try {
-    // 1) 로그인 체크
-    const { data: { user } } = await window.supabaseClient.auth.getUser();
-    if (!user) return alert("로그인 후 인증 가능합니다.");
+    const raw   = (document.getElementById("otp-phone").value || "").trim();
+    const token = (document.getElementById("otp-code").value  || "").trim();
+    if (!raw || !token) {
+      alert("전화번호와 인증 코드를 입력하세요.");
+      return;
+    }
 
-    // 2) 서버 검증(커스텀 OTP)
+    // postJSON 가드
+    if (typeof window.postJSON !== "function") {
+      console.error("[OTP verify] postJSON is not defined");
+      alert("내부 오류: postJSON 미정의");
+      return;
+    }
+
+    const phone = (typeof window.normalizePhoneKR === "function")
+      ? window.normalizePhoneKR(raw, "intl")
+      : toE164KR(raw);
+
+    const { data: { user } } = await window.supabaseClient.auth.getUser();
+    if (!user) {
+      alert("로그인 후 인증 가능합니다.");
+      return;
+    }
+
     const { status, json, text } = await postJSON("/api/otp?action=verify", {
       phone,
-      code: token,      // 서버는 'code' 필드를 기대
-      user_id: user.id  // profiles 업데이트용
+      code: token,
+      user_id: user.id
     });
 
     const ok = (status === 200) && json?.ok && json?.verified;
     if (!ok) {
-     console.error("[OTP verify] fail:", { status, json, text });
-     alert("인증 실패: " + (json?.error || json?.details || text || `HTTP ${status}`));
+      console.error("[OTP verify] fail:", { status, json, text });
+      alert("인증 실패: " + (json?.error || json?.details || text || `HTTP ${status}`));
       return;
     }
 
+    alert("전화번호 인증이 완료되었습니다!");
+    modal.style.display = "none";
 
-    // 3) 성공 처리
-// 3) 성공 처리
-alert("전화번호 인증이 완료되었습니다!");
-const modalEl = document.getElementById("phone-otp-modal");
-if (modalEl) modalEl.style.display = "none";
+    await window.supabaseClient
+      .from("profiles")
+      .update({
+        phone_verified: true,
+        phone_verified_at: new Date().toISOString(),
+      })
+      .eq("user_id", user.id);
 
-// ✅ 인증 성공 시 시각 저장
-await window.supabaseClient
-  .from("profiles")
-  .update({
-    phone_verified: true,
-    phone_verified_at: new Date().toISOString(),
-  })
-  .eq("user_id", user.id);
+    if (typeof window.openSubscriptionModal === "function") {
+      window.openSubscriptionModal();
+    } else {
+      const subModal = document.getElementById("subscriptionModal");
+      if (subModal) subModal.style.display = "block";
+    }
 
-
-// ✅ index.html의 결제 모달 표시
-// ✅ 정기구독 모달을 즉시 렌더링(빈칸 방지)
-if (typeof window.openSubscriptionModal === "function") {
-  window.openSubscriptionModal();
-} else {
-  // (혹시 함수가 아직 로드 전이면 최소한 열어두기)
-  const subModal = document.getElementById("subscriptionModal");
-  if (subModal) subModal.style.display = "block";
-}
-
-
-    // 4) UI 갱신
     const { data: { session } } = await window.supabaseClient.auth.getSession();
     updateAuthUI(session);
 
-} catch (err) {
-  console.error("[OTP verify] catch:", err);
+  } catch (err) {
+    console.error("[OTP verify] catch:", err);
+    try {
+      const phoneIntl = (typeof window.normalizePhoneKR === "function")
+        ? window.normalizePhoneKR(document.getElementById("otp-phone").value.trim(), "intl")
+        : toE164KR(document.getElementById("otp-phone").value.trim());
 
-  // 1) 서버가 상세 코드를 안줘도, 프로필에 같은 번호가 있는지 직접 확인하여 사용자 메시지 보정
-  try {
-    const phoneRaw = document.getElementById("otp-phone")?.value?.trim() || "";
-    const phoneIntl = window.normalizePhoneKR ? window.normalizePhoneKR(phoneRaw, "intl") : phoneRaw;
+      const { data: me } = await window.supabaseClient.auth.getUser();
+      const myId = me?.user?.id || null;
 
-    const { data: me } = await window.supabaseClient.auth.getUser();
-    const myId = me?.user?.id || null;
+      const { data: dup } = await window.supabaseClient
+        .from("profiles")
+        .select("user_id")
+        .eq("phone", phoneIntl)
+        .neq("user_id", myId)
+        .maybeSingle();
 
-    const { data: dup } = await window.supabaseClient
-      .from("profiles")
-      .select("user_id")
-      .eq("phone", phoneIntl)
-      .neq("user_id", myId)
-      .maybeSingle();
+      if (dup) {
+        alert("이미 존재하는 번호입니다.\n다른 번호를 입력하거나, 해당 번호로 가입된 계정으로 로그인해 주세요.");
+        return;
+      }
+    } catch (_) {}
 
-    if (dup) {
-      alert("이미 존재하는 번호입니다.\n다른 번호를 입력하거나, 해당 번호로 가입된 계정으로 로그인해 주세요.");
-      return;
-    }
-  } catch (probeErr) {
-    console.warn("[OTP verify] duplicate probe failed:", probeErr);
+    const rawMsg = `${err?.message || ''} ${err?.text || ''} ${err?.json?.error || ''} ${err?.json?.details || ''}`.trim();
+    alert(`인증 실패: ${rawMsg || '서버 오류'}`);
+  } finally {
+    btn.disabled = false;
   }
+};
 
-  // 2) 위 보정이 안 되면, 서버가 준 정보를 최대한 합쳐서 안내
-  const raw = `${err?.message || ''} ${err?.text || ''} ${err?.json?.error || ''} ${err?.json?.details || ''}`.trim();
-  alert(`인증 실패: ${raw || '서버 오류'}`);
 }
 
-}; // ← 여기서 onclick 핸들러를 세미콜론으로 닫아야 함
-}   
 
+// ✅ 전화인증 모달 열릴 때 DB 전화번호 자동 채우기 (드롭인 패치)
+// ✅ 전화인증 모달: DB 전화번호 자동 채우기(견고 버전)
+// - 모달 DOM 렌더 타이밍 이슈 대응 (MutationObserver + 타임아웃 폴백)
+// - 셀렉터 여러개 트라이
+// - 이미 패치된 경우 중복 방지
+(function () {
+  if (window.__otpPrefillPatched2) return;
+  window.__otpPrefillPatched2 = true;
 
-//구글정기결제창
-
-window.startGoogleSubscription = function() {
-  if (window.AndroidApp) {
-    window.AndroidApp.startGoogleSubscription(); // 앱 내부 결제 호출
-    return;
+  // ── 유틸: 숫자만 추출 + 보기 좋은 포맷(11자리면 010-0000-0000)
+  function formatPhone(raw) {
+    const only = String(raw || "").replace(/\D+/g, "");
+    if (only.length === 11) return `${only.slice(0,3)}-${only.slice(3,7)}-${only.slice(7)}`;
+    return only;
   }
-  window.open("pay/google?plan=monthly", "_blank", "width=480,height=720");
-};
+
+  async function fetchUserPhone() {
+    try {
+      const { data: { user } } = await window.supabaseClient.auth.getUser();
+      if (!user) return "";
+      // profiles.phone 우선
+      const { data: prof } = await window.supabaseClient
+        .from("profiles")
+        .select("phone")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      return prof?.phone || user.user_metadata?.phone || "";
+    } catch (e) {
+      console.warn("[otp prefill] fetchUserPhone error:", e);
+      return "";
+    }
+  }
+
+  // ── 입력칸 찾기 시도 (모달 내부 렌더 완료를 기다리며)
+  function findPhoneInput() {
+    const CANDIDATES = [
+      "#otpPhoneInput",
+      'input[name="phone"]',
+      'input[type="tel"]',
+      '.otp-phone input',
+      '.phone-input input',
+      '.phone input',
+    ];
+    for (const sel of CANDIDATES) {
+      const el = document.querySelector(sel);
+      if (el) return el;
+    }
+    return null;
+  }
+
+  async function prefillWhenReady(value) {
+    // 1) 즉시 시도
+    let input = findPhoneInput();
+    if (input) {
+      input.value = value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      try { input.selectionStart = input.selectionEnd = input.value.length; } catch {}
+      return true;
+    }
+
+    // 2) MutationObserver로 3초 동안 기다리기
+    const done = await new Promise((resolve) => {
+      let resolved = false;
+      const obs = new MutationObserver(() => {
+        const el = findPhoneInput();
+        if (el) {
+          el.value = value;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+          try { el.selectionStart = el.selectionEnd = el.value.length; } catch {}
+          resolved = true;
+          obs.disconnect();
+          resolve(true);
+        }
+      });
+      obs.observe(document.documentElement, { childList: true, subtree: true });
+
+      // 3초 타임아웃 폴백
+      setTimeout(() => {
+        if (!resolved) {
+          obs.disconnect();
+          resolve(false);
+        }
+      }, 3000);
+    });
+
+    // 3) 폴백: 0.5초 간격 2초 추가 폴링
+    if (!done) {
+      const end = Date.now() + 2000;
+      while (Date.now() < end) {
+        await new Promise(r => setTimeout(r, 500));
+        const el = findPhoneInput();
+        if (el) {
+          el.value = value;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+          try { el.selectionStart = el.selectionEnd = el.value.length; } catch {}
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // ── 원본 래핑
+  const originalOpen = window.openPhoneOtpModal;
+  window.openPhoneOtpModal = async function (...args) {
+    // 원본 먼저 호출(모달 열림)
+    const ret = typeof originalOpen === "function" ? originalOpen.apply(this, args) : undefined;
+
+    try {
+      const raw = await fetchUserPhone();
+      const formatted = formatPhone(raw);
+      if (!formatted) return ret;
+
+      // 모달 DOM이 그려질 시간을 한 틱 줌
+      await new Promise(r => setTimeout(r, 0));
+      const ok = await prefillWhenReady(formatted);
+      if (!ok) console.warn("[otp prefill] 입력칸을 찾지 못했습니다. 셀렉터 확인 필요");
+    } catch (e) {
+      console.warn("[otp prefill] failed:", e);
+    }
+    return ret;
+  };
+
+  // 수동 테스트용(원할 때 호출)
+  window.__testOtpPrefill = async () => {
+    const raw = await fetchUserPhone();
+    const formatted = formatPhone(raw);
+    const ok = await prefillWhenReady(formatted);
+    console.log("[__testOtpPrefill]", { raw, formatted, ok });
+  };
+})();
+
+
 
 
 
@@ -1071,7 +1396,7 @@ async function startFixedTermPay({ months, amount, productId, dailyLimit = 60 })
 
     // 5) 서버에 활성화 요청 (검증 + 기간부여)
     try {
-      const res = await fetch("/api/payment/fixed-activate", {
+      const res = await fetch("/api/payment/manage-subscription?action=activate_fixed", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1098,6 +1423,7 @@ async function startFixedTermPay({ months, amount, productId, dailyLimit = 60 })
   });
 }
 
+
 // 버튼 핸들러 (이미 바인딩되어 있으니 함수만 존재하면 됩니다)
 // ★ 전역에 올려서 어디서든 호출 가능하게
 window.startThreeMonthPlan = function () {
@@ -1109,27 +1435,352 @@ window.startSixMonthPlan = function () {
 
 
 
+// 결제수단 선택 모달
+
+// ───────────────────────────────────────────────
+// 카카오 진입 지점만 선택창을 중간에 끼우는 최소 패치
+// (기존 버튼/화면은 손대지 않음)
+// ───────────────────────────────────────────────
+
+
+
+
+
+
+
+// ───────────────────────────────────────────────────────────
+// INICIS(이니시스) - PortOne(아임포트) 결제 모듈 (라우트 불필요)
+//  - 정기결제: startInicisSubscription('basic'|'plus')
+//  - 선결제(3/6개월): startInicisThreeMonthPlan(), startInicisSixMonthPlan()
+// ───────────────────────────────────────────────────────────
+
+// ───────────────────────────────────────────────────────────
+// INICIS(이니시스) - PortOne(아임포트) 결제 모듈 (라우트 불필요)
+//  - 정기결제: startInicisSubscription('basic'|'plus')
+//  - 선결제(3/6개월): startInicisThreeMonthPlan(), startInicisSixMonthPlan()
+//  - 변경점: 결제 성공 시 서버로 receipt_hint(영수증 힌트) 함께 전달
+// ───────────────────────────────────────────────────────────
+(function () {
+  // ====== 환경 스위치 ======
+  const USE_TEST = true; // ← 운영 전환 시 false 로 변경
+
+  // 테스트 MID
+  const PG_ONETIME_TEST   = "html5_inicis.INIpayTest"; // 단건(일반)
+  const PG_RECURRING_TEST = "html5_inicis.INIBillTst"; // 정기(빌링)
+
+  // 운영 MID (필요 시 교체)
+  const PG_ONETIME_PROD   = "html5_inicis.MOI9890153";    // 일반(예시)
+  const PG_RECURRING_PROD = "html5_inicis.MOI0760015"; // 정기(빌링) MID 입력
+
+  const PG = {
+    onetime:   USE_TEST ? PG_ONETIME_TEST   : PG_ONETIME_PROD,
+    recurring: USE_TEST ? PG_RECURRING_TEST : PG_RECURRING_PROD,
+  };
+
+  const IMP_CODE = "imp81444885"; // ← 본인 프로젝트 imp 코드로 교체
+
+  // 중복 클릭 방지
+  let __inicisLock = false;
+  function withLock(fn) {
+    return async (...args) => {
+      if (__inicisLock) return;
+      __inicisLock = true;
+      try { return await fn(...args); }
+      finally { __inicisLock = false; }
+    };
+  }
+
+  function ensureIMP() {
+    if (!window.IMP || typeof window.IMP.init !== "function") {
+      alert("결제 모듈이 로드되지 않았습니다. 잠시 후 다시 시도해 주세요.");
+      throw new Error("IMP not loaded");
+    }
+    const IMP = window.IMP;
+    try { IMP.init(IMP_CODE); } catch (_) {}
+    return IMP;
+  }
+
+  function normalizeTel(tel) {
+    if (!tel) return "01012345678";
+    const only = String(tel).replace(/\D+/g, "");
+    return only || "01012345678";
+  }
+
+  async function postJSON(url, body) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data };
+  }
+
+  /**
+   * 공통 결제 요청
+   * - PortOne 콜백(rsp)에서 가능한 한 많은 필드를 수집해 receipt_hint로 반환
+   */
+  async function requestPayInicis({ name, amount, merchant_uid, customer_uid }) {
+    const { data: { user } } = await window.supabaseClient.auth.getUser();
+    if (!user) throw new Error("로그인이 필요합니다.");
+
+    const IMP = ensureIMP();
+
+    // customer_uid 있으면 정기(빌링), 없으면 단건
+    const pgToUse = customer_uid ? PG.recurring : PG.onetime;
+    console.log(`[INICIS] MODE=${USE_TEST ? "TEST" : "PROD"} PG=${pgToUse}`);
+
+    const payload = {
+      pg: pgToUse,
+      pay_method: "card",
+      merchant_uid,
+      name,
+      amount: Number(amount),
+      buyer_email: user.email || "user@example.com",
+      buyer_name: user.user_metadata?.name || "홍길동",
+      buyer_tel: normalizeTel(user.user_metadata?.phone),
+      m_redirect_url: location.origin + "/payment/complete",
+    };
+    if (customer_uid) payload.customer_uid = customer_uid;
+
+    return new Promise((resolve) => {
+      IMP.request_pay(payload, (rsp) => {
+        console.log("[INICIS rsp]", rsp);
+        if (!rsp || !rsp.success) {
+          return resolve({ ok: false, error: rsp?.error_msg || "결제 실패", rsp });
+        }
+
+        // 프론트에서 알고 있는 최소/안전값 수집 (서버 검증으로 최종 확정)
+        const receipt_hint = {
+          provider: "inicis",
+          kind: customer_uid ? "recurring_start" : "fixed",
+          amount: Number(rsp.paid_amount ?? payload.amount),
+          price: Number(rsp.paid_amount ?? payload.amount),
+          imp_uid: rsp.imp_uid || null,
+          merchant_uid: rsp.merchant_uid || merchant_uid || null,
+          customer_uid: customer_uid || null,
+          pay_method: rsp.pay_method || "card",
+          pg_provider: rsp.pg_provider || "inicis",
+          pg_tid: rsp.pg_tid || rsp.apply_num || null,   // 없을 수도 있음
+          paid_at_unix: typeof rsp.paid_at === "number" ? rsp.paid_at : null, // 없으면 서버 검증에서 보완
+          at: new Date().toISOString(),
+        };
+
+        resolve({ ok: true, rsp, receipt_hint });
+      });
+    });
+  }
+
+  // ───────── 정기결제 시작 ─────────
+  async function _startInicisSubscription(tier = "basic") {
+    const { data: { user } } = await window.supabaseClient.auth.getUser();
+    if (!user) return alert("로그인이 필요합니다.");
+
+    const PLAN = {
+      basic: { amount: 11000, daily_limit: 60,  name: "INICIS 정기구독 (월간)",  planId: "recurring_monthly_60" },
+      plus:  { amount: 16500, daily_limit: 150, name: "INICIS 정기구독+ (월간)", planId: "recurring_monthly_150" },
+    };
+    const sel = PLAN[tier] || PLAN.basic;
+
+    const customerUid = `inicis_${user.id}_${tier}`;
+    const merchantUid = `inicis_subs_${tier}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+    const res = await requestPayInicis({
+      name: sel.name,
+      amount: sel.amount,
+      merchant_uid: merchantUid,
+      customer_uid: customerUid,
+    });
+
+    if (!res.ok) return alert("❌ 결제 실패: " + res.error);
+    alert("결제 성공 🎉\n결제번호: " + res.rsp.imp_uid);
+
+    // 서버에 등록(+ receipt_hint 전달)
+    const r = await postJSON("/api/payment/manage-subscription?action=register", {
+      provider: "inicis",
+      imp_uid: res.rsp.imp_uid,
+      customer_uid: res.rsp.customer_uid || customerUid,
+      user_id: user.id,
+      tier,
+      planId: sel.planId,
+      price: sel.amount,
+      daily_limit: sel.daily_limit,
+      receipt_hint: res.receipt_hint || null, // ★ 추가
+    });
+    if (!r.ok) return alert("❌ 서버 등록 실패: " + (r.data.error || r.status));
+
+    alert("✅ 정기결제 등록 및 프리미엄 등급 적용 완료");
+    setTimeout(() => location.reload(), 300);
+  }
+
+  window.startInicisSubscription = withLock(_startInicisSubscription);
+  window.startInicisSubscriptionBasic = () => window.startInicisSubscription("basic");
+  window.startInicisSubscriptionPlus  = () => window.startInicisSubscription("plus");
+
+  // ───────── 3/6개월 선결제 ─────────
+  async function _startInicisFixedTermPay({ months, amount, productId, dailyLimit = 60 }) {
+    const { data: { user } } = await window.supabaseClient.auth.getUser();
+    if (!user) return alert("로그인이 필요합니다.");
+
+    const merchantUid = `inicis_fixed_${months}m_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+    const res = await requestPayInicis({
+      name: `INICIS ${months}개월 구독 (일 ${dailyLimit}회)`,
+      amount,
+      merchant_uid: merchantUid,
+    });
+
+    if (!res.ok) return alert("❌ 결제 실패: " + res.error);
+
+    // 서버 활성화(+ receipt_hint 전달)
+    const r = await postJSON("/api/payment/manage-subscription?action=activate_fixed", {
+      provider: "inicis",
+      imp_uid: res.rsp.imp_uid,
+      merchant_uid: res.rsp.merchant_uid,
+      user_id: user.id,
+      productId,
+      termMonths: months,
+      dailyLimit,
+      price: amount,
+      receipt_hint: res.receipt_hint || null, // ★ 추가
+    });
+    if (!r.ok) return alert("❌ 서버 처리 실패: " + (r.data.error || r.status));
+
+    alert("✅ 결제가 완료되었습니다. 구독이 활성화됐어요!");
+    setTimeout(() => location.reload(), 300);
+  }
+
+  window.startInicisThreeMonthPlan = withLock(() =>
+    _startInicisFixedTermPay({ months: 3, amount: 60000, productId: "sub_3m_60_60000", dailyLimit: 60 })
+  );
+  window.startInicisSixMonthPlan = withLock(() =>
+    _startInicisFixedTermPay({ months: 6, amount: 100000, productId: "sub_6m_60_100000", dailyLimit: 60 })
+  );
+})();
+
+
+
+
+
+
+// ─── 로그인된 유저가 전화 인증 필요하면 모달을 띄우는 검사 ───
+// 기존 함수 덮어쓰기(리턴값 추가: true/false)
+// ✅ 전화인증 가드: 인증 OK면 true, 모달 띄우면 false 반환
+// ✅ 전화인증 가드: 인증 OK면 true, 모달 띄우면 false
+// daysValid: 인증 유효일수(기본 3일). 테스트로 항상 모달 띄우려면 daysValid=0 로 호출.
+// ✅ 전화번호 인증 유효기간: 시간 단위 (기본 1시간)
+window.requirePhoneVerificationIfNeeded = async function(daysValid = 3) {
+  try {
+    const { data: { user } } = await window.supabaseClient.auth.getUser();
+    if (!user) { openPhoneOtpModal?.(); return false; }
+
+    const { data: prof, error } = await window.supabaseClient
+      .from("profiles")
+      .select("phone_verified, phone_verified_at")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      console.warn("[requirePhoneVerificationIfNeeded] profiles 조회 오류:", error); // ← 여기 꼭 찍어보세요
+      openPhoneOtpModal?.();
+      return false;
+    }
+
+    const isFlagTrue = prof?.phone_verified === true;     // 플래그 우선
+    if (isFlagTrue) return true;          // ✅ 전화인증 플래그가 true면 기간 무시하고 바로 통과
+// ✅ 플래그가 false면 기간과 무관하게 즉시 모달
+if (!isFlagTrue) {
+  typeof openPhoneOtpModal === "function" ? openPhoneOtpModal() : alert("전화 인증이 필요합니다.");
+  return false;
+}
+    const ts = prof?.phone_verified_at ? new Date(prof.phone_verified_at).getTime() : 0;
+    const validMs = Math.max(0, daysValid) * 24 * 60 * 60 * 1000;
+    const isWithinWindow = daysValid > 0 && ts > 0 && (Date.now() - ts) <= validMs;
+
+    const ok = isFlagTrue || isWithinWindow;
+    if (!ok) { openPhoneOtpModal?.(); return false; }
+    return true;
+  } catch (e) {
+    console.warn("[requirePhoneVerificationIfNeeded] 예외:", e);
+    openPhoneOtpModal?.();
+    return false;
+  }
+};
+
+
+
 
 
 
 // ✅ 정기구독 버튼 클릭 시
 // 전역: 자동 닫힘 타이머(있으면 유지)
+
+
+
+
 window.__subModalTimer = window.__subModalTimer || null;
 
 window.openSubscriptionModal = async function () {
   const { data: { user } } = await window.supabaseClient.auth.getUser();
   if (!user) return alert("로그인이 필요합니다.");
+  // ★ 추가: 결제 모달 열기 전, 휴대폰 인증 유효성 검사
+
+  // ─────────────────────────────────────────────────────────────
+  // [NEW] 플랜 메타: 타입(onetime/subs), 코드, 금액
+  const PLANS = {
+    "3m":  { type: "onetime", plan_code: "premium3",       amount: 60000,  label: "3개월 구독" },
+    "6m":  { type: "onetime", plan_code: "premium6",       amount: 100000, label: "6개월 구독" },
+    "rb":  { type: "subs",    plan_code: "premium",        amount: 11000,  label: "정기구독(기본)" },
+    "rp":  { type: "subs",    plan_code: "premium_plus",   amount: 16500,  label: "정기구독+" },
+  };
+  let __pendingChoice = null; // { planKey }
+
+  function msLeftUntil(endDate) {
+    if (!endDate) return Infinity;
+    return Math.max(0, new Date(endDate).getTime() - Date.now());
+  }
+function formatRemaining(endDate) {
+  const ms = msLeftUntil(endDate);
+  if (!Number.isFinite(ms)) return '-';
+  if (ms <= 0) return '0';
+
+  const ONE_DAY = 24 * 60 * 60 * 1000;
+
+  // 일 단위 표기는 기존 로직 유지 (반올림은 그대로)
+  if (ms >= ONE_DAY) {
+    const days = Math.ceil(ms / ONE_DAY);
+    return `${days}일`;
+  }
+
+  // ⏱ 분/시간 계산: floor로 정확히 자르고, 1분 미만은 별도 표기
+  const totalMins = Math.floor(ms / 60000);
+  if (totalMins <= 0) return '1분 미만';
+
+  const hours = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
+
+  if (hours === 0) return `${totalMins}분`;
+  if (mins === 0)  return `${hours}시간`;
+  return `${hours}시간 ${mins}분`;
+}
+
+  function formatKSTDate(dateLike) {
+    const d = new Date(dateLike);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleString('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+    });
+  }
 
   const modal = document.getElementById("subscriptionModal");
   if (!modal) return;
 
-  // ── 공통: 닫기 ───────────────────────────────────────────────
   const close = () => {
     modal.style.display = "none";
     if (window.__subModalTimer) { clearTimeout(window.__subModalTimer); window.__subModalTimer = null; }
   };
 
-  // 최초 플레이스홀더
   modal.style.display = "block";
   modal.innerHTML = `
     <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:520px; margin:0 auto;">
@@ -1138,7 +1789,6 @@ window.openSubscriptionModal = async function () {
     </div>
   `;
 
-  // ESC / 바깥 클릭 닫기(중복 방지)
   if (!modal.__outsideCloseBound) {
     modal.addEventListener("mousedown", (e) => {
       const panel = modal.querySelector(".modal-panel") || modal.firstElementChild || null;
@@ -1151,185 +1801,423 @@ window.openSubscriptionModal = async function () {
     window.__subEscBound = true;
   }
 
-  // ── 결제 선택 화면(미보유/비활성) ───────────────────────────
+  // ─────────────────────────────────────────────────────────────
+  // [NEW] 결제수단 선택 미니 모달 생성/열기/닫기
+  function ensureGatewayChooser() {
+    if (document.getElementById("gwChooser")) return;
+    const wrap = document.createElement("div");
+    wrap.id = "gwChooser";
+    wrap.style.cssText = `
+      display:none; position:fixed; inset:0; z-index:9999;
+      background:rgba(0,0,0,0.35);
+      align-items:center; justify-content:center;
+    `;
+    wrap.innerHTML = `
+      <div class="gw-card" style="background:#fff; border-radius:10px; padding:16px; width:min(360px, 92vw); box-shadow:0 10px 30px rgba(0,0,0,.15);">
+        <h4 style="margin:0 0 8px; font-size:18px;">결제수단 선택</h4>
+        <p id="gwDesc" style="margin:0 0 12px; font-size:13px; color:#555;"></p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="gwBtnInicis" class="btn-outline" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:8px 12px;">이니시스 (카드/계좌)</button>
+          <button id="gwBtnKakao"  class="btn-success" style="border-radius:6px; padding:8px 12px;">카카오페이 간편결제</button>
+          <button id="gwBtnClose"  class="btn-ghost"   style="border:1px solid #eee; background:#f5f5f5; border-radius:6px; padding:8px 12px;">취소</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(wrap);
+
+    // 닫기
+    wrap.addEventListener("mousedown", (e) => {
+      const card = wrap.querySelector(".gw-card");
+      if (card && !card.contains(e.target)) closeGatewayChooser();
+    });
+    document.getElementById("gwBtnClose").addEventListener("click", closeGatewayChooser);
+
+    // 이니시스 분기
+    // 이니시스 버튼 클릭 시: 라우트 호출(x) → PortOne 함수 직접 호출(o)
+document.getElementById("gwBtnInicis").addEventListener("click", () => {
+  if (!__pendingChoice) return;
+  const key = __pendingChoice.planKey;
+
+  try {
+    switch (key) {
+      case "3m":
+        (window.startInicisThreeMonthPlan || startInicisThreeMonthPlan)();
+        break;
+      case "6m":
+        (window.startInicisSixMonthPlan || startInicisSixMonthPlan)();
+        break;
+      case "rb":
+        (window.startInicisSubscriptionBasic || startInicisSubscriptionBasic)();
+        break;
+      case "rp":
+        (window.startInicisSubscriptionPlus || startInicisSubscriptionPlus)();
+        break;
+      default:
+        alert("선택한 플랜을 찾을 수 없습니다.");
+    }
+  } finally {
+    closeGatewayChooser();
+  }
+});
+
+
+    // 카카오 분기(기존 함수 재사용)
+    document.getElementById("gwBtnKakao").addEventListener("click", async () => {
+      if (!__pendingChoice) return;
+      const { planKey } = __pendingChoice;
+      try {
+        if (planKey === "3m") {
+          (window.startThreeMonthPlan || startThreeMonthPlan)();
+        } else if (planKey === "6m") {
+          (window.startSixMonthPlan || startSixMonthPlan)();
+        } else if (planKey === "rb") {
+          (window.startKakaoSubscriptionBasic || startKakaoSubscriptionBasic)();
+        } else if (planKey === "rp") {
+          (window.startKakaoSubscriptionPlus || startKakaoSubscriptionPlus)();
+        }
+      } finally {
+        closeGatewayChooser();
+      }
+    });
+  }
+  function openGatewayChooser(planKey) {
+    ensureGatewayChooser();
+    __pendingChoice = { planKey };
+    const meta = PLANS[planKey];
+    const desc = document.getElementById("gwDesc");
+    if (desc) desc.textContent = `${meta.label} - 결제수단을 선택하세요.`;
+    const layer = document.getElementById("gwChooser");
+    if (layer) layer.style.display = "flex";
+  }
+  function closeGatewayChooser() {
+    __pendingChoice = null;
+    const layer = document.getElementById("gwChooser");
+    if (layer) layer.style.display = "none";
+  }
+  // ─────────────────────────────────────────────────────────────
+
   function renderPurchaseChoices() {
     modal.innerHTML = `
-      <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:520px; margin:0 auto;">
-        <h3 style="margin:0 0 8px;">구독 결제</h3>
-        <p style="margin:0 0 12px;">전화번호 인증이 완료되었습니다. 상품을 선택해 결제하세요.</p>
+      <style>
+        .modal-panel{
+          background:#fff; border-radius:10px; padding:16px; max-width:520px; margin:0 auto;
+          font-size:16px; line-height:1.55; -webkit-text-size-adjust:100%;
+        }
+        .modal-panel h3{ margin:0 0 8px; font-size:20px; }
+        .modal-panel p{  margin:0 0 12px; font-size:14px; }
+        .modal-panel .plan{ background:#f9fafb; border:1px solid #eee; border-radius:8px; padding:12px; margin-bottom:12px; }
+        .modal-panel ul{ margin:0; padding-left:18px; line-height:1.6; }
+        .modal-panel li{ font-size:14px; }
+        @media (max-width:480px){
+          .modal-panel{ max-width:94vw; padding:14px; font-size:14px; }
+          .modal-panel h3{ font-size:18px; }
+          .modal-panel p, .modal-panel li{ font-size:13px; }
+        }
+        @media (max-width:360px){
+          .modal-panel{ padding:12px; font-size:13px; }
+          .modal-panel h3{ font-size:16px; }
+          .modal-panel p, .modal-panel li{ font-size:12px; }
+        }
+      </style>
+      <div class="modal-panel">
+        <h3>구독 결제</h3>
+        <p>전화번호 인증이 완료되었습니다. 상품을 선택하여 결제하세요.</p>
 
-        <div style="background:#f9fafb; border:1px solid #eee; border-radius:8px; padding:12px; margin-bottom:12px;">
-          <ul style="margin:0; padding-left:18px; line-height:1.6;">
-            <li><strong>3개월 구독</strong>: 1일 60회 · <strong>3개월간 60,000원</strong></li>
-            <li><strong>6개월 구독</strong>: 1일 60회 · <strong>6개월간 100,000원</strong></li>
-            <li><strong>정기구독</strong> (기본): 1일 60회 · <strong>월 11,000원</strong></li>
-            <li><strong>정기구독+</strong> (플러스): 1일 150회 · <strong>월 16,500원</strong></li>
+        <div class="plan">
+          <ul>
+            <li><strong>3개월 일반 결제</strong>: 1일 60회 · <strong>3개월간 60,000원[일시불]</strong></li>
+            <li><strong>6개월 일반 결제</strong>: 1일 60회 · <strong>6개월간 100,000원[일시불]</strong></li>
+            <li><strong>프리미엄 정기구독 결제</strong> (기본): 1일 60회 · <strong>월 11,000원</strong></li>
+            <li><strong>프리미엄+ 정기구독 결제</strong> (플러스): 1일 150회 · <strong>월 16,500원</strong></li>
           </ul>
         </div>
 
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <button class="btn-success" id="btn3m">3개월 구독 결제</button>
-          <button class="btn-success" id="btn6m">6개월 구독 결제</button>
-          <button class="btn-success" id="btnRecurringBasic">정기구독 결제</button>
-          <button class="btn-success" id="btnRecurringPlus">정기구독+ 결제</button>
+          <button class="btn-success" id="btn3m">3개월 일반 결제</button>
+          <button class="btn-success" id="btn6m">6개월 일반 결제</button> <br>
+          <button class="btn-success" id="btnRecurringBasic">프리미엄 정기구독 결제</button> 
+          <button class="btn-success" id="btnRecurringPlus">프리미엄+ 정기구독 결제</button>
           <button id="subCloseBtn" style="border:1px solid #ddd; background:#f5f5f5; border-radius:6px; padding:6px 10px;">닫기</button>
         </div>
       </div>
     `;
 
-    // 전역(또는 동일 스코프) 함수 바인딩
-    document.getElementById("btn3m")?.addEventListener("click", () => {
-      (window.startThreeMonthPlan || startThreeMonthPlan)();
-    });
-    document.getElementById("btn6m")?.addEventListener("click", () => {
-      (window.startSixMonthPlan || startSixMonthPlan)();
-    });
-    document.getElementById("btnRecurringBasic")?.addEventListener("click", () => {
-      (window.startKakaoSubscriptionBasic || startKakaoSubscriptionBasic)();
-    });
-    document.getElementById("btnRecurringPlus")?.addEventListener("click", () => {
-      (window.startKakaoSubscriptionPlus || startKakaoSubscriptionPlus)();
-    });
+    // [변경점] 카카오 직행 → 결제수단 선택으로 변경
+// 결제 모달 렌더 이후 바인딩 부분만 수정
+document.getElementById("btn3m")?.addEventListener("click", async () => {
+  const ok = await requirePhoneVerificationIfNeeded();
+  if (!ok) return;                 // 인증 완료 전엔 진행 X
+  openGatewayChooser("3m");        // 기존 흐름
+});
+
+document.getElementById("btn6m")?.addEventListener("click", async () => {
+  const ok = await requirePhoneVerificationIfNeeded();
+  if (!ok) return;
+  openGatewayChooser("6m");
+});
+
+document.getElementById("btnRecurringBasic")?.addEventListener("click", async () => {
+  const ok = await requirePhoneVerificationIfNeeded();
+  if (!ok) return;
+  openGatewayChooser("rb");
+});
+
+document.getElementById("btnRecurringPlus")?.addEventListener("click", async () => {
+  const ok = await requirePhoneVerificationIfNeeded();
+  if (!ok) return;
+  openGatewayChooser("rp");
+});
+
     document.getElementById("subCloseBtn")?.addEventListener("click", close);
   }
 
+  // ── 헬퍼: memberships.metadata에서 customer_uid 읽기
+  async function readCustomerUid() {
+    const { data: { user } } = await window.supabaseClient.auth.getUser();
+    if (!user) throw new Error("로그인이 필요합니다.");
+
+    const { data, error } = await window.supabaseClient
+      .from("memberships")
+      .select("metadata")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    let meta = null;
+    try {
+      if (!data?.metadata) meta = null;
+      else meta = (typeof data.metadata === "string") ? JSON.parse(data.metadata) : data.metadata;
+    } catch { meta = null; }
+
+    return meta?.customer_uid || null;
+  }
+
+  // 네트워크 오류 등으로 응답을 못 받았을 때, 정말 전환이 반영됐는지 짧게 확인
+  async function confirmSwitchSuccess(userId, tier, tries = 3, delayMs = 500) {
+    const expectPlan = tier === 'plus' ? 'premium_plus' : 'premium';
+    for (let i = 0; i < tries; i++) {
+      const { data, error } = await window.supabaseClient
+        .from('memberships')
+        .select('plan, status, current_period_end')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (!error && data && data.plan === expectPlan && data.status === 'active') {
+        return true;
+      }
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+    return false;
+  }
+
+  // ── 헬퍼: 정기 전환 전에 빌링키 보장 (tier: 'basic' | 'plus')
+async function ensureBillingKeyForTier(tier) {
+  const existing = await readCustomerUid().catch(() => null);
+  if (existing) return true;
+
+  if (!confirm("정기 결제를 위해 카드(빌링키) 등록이 필요합니다. 지금 등록하시겠어요?")) {
+    return false;
+  }
+
+  // ✅ 카카오/이니시스 선택창을 먼저 띄움
+  // tier === 'basic' → 'rb', tier === 'plus' → 'rp'
+  const planKey = (tier === 'plus') ? 'rp' : 'rb';
+  if (typeof openGatewayChooser === 'function') {
+    openGatewayChooser(planKey);
+  } else {
+    // (혹시 함수 스코프 문제로 접근 못할 때를 위한 안전장치)
+    const opener = window.openGatewayChooser || openGatewayChooser;
+    if (typeof opener === 'function') opener(planKey);
+  }
+
+  // ✅ 사용자가 결제수단 선택 후(카카오/이니시스 중 하나로 빌링 등록), 빌링키 생성될 때까지 폴링
+  const timeoutMs = 60000;
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    await new Promise(r => setTimeout(r, 2000));
+    const uid = await readCustomerUid().catch(() => null);
+    if (uid) return true;
+  }
+  alert("카드 등록이 확인되지 않았습니다. 등록을 마친 후 다시 시도해 주세요.");
+  return false;
+}
+
+
+
+
   try {
-    // ── 구독 상태 조회 ────────────────────────────────────────
     const { data, error } = await window.supabaseClient
       .from("memberships")
       .select("*")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    // 미보유/비활성 ⇒ 결제 선택
     if (error || !data || data.status === "inactive") {
       renderPurchaseChoices();
       return;
     }
 
-    // ── 활성 구독 화면 ────────────────────────────────────────
-
     const plan = (data.plan || "").trim();
     const isFixed = plan === "premium3" || plan === "premium6";
     const isRecurring = plan === "premium" || plan === "premium_plus";
     const resumeLabel = isFixed ? "다시 구매하기" : "재구독 신청하기";
-const isCancelRequested = !!data.cancel_at_period_end;
+    const isCancelRequested = !!data.cancel_at_period_end;
 
-// ✅ 라벨
-const dateLabel = isFixed
-  ? "만료일"
-  : (isCancelRequested ? "해지 예정일" : "다음 결제일");
+    const dateLabel = isFixed ? "만료일" : (isCancelRequested ? "해지 예정일" : "다음 결제일");
 
-// ✅ 상태 텍스트
-let statusText;
-if (isFixed) {
-  // 선결제는 해지신청 개념 대신 만료 예정으로 표시
-  if (data.status === "active") {
-    statusText = isCancelRequested ? "active (만료 예정)" : "active (선결제)";
-  } else {
-    statusText = data.status;
-  }
-} else {
-  // 정기 구독만 해지 신청 문구
-  statusText = isCancelRequested ? `${data.status} (해지 신청됨)` : data.status;
-}
+    let statusText;
+    if (isFixed) {
+      statusText = (data.status === "active")
+        ? (isCancelRequested ? "active (만료 예정)" : "active (선결제)")
+        : data.status;
+    } else {
+      statusText = isCancelRequested ? `${data.status} (해지 신청됨)` : data.status;
+    }
 
-// ✅ 날짜 값/남은 일수
-const dateValue = data.current_period_end
-  ? new Date(data.current_period_end).toLocaleDateString("ko-KR")
-  : "-";
+    const dateValue = data.current_period_end
+      ? formatKSTDate(data.current_period_end)
+      : "-";
 
-const end = data.current_period_end ? new Date(data.current_period_end) : null;
-const daysLeft = end ? Math.max(0, Math.ceil((end - new Date()) / 86400000)) : null;
+    const end = data.current_period_end ? new Date(data.current_period_end) : null;
+    const ONE_DAY = 24 * 60 * 60 * 1000;
+    const canSwitchOrBuy = end ? msLeftUntil(end) <= ONE_DAY : true;
+    const remainingLabel = end ? formatRemaining(end) : '-';
 
-const extraLine = end
-  ? `<div style="margin-top:6px;color:#888;font-size:12px;">
-       ${dateLabel}까지 약 ${daysLeft}일 남았습니다.
-     </div>`
-  : "";
+    const switchNotice = end
+      ? `<div style="margin-top:6px;color:${canSwitchOrBuy ? '#0a7c0a' : '#c0392b'};font-size:12px;">
+           ${canSwitchOrBuy
+             ? `지금은 플랜 변경 or 새 구매가 가능합니다. (만료까지 약 ${remainingLabel} 남음)`
+             : `플랜 변경 or 새 구매는 <b>만료 24시간 전부터</b> 가능합니다. (현재 남은 시간: 약 ${remainingLabel})`
+           }
+         </div>`
+      : "";
 
+    // ✅ 공통 가드 & 비활성화 유틸
+    const guardSwitch = () => {
+      if (!canSwitchOrBuy) {
+        const remain = end ? formatRemaining(end) : '-';
+        alert(
+          `현재 플랜 만료까지 약 ${remain} 남았습니다.\n` +
+          `플랜 변경 또는 새 구매는 만료 24시간 전부터 가능합니다.`
+        );
+        return false;
+      }
+      return true;
+    };
+    const disableIfLocked = (btnId) => {
+      const el = document.getElementById(btnId);
+      if (!el) return;
+      if (!canSwitchOrBuy) {
+        el.disabled = true;
+        el.style.opacity = "0.5";
+        el.style.cursor = "not-allowed";
+        el.title = "만료 24시간 전부터 가능합니다.";
+      }
+    };
 
-    // changePlan 버튼 라벨
     let changeLabel = "플랜 변경";
-    if (plan === "premium") changeLabel = "프리미엄+로 전환";
-    else if (plan === "premium_plus") changeLabel = "프리미엄(기본)으로 전환";
+    if (plan === "premium") changeLabel = "다른 플랜으로 전환";
+    else if (plan === "premium_plus") changeLabel = "다른 플랜으로 전환";
     else if (plan === "premium3" || plan === "premium6") changeLabel = "다른 플랜으로 전환";
 
-    // 렌더링
     modal.innerHTML = `
       <div class="modal-panel" style="background:#fff; border-radius:10px; padding:16px; max-width:520px; margin:0 auto;">
         <h3 style="margin:0 0 8px;">구독 정보</h3>
         <p style="margin:4px 0;"><strong>플랜:</strong> ${data.plan ?? "-"}</p>
         <p style="margin:4px 0;"><strong>상태:</strong> ${statusText}</p>
         <p style="margin:4px 0 12px;"><strong>${dateLabel}:</strong> ${dateValue}</p>
-        ${extraLine}<br>
+        ${switchNotice}<br>
 
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           ${
-            isCancelRequested
-              ? `<button id="resumeSubBtn" class="btn-success">${resumeLabel}</button>`
-              : `<button id="cancelSubBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기결제 해지 신청</button>`
+            isRecurring
+              ? (isCancelRequested
+                  ? `<button id="resumeSubBtn" class="btn-success">${resumeLabel}</button>`
+                  : `<button id="cancelSubBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기결제 해지 신청</button>`
+                )
+              : ''
           }
 
-          <button id="changePlanBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">${changeLabel}</button>
-
-          ${isRecurring ? `
-            <button id="to3mBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">프리미엄3으로 전환</button>
-            <button id="to6mBtn" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">프리미엄6으로 전환</button>
-          ` : ""}
+          <button id="changePlanBtn" class="btn-success">${changeLabel}</button>
 
           <button id="subCloseBtn2" class="btn-success">닫기</button>
         </div>
 
         ${
           isCancelRequested
-            ? `<div style="margin-top:8px; color:#888; font-size:12px;">(현재 ${dateLabel}까지 이용 가능합니다.)</div>`
-            : `<div style="margin-top:8px; color:#888; font-size:12px;">5초 후 자동으로 닫혀요.</div>`
+            ? `<div style="margin-top:8px; color:#888; font-size:12px;">(현재 ${dateLabel}까지 이용 가능합니다. <br> *주의: 플랜전환시 즉시 전환되므로 1일 사주출력횟수 제한치도 즉시 전환됩니다!!!)</div>`
+            : `<div style="margin-top:8px; color:#888; font-size:12px;">10초 후 자동으로 닫혀요.<br> *주의: 플랜전환시 즉시 전환되므로 1일 사주출력횟수 제한치도 즉시 전환됩니다!!!</div>`
         }
       </div>
     `;
 
-    // 공통 바인딩
     document.getElementById("subCloseBtn2")?.addEventListener("click", close);
 
-    // 정기↔정기 토글 + 정기→선결제/ 선결제→정기/선결제 전환
+    // ✅ 버튼 비활성화(UX)
+    disableIfLocked("changePlanBtn");
+
+    // ✅ 변경 버튼(전환/새구매 전체 가드)
     document.getElementById("changePlanBtn")?.addEventListener("click", async () => {
+
+   // ✅ ✅ 결제/전환 진입 가드 (한 번만)
+   const ok = await requirePhoneVerificationIfNeeded();  // (또는 ensurePhoneVerifiedForPayment())
+   if (!ok) return;
+      if (!guardSwitch()) return;
       const curPlan = plan;
 
       // A) 정기 (premium / premium_plus)
       if (curPlan === "premium" || curPlan === "premium_plus") {
-        const how = window.prompt(
+
+        const howRaw = window.prompt(
           "변경 방법을 선택하세요:\n" +
           "1 = 정기 내에서 플랜 전환(기본↔플러스)\n" +
           "3 = 프리미엄3(선결제)로 전환\n" +
           "6 = 프리미엄6(선결제)로 전환",
           "1"
         );
+        if (howRaw === null) return;
+        const how = String(howRaw).trim();
+        if (!["1", "3", "6"].includes(how)) return;
 
-        if (how === "3") {
-          if (typeof switchRecurringToFixed === "function") return switchRecurringToFixed("premium3");
-          return (window.startThreeMonthPlan || startThreeMonthPlan)();
-        }
-        if (how === "6") {
-          if (typeof switchRecurringToFixed === "function") return switchRecurringToFixed("premium6");
-          return (window.startSixMonthPlan || startSixMonthPlan)();
-        }
+  if (how === "3") { openGatewayChooser("3m"); return; }
+  if (how === "6") { openGatewayChooser("6m"); return; }
 
-        // 기본: 정기 내 토글
-        const target = (curPlan === "premium_plus") ? "premium" : "premium_plus";
-        const res = await fetch("/api/payment/manage-subscription?action=change_plan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: user.id, new_plan: target }),
-        });
-        const json = await res.json();
-        if (!res.ok) return alert("변경 실패: " + (json.error || ""));
-        alert(json.message || "플랜이 변경되었습니다. 다음 결제부터 적용돼요.");
-        return window.location.reload();
+        if (how === "1") {
+          const target = (curPlan === "premium_plus") ? "premium" : "premium_plus";
+          const res = await fetch("/api/payment/manage-subscription?action=change_plan", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: user.id, new_plan: target }),
+          });
+          const json = await res.json();
+
+          if (res.status === 409 && json?.error === "NEED_BILLING_KEY") {
+            if (json.next_plan === "premium_plus") {
+              (window.startKakaoSubscriptionPlus || startKakaoSubscriptionPlus)();
+            } else {
+              (window.startKakaoSubscriptionBasic || startKakaoSubscriptionBasic)();
+            }
+            alert("정기 결제 등록 화면으로 이동합니다. 등록 완료 후 다시 전환을 눌러 주세요.");
+            return;
+          }
+
+          if (!res.ok) {
+            alert("변경 실패: " + (json.error || ""));
+            return;
+          }
+
+          alert(json.message || "플랜이 변경되었습니다. 다음 결제부터 적용돼요.");
+          window.location.reload();
+          return;
+        }
+        return;
       }
 
       // B) 선결제 (premium3 / premium6) → 클릭 패널
       if (curPlan === "premium3" || curPlan === "premium6") {
+
+
         const old = document.getElementById("planSwitchSheet");
         if (old) { old.remove(); return; }
 
@@ -1344,29 +2232,114 @@ const extraLine = end
         sheet.innerHTML = `
           <div style="font-size:13px; color:#555; margin-bottom:8px;">변경 방법을 선택하세요</div>
           <div style="display:flex; flex-wrap:wrap; gap:8px;">
-            <button id="optFixedToggle"   style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">${primaryFixedLabel}</button>
-            <button id="optRecurringBasic" style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기(기본)으로 전환</button>
-            <button id="optRecurringPlus"  style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">정기(플러스)로 전환</button>
-            <button id="optCancel"          style="border:1px solid #ddd; background:#f5f5f5; border-radius:6px; padding:6px 10px;">닫기</button>
+            <button id="optFixedToggle"    style="border:1px solid #ddd; background:#fff; border-radius:6px; padding:6px 10px;">${primaryFixedLabel}</button>
+            <button id="optRecurringBasic" class="btn-success">정기(기본)으로 즉시 전환</button>
+            <button id="optRecurringPlus"  class="btn-success">정기(플러스)로 즉시 전환</button>
+            <button id="optCancel"         style="border:1px solid #ddd; background:#f5f5f5; border-radius:6px; padding:6px 10px;">닫기</button>
           </div>
         `;
 
         const panel = modal.querySelector(".modal-panel");
         (panel ? panel : modal).appendChild(sheet);
 
-        sheet.querySelector("#optFixedToggle")?.addEventListener("click", () => {
-          if (curPlan === "premium3") {
-            (window.startSixMonthPlan || startSixMonthPlan)();
-          } else {
-            (window.startThreeMonthPlan || startThreeMonthPlan)();
+        // 선결제 ↔ 선결제 토글(구매 플로우 즉시 진입)
+  sheet.querySelector("#optFixedToggle")?.addEventListener("click", async () => {
+   // (선택) 여기서도 추가로 전화인증 가드를 걸고 싶으면 주석 해제
+   // const ok2 = await requirePhoneVerificationIfNeeded();
+   // if (!ok2) return;
+   if (curPlan === "premium3") openGatewayChooser("6m");
+   else                        openGatewayChooser("3m");
+ });
+
+        // 안전 헬퍼들
+        async function callImmediateFromFixed(tier) {
+          const res  = await fetch('/api/payment/manage-subscription?action=switch_from_fixed_to_recurring', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: user.id, next_tier: tier }) // 'basic' | 'plus'
+          });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            const msg = json?.message || json?.error || '전환 실패';
+            throw new Error(msg);
           }
+          return json;
+        }
+
+        // 선결제 → 정기(기본) 즉시 전환
+        sheet.querySelector("#optRecurringBasic")?.addEventListener("click", async (e) => {
+          const btn = e.currentTarget;
+          await withBtnLock(btn, async () => {
+            try {
+              const ok = await ensureBillingKeyForTier('basic');
+              if (!ok) return;
+
+              const { res, json, error } = await safeFetch(
+                '/api/payment/manage-subscription?action=switch_from_fixed_to_recurring',
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ user_id: user.id, next_tier: 'basic' }),
+                }
+              );
+
+              if (error || !res) {
+                const okAfter = await confirmSwitchSuccess(user.id, 'basic');
+                if (okAfter) setTimeout(() => { try { window.location.reload(); } catch {} }, 200);
+                return;
+              }
+
+              if (!res.ok) {
+                const msg = json?.message || json?.error || '전환 실패';
+                alert(`전환 실패: ${msg}`);
+                return;
+              }
+
+              alert(json?.message || '정기(기본)으로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
+              setTimeout(() => { try { window.location.reload(); } catch {} }, 200);
+            } catch (err) {
+              alert('전환 실패: ' + err.message);
+            }
+          });
         });
-        sheet.querySelector("#optRecurringBasic")?.addEventListener("click", () => {
-          (window.startKakaoSubscriptionBasic || startKakaoSubscriptionBasic)();
+
+        // 선결제 → 정기(플러스) 즉시 전환
+        sheet.querySelector("#optRecurringPlus")?.addEventListener("click", async (e) => {
+          const btn = e.currentTarget;
+          await withBtnLock(btn, async () => {
+            try {
+              const ok = await ensureBillingKeyForTier('plus');
+              if (!ok) return;
+
+              const { res, json, error } = await safeFetch(
+                '/api/payment/manage-subscription?action=switch_from_fixed_to_recurring',
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ user_id: user.id, next_tier: 'plus' }),
+                }
+              );
+
+              if (error || !res) {
+                const okAfter = await confirmSwitchSuccess(user.id, 'plus');
+                if (okAfter) setTimeout(() => { try { window.location.reload(); } catch {} }, 200);
+                return;
+              }
+
+              if (!res.ok) {
+                const msg = json?.message || json?.error || '전환 실패';
+                alert(`전환 실패: ${msg}`);
+                return;
+              }
+
+              alert(json?.message || '정기(플러스)로 즉시 전환되었습니다. 새 주기는 기존 만료일 다음날부터 시작됩니다.');
+              setTimeout(() => { try { window.location.reload(); } catch {} }, 200);
+            } catch (err) {
+              alert('전환 실패: ' + err.message);
+            }
+          });
         });
-        sheet.querySelector("#optRecurringPlus")?.addEventListener("click", () => {
-          (window.startKakaoSubscriptionPlus || startKakaoSubscriptionPlus)();
-        });
+
         sheet.querySelector("#optCancel")?.addEventListener("click", () => {
           sheet.remove();
         });
@@ -1374,26 +2347,45 @@ const extraLine = end
         return;
       }
 
-      // 알 수 없는 플랜 → 구매 선택
+      // 그 외 플랜은 구매 선택 UI로
       renderPurchaseChoices();
     });
 
-    // 정기 → 3/6개월 전환(빠른 버튼) 바인딩
+    // 정기 → 3/6 전환(빠른 버튼) 바인딩 (원래 로직 유지; 버튼이 있을 경우만)
     if (isRecurring) {
-      document.getElementById("to3mBtn")?.addEventListener("click", () => {
-        if (typeof switchRecurringToFixed === "function") return switchRecurringToFixed("premium3");
+      document.getElementById("to3mBtn")?.addEventListener("click", async () => {
+        if (!guardSwitch()) return;
+        const r = await fetch("/api/payment/manage-subscription?action=schedule_to_fixed", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: user.id, termMonths: 3 })
+        });
+        const j = await r.json();
+        if (!r.ok) return alert("전환 예약 실패: " + (j.error || ""));
+        alert(j.message || "만료일에 프리미엄3으로 자동 전환됩니다. 결제를 진행합니다.");
         (window.startThreeMonthPlan || startThreeMonthPlan)();
       });
-      document.getElementById("to6mBtn")?.addEventListener("click", () => {
-        if (typeof switchRecurringToFixed === "function") return switchRecurringToFixed("premium6");
+
+      document.getElementById("to6mBtn")?.addEventListener("click", async () => {
+        if (!guardSwitch()) return;
+        const r = await fetch("/api/payment/manage-subscription?action=schedule_to_fixed", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: user.id, termMonths: 6 })
+        });
+        const j = await r.json();
+        if (!r.ok) return alert("전환 예약 실패: " + (j.error || ""));
+        alert(j.message || "만료일에 프리미엄6으로 자동 전환됩니다. 결제를 진행합니다.");
         (window.startSixMonthPlan || startSixMonthPlan)();
       });
     }
 
-    // 해지 신청/자동 닫기/재구독
     if (!isCancelRequested) {
       document.getElementById("cancelSubBtn")?.addEventListener("click", async () => {
-        if (!confirm("이번 달 말일에 해지됩니다. 진행할까요?")) return;
+        const targetText = end ? `다음 결제일(${formatKSTDate(end)}) 이후` : '다음 결제 주기 이후';
+        const ok = confirm(`해지 신청 시 ${targetText} 자동 해지됩니다. 진행할까요?`);
+        if (!ok) return;
+
         const res = await fetch("/api/payment/manage-subscription?action=cancel", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1405,17 +2397,15 @@ const extraLine = end
       });
 
       if (window.__subModalTimer) clearTimeout(window.__subModalTimer);
-      window.__subModalTimer = setTimeout(close, 5000);
+      window.__subModalTimer = setTimeout(close, 10000);
     } else {
       const resumeBtn = document.getElementById("resumeSubBtn");
       if (resumeBtn) {
         resumeBtn.addEventListener("click", async () => {
-          // 선결제 플랜은 재구매 UX로 전환
           if (plan === "premium3" || plan === "premium6") {
             renderPurchaseChoices();
             return;
           }
-          // 정기 플랜은 resume 호출
           try {
             const res = await fetch("/api/payment/manage-subscription?action=resume", {
               method: "POST",
@@ -1447,44 +2437,8 @@ const extraLine = end
 
 
 
-// ─── 로그인된 유저가 전화 인증 필요하면 모달을 띄우는 검사 ───
-async function requirePhoneVerificationIfNeeded() {
-  const { data: { session } } = await window.supabaseClient.auth.getSession();
-  if (!session?.user) return alert("로그인 후 이용 가능합니다.");
 
-  try {
-    const { data, error } = await window.supabaseClient
-      .from("profiles")
-      .select("phone_verified, phone_verified_at")
-      .eq("user_id", session.user.id)
-      .maybeSingle();
 
-    if (error) console.warn("[profiles maybeSingle] warn:", error);
-
-    // 인증 기록 없으면 바로 인증 요구
-    if (!data?.phone_verified_at) {
-      openPhoneOtpModal();
-      return;
-    }
-
-    // 3일 유효기간 계산
-    const lastVerified = new Date(data.phone_verified_at);
-    const now = new Date();
-    const diffDays = (now - lastVerified) / (1000 * 60 * 60 * 24);
-
-    if (diffDays > 3) {
-      console.log("[requirePhoneVerificationIfNeeded] 인증 만료:", diffDays, "일 경과");
-      openPhoneOtpModal(); // 3일 초과 → 다시 인증
-      return;
-    }
-
-    // 유효기간 이내면 통과
-    console.log("[requirePhoneVerificationIfNeeded] 인증 유효:", diffDays, "일 경과");
-  } catch (e) {
-    console.warn("[requirePhoneVerificationIfNeeded] 조회 실패:", e);
-    openPhoneOtpModal(); // 조회 실패 시 안전하게 인증 요구
-  }
-}
 
 
 
@@ -3345,6 +4299,73 @@ window.handleDaeyunClick = handleDaeyunClick;
 }
 
 
+
+
+/* 컨테이너 & 스크롤 래퍼 */
+.Etcsinsal-tables {
+  display: grid;
+  gap: 16px;
+}
+.Etcsinsal-tables .table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.06) inset;
+}
+
+/* 기본 반응형 테이블 설정 */
+.Etcsinsal-tables .responsive-table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;                     /* 균등 분배 */
+  font-size: clamp(11px, 1.6vw, 14px);
+  line-height: 1.35;
+  min-width: 720px;                        /* 좁은 화면에서 가로 스크롤 */
+  hyphens: auto;                           /* 길고 연속된 라틴 텍스트 자동 하이픈 */
+}
+
+.Etcsinsal-tables .responsive-table th,
+.Etcsinsal-tables .responsive-table td {
+  padding: 6px 8px;
+  /* ↓↓↓ 핵심 수정: 셀 밖으로 넘치지 않도록 줄바꿈 허용 */
+  white-space: normal;                     /* 줄바꿈 허용 */
+  overflow-wrap: anywhere;                 /* 너무 긴 단어/토큰도 강제 줄바꿈 */
+  word-break: keep-all;                    /* 한글/한자는 단어 단위로 */
+  border: 1px solid #ddd;
+}
+
+/* 첫 번째 열(신살류) sticky */
+.Etcsinsal-tables .responsive-table th[rowspan],
+.Etcsinsal-tables .responsive-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+}
+
+/* 헤더 sticky */
+.Etcsinsal-tables .responsive-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+/* 모바일 추가 축소 */
+@media (max-width: 480px) {
+  .Etcsinsal-tables .responsive-table {
+    min-width: 600px;
+    font-size: clamp(10px, 3.2vw, 12px);
+  }
+  .Etcsinsal-tables .responsive-table th,
+  .Etcsinsal-tables .responsive-table td {
+    padding: 4px 6px;
+  }
+}
+
+
+
+
 .sewoon-cell.selected {
   background-color: #ffeaa7 !important;
   border: 2px solid #fdcb6e !important;
@@ -3735,14 +4756,18 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
 
 </div>
 
+
+  <div id="basic-daeyun-table" class="basic-daeyun-container"></div>
+  <div id="basic-yearly-ganji-container"></div>
+
+
 `;
 
 
     document.getElementById('basic-section').innerHTML = `
 
 <!-- 당령 표시용 영역 -->
-  <div id="basic-daeyun-table" class="basic-daeyun-container"></div>
-  <div id="basic-yearly-ganji-container"></div>
+
 <div style="margin-top: 1rem; margin-left: 20px;">
 
   <table class="dangryeong-table" style="
@@ -3791,7 +4816,11 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
 </td>
 </tr>
 
-
+  <tr>
+    <td colspan="2">
+      <div id="etc-sinsal-box"></div>
+    </td>
+  </tr>
 
     </tbody>
   </table>
@@ -3813,20 +4842,12 @@ document.getElementById('sinsal-section').innerHTML = `
 
 <table class="layout-table">
   <tr>
-    <td style="width:50%;">
-      <div class="daeyun-table-container"></div>
-      <div id="yearly-series" style="margin-top: 1rem;"></div>
-      <div id="yearly-ganji-container" style="margin-top: 20px;"></div>
-    </td>
+
     <td style="width:50%;">
       <div id="sinsal-box"></div>
     </td>
   </tr>
-  <tr>
-    <td colspan="2">
-      <div id="etc-sinsal-box"></div>
-    </td>
-  </tr>
+
 </table>
 
 
@@ -4230,7 +5251,42 @@ window.rerenderSinsal = rerenderSinsal;
 
 
 
+
+
+
+
+
 /////////////////12신살,12운성출력 끝 /////////////////////////////////////
+
+
+
+
+
+// 기본 대운/세운표에서 현재 선택값을 읽는 최소 헬퍼
+window.__readBasicFortune = {
+  daeyun(){
+    // 1) renderBasicDaeyunTable이 남겨둔 전역(있다면)
+    if (window.basicDaeyunSelected?.stem && window.basicDaeyunSelected?.branch)
+      return window.basicDaeyunSelected;
+
+    // 2) fortuneState(이미 쓰고 있다면)
+    if (window.fortuneState?.daeyun?.stem && window.fortuneState?.daeyun?.branch)
+      return window.fortuneState.daeyun;
+
+    // 3) DOM(기본표 컨테이너 기준)
+    const td = document.querySelector('#daeyun-basic .daeyun-selected');
+    return td ? { stem: td.dataset.stem?.trim(), branch: td.dataset.branch?.trim() } : {};
+  },
+  sewoon(){
+    if (window.basicSewoonSelected?.stem && window.basicSewoonSelected?.branch)
+      return window.basicSewoonSelected;
+    if (window.fortuneState?.sewoon?.stem && window.fortuneState?.sewoon?.branch)
+      return window.fortuneState.sewoon;
+    const cell = document.querySelector('#sewoon-basic .sewoon-cell.selected');
+    return cell ? { stem: cell.dataset.stem?.trim(), branch: cell.dataset.branch?.trim() } : {};
+  }
+};
+
 
 // ✅ 여기서 대운 테이블을 동적으로 렌더링!
 // ✅ 대운 테이블 렌더
@@ -4396,7 +5452,7 @@ async function renderUserProfile() {
   const { data: { user } } = await window.supabaseClient.auth.getUser();
   if (!user) return;
 
-  // ✅ 정기구독 버튼
+  // ✅ 정기구독 및 결제 버튼
   const subscribeBtn = document.getElementById("subscribeBtn");
   if (subscribeBtn) {
     // 중복 이벤트 방지
@@ -4404,24 +5460,8 @@ async function renderUserProfile() {
     subscribeBtn._bound = async (e) => {
       e.preventDefault();
       try {
-        // ✅ profiles 테이블에서 전화 인증 여부 확인
-        const { data: profile, error: profErr } = await window.supabaseClient
-          .from("profiles")
-          .select("phone_verified")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (profErr) console.warn("[profiles maybeSingle] warn:", profErr);
-
-        // ✅ 전화 인증 안 되어 있으면 OTP 모달 오픈
-        if (!profile || !profile.phone_verified) {
-          openPhoneOtpModal();
-          return;
-        }
-
-        // ✅ 인증 완료 → 구독 상태에 따라 결제창 or 결제정보 표시
-        await openSubscriptionModal(); // <-- 🔥 새로 만든 함수 실행
-
+        // 🔁 여기서는 전화인증 체크하지 않음 — 그냥 결제 모달만 열기
+        await openSubscriptionModal();
       } catch (err) {
         console.error("[subscribeBtn] error:", err);
         alert(err?.message || "처리 중 오류가 발생했습니다.");
@@ -4821,16 +5861,20 @@ function bindAuthPipelines() {
 
   window.supabaseClient.auth.onAuthStateChange(async (event, session) => {
     try {
-      if (event === "SIGNED_IN" && session?.user?.id) {
+      if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session?.user?.id) {
         const userId = session.user.id;
-        const sessionId = session.access_token;
+        const sessionId = session.access_token; // (표시용) 현재 기기 식별
 
         // 1) 기존 로그인 세션 전부 종료 (다른 기기 즉시 무효화 상태로)
-        await postJSON("/api/terminate-other-sessions", { user_id: userId });
+        await window.supabaseClient.auth.signOut({ scope: "others" });
 
         // 2) 현재 세션을 active_sessions에 기록 (Realtime 트리거 포인트)
         await postJSON("/api/update-session", { user_id: userId, session_id: sessionId });
 
+        // ✅ 2-1) 다른 기기들에게 "지금 당장 나가라" 브로드캐스트
+       window.supabaseClient
+         .channel(`user:${userId}`)
+         .send({ type: "broadcast", event: "force-logout", payload: { except: sessionId } });
         // 3) 실시간 감시 시작 (한 번만 구독)
         await initRealtimeWatcher();
 
@@ -4851,36 +5895,80 @@ function bindAuthPipelines() {
 }
 
 /***** ✅ 실시간 세션 변경 감시 (다른 기기 로그인 시 자동 로그아웃) *****/
+// ✅ active_sessions 테이블에 "현재 세션"이 바뀌면, 이 기기 즉시 로그아웃
+//    - 가능한 한 refresh_token(=session.refresh_token)을 기준으로 비교합니다.
+//    - 만약 DB에 access_token을 저장 중이라면 기존 컬럼(session_id)도 함께 비교합니다.
+//    - active_sessions 테이블 컬럼 예시:
+//        user_id uuid
+//        session_rt text   -- (권장) 현재 세션의 refresh_token
+//        session_id text   -- (호환) 기존에 쓰던 access_token
+
+
+let __FORCE_LOGOUT_FIRED__ = false;
+
 async function initRealtimeWatcher() {
   if (__REALTIME_SET__) return;
+
   const { data: u } = await window.supabaseClient.auth.getUser();
   const user = u?.user;
   if (!user) return;
 
-  __REALTIME_SET__ = true;
+  // 현재 세션 토큰(둘 다 확보: refresh 우선, access 보조)
+  async function getCurrentTokens() {
+    const { data: s } = await window.supabaseClient.auth.getSession();
+    return {
+      access: s?.session?.access_token || null,
+      refresh: s?.session?.refresh_token || null,
+    };
+  }
 
-  window.supabaseClient
-    .channel("realtime:active_sessions")
+  // 동일 사용자 행만 수신하도록 필터
+  const channel = window.supabaseClient
+    .channel(`realtime:active_sessions:${user.id}`)
     .on(
       "postgres_changes",
-      { event: "*", schema: "public", table: "active_sessions" }, // INSERT/UPDATE 모두 감시
+      {
+        event: "*",
+        schema: "public",
+        table: "active_sessions",
+        filter: `user_id=eq.${user.id}`,
+      },
       async (payload) => {
-        if (payload?.new?.user_id !== user.id) return;
+        // 이미 처리된 강제 로그아웃이면 중복 방지
+        if (__FORCE_LOGOUT_FIRED__) return;
 
-        const { data: s } = await window.supabaseClient.auth.getSession();
-        const current = s?.session?.access_token;
-        const latest  = payload?.new?.session_id;
+        // 현재 기기의 세션 토큰(실시간 비교용)
+        const current = await getCurrentTokens();
 
-        if (current && latest && current !== latest) {
+        // DB에서 최신으로 기록된 토큰(가급적 refresh 기준)
+        const latestRefresh = payload?.new?.session_rt || null;
+        const latestAccess  = payload?.new?.session_id || null;
+
+        // 1) refresh_token 기준 비교 (권장 & 안정적)
+        if (latestRefresh && current.refresh && latestRefresh !== current.refresh) {
+          __FORCE_LOGOUT_FIRED__ = true;
           alert("다른 기기에서 로그인되어 자동 로그아웃됩니다.");
           await window.supabaseClient.auth.signOut();
           updateAuthUI(null);
+          return;
+        }
+
+        // 2) (호환) access_token 기준 비교
+        //    주의: access_token은 주기적으로 갱신되므로 오탐 가능. refresh 정비 전 임시용으로만 사용.
+        if (!latestRefresh && latestAccess && current.access && latestAccess !== current.access) {
+          __FORCE_LOGOUT_FIRED__ = true;
+          alert("다른 기기에서 로그인되어 자동 로그아웃됩니다.");
+          await window.supabaseClient.auth.signOut();
+          updateAuthUI(null);
+          return;
         }
       }
     )
     .subscribe((status) => {
       console.log("[realtime] active_sessions:", status);
     });
+
+  __REALTIME_SET__ = true;
 }
 
 // ✅ 최초 로드 시: 이미 로그인된 상태여도 즉시 구독 + 세션 기록 (중요!)
@@ -4928,6 +6016,35 @@ async function initRealtimeWatcher() {
     renderUserProfile();
 
 wireProfileEditEvents();
+
+// 1) 설명 사전 로드(전역 주입)
+try {
+  const explainMod = await import('./explain.js');
+  if (explainMod?.TERM_HELP) {
+    window.TERM_HELP = explainMod.TERM_HELP;
+    console.log('[TERM_HELP] loaded groups:', Object.keys(window.TERM_HELP));
+  } else {
+    console.warn('[TERM_HELP] missing export');
+  }
+} catch (e) {
+  console.warn('[TERM_HELP] load skipped:', e);
+}
+
+// 2) 툴팁 설치 (initTermHelp 존재 체크 후 호출)
+try {
+  const tipMod = await import('./utils/tooltip.js');
+  console.log('[tooltip] module keys:', Object.keys(tipMod || {}));
+  const init = tipMod?.initTermHelp || tipMod?.default?.initTermHelp || window.initTermHelp;
+  if (typeof init === 'function') {
+    init();
+    console.log('[tooltip] installed OK');
+  } else {
+    console.warn('[tooltip] initTermHelp not found');
+  }
+} catch (e) {
+  console.warn('[tooltip] install failed:', e);
+}
+
 
   } catch (err) {
     console.error("[init] fatal:", err);
