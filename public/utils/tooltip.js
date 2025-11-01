@@ -140,7 +140,8 @@ export function initTermHelp() {
   document.addEventListener('click', (e) => {
     const t = e.target.closest?.('.explainable');
     if (!t) return;
-
+    // ⬇️ 다른 전역 click 닫힘 핸들러가 같은 이벤트로 즉시 숨기는 것 방지
+    e.stopPropagation(); // 필요시 e.stopImmediatePropagation() 로 강하게
     const group = t.getAttribute('data-group') || 'unseong';
     const term  = t.getAttribute('data-term')  || t.textContent.trim();
     const from  = (group === 'tengod') ? '십신' : (group === 'sipsal12' ? '12신살' : '12운성');
@@ -153,7 +154,7 @@ export function initTermHelp() {
 
   // B) 버블 단계: 바깥 클릭 → 닫기 (열고 200ms 이내는 무시)
   document.addEventListener('click', (e) => {
-    if (Date.now() - __lastOpenAt < 200) return;
+    if (Date.now() - __lastOpenAt < 300) return;
     if (!e.target.closest('#term-help-pop') && !e.target.closest('.explainable')) {
       hide();
     }
