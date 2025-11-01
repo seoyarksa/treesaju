@@ -1,5 +1,7 @@
 // explain.js
-
+//<span class="unseong-tag explainable" data-group="unseong" data-term="${u}">  //12운성
+//<span class="ten-god explainable" data-group="tengod" data-term="${tenHidden}">  //십신
+//<span class="twelve-sinsal-tag explainable" data-group="sipsal12" data-term="${term}">  //12신살
 
 export const TERM_HELP = {
     //12운성설명
