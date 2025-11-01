@@ -41,49 +41,72 @@ export function initTermHelp() {
   tip.setAttribute('data-installed', '1');
 
   // 포인터 힌트(CSS 충돌 최소화)
-  const style = document.createElement('style');
-  style.setAttribute('data-tooltip-style', '1');
-  style.textContent = `
-    .explainable { cursor: help !important; }
-    #term-help-pop { will-change: transform; }
-    #term-help-pop a { color: #8ecbff; text-decoration: underline; }
-  `;
-  document.head.appendChild(style);
+// 포인터 힌트 + 강제 스타일 (!important) — 외부 CSS와의 충돌 방지
+const style = document.createElement('style');
+style.setAttribute('data-tooltip-style', '1');
+style.textContent = `
+  .explainable { cursor: help !important; }
+  /* 최상단 레이어 강제 */
+  #term-help-pop {
+    position: fixed !important;
+    z-index: 2147483647 !important;
+    display: none !important;
+    max-width: 320px !important;
+    padding: 10px 12px !important;
+    border-radius: 10px !important;
+    background: #111 !important;
+    color: #fff !important;
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,.25) !important;
+    white-space: pre-wrap !important;
+    word-break: keep-all !important;
+    pointer-events: auto !important;
+  }
+`;
+document.head.appendChild(style);
+
 
   // 도우미
-  const hide = () => {
-    if (tip.style.display !== 'none') {
-      tip.style.display = 'none';
-      console.debug('[tooltip] hide');
-    }
-  };
+const hide = () => {
+  tip.style.setProperty('display', 'none', 'important');
+  console.debug('[tooltip] hide');
+};
 
-  const showNear = (target, html) => {
-    tip.innerHTML = html;
-    tip.style.display = 'block'; // 먼저 보여야 크기 계산됨
 
-    const r = target.getBoundingClientRect();
-    const gap = 8;
-    let left = r.left;
-    let top  = r.top + window.scrollY + r.height + gap;
+const showNear = (target, html) => {
+  tip.innerHTML = html;
+  // ✅ 표시 강제 (어떤 CSS가 덮어써도 이기도록)
+  tip.style.setProperty('display', 'block', 'important');
+  tip.style.setProperty('opacity', '1', 'important');
+  tip.style.setProperty('visibility', 'visible', 'important');
 
-    // 우측/좌측 경계 보정
-    const maxLeft = window.innerWidth - tip.offsetWidth - 8;
-    if (left > maxLeft) left = maxLeft;
-    if (left < 8) left = 8;
+  // 먼저 보이게 → 크기 계산
+  const r = target.getBoundingClientRect();
+  const gap = 8;
+  let left = r.left;
+  let top  = r.top + window.scrollY + r.height + gap;
 
-    // 하단 넘치면 위로
-    const bottom = top + tip.offsetHeight;
-    const viewportBottom = window.scrollY + window.innerHeight - 8;
-    if (bottom > viewportBottom) {
-      top = r.top + window.scrollY - tip.offsetHeight - gap;
-      if (top < window.scrollY + 8) top = window.scrollY + 8;
-    }
+  const maxLeft = window.innerWidth - tip.offsetWidth - 8;
+  if (left > maxLeft) left = maxLeft;
+  if (left < 8) left = 8;
 
-    tip.style.left = `${left}px`;
-    tip.style.top  = `${top}px`;
-    console.debug('[tooltip] showNear', { left, top, termHtml: html });
-  };
+  const bottom = top + tip.offsetHeight;
+  const viewportBottom = window.scrollY + window.innerHeight - 8;
+  if (bottom > viewportBottom) {
+    top = r.top + window.scrollY - tip.offsetHeight - gap;
+    if (top < window.scrollY + 8) top = window.scrollY + 8;
+  }
+
+  tip.style.left = `${left}px`;
+  tip.style.top  = `${top}px`;
+
+  console.debug('[tooltip] showNear', { left, top, termHtml: html });
+
+  // ✅ 즉시 가시성 점검 로그
+  const rect = tip.getBoundingClientRect();
+  console.debug('[tooltip] rect', rect, 'computed display=', getComputedStyle(tip).display);
+};
 
   const getDesc = (group, term) => {
     const dict = (window.TERM_HELP && window.TERM_HELP[group]) || {};
