@@ -75,9 +75,11 @@ body {
   display: block;
   width: 100%;
   height: auto;
-  border-radius: 14px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+  border-radius: 14px; /* 필요 없으면 이것도 삭제 가능 */
+  box-shadow: none; /* ← 그림자 제거 */
+  background-color: transparent; /* 혹시 모를 여백색 차이 제거 */
 }
+
 @media (max-width: 900px) {
   .landing-wrap {
     display: block;
