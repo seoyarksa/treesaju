@@ -48,35 +48,44 @@
   <script src="https://cdn.iamport.kr/js/iamport.payment-1.2.0.js"></script>
 
 <style>
-  body {
-    font-family: 'Nanum Gothic', sans-serif;
-    margin: 0; padding: 0;
-    background-color: #f8f8f8;
-  }
-
-    /* 사주트리나무 그림 */
-
-.landing-wrap{
-  display:flex; gap:24px; align-items:flex-start; margin-top:8px;
+body {
+  font-family: 'Nanum Gothic', sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #ffffff; /* ← 여기만 흰색으로 변경 */
 }
-.hero-left{
-  flex:1; position:sticky; top:12px; /* 스크롤해도 살짝 고정되어 보이게 */
+
+/* 사주트리나무 그림 */
+.landing-wrap {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  margin-top: 8px;
 }
-.hero-right{
-  flex:1.25; min-width:360px;
+.hero-left {
+  flex: 1;
+  position: sticky;
+  top: 12px; /* 스크롤해도 살짝 고정되어 보이게 */
+}
+.hero-right {
+  flex: 1.25;
+  min-width: 360px;
 }
 .hero-left img {
   display: block;
   width: 100%;
   height: auto;
   border-radius: 14px;
-  box-shadow: 0 10px 24px rgba(0,0,0,.08);
-  background-color: #f8f8f8; /* ← 추가 */
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
 }
-
-@media (max-width: 900px){
-  .landing-wrap{ display:block; }
-  .hero-left{ position:static; margin-bottom:16px; }
+@media (max-width: 900px) {
+  .landing-wrap {
+    display: block;
+  }
+  .hero-left {
+    position: static;
+    margin-bottom: 16px;
+  }
 }
 
   /* 구분선 */
