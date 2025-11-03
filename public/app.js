@@ -5448,7 +5448,34 @@ requestAnimationFrame(() => {
   }
 
 
-
+// ─── 미니 사주창: CSS 주입 ───
+(function injectMiniSajuCSS(){
+  if (document.getElementById('mini-saju-style')) return;
+  const s = document.createElement('style');
+  s.id = 'mini-saju-style';
+  s.textContent = `
+    #saju-mini {
+      position: fixed; right: 16px; bottom: 16px; z-index: 9999;
+      width: 300px; max-width: calc(100vw - 24px);
+      background:#fff; border:1px solid #e5e5ea; border-radius:12px;
+      box-shadow:0 10px 30px rgba(0,0,0,.18); overflow:hidden; font-size:14px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
+    }
+    #saju-mini .bar { display:flex; align-items:center; justify-content:space-between;
+      padding:8px 10px; background:linear-gradient(180deg,#f7f7f9,#efeff3); border-bottom:1px solid #ececf1;
+    }
+    #saju-mini .body { max-height:260px; overflow:auto; padding:10px; }
+    #saju-mini table { width:100%; border-collapse:collapse; }
+    #saju-mini th, #saju-mini td { border-bottom:1px solid #f3f3f6; padding:4px 6px; text-align:left; vertical-align:top; }
+    #saju-mini th { width:3.5em; color:#666; font-weight:600; }
+    #saju-mini small { color:#777; }
+    #saju-mini .chip { display:inline-block; padding:2px 6px; border:1px solid #eee; border-radius:6px; margin:2px 2px 0 0; background:#fbfbfe; }
+    #saju-mini .btn { border:0; background:#f1f1f6; width:24px; height:24px; border-radius:6px; cursor:pointer; font-size:14px; line-height:1; }
+    #saju-mini .btn:hover { background:#e9e9f2; }
+    #saju-mini.is-min .body { display:none; }
+  `;
+  document.head.appendChild(s);
+})();
 
 // ─── 미니 사주창: 렌더러 ───
 function renderSajuMiniFromCurrentOutput(ctx = {}) {
@@ -5507,61 +5534,93 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
   };
 
   // ─ UI 만들기/갱신
-let box = document.getElementById('saju-mini');
-if (!box) {
-  box = document.createElement('div');
-  box.id = 'saju-mini';
-  box.className = 'saju-mini'; // ✅ index의 클래스 사용
-  box.innerHTML = `
-    <div class="saju-mini__bar">
-      <strong>사주 요약</strong>
-      <div class="saju-mini__actions">
-        <button type="button" id="saju-mini-min" title="접기">—</button>
-        <button type="button" id="saju-mini-close" title="닫기">×</button>
+  let box = document.getElementById('saju-mini');
+  if (!box) {
+    // CSS가 없으면 주입(중복 방지)
+    if (!document.getElementById('mini-saju-style')) {
+      const s = document.createElement('style');
+      s.id = 'mini-saju-style';
+      s.textContent = `
+        #saju-mini{position:fixed;right:16px;bottom:16px;z-index:9999;width:300px;max-width:calc(100vw - 24px);
+          background:#fff;border:1px solid #e5e5ea;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);overflow:hidden;font-size:14px;
+          font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif;}
+        #saju-mini .bar{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:linear-gradient(180deg,#f7f7f9,#efeff3);border-bottom:1px solid #ececf1;}
+        #saju-mini .body{max-height:260px;overflow:auto;padding:10px;}
+        #saju-mini table{width:100%;border-collapse:collapse;}
+        #saju-mini th,#saju-mini td{border-bottom:1px solid #f3f3f6;padding:4px 6px;text-align:left;vertical-align:top;}
+        #saju-mini th{width:3.5em;color:#666;font-weight:600;}
+        #saju-mini small{color:#777;}
+        #saju-mini .chip{display:inline-block;padding:2px 6px;border:1px solid #eee;border-radius:6px;margin:2px 2px 0 0;background:#fbfbfe;}
+        #saju-mini .btn{border:0;background:#f1f1f6;width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:14px;line-height:1;}
+        #saju-mini .btn:hover{background:#e9e9f2;}
+        #saju-mini.is-min .body{display:none;}
+      `;
+      document.head.appendChild(s);
+    }
+    box = document.createElement('div');
+    box.id = 'saju-mini';
+    box.innerHTML = `
+      <div class="bar">
+        <strong>사주 요약</strong>
+        <div>
+          <button class="btn" id="saju-mini-min" title="접기">—</button>
+          <button class="btn" id="saju-mini-close" title="닫기">×</button>
+        </div>
       </div>
-    </div>
-    <div class="saju-mini__body" id="saju-mini-body"></div>
+      <div class="body" id="saju-mini-body"></div>
+    `;
+    document.body.appendChild(box);
+    box.querySelector('#saju-mini-min')?.addEventListener('click', () => box.classList.toggle('is-min'));
+    box.querySelector('#saju-mini-close')?.addEventListener('click', () => box.remove());
+  }
+
+    const body = box.querySelector('#saju-mini-body');
+  const C = (txt) => _colorize(txt);
+
+  // 표는 [시주, 일주, 월주, 년주] 순서로 가로 헤더를 만들고,
+  // 1행: 천간(십신), 2행: 지지, 3행: 지장간 으로 구성
+  const columns = [data.hour, data.day, data.month, data.year];
+
+  body.innerHTML = `
+    <table class="mini-grid">
+      <thead>
+        <tr>
+          <th>시주</th>
+          <th>일주</th>
+          <th>월주</th>
+          <th>년주</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- 1행: 천간(십신) -->
+        <tr>
+          ${columns.map(p => `
+            <td>
+              <div><strong>${C(p.gan || '-')}</strong> <small>(${p.ten || '-'})</small></div>
+            </td>
+          `).join('')}
+        </tr>
+        <!-- 2행: 지지 -->
+        <tr>
+          ${columns.map(p => `
+            <td>
+              <div><strong>${C(p.jiji || '-')}</strong></div>
+            </td>
+          `).join('')}
+        </tr>
+        <!-- 3행: 지장간 -->
+        <tr>
+          ${columns.map(p => `
+            <td>
+              ${p.hides && p.hides.length
+                ? p.hides.map(h => `<span class="chip">${h}</span>`).join('')
+                : '-'}
+            </td>
+          `).join('')}
+        </tr>
+      </tbody>
+    </table>
   `;
-  document.body.appendChild(box);
-
-  // 버튼 동작
-  box.querySelector('#saju-mini-min')?.addEventListener('click', () => box.classList.toggle('is-min'));
-  box.querySelector('#saju-mini-close')?.addEventListener('click', () => box.remove());
-}
-
-
-const body = box.querySelector('#saju-mini-body');
-const columns = [data.hour, data.day, data.month, data.year];
-const C = (txt) => _colorize(txt);
-
-body.innerHTML = `
-  <table>
-    <thead>
-      <tr>
-        <th>시주</th><th>일주</th><th>월주</th><th>년주</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        ${columns.map(p => `
-          <td><strong>${C(p.gan || '-')}</strong> <small>(${p.ten || '-'})</small></td>
-        `).join('')}
-      </tr>
-      <tr>
-        ${columns.map(p => `<td><strong>${C(p.jiji || '-')}</strong></td>`).join('')}
-      </tr>
-      <tr>
-        ${columns.map(p => `
-          <td>${
-            p.hides?.length
-              ? p.hides.map(h => `<span class="saju-chip">${h}</span>`).join('')
-              : '-'
-          }</td>
-        `).join('')}
-      </tr>
-    </tbody>
-  </table>
-`;
 
 
 
