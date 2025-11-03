@@ -643,7 +643,7 @@ const sinsalRow = `
       <tbody>
         ${guide}
         ${jijiRow}
-        ${unseongRow}
+        <span class="unseong-tag explainable" data-group="unseong" data-term="${unseongRow}">${unseongRow}</span>
         ${sinsalRow}
         <tr id="mini-unseong-row" style="display:none;"><td colspan="13" style="padding:6px;"></td></tr>
       </tbody>
