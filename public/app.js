@@ -5077,7 +5077,7 @@ const sajuGanjiArr = [
   saju.yearGan + saju.yearBranch
 ];
 document.getElementById('sinsal-box').innerHTML = renderSinsalTable({ sajuGanArr, samhapKey, sajuJijiArr });
-
+wireSajuTooltips(box); // ✅ 한 번
 
 
 // 2. 클릭 이벤트 연결

@@ -504,6 +504,32 @@ window.renderUnseongByBranches = renderUnseongByBranches;
 
 //천간별 12운성 구하기 끝////////////////////////////
 
+// ✅ 추가: span 값 + data-term 동기화 유틸
+window.setExplainable = window.setExplainable || function setExplainable(span, termText) {
+  if (!span) return;
+  const t = (termText ?? '').toString().trim();
+  span.textContent = t || '-';
+  if (t && t !== '-') {
+    span.dataset.term = t;
+    span.classList.add('explainable');
+  } else {
+    span.dataset.term = '';
+    span.classList.remove('explainable');
+  }
+};
+
+// ✅ 추가: 값 찍힌 뒤 한번 호출해 보정(선택·권장)
+window.wireSajuTooltips = window.wireSajuTooltips || function (container = document.getElementById('sinsal-box') || document) {
+  const sel = '.unseong-tag, .twelve-sinsal-tag, .ten-god';
+  container.querySelectorAll(sel).forEach(el => {
+    const t = (el.textContent || '').trim();
+    if (t && t !== '-') {
+      el.dataset.term = t;
+      el.classList.add('explainable');
+    }
+  });
+  window.initTermHelp?.();
+};
 
 
 export function renderSinsalTable({ sajuGanArr, samhapKey, sajuJijiArr }) {
@@ -674,26 +700,39 @@ const GREEN = {
 };
 
 // ✅ 단일 셀 채우기
+// ✅ 단일 셀 채우기
 export function setCellValue(rowId, colIndex, value) {
   const row = document.getElementById(rowId);
   if (!row) return;
-  // row는 <th> + 12개 <td> 구조 → td 인덱스 보정 필요 X (NodeList가 td만 반환됨)
   const tds = row.querySelectorAll('td');
   const td = tds[colIndex];
   if (!td) return;
 
-  // 값 세팅
-  td.textContent = value ?? '';
+  // ✅ 변경: 행에 맞는 span을 찾아 "span만" 업데이트
+  const spanSelector =
+    rowId === 'unseong-row' ? '.unseong-tag' :
+    rowId === 'sinsal-row'   ? '.twelve-sinsal-tag' :
+    null;
+
+  const span = spanSelector ? td.querySelector(spanSelector) : null;
+
+  if (span) {
+    window.setExplainable(span, (value ?? ''));  // ✅ 텍스트 + data-term 동시 세팅
+  } else {
+    // (해당 행이 아니거나 span이 없으면) 기존 fallback
+    td.textContent = value ?? '';
+  }
 
   // 녹색 클래스 토글
   td.classList.remove('green-mark');
   if (
-    (rowId === 'unseong-row' && GREEN.unseong.includes(value)) ||
-    (rowId === 'sinsal-row'   && GREEN.sinsal.includes(value))
+    (rowId === 'unseong-row' && window.GREEN?.unseong?.includes(value)) ||
+    (rowId === 'sinsal-row'   && window.GREEN?.sinsal?.includes(value))
   ) {
     td.classList.add('green-mark');
   }
 }
+
 
 // ✅ 한 행 전체를 한 번에 채우기 (배열 길이 12 권장)
 export function setRowValues(rowId, values) {
