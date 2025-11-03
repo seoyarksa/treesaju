@@ -573,7 +573,7 @@ const jijiRow = `<tr id="jiji-row">
 const unseongRow = `
 <tr id="unseong-row">
   <th>
-    <span class="explainable" data-group="unseong" data-term="12운성">12운성</span>
+    <span class="explainable" data-group="terms" data-term="12운성">12운성</span>
   </th>
   ${jijiArr.map(() => `
     <td>
@@ -584,7 +584,7 @@ const unseongRow = `
 const sinsalRow = `
 <tr id="sinsal-row">
   <th>
-    <span class="explainable" data-group="sipsal12" data-term="12신살">12신살</span>
+    <span class="explainable" data-group="terms" data-term="12신살">12신살</span>
   </th>
   ${jijiArr.map(() => `
     <td>
