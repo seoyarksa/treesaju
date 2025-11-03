@@ -4143,6 +4143,11 @@ async function showBirthInfo(data) {
 window.handleDaeyunClick = handleDaeyunClick;
 
 
+function tgTag(label) {
+  const term = (label ?? '').toString().trim();
+  if (!term) return ''; // 빈 값이면 그냥 빈 문자열
+  return `<span class="ten-god explainable" data-group="tengod" data-term="${term}">${term}</span>`;
+}
 
 
     document.getElementById('common-section').innerHTML = `
@@ -4677,7 +4682,7 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
       <td>
         <div>${colorize(timeGanji.gan)}</div>
         <div style="font-size:0.85rem; color:#888;">
-          (${getTenGod(dayGanKorGan, convertHanToKorStem(timeGanji.gan))})
+          (${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(timeGanji.gan)))})
         </div>
       </td>
       <td>
