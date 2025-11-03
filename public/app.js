@@ -5574,54 +5574,28 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
     box.querySelector('#saju-mini-close')?.addEventListener('click', () => box.remove());
   }
 
-    const body = box.querySelector('#saju-mini-body');
+  const body = box.querySelector('#saju-mini-body');
   const C = (txt) => _colorize(txt);
 
-  // 표는 [시주, 일주, 월주, 년주] 순서로 가로 헤더를 만들고,
-  // 1행: 천간(십신), 2행: 지지, 3행: 지장간 으로 구성
-  const columns = [data.hour, data.day, data.month, data.year];
+  const row = (label, p) => `
+    <tr>
+      <th>${label}</th>
+      <td>
+        <div><strong>${C(p.gan || '-')}</strong> <small>(${p.ten || '-'})</small></div>
+        <div>지지: <strong>${C(p.jiji || '-')}</strong></div>
+        ${p.hides?.length ? `<div style="margin-top:4px;">지장간: ${p.hides.map(h => `<span class="chip">${h}</span>`).join('')}</div>` : ''}
+      </td>
+    </tr>`;
 
   body.innerHTML = `
-    <table class="mini-grid">
-      <thead>
-        <tr>
-          <th>시주</th>
-          <th>일주</th>
-          <th>월주</th>
-          <th>년주</th>
-        </tr>
-      </thead>
-      <tbody>
-        <!-- 1행: 천간(십신) -->
-        <tr>
-          ${columns.map(p => `
-            <td>
-              <div><strong>${C(p.gan || '-')}</strong> <small>(${p.ten || '-'})</small></div>
-            </td>
-          `).join('')}
-        </tr>
-        <!-- 2행: 지지 -->
-        <tr>
-          ${columns.map(p => `
-            <td>
-              <div><strong>${C(p.jiji || '-')}</strong></div>
-            </td>
-          `).join('')}
-        </tr>
-        <!-- 3행: 지장간 -->
-        <tr>
-          ${columns.map(p => `
-            <td>
-              ${p.hides && p.hides.length
-                ? p.hides.map(h => `<span class="chip">${h}</span>`).join('')
-                : '-'}
-            </td>
-          `).join('')}
-        </tr>
-      </tbody>
+    <table>
+      ${row('년주',  data.year)}
+      ${row('월주',  data.month)}
+      ${row('일주',  data.day)}
+      ${row('시주',  data.hour)}
     </table>
   `;
-
+}
 
 
 
