@@ -4739,10 +4739,10 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
     <div class="hidden-stem-wrapper">
       ${dayLines.map(s => `
         <div class="hidden-stem">
-          (${colorize(convertKorToHanStem(s), '0.85rem')}
+          ${colorize(convertKorToHanStem(s), '0.85rem')}
           <span style="font-size:0.75rem; color:#999;">
              ${tgTag(getTenGod(dayGanKorGan, s))}
-          </span>)
+          </span>
         </div>`).join('')}
     </div>
   </td>
@@ -4750,10 +4750,10 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
     <div class="hidden-stem-wrapper">
       ${monthLines.map(s => `
         <div class="hidden-stem">
-          (${colorize(convertKorToHanStem(s), '0.85rem')}
+          ${colorize(convertKorToHanStem(s), '0.85rem')}
           <span style="font-size:0.75rem; color:#999;">
             ${tgTag(getTenGod(dayGanKorGan, s))}
-          </span>)
+          </span>
         </div>`).join('')}
     </div>
   </td>
@@ -4761,10 +4761,10 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
     <div class="hidden-stem-wrapper">
       ${yearLines.map(s => `
         <div class="hidden-stem">
-          (${colorize(convertKorToHanStem(s), '0.85rem')}
+          ${colorize(convertKorToHanStem(s), '0.85rem')}
           <span style="font-size:0.75rem; color:#999;">
              ${tgTag(getTenGod(dayGanKorGan, s))}
-          </span>)
+          </span>
         </div>`).join('')}
     </div>
   </td>
