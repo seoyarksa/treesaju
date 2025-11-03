@@ -5589,7 +5589,7 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
     box.id = 'saju-mini';
     box.innerHTML = `
       <div class="bar">
-        <strong>사주 요약</strong>
+        <strong id="saju-mini-title">사주 팔자</strong>
         <div>
           <button class="btn" id="saju-mini-min" title="접기">—</button>
           <button class="btn" id="saju-mini-close" title="닫기">×</button>
@@ -5597,9 +5597,19 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
       </div>
       <div class="body" id="saju-mini-body"></div>
     `;
+
+    // 박스 만든 직후나, 표 채운 직후 공통으로 호출
+function setMiniTitle() {
+  const titleEl = document.querySelector('#saju-mini #saju-mini-title');
+  if (!titleEl) return;
+  const name = document.getElementById('customer-name')?.value?.trim() || '';
+  titleEl.textContent = name ? `사주팔자(${name})` : '사주팔자';
+}
     document.body.appendChild(box);
+setMiniTitle();
 
   }
+
 
 // ▼▼ 기존의 row()/body.innerHTML 부분을 이걸로 교체 ▼▼
 const body = box.querySelector('#saju-mini-body');
@@ -5659,11 +5669,25 @@ body.innerHTML = `
     </tbody>
   </table>
 `;
-
+setMiniTitle();
             }
 
 
 
+(function wireMiniTitleLive(){
+  if (window.__miniTitleWired) return;
+  window.__miniTitleWired = true;
+
+  const input = document.getElementById('customer-name');
+  if (!input) return; // 페이지에 그 요소 없으면 패스
+
+  input.addEventListener('input', () => {
+    const el = document.querySelector('#saju-mini #saju-mini-title');
+    if (!el) return;
+    const v = input.value.trim();
+    el.textContent = v ? `사주팔자(${v})` : '사주팔자';
+  });
+})();
 
 
 
