@@ -5436,7 +5436,13 @@ requestAnimationFrame(() => {
   // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
 // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
 // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
-renderSajuMiniFromCurrentOutput();   // ← 이 줄만 추가
+renderSajuMiniFromCurrentOutput({
+  timeGanji, dayGanji, monthGanji, yearGanji,
+  timeLines, dayLines, monthLines, yearLines,
+  dayGanKorGan,
+  getTenGod, convertHanToKorStem, convertKorToHanStem, colorize
+});
+
   }
 
 
@@ -5470,31 +5476,85 @@ renderSajuMiniFromCurrentOutput();   // ← 이 줄만 추가
 })();
 
 // ─── 미니 사주창: 렌더러 ───
-function renderSajuMiniFromCurrentOutput() {
-  // 메인 출력에서 이미 쓰는 변수들을 그대로 사용
-  // (dayGanKorGan, getTenGod, convertHanToKorStem, convertKorToHanStem, colorize 모두 기존 코드에 있음)
+function renderSajuMiniFromCurrentOutput(ctx = {}) {
+  // 1) 안전한 디펜던시 주입(함수 포인터)
+  const _getTenGod             = ctx.getTenGod             || window.getTenGod             || (() => '');
+  const _convertHanToKorStem   = ctx.convertHanToKorStem   || window.convertHanToKorStem   || (x => x);
+  const _convertKorToHanStem   = ctx.convertKorToHanStem   || window.convertKorToHanStem   || (x => x);
+  const _colorize              = ctx.colorize              || window.colorize              || (x => x);
+
+  // 2) pillars & lines: 우선 인자 → 전역 → (옵션) DOM 파싱
+  //   timeGanji/dayGanji/... 는 { gan: '丙', ji: '申' } 형태를 기대
+  const timeGanji  = ctx.timeGanji  || window.timeGanji;
+  const dayGanji   = ctx.dayGanji   || window.dayGanji;
+  const monthGanji = ctx.monthGanji || window.monthGanji;
+  const yearGanji  = ctx.yearGanji  || window.yearGanji;
+
+  const timeLines  = ctx.timeLines  || window.timeLines  || [];
+  const dayLines   = ctx.dayLines   || window.dayLines   || [];
+  const monthLines = ctx.monthLines || window.monthLines || [];
+  const yearLines  = ctx.yearLines  || window.yearLines  || [];
+
+  const dayGanKorGan = ctx.dayGanKorGan || window.dayGanKorGan || ''; // 십신 계산 기준
+
+  // 3) 값이 정말 없으면 조용히 return (ReferenceError 방지)
+  if (!dayGanji || !monthGanji || !yearGanji || !timeGanji) {
+    // TODO: 필요하면 여기서 DOM(.ganji-table)에서 텍스트 파싱해 보완 가능
+    console.warn('[mini] pillars missing — skip render');
+    return;
+  }
+
   const data = {
     hour: {
-      gan: timeGanji?.gan, ten: getTenGod?.(dayGanKorGan, convertHanToKorStem(timeGanji?.gan)),
-      jiji: timeGanji?.ji, hides: (timeLines||[]).map(s => `${convertKorToHanStem(s)} ${getTenGod?.(dayGanKorGan, s)}`)
+      gan:  timeGanji.gan,
+      ten:  _getTenGod(dayGanKorGan, _convertHanToKorStem(timeGanji.gan)),
+      jiji: timeGanji.ji,
+      hides: timeLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`)
     },
-    day:  {
-      gan: dayGanji?.gan, ten: '일간',
-      jiji: dayGanji?.ji, hides: (dayLines||[]).map(s => `${convertKorToHanStem(s)} ${getTenGod?.(dayGanKorGan, s)}`)
+    day: {
+      gan:  dayGanji.gan,
+      ten:  '일간',
+      jiji: dayGanji.ji,
+      hides: dayLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`)
     },
-    month:{
-      gan: monthGanji?.gan, ten: getTenGod?.(dayGanKorGan, convertHanToKorStem(monthGanji?.gan)),
-      jiji: monthGanji?.ji, hides: (monthLines||[]).map(s => `${convertKorToHanStem(s)} ${getTenGod?.(dayGanKorGan, s)}`)
+    month: {
+      gan:  monthGanji.gan,
+      ten:  _getTenGod(dayGanKorGan, _convertHanToKorStem(monthGanji.gan)),
+      jiji: monthGanji.ji,
+      hides: monthLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`)
     },
     year: {
-      gan: yearGanji?.gan, ten: getTenGod?.(dayGanKorGan, convertHanToKorStem(yearGanji?.gan)),
-      jiji: yearGanji?.ji, hides: (yearLines||[]).map(s => `${convertKorToHanStem(s)} ${getTenGod?.(dayGanKorGan, s)}`)
+      gan:  yearGanji.gan,
+      ten:  _getTenGod(dayGanKorGan, _convertHanToKorStem(yearGanji.gan)),
+      jiji: yearGanji.ji,
+      hides: yearLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`)
     },
   };
 
-  // 요소 만들기(없으면 생성, 있으면 재사용)
+  // ─ UI 만들기/갱신
   let box = document.getElementById('saju-mini');
   if (!box) {
+    // CSS가 없으면 주입(중복 방지)
+    if (!document.getElementById('mini-saju-style')) {
+      const s = document.createElement('style');
+      s.id = 'mini-saju-style';
+      s.textContent = `
+        #saju-mini{position:fixed;right:16px;bottom:16px;z-index:9999;width:300px;max-width:calc(100vw - 24px);
+          background:#fff;border:1px solid #e5e5ea;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);overflow:hidden;font-size:14px;
+          font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif;}
+        #saju-mini .bar{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:linear-gradient(180deg,#f7f7f9,#efeff3);border-bottom:1px solid #ececf1;}
+        #saju-mini .body{max-height:260px;overflow:auto;padding:10px;}
+        #saju-mini table{width:100%;border-collapse:collapse;}
+        #saju-mini th,#saju-mini td{border-bottom:1px solid #f3f3f6;padding:4px 6px;text-align:left;vertical-align:top;}
+        #saju-mini th{width:3.5em;color:#666;font-weight:600;}
+        #saju-mini small{color:#777;}
+        #saju-mini .chip{display:inline-block;padding:2px 6px;border:1px solid #eee;border-radius:6px;margin:2px 2px 0 0;background:#fbfbfe;}
+        #saju-mini .btn{border:0;background:#f1f1f6;width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:14px;line-height:1;}
+        #saju-mini .btn:hover{background:#e9e9f2;}
+        #saju-mini.is-min .body{display:none;}
+      `;
+      document.head.appendChild(s);
+    }
     box = document.createElement('div');
     box.id = 'saju-mini';
     box.innerHTML = `
@@ -5508,15 +5568,12 @@ function renderSajuMiniFromCurrentOutput() {
       <div class="body" id="saju-mini-body"></div>
     `;
     document.body.appendChild(box);
-    // 버튼 동작
     box.querySelector('#saju-mini-min')?.addEventListener('click', () => box.classList.toggle('is-min'));
     box.querySelector('#saju-mini-close')?.addEventListener('click', () => box.remove());
   }
 
   const body = box.querySelector('#saju-mini-body');
-
-  // colorize가 있으면 살짝 색감 유지
-  const C = (txt) => (typeof colorize === 'function' ? colorize(txt) : txt);
+  const C = (txt) => _colorize(txt);
 
   const row = (label, p) => `
     <tr>
@@ -5530,10 +5587,10 @@ function renderSajuMiniFromCurrentOutput() {
 
   body.innerHTML = `
     <table>
-      ${row('년주', data.year)}
-      ${row('월주', data.month)}
-      ${row('일주', data.day)}
-      ${row('시주', data.hour)}
+      ${row('년주',  data.year)}
+      ${row('월주',  data.month)}
+      ${row('일주',  data.day)}
+      ${row('시주',  data.hour)}
     </table>
   `;
 }
