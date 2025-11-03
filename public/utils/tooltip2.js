@@ -148,7 +148,21 @@ const showNear = (target, html) => {
 
     const group = t.getAttribute('data-group') || 'unseong';
     const term  = t.getAttribute('data-term')  || t.textContent.trim();
-    const from  = (group === 'tengod') ? '십신' : (group === 'sipsal12' ? '12신살' : '12운성');
+    let from;
+switch (group) {
+  case 'tengod':
+    from = '십신';
+    break;
+  case 'sipsal12':
+    from = '12신살';
+    break;
+  case 'terms':
+    from = '용어설명';
+    break;
+  default:
+    from = '12운성';
+}
+
     const title = `${from} · ${term}`;
     const body  = getDesc(group, term);
 

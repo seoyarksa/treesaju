@@ -2,6 +2,7 @@
 //<span class="unseong-tag explainable" data-group="unseong" data-term="${u}">  //12운성
 //<span class="ten-god explainable" data-group="tengod" data-term="${tenHidden}">  //십신
 //<span class="twelve-sinsal-tag explainable" data-group="sipsal12" data-term="${term}">  //12신살
+//<span class="explainable" data-group="terms" data-term="">12운성</span>  //일반용어
 
 export const TERM_HELP = {
 
@@ -9,6 +10,8 @@ export const TERM_HELP = {
   terms: {
     '12운성': '천간의 현 환경에서의 상태나 모습을 나타낸다. 사람이 태어나서 죽을때까지의 상태나 모습의 변화에 비유되기도 함 ',
     '12신살': '지지에서의 환경적, 관계적 변화를 나타낸다. 이는 현재 가지고 있는 고유의 상태나 모습이 아닌 환경적 변화에 따른 대응 관계를 설명한다.,   ',
+    '일간': '일간은 사주에서 대표되는 나를 의미한다. 육신의 기준점',
+    '': ' ',
     '': ' ',
   },
 
