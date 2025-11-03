@@ -5560,7 +5560,13 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
       hides: yearLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`)
     },
   };
-
+  // ✅ 0) 제목 갱신 헬퍼: 박스가 있든 없든 document에서 찾아서 갱신
+  const setMiniTitle = () => {
+    const titleEl = document.querySelector('#saju-mini #saju-mini-title');
+    if (!titleEl) return;
+    const name = document.getElementById('customer-name')?.value?.trim() || '';
+    titleEl.textContent = name ? `사주팔자(${name})` : '사주팔자';
+  };
   // ─ UI 만들기/갱신
   let box = document.getElementById('saju-mini');
   if (!box) {
