@@ -214,9 +214,9 @@ export function renderBasicDaeyunTable({
        class="daeyun-cell"
        data-stem="${stem}"
        data-branch="${branch}">
-                <div>${colorize(stem)}</div>
-                ${tenGod ? `<div style="font-size:0.75rem; color:#999;">(${tenGod})</div>` : ""}
-                <div>${colorize(branch)}</div>
+                <div><span class="explainable" data-group="terms" data-term="${colorize(stem)}">${colorize(stem)}</span></div>
+                ${tenGod ? `<div style="font-size:0.75rem; color:#999;"><span class="explainable" data-group="tengod" data-term="${tenGod}">(${tenGod})</span></div>` : ""}
+                <div><span class="explainable" data-group="terms" data-term="${colorize(branch)}">${colorize(branch)}</span></div>
               </td>
             `;
           }).join('')}
