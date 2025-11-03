@@ -1163,7 +1163,7 @@ function generateNackhwaTable({ birthSaju, dayGanji }) {
     const val = stripTags(colorize(b));
     const highlight = birthBranches.includes(val) ? ' class="highlight-cell"' : '';
     const sipsin = getSipsin(dayMaster, b);
-    return `<td${highlight}><span style="font-size:1.5em;">${colorize(b)}</span><br><span class="explainable" data-group="terms" data-term="${sipsin}";style="font-size:0.9em;">${sipsin}</span></td>`;
+    return `<td${highlight}><span style="font-size:1.5em;">${colorize(b)}</span><br><span class="explainable" data-group="tengod" data-term="${sipsin}";style="font-size:0.9em;">${sipsin}</span></td>`;
   }).join("")}
 </tr>
 <tr>
@@ -1173,7 +1173,7 @@ function generateNackhwaTable({ birthSaju, dayGanji }) {
     const val = stripTags(colorize(chong));
     const highlight = birthBranches.includes(val) ? ' class="highlight-cell"' : '';
     const sipsin = chong ? getSipsin(dayMaster, chong) : '';
-    return `<td${highlight}><span style="font-size:1.5em;">${colorize(chong)}</span><br><span style="font-size:0.9em;">${sipsin}</span></td>`;
+    return `<td${highlight}><span style="font-size:1.5em;">${colorize(chong)}</span><br><span class="explainable" data-group="tengod" data-term="${sipsin}"; style="font-size:0.9em;">${sipsin}</span></td>`;
   }).join("")}
 </tr>
 
