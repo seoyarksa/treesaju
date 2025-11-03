@@ -504,37 +504,6 @@ window.renderUnseongByBranches = renderUnseongByBranches;
 
 //천간별 12운성 구하기 끝////////////////////////////
 
-// ✅ 추가: span 값 + data-term 동기화 유틸
-window.setExplainable = window.setExplainable || function setExplainable(span, termText) {
-  if (!span) return;
-  const t = (termText ?? '').toString().trim();
-  span.textContent = t || '-';
-  if (t && t !== '-') {
-    span.dataset.term = t;
-    span.classList.add('explainable');
-  } else {
-    span.dataset.term = '';
-    span.classList.remove('explainable');
-  }
-};
-
-// ✅ 추가: 값 찍힌 뒤 한번 호출해 보정(선택·권장)
-// 바꿔 넣기 (그대로 복붙)
-window.wireSajuTooltips = window.wireSajuTooltips || function (container = document) {
-  const sel = '.unseong-tag, .twelve-sinsal-tag, .ten-god';
-  container.querySelectorAll(sel).forEach(el => {
-    const t = (el.textContent || '').trim();
-    if (t && t !== '-') {
-      el.dataset.term = t;
-      el.classList.add('explainable');
-    } else {
-      el.dataset.term = '';
-      el.classList.remove('explainable');
-    }
-  });
-  window.initTermHelp?.();
-};
-
 
 
 export function renderSinsalTable({ sajuGanArr, samhapKey, sajuJijiArr }) {
@@ -566,8 +535,8 @@ const colCss = [...highlightIdx].map(i => `
   // 1. 상단 헤더
   const headerRows = `
     <tr>
-      <th colspan="10"><span class="explainable" data-group="terms" data-term="12운성">12운성</span></th>
-      <th colspan="4"> <span class="explainable" data-group="terms" data-term="12신살">12신살</span></th>
+      <th colspan="10">12운성</th>
+      <th colspan="4">12신살</th>
     </tr>
     <tr>
       ${ganList.map(gan => {
@@ -601,30 +570,8 @@ const jijiRow = `<tr id="jiji-row">
 </tr>`;
 
   // 운성/신살 행은 동적 갱신이므로, 클래스 없이 빈칸으로!
-  
-const unseongRow = `
-<tr id="unseong-row">
-  <th>
-    <span class="explainable" data-group="terms" data-term="12운성">12운성</span>
-  </th>
-  ${jijiArr.map(() => `
-    <td>
-      <span class="unseong-tag explainable" data-group="unseong" data-term="">-</span>
-    </td>
-  `).join('')}
-</tr>`;
-const sinsalRow = `
-<tr id="sinsal-row">
-  <th>
-    <span class="explainable" data-group="terms" data-term="12신살">12신살</span>
-  </th>
-  ${jijiArr.map(() => `
-    <td>
-      <span class="twelve-sinsal-tag explainable" data-group="sipsal12" data-term="">-</span>
-    </td>
-  `).join('')}
-</tr>`;
-
+ const unseongRow = `<tr id="unseong-row"><th>12운성</th>${jijiArr.map(() => `<td></td>`).join('')}</tr>`;
+const sinsalRow  = `<tr id="sinsal-row"><th>12신살</th>${jijiArr.map(() => `<td></td>`).join('')}</tr>`;
 
   const guide = `
     <tr>
@@ -705,103 +652,44 @@ const GREEN = {
 };
 
 // ✅ 단일 셀 채우기
-// ✅ 단일 셀 채우기
 export function setCellValue(rowId, colIndex, value) {
   const row = document.getElementById(rowId);
   if (!row) return;
+  // row는 <th> + 12개 <td> 구조 → td 인덱스 보정 필요 X (NodeList가 td만 반환됨)
   const tds = row.querySelectorAll('td');
   const td = tds[colIndex];
   if (!td) return;
 
-  // ✅ 변경: 행에 맞는 span을 찾아 "span만" 업데이트
-  const spanSelector =
-    rowId === 'unseong-row' ? '.unseong-tag' :
-    rowId === 'sinsal-row'   ? '.twelve-sinsal-tag' :
-    null;
-
-  const span = spanSelector ? td.querySelector(spanSelector) : null;
-
-  if (span) {
-    window.setExplainable(span, (value ?? ''));  // ✅ 텍스트 + data-term 동시 세팅
-  } else {
-    // (해당 행이 아니거나 span이 없으면) 기존 fallback
-    td.textContent = value ?? '';
-  }
+  // 값 세팅
+  td.textContent = value ?? '';
 
   // 녹색 클래스 토글
   td.classList.remove('green-mark');
   if (
-    (rowId === 'unseong-row' && window.GREEN?.unseong?.includes(value)) ||
-    (rowId === 'sinsal-row'   && window.GREEN?.sinsal?.includes(value))
+    (rowId === 'unseong-row' && GREEN.unseong.includes(value)) ||
+    (rowId === 'sinsal-row'   && GREEN.sinsal.includes(value))
   ) {
     td.classList.add('green-mark');
   }
 }
 
-
 // ✅ 한 행 전체를 한 번에 채우기 (배열 길이 12 권장)
 export function setRowValues(rowId, values) {
   const row = document.getElementById(rowId);
   if (!row) return;
-
   const tds = row.querySelectorAll('td');
-
-  // 어떤 span을 써야 하는지 행에 따라 선택
-  const spanSelector =
-    rowId === 'unseong-row' ? '.unseong-tag' :
-    rowId === 'sinsal-row'   ? '.twelve-sinsal-tag' :
-    null;
-
-  const spans = spanSelector ? row.querySelectorAll(`td ${spanSelector}`) : null;
-
   for (let i = 0; i < tds.length; i++) {
-    const v = (values?.[i] ?? '').toString().trim();
-
-    // ✅ 툴팁 span이 있으면 그 안에만 값/데이터 넣기 (td 전체를 갈아치우지 않음)
-    if (spans && spans[i]) {
-      const span = spans[i];
-
-      // setExplainable 유틸 있으면 사용
-      if (typeof window.setExplainable === 'function') {
-        window.setExplainable(span, v || '-');
-      } else {
-        // 폴백: 텍스트 + data-term 동기화
-        span.textContent = v || '-';
-        if (v && v !== '-') {
-          span.dataset.term = v;
-          span.classList.add('explainable');
-        } else {
-          span.dataset.term = '';
-          span.classList.remove('explainable');
-        }
-      }
-    } else {
-      // 해당 행이 아니거나 span이 없다면 기존 방식 유지
-      tds[i].textContent = v;
-    }
-
-    // ✅ 강조 클래스 처리(셀 자체에)
+    const v = values?.[i] ?? '';
+    tds[i].textContent = v;
     tds[i].classList.remove('green-mark');
     if (
-      (rowId === 'unseong-row' && window.GREEN?.unseong?.includes(v)) ||
-      (rowId === 'sinsal-row'   && window.GREEN?.sinsal?.includes(v))
+      (rowId === 'unseong-row' && GREEN.unseong.includes(v)) ||
+      (rowId === 'sinsal-row'   && GREEN.sinsal.includes(v))
     ) {
       tds[i].classList.add('green-mark');
     }
   }
-
-  // ✅ 마지막에 한 번: 혹시 빠진 곳 보정 + 팝업 초기화
-  if (typeof window.wireSajuTooltips === 'function') {
-    window.wireSajuTooltips(row);
-  } else if (typeof window.initTermHelp === 'function') {
-    window.initTermHelp();
-  }
-
-  // setRowValues(...) 마지막에
-wireSajuTooltips(document.getElementById('sinsal-box'));
-
 }
-
 
 
 
