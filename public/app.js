@@ -5560,13 +5560,45 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
   };
 
   // ── 4) 제목 갱신 헬퍼(항상 #customer-name에서 읽음)
-  const setMiniTitle = () => {
-    const titleEl = document.querySelector('#saju-mini #saju-mini-title');
-    if (!titleEl) return;
-    const nameInput = document.getElementById('customer-name');
-    const name = (nameInput?.value || '').trim();
-    titleEl.textContent = name ? `사주팔자(${name})` : '사주팔자';
-  };
+// ── 4) 제목 갱신 헬퍼(항상 #customer-name에서 읽음) + 디버깅 로그
+const setMiniTitle = (label = 'setMiniTitle') => {
+  const titleEl = document.querySelector('#saju-mini #saju-mini-title');
+  if (!titleEl) {
+    console.warn(`[mini:title] ${label} → titleEl 없음(#saju-mini-title 미존재)`);
+    return;
+  }
+
+  const inputEl = document.getElementById('customer-name');
+  if (!inputEl) {
+    console.warn(`[mini:title] ${label} → #customer-name 엘리먼트 없음 (DOM 시점 문제 가능)`);
+  }
+
+  // value/attr 모두 확인
+  const v1 = inputEl?.value ?? '';
+  const v2 = inputEl?.getAttribute?.('value') ?? '';
+  const v3 = (window.customerName ?? '');
+  const v4 = (typeof ctx.customerName === 'string' ? ctx.customerName : (ctx.name || ''));
+
+  // 우선순위: value → attribute(value) → window.customerName → ctx.customerName
+  const raw = (v1 || v2 || v3 || v4 || '');
+  const name = raw.trim();
+
+  const before = titleEl.textContent;
+  titleEl.textContent = name ? `사주팔자(${name})` : '사주팔자';
+
+  console.log('[mini:title]', {
+    label,
+    foundTitleEl: !!titleEl,
+    foundInputEl: !!inputEl,
+    value: v1,
+    attrValue: v2,
+    windowCustomerName: v3,
+    ctxCustomerName: v4,
+    decidedName: name,
+    beforeText: before,
+    afterText: titleEl.textContent
+  });
+};
 
   // ── 5) CSS 주입(중복 방지)
   if (!document.getElementById('mini-saju-style')) {
@@ -5613,14 +5645,18 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
     box.querySelector('#saju-mini-close')?.addEventListener('click', () => box.remove());
 
     // 고객명 입력 변경 시 제목 자동 반영(1회만)
-    if (!window.__miniTitleWired) {
-      const input = document.getElementById('customer-name');
-      if (input) {
-        input.addEventListener('input', setMiniTitle);
-        input.addEventListener('change', setMiniTitle);
-      }
-      window.__miniTitleWired = true;
-    }
+if (!window.__miniTitleWired) {
+  const input = document.getElementById('customer-name');
+  if (input) {
+    console.log('[mini:title] wire input listeners on #customer-name');
+    input.addEventListener('input',  () => setMiniTitle('input'));
+    input.addEventListener('change', () => setMiniTitle('change'));
+  } else {
+    console.warn('[mini:title] #customer-name 없음 → 이벤트 바인딩 보류 (DOM 나중 생성일 수 있음)');
+  }
+  window.__miniTitleWired = true;
+}
+
   }
 
   // ── 7) 본문 표 렌더
