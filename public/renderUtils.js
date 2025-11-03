@@ -216,7 +216,7 @@ export function renderBasicDaeyunTable({
        data-branch="${branch}">
                 <div><span class="explainable" data-group="terms" data-term="">${colorize(stem)}</span></div>
                 ${tenGod ? `<div style="font-size:0.75rem; color:#999;"><span class="explainable" data-group="tengod" data-term="${tenGod}">(${tenGod})</span></div>` : ""}
-                <div><span class="explainable" data-group="terms" data-term="${colorize(branch)}">${colorize(branch)}</span></div>
+                <div><span class="explainable" data-group="terms" data-term="">${colorize(branch)}</span></div>
               </td>
             `;
           }).join('')}
@@ -394,9 +394,9 @@ sewoonReversed.forEach(({ stem, branch, year }) => {
   td.style.verticalAlign = "middle";
 
   td.innerHTML = `
-    <div>${colorize(stem)}</div>
-    ${tenGod ? `<div style="font-size:0.75rem; color:#999;">(${tenGod})</div>` : ""}
-    <div>${colorize(branch)}</div>
+    <div><span class="explainable" data-group="terms" data-term="">${colorize(stem)}</span></div>
+    ${tenGod ? `<div style="font-size:0.75rem; color:#999;"><span class="explainable" data-group="tengod" data-term="${tenGod}">(${tenGod})</span></div>` : ""}
+    <div><span class="explainable" data-group="terms" data-term="">${colorize(branch)}</span></div>
   `;
 
   td.addEventListener("click", () => basicSewoonClick(td, stem, branch, year));
