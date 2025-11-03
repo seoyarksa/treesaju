@@ -5507,13 +5507,13 @@ requestAnimationFrame(() => {
 
 // ─── 미니 사주창: 렌더러 ───
 function renderSajuMiniFromCurrentOutput(ctx = {}) {
-  // ── 1) 의존 함수 안전 주입
+  // 1) 의존 함수(없으면 안전 폴백)
   const _getTenGod           = ctx.getTenGod           || window.getTenGod           || (() => '');
   const _convertHanToKorStem = ctx.convertHanToKorStem || window.convertHanToKorStem || (x => x);
   const _convertKorToHanStem = ctx.convertKorToHanStem || window.convertKorToHanStem || (x => x);
   const _colorize            = ctx.colorize            || window.colorize            || (x => x);
 
-  // ── 2) 기둥/지장간 데이터 (ctx → window)
+  // 2) 데이터 (ctx → window)
   const timeGanji  = ctx.timeGanji  || window.timeGanji;
   const dayGanji   = ctx.dayGanji   || window.dayGanji;
   const monthGanji = ctx.monthGanji || window.monthGanji;
@@ -5526,81 +5526,46 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
 
   const dayGanKorGan = ctx.dayGanKorGan || window.dayGanKorGan || '';
 
+  // (필수 값 없으면 그만)
   if (!dayGanji || !monthGanji || !yearGanji || !timeGanji) {
     console.warn('[mini] pillars missing — skip render');
     return;
   }
 
-  // ── 3) 표에 넣을 데이터 가공
+  // 3) 표 데이터 가공
   const data = {
-    hour:  {
-      gan:  timeGanji.gan,
-      ten:  _getTenGod(dayGanKorGan, _convertHanToKorStem(timeGanji.gan)),
-      jiji: timeGanji.ji,
-      hides: timeLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`),
-    },
-    day:   {
-      gan:  dayGanji.gan,
-      ten:  '일간',
-      jiji: dayGanji.ji,
-      hides: dayLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`),
-    },
-    month: {
-      gan:  monthGanji.gan,
-      ten:  _getTenGod(dayGanKorGan, _convertHanToKorStem(monthGanji.gan)),
-      jiji: monthGanji.ji,
-      hides: monthLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`),
-    },
-    year:  {
-      gan:  yearGanji.gan,
-      ten:  _getTenGod(dayGanKorGan, _convertHanToKorStem(yearGanji.gan)),
-      jiji: yearGanji.ji,
-      hides: yearLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`),
-    },
+    hour:  { gan: timeGanji.gan,  ten: _getTenGod(dayGanKorGan, _convertHanToKorStem(timeGanji.gan)),  jiji: timeGanji.ji,  hides: timeLines.map(s  => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
+    day:   { gan: dayGanji.gan,   ten: '일간',                                                         jiji: dayGanji.ji,   hides: dayLines.map(s   => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
+    month: { gan: monthGanji.gan, ten: _getTenGod(dayGanKorGan, _convertHanToKorStem(monthGanji.gan)), jiji: monthGanji.ji, hides: monthLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
+    year:  { gan: yearGanji.gan,  ten: _getTenGod(dayGanKorGan, _convertHanToKorStem(yearGanji.gan)),  jiji: yearGanji.ji,  hides: yearLines.map(s  => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
   };
 
-  // ── 4) 제목 갱신 헬퍼(항상 #customer-name에서 읽음)
-// ── 4) 제목 갱신 헬퍼(항상 #customer-name에서 읽음) + 디버깅 로그
-const setMiniTitle = (label = 'setMiniTitle') => {
-  const titleEl = document.querySelector('#saju-mini #saju-mini-title');
-  if (!titleEl) {
-    console.warn(`[mini:title] ${label} → titleEl 없음(#saju-mini-title 미존재)`);
-    return;
-  }
+  // 4) 제목 세터 (항상 #customer-name을 읽어 표시)
+  const setMiniTitle = (label = 'setMiniTitle') => {
+    // id로 먼저 찾고, 없으면 .bar strong으로 폴백
+    let titleEl = document.querySelector('#saju-mini #saju-mini-title')
+               || document.querySelector('#saju-mini .bar strong');
+    if (!titleEl) {
+      console.warn(`[mini:title] ${label} → title 요소 없음`);
+      return;
+    }
 
-  const inputEl = document.getElementById('customer-name');
-  if (!inputEl) {
-    console.warn(`[mini:title] ${label} → #customer-name 엘리먼트 없음 (DOM 시점 문제 가능)`);
-  }
+    const inputEl = document.getElementById('customer-name');
+    const v1 = inputEl?.value ?? '';
+    const v2 = inputEl?.getAttribute?.('value') ?? '';
+    const v3 = window.customerName ?? '';
+    const v4 = (typeof ctx.customerName === 'string' ? ctx.customerName : (ctx.name || ''));
 
-  // value/attr 모두 확인
-  const v1 = inputEl?.value ?? '';
-  const v2 = inputEl?.getAttribute?.('value') ?? '';
-  const v3 = (window.customerName ?? '');
-  const v4 = (typeof ctx.customerName === 'string' ? ctx.customerName : (ctx.name || ''));
+    const raw = (v1 || v2 || v3 || v4 || '');
+    const name = raw.trim();
 
-  // 우선순위: value → attribute(value) → window.customerName → ctx.customerName
-  const raw = (v1 || v2 || v3 || v4 || '');
-  const name = raw.trim();
+    titleEl.textContent = name ? `사주팔자(${name})` : '사주팔자';
 
-  const before = titleEl.textContent;
-  titleEl.textContent = name ? `사주팔자(${name})` : '사주팔자';
+    // 디버깅 로그(필요 없으면 주석 처리해도 됨)
+    console.log('[mini:title]', { label, value:v1, attr:v2, win:v3, ctx:v4, decided:name, text:titleEl.textContent });
+  };
 
-  console.log('[mini:title]', {
-    label,
-    foundTitleEl: !!titleEl,
-    foundInputEl: !!inputEl,
-    value: v1,
-    attrValue: v2,
-    windowCustomerName: v3,
-    ctxCustomerName: v4,
-    decidedName: name,
-    beforeText: before,
-    afterText: titleEl.textContent
-  });
-};
-
-  // ── 5) CSS 주입(중복 방지)
+  // 5) CSS 1회 주입
   if (!document.getElementById('mini-saju-style')) {
     const s = document.createElement('style');
     s.id = 'mini-saju-style';
@@ -5623,7 +5588,7 @@ const setMiniTitle = (label = 'setMiniTitle') => {
     document.head.appendChild(s);
   }
 
-  // ── 6) 박스 생성(없으면 만들고, 있으면 재사용)
+  // 6) 박스 생성(없으면 만들고, 있으면 재사용)
   let box = document.getElementById('saju-mini');
   if (!box) {
     box = document.createElement('div');
@@ -5638,40 +5603,40 @@ const setMiniTitle = (label = 'setMiniTitle') => {
       </div>
       <div class="body" id="saju-mini-body"></div>
     `;
+    // (중요) DOM에 붙인 다음 제목 세팅
     document.body.appendChild(box);
+    setMiniTitle('after-append');
 
-    // 버튼 직결 바인딩
+    // 버튼 바인딩
     box.querySelector('#saju-mini-min')?.addEventListener('click', () => box.classList.toggle('is-min'));
     box.querySelector('#saju-mini-close')?.addEventListener('click', () => box.remove());
 
-    // 고객명 입력 변경 시 제목 자동 반영(1회만)
-if (!window.__miniTitleWired) {
-  const input = document.getElementById('customer-name');
-  if (input) {
-    console.log('[mini:title] wire input listeners on #customer-name');
-    input.addEventListener('input',  () => setMiniTitle('input'));
-    input.addEventListener('change', () => setMiniTitle('change'));
+    // 고객명 입력 변화 감지(1회만 연결)
+    if (!window.__miniTitleWired) {
+      const input = document.getElementById('customer-name');
+      if (input) {
+        input.addEventListener('input',  () => setMiniTitle('input'));
+        input.addEventListener('change', () => setMiniTitle('change'));
+      } else {
+        console.warn('[mini:title] #customer-name 없음 → 입력 이벤트 연결 보류');
+      }
+      window.__miniTitleWired = true;
+    }
   } else {
-    console.warn('[mini:title] #customer-name 없음 → 이벤트 바인딩 보류 (DOM 나중 생성일 수 있음)');
+    // 혹시 예전 마크업이라 id 빠졌으면 복구
+    if (!box.querySelector('#saju-mini-title')) {
+      const strong = box.querySelector('.bar strong');
+      if (strong) strong.id = 'saju-mini-title';
+    }
   }
-  window.__miniTitleWired = true;
-}
 
-  }
-
-  // ── 7) 본문 표 렌더
+  // 7) 본문 표 렌더
   const body = box.querySelector('#saju-mini-body');
-
   const C = (txt) => (typeof _colorize === 'function' ? _colorize(txt) : (txt ?? ''));
-  const coerceCol = (p) => {
-    if (!p || typeof p !== 'object') return { gan: '-', ten: '-', jiji: '-', hides: [] };
-    return {
-      gan:  p.gan  ?? '-',
-      ten:  p.ten  ?? '-',
-      jiji: p.jiji ?? '-',
-      hides: Array.isArray(p.hides) ? p.hides : [],
-    };
-  };
+  const coerceCol = (p) => (!p || typeof p !== 'object')
+    ? { gan:'-', ten:'-', jiji:'-', hides:[] }
+    : { gan: p.gan ?? '-', ten: p.ten ?? '-', jiji: p.jiji ?? '-', hides: Array.isArray(p.hides) ? p.hides : [] };
+
   const columns = [data.hour, data.day, data.month, data.year].map(coerceCol);
 
   body.innerHTML = `
@@ -5698,11 +5663,12 @@ if (!window.__miniTitleWired) {
     </table>
   `;
 
-  // ── 8) 제목 즉시/지연 갱신(자동입력 대응)
+  // 8) 제목 즉시/지연 갱신(자동입력 대응)
   setMiniTitle();
-  requestAnimationFrame(setMiniTitle);
-  setTimeout(setMiniTitle, 300);
+  requestAnimationFrame(() => setMiniTitle('raf'));
+  setTimeout(() => setMiniTitle('t+300'), 300);
 }
+
 
 
 
