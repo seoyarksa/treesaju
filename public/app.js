@@ -5507,13 +5507,13 @@ requestAnimationFrame(() => {
 
 // ─── 미니 사주창: 렌더러 ───
 function renderSajuMiniFromCurrentOutput(ctx = {}) {
-  // 1) 안전한 디펜던시 주입(함수 포인터)
+  // ── 1) 의존 함수 안전 주입
   const _getTenGod           = ctx.getTenGod           || window.getTenGod           || (() => '');
   const _convertHanToKorStem = ctx.convertHanToKorStem || window.convertHanToKorStem || (x => x);
   const _convertKorToHanStem = ctx.convertKorToHanStem || window.convertKorToHanStem || (x => x);
   const _colorize            = ctx.colorize            || window.colorize            || (x => x);
 
-  // 2) pillars & lines
+  // ── 2) 기둥/지장간 데이터 (ctx → window)
   const timeGanji  = ctx.timeGanji  || window.timeGanji;
   const dayGanji   = ctx.dayGanji   || window.dayGanji;
   const monthGanji = ctx.monthGanji || window.monthGanji;
@@ -5531,50 +5531,69 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
     return;
   }
 
+  // ── 3) 표에 넣을 데이터 가공
   const data = {
-    hour:  { gan: timeGanji.gan,  ten: _getTenGod(dayGanKorGan, _convertHanToKorStem(timeGanji.gan)),  jiji: timeGanji.ji,
-             hides: timeLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
-    day:   { gan: dayGanji.gan,   ten: '일간', jiji: dayGanji.ji,
-             hides: dayLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
-    month: { gan: monthGanji.gan, ten: _getTenGod(dayGanKorGan, _convertHanToKorStem(monthGanji.gan)), jiji: monthGanji.ji,
-             hides: monthLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
-    year:  { gan: yearGanji.gan,  ten: _getTenGod(dayGanKorGan, _convertHanToKorStem(yearGanji.gan)),  jiji: yearGanji.ji,
-             hides: yearLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
+    hour:  {
+      gan:  timeGanji.gan,
+      ten:  _getTenGod(dayGanKorGan, _convertHanToKorStem(timeGanji.gan)),
+      jiji: timeGanji.ji,
+      hides: timeLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`),
+    },
+    day:   {
+      gan:  dayGanji.gan,
+      ten:  '일간',
+      jiji: dayGanji.ji,
+      hides: dayLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`),
+    },
+    month: {
+      gan:  monthGanji.gan,
+      ten:  _getTenGod(dayGanKorGan, _convertHanToKorStem(monthGanji.gan)),
+      jiji: monthGanji.ji,
+      hides: monthLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`),
+    },
+    year:  {
+      gan:  yearGanji.gan,
+      ten:  _getTenGod(dayGanKorGan, _convertHanToKorStem(yearGanji.gan)),
+      jiji: yearGanji.ji,
+      hides: yearLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`),
+    },
   };
 
-  // ✅ 제목 갱신 헬퍼 (한 번만 선언)
+  // ── 4) 제목 갱신 헬퍼(항상 #customer-name에서 읽음)
   const setMiniTitle = () => {
     const titleEl = document.querySelector('#saju-mini #saju-mini-title');
     if (!titleEl) return;
-    const name = document.getElementById('customer-name')?.value?.trim() || '';
+    const nameInput = document.getElementById('customer-name');
+    const name = (nameInput?.value || '').trim();
     titleEl.textContent = name ? `사주팔자(${name})` : '사주팔자';
   };
 
-  // ─ UI 만들기/갱신
+  // ── 5) CSS 주입(중복 방지)
+  if (!document.getElementById('mini-saju-style')) {
+    const s = document.createElement('style');
+    s.id = 'mini-saju-style';
+    s.textContent = `
+      #saju-mini{position:fixed;right:16px;bottom:16px;z-index:9999;width:300px;max-width:calc(100vw - 24px);
+        background:#fff;border:1px solid #e5e5ea;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);overflow:hidden;
+        font-size:12px;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif;}
+      #saju-mini .bar{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:linear-gradient(180deg,#f7f7f9,#efeff3);
+        border-bottom:1px solid #ececf1;}
+      #saju-mini .body{max-height:260px;overflow:auto;padding:10px;}
+      #saju-mini table{width:100%;border-collapse:collapse;}
+      #saju-mini th,#saju-mini td{border-bottom:1px solid #f3f3f6;padding:4px 6px;text-align:left;vertical-align:top;}
+      #saju-mini th{color:#666;font-weight:600;}
+      #saju-mini small{color:#777;}
+      #saju-mini .saju-chip{display:inline-block;padding:1px 4px;border:1px solid #eee;border-radius:6px;margin:2px 2px 0 0;background:#fbfbfe;font-size:11px;}
+      #saju-mini .btn{border:0;background:#f1f1f6;width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:14px;line-height:1;}
+      #saju-mini .btn:hover{background:#e9e9f2;}
+      #saju-mini.is-min .body{display:none;}
+    `;
+    document.head.appendChild(s);
+  }
+
+  // ── 6) 박스 생성(없으면 만들고, 있으면 재사용)
   let box = document.getElementById('saju-mini');
   if (!box) {
-    // CSS 주입(중복 방지)
-    if (!document.getElementById('mini-saju-style')) {
-      const s = document.createElement('style');
-      s.id = 'mini-saju-style';
-      s.textContent = `
-        #saju-mini{position:fixed;right:16px;bottom:16px;z-index:9999;width:300px;max-width:calc(100vw - 24px);
-          background:#fff;border:1px solid #e5e5ea;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);overflow:hidden;font-size:14px;
-          font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif;}
-        #saju-mini .bar{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:linear-gradient(180deg,#f7f7f9,#efeff3);border-bottom:1px solid #ececf1;}
-        #saju-mini .body{max-height:260px;overflow:auto;padding:10px;}
-        #saju-mini table{width:100%;border-collapse:collapse;}
-        #saju-mini th,#saju-mini td{border-bottom:1px solid #f3f3f6;padding:4px 6px;text-align:left;vertical-align:top;}
-        #saju-mini th{width:3.5em;color:#666;font-weight:600;}
-        #saju-mini small{color:#777;}
-        #saju-mini .saju-chip{display:inline-block;padding:2px 6px;border:1px solid #eee;border-radius:6px;margin:2px 2px 0 0;background:#fbfbfe;}
-        #saju-mini .btn{border:0;background:#f1f1f6;width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:14px;line-height:1;}
-        #saju-mini .btn:hover{background:#e9e9f2;}
-        #saju-mini.is-min .body{display:none;}
-      `;
-      document.head.appendChild(s);
-    }
-
     box = document.createElement('div');
     box.id = 'saju-mini';
     box.innerHTML = `
@@ -5589,23 +5608,34 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
     `;
     document.body.appendChild(box);
 
-    // 버튼 직결(없어도 위임 리스너가 있으면 동작하지만, 여기서 보강)
+    // 버튼 직결 바인딩
     box.querySelector('#saju-mini-min')?.addEventListener('click', () => box.classList.toggle('is-min'));
     box.querySelector('#saju-mini-close')?.addEventListener('click', () => box.remove());
 
-    // 제목 최초 세팅
-    setMiniTitle();
+    // 고객명 입력 변경 시 제목 자동 반영(1회만)
+    if (!window.__miniTitleWired) {
+      const input = document.getElementById('customer-name');
+      if (input) {
+        input.addEventListener('input', setMiniTitle);
+        input.addEventListener('change', setMiniTitle);
+      }
+      window.__miniTitleWired = true;
+    }
   }
 
-  // 본문 표 렌더
+  // ── 7) 본문 표 렌더
   const body = box.querySelector('#saju-mini-body');
-  const C = (txt) => (typeof _colorize === 'function' ? _colorize(txt) : (txt ?? ''));
 
+  const C = (txt) => (typeof _colorize === 'function' ? _colorize(txt) : (txt ?? ''));
   const coerceCol = (p) => {
     if (!p || typeof p !== 'object') return { gan: '-', ten: '-', jiji: '-', hides: [] };
-    return { gan: p.gan ?? '-', ten: p.ten ?? '-', jiji: p.jiji ?? '-', hides: Array.isArray(p.hides) ? p.hides : [] };
+    return {
+      gan:  p.gan  ?? '-',
+      ten:  p.ten  ?? '-',
+      jiji: p.jiji ?? '-',
+      hides: Array.isArray(p.hides) ? p.hides : [],
+    };
   };
-
   const columns = [data.hour, data.day, data.month, data.year].map(coerceCol);
 
   body.innerHTML = `
@@ -5620,34 +5650,24 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
       </thead>
       <tbody>
         <tr>
-          ${columns.map(p => `
-            <td><strong>${C(p.gan)}</strong> <small>(${C(p.ten)})</small></td>
-          `).join('')}
+          ${columns.map(p => `<td><strong>${C(p.gan)}</strong> <small>(${C(p.ten)})</small></td>`).join('')}
         </tr>
         <tr>
-          ${columns.map(p => `
-            <td><strong>${C(p.jiji)}</strong></td>
-          `).join('')}
+          ${columns.map(p => `<td><strong>${C(p.jiji)}</strong></td>`).join('')}
         </tr>
         <tr>
-          ${columns.map(p => `
-            <td>${p.hides.length ? p.hides.map(h => `<span class="saju-chip">(${h})</span>`).join('') : '-'}</td>
-          `).join('')}
+          ${columns.map(p => `<td>${p.hides.length ? p.hides.map(h => `<span class="saju-chip">(${h})</span>`).join('') : '-'}</td>`).join('')}
         </tr>
       </tbody>
     </table>
   `;
 
-  // 제목 갱신 (렌더 후 보강)
+  // ── 8) 제목 즉시/지연 갱신(자동입력 대응)
   setMiniTitle();
-
-  // 고객명 바뀌면 실시간 갱신 (한 번만 연결)
-  if (!window.__miniTitleWired) {
-    const input = document.getElementById('customer-name');
-    if (input) input.addEventListener('input', setMiniTitle);
-    window.__miniTitleWired = true;
-  }
+  requestAnimationFrame(setMiniTitle);
+  setTimeout(setMiniTitle, 300);
 }
+
 
 
 
