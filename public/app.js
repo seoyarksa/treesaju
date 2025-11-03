@@ -4209,7 +4209,7 @@ function tgTag(label) {
   border-collapse: collapse;
   table-layout: fixed;       /* ✅ 칸 비율로 강제 */
   word-break: break-word;
-  white-space: normal;       /* ✅ 줄바꿈 허용 */
+  white-space: keep-all;       /* ✅ 줄바꿈 허용 */
 }
 
 .daeyun-table,
