@@ -155,61 +155,6 @@ if (!window.__miniSajuDelegated) {
   window.__miniSajuDelegated = true;
 }
 
-// 앱 초기화 시 한 번만
-(function enableMiniDrag(){
-  const id = 'saju-mini';
-  let drag = null;
-
-  document.addEventListener('mousedown', (e) => {
-    const mini = document.getElementById(id);
-    if (!mini) return;
-    // 바 영역에서만 드래그
-    if (!e.target.closest('#'+id+' .bar')) return;
-
-    const rect = mini.getBoundingClientRect();
-    drag = {
-      offsetX: e.clientX - rect.left,
-      offsetY: e.clientY - rect.top
-    };
-    document.body.style.userSelect = 'none';
-  });
-
-  document.addEventListener('mousemove', (e) => {
-    if (!drag) return;
-    const mini = document.getElementById(id);
-    if (!mini) return;
-    const x = Math.min(window.innerWidth - 40, Math.max(0, e.clientX - drag.offsetX));
-    const y = Math.min(window.innerHeight - 40, Math.max(0, e.clientY - drag.offsetY));
-    mini.style.left = x + 'px';
-    mini.style.top  = y + 'px';
-    mini.style.right = 'auto';
-    mini.style.bottom = 'auto';
-  });
-
-  document.addEventListener('mouseup', () => {
-    if (!drag) return;
-    const mini = document.getElementById(id);
-    if (mini) {
-      const rect = mini.getBoundingClientRect();
-      localStorage.setItem('saju-mini-pos', JSON.stringify({ x: rect.left, y: rect.top }));
-    }
-    drag = null;
-    document.body.style.userSelect = '';
-  });
-
-  // 복원
-  window.addEventListener('DOMContentLoaded', () => {
-    const pos = localStorage.getItem('saju-mini-pos');
-    if (!pos) return;
-    const { x, y } = JSON.parse(pos);
-    const mini = document.getElementById(id);
-    if (!mini) return;
-    mini.style.left = x + 'px';
-    mini.style.top  = y + 'px';
-    mini.style.right = 'auto';
-    mini.style.bottom = 'auto';
-  });
-})();
 
 
 // ===== app.js (안전망 포함, 전체 교체용) =====

@@ -98,7 +98,7 @@ body {
   .hero-left { margin-bottom: 16px; }
 }
 
-}
+
 
   /* 구분선 */
 .section-split{
@@ -187,9 +187,27 @@ body {
   display: none;
 }
 
+
+
+#sinsal-box .unseong-tag,
+#sinsal-box .twelve-sinsal-tag,
+#sinsal-box .ten-god { display:block; width:100%; height:100%; padding:4px 0; }
+
+
+/* 렌더 CSS(centerStyle 등) 어딘가에 추가 */
+.unseong-tag,
+.twelve-sinsal-tag,
+.ten-god {
+  display: block; width: 100%; height: 100%; padding: 4px 0;
+}
+
 .explainable { cursor: pointer !important; }
 .explainable::after { display: none !important; }
-
+  .explainable {
+    cursor: help !important;
+    pointer-events: auto !important; /* ← 충돌 방지 */
+    display: inline-block;           /* 클릭 면적 안정화 */
+  }
 
 .tooltip {
   position: relative;
@@ -452,6 +470,88 @@ body {
 }
 
 #term-help-pop { pointer-events: none; }
+
+
+/*작은창 */
+.saju-mini{
+  position: fixed;     /* ✅ 스크롤해도 화면에 고정 */
+  right: 16px;
+  bottom: 16px;
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  background:#f8f1c9;
+  border:1px solid #ddd;
+  border-radius:12px;
+  box-shadow:0 10px 30px rgba(0,0,0,.18);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
+  font-size: 14px;
+  color:#222;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.saju-mini__bar{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:8px;
+  padding:8px 10px;
+    background: linear-gradient(
+    90deg,
+    #e8f0c8 0 8px,         /* 왼쪽 연두 */
+    #e8f0c8 8px calc(100% - 8px), /* 중앙 흰색 */
+    #e8f0c8 calc(100% - 8px) 100% /* 오른쪽 연두 */
+  );
+  border-bottom:1px solid #e6e6ea;
+  cursor: move;                 /* 드래그 가능 느낌 */
+  user-select: none;
+}
+
+.saju-mini__actions{ display:flex; gap:6px; }
+.saju-mini__actions button{
+  border:0; background:#f1f1f6; width:24px; height:24px; border-radius:6px;
+  cursor:pointer; font-size:14px; line-height:1;
+}
+.saju-mini__actions button:hover{ background:#e9e9f2; }
+
+.saju-mini__body{
+  max-height: 260px;            /* 내용이 길면 내부 스크롤 */
+  overflow:auto;
+  padding:10px;
+}
+
+.saju-mini table{ width:100%; border-collapse:collapse; }
+.saju-mini th, .saju-mini td{
+  padding:4px 6px; border-bottom:1px solid #f0f0f2; text-align:left; vertical-align:top;
+}
+.saju-mini th{ width:3.5em; color:#666; font-weight:600; }
+.saju-mini small{ color:#666; }
+.saju-chip{
+  display:inline-block; padding:2px 6px; border:1px solid #e7e7ee; border-radius:6px; margin:2px 2px 0 0; background:#fbfbfe;
+}
+
+.saju-mini thead th, .saju-mini td { text-align: center; }
+
+
+/* 접힘 상태 */
+.saju-mini.is-min .saju-mini__body{ display:none; }
+
+/* ── 미니 사주 표 최소 글씨/여백 ───────────────────────── */
+#saju-mini { font-size: 12px; }                   /* 기본 폰트 크기 ↓ */
+#saju-mini .mini-grid { font-size: 11px; }        /* 표 안 폰트 더 ↓ */
+#saju-mini thead th, 
+#saju-mini td { text-align: center; }
+#saju-mini th, 
+#saju-mini td { padding: 2px 3px; line-height: 1.1; }  /* 여백/줄간격 압축 */
+#saju-mini small { font-size: .75em; color: #666; }     /* 십신 괄호 */
+#saju-mini .saju-chip { 
+  font-size: 10px; padding: 1px 4px; border-radius: 4px; 
+}
+#saju-mini { z-index: 2147483647; }
+#saju-mini, #saju-mini * { pointer-events: auto; }
+
+
+/* 작은 창 끝 */
+
+
 
 </style>
 
@@ -843,6 +943,19 @@ body {
 
 
 
+<!-- 미니 사주창 -->
+<div id="saju-mini" class="saju-mini" aria-live="polite">
+  <div class="saju-mini__bar" id="saju-mini-bar">
+    <strong>사주 팔자</strong>
+    <div class="saju-mini__actions">
+      <button type="button" id="saju-mini-min" title="접기">—</button>
+      <button type="button" id="saju-mini-close" title="닫기">×</button>
+    </div>
+  </div>
+  <div class="saju-mini__body" id="saju-mini-body">
+    <!-- 데이터가 JS로 채워짐 -->
+  </div>
+</div>
 
 
 
