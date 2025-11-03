@@ -4730,7 +4730,7 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
         <div class="hidden-stem">
           ${colorize(convertKorToHanStem(s), '0.85rem')}
           <span style="font-size:0.75rem; color:#999;">
-             ${tgTag(getTenGod(dayGanKorGan, s))}
+             (${tgTag(getTenGod(dayGanKorGan, s))})
           </span>
         </div>`).join('')}
     </div>
