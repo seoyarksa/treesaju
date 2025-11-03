@@ -45,34 +45,59 @@
   window.client = window.supabaseClient;
   console.log("[INDEX] supabaseClient ready:", !!window.supabaseClient);
 </script>
-
   <script src="https://cdn.iamport.kr/js/iamport.payment-1.2.0.js"></script>
 
 <style>
-  body {
-    font-family: 'Nanum Gothic', sans-serif;
-    margin: 0; padding: 0;
-    background-color: #f8f8f8;
-  }
+body {
+  font-family: 'Nanum Gothic', sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #ffffff; /* ← 여기만 흰색으로 변경 */
+}
 
-    /* 사주트리나무 그림 */
+/* 사주트리나무 그림 */
+/* 두 컬럼 하단선 정렬 */
+.landing-wrap {
+  display: flex;
+  gap: 24px;
+  align-items: flex-end; /* ⬅️ 양쪽 아이템의 '아랫변'을 맞춤 */
+  margin-top: 8px;
+}
 
-.landing-wrap{
-  display:flex; gap:24px; align-items:flex-start; margin-top:8px;
+/* 왼쪽: 고정/스티키 금지 + 하단 정렬 보장 */
+.hero-left {
+  flex: 1;
+  position: static;        /* sticky/fixed 쓰지 않기 */
+  align-self: flex-end;    /* ⬅️ 개별 하단 정렬(안전장치) */
 }
-.hero-left{
-  flex:1; position:sticky; top:12px; /* 스크롤해도 살짝 고정되어 보이게 */
+
+/* 오른쪽: 폼 영역 */
+.hero-right {
+  flex: 1.25;
+  min-width: 360px;
 }
-.hero-right{
-  flex:1.25; min-width:360px;
+
+/* 폼 마지막 요소에 불필요한 아래 마진이 있으면 제거(하단선 어긋남 방지) */
+.hero-right > :last-child {
+  margin-bottom: 0;
 }
-.hero-left img{
-  display:block; width:100%; height:auto;
-  border-radius:14px; box-shadow:0 10px 24px rgba(0,0,0,.08);
+
+/* 이미지 자체는 그대로 */
+.hero-left img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+  box-shadow: none;
+  background: transparent;
 }
-@media (max-width: 900px){
-  .landing-wrap{ display:block; }
-  .hero-left{ position:static; margin-bottom:16px; }
+
+/* 모바일은 세로 스택 */
+@media (max-width: 900px) {
+  .landing-wrap { display: block; }
+  .hero-left { margin-bottom: 16px; }
+}
+
 }
 
   /* 구분선 */
@@ -162,6 +187,8 @@
   display: none;
 }
 
+.explainable { cursor: pointer !important; }
+.explainable::after { display: none !important; }
 
 
 .tooltip {
@@ -415,6 +442,16 @@
   background: #fafafa;            /* 필요 시 유지 */
   border-radius: 8px;             /* 필요 시 유지 */
 }
+
+/* 상단 헤더 전체 파란 톤 */
+#unseong-block .unseong-table .tophead th { background: #e9f5ff !important; }
+
+/* 중간 헤더(지지 값 라인)는 그대로 노랑 */
+#unseong-block .unseong-table thead tr.midhead th {
+  background: #fff7d6 !important;
+}
+
+#term-help-pop { pointer-events: none; }
 
 </style>
 

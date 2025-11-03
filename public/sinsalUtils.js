@@ -570,8 +570,29 @@ const jijiRow = `<tr id="jiji-row">
 </tr>`;
 
   // 운성/신살 행은 동적 갱신이므로, 클래스 없이 빈칸으로!
- const unseongRow = `<tr id="unseong-row"><th>12운성</th>${jijiArr.map(() => `<td></td>`).join('')}</tr>`;
-const sinsalRow  = `<tr id="sinsal-row"><th>12신살</th>${jijiArr.map(() => `<td></td>`).join('')}</tr>`;
+const unseongRow = `
+<tr id="unseong-row">
+  <th>
+    <span class="explainable" data-group="unseong" data-term="12운성">12운성</span>
+  </th>
+  ${jijiArr.map(() => `
+    <td>
+      <span class="unseong-tag explainable" data-group="unseong" data-term="">-</span>
+    </td>
+  `).join('')}
+</tr>`;
+const sinsalRow = `
+<tr id="sinsal-row">
+  <th>
+    <span class="explainable" data-group="sipsal12" data-term="12신살">12신살</span>
+  </th>
+  ${jijiArr.map(() => `
+    <td>
+      <span class="twelve-sinsal-tag explainable" data-group="sipsal12" data-term="">-</span>
+    </td>
+  `).join('')}
+</tr>`;
+
 
   const guide = `
     <tr>
