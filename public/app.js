@@ -5550,7 +5550,8 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
         #saju-mini th,#saju-mini td{border-bottom:1px solid #f3f3f6;padding:4px 6px;text-align:left;vertical-align:top;}
         #saju-mini th{width:3.5em;color:#666;font-weight:600;}
         #saju-mini small{color:#777;}
-       #saju-mini .saju-chip{display:inline-block;padding:2px 6px;border:1px solid #eee;border-radius:6px;margin:2px 2px 0 0;background:#fbfbfe;}        #saju-mini .btn{border:0;background:#f1f1f6;width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:14px;line-height:1;}
+        #saju-mini .chip{display:inline-block;padding:2px 6px;border:1px solid #eee;border-radius:6px;margin:2px 2px 0 0;background:#fbfbfe;}
+        #saju-mini .btn{border:0;background:#f1f1f6;width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:14px;line-height:1;}
         #saju-mini .btn:hover{background:#e9e9f2;}
         #saju-mini.is-min .body{display:none;}
       `;
