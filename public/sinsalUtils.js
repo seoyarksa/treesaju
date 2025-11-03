@@ -506,144 +506,94 @@ window.renderUnseongByBranches = renderUnseongByBranches;
 
 
 
-// sinsalTable.js
-
-// ──────────────────────────────────────────────────────────
-// 0) 공통 유틸: 값 ↔ data-term 동기화 (툴팁용)
-// ──────────────────────────────────────────────────────────
-function setExplainable(span, termText) {
-  if (!span) return;
-  const t = (termText ?? '').toString().trim();
-  span.textContent = t || '-';
-  span.dataset.term = (t && t !== '-') ? t : '';
-  span.classList.toggle('explainable', !!span.dataset.term);
-}
-
-function ensureExplainables(container = document) {
-  // 12운성
-  container.querySelectorAll('.unseong-tag').forEach(el => {
-    el.dataset.group = 'unseong';
-    const t = el.textContent.trim();
-    if (t && t !== '-' && el.dataset.term !== t) el.dataset.term = t;
-    el.classList.toggle('explainable', !!el.dataset.term);
-  });
-  // 12신살
-  container.querySelectorAll('.twelve-sinsal-tag').forEach(el => {
-    el.dataset.group = 'sipsal12';
-    const t = el.textContent.trim();
-    if (t && t !== '-' && el.dataset.term !== t) el.dataset.term = t;
-    el.classList.toggle('explainable', !!el.dataset.term);
-  });
-  // 십신
-  container.querySelectorAll('.ten-god').forEach(el => {
-    el.dataset.group = 'tengod';
-    const t = el.textContent.trim();
-    if (t && t !== '-' && el.dataset.term !== t) el.dataset.term = t;
-    el.classList.toggle('explainable', !!el.dataset.term);
-  });
-}
-
-// 렌더 직후 한 번만 호출하면 됨.
-function afterSinsalTableRendered(root = document) {
-  try {
-    ensureExplainables(root);
-    // 기존 시스템 훅(있으면 호출)
-    window.initTermHelp?.();
-    window.attachUnseongTooltips?.();
-    window.attachSinsalTooltips?.();
-  } catch (e) {
-    console.warn('[afterSinsalTableRendered] warn:', e);
-  }
-}
-
-// 외부에서 동적 갱신 시 쓸 수 있게 공개
-window.setExplainable = window.setExplainable || setExplainable;
-window.ensureExplainables = window.ensureExplainables || ensureExplainables;
-window.afterSinsalTableRendered = window.afterSinsalTableRendered || afterSinsalTableRendered;
-
-
-// ──────────────────────────────────────────────────────────
 export function renderSinsalTable({ sajuGanArr, samhapKey, sajuJijiArr }) {
   const ganList = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
   const samhapNames = ['申子辰', '亥卯未', '寅午戌', '巳酉丑'];
   const jijiArr = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
   const sajuGanjiArr = sajuGanArr.map((gan, idx) => gan + sajuJijiArr[idx]);
 
-  const dayGan = sajuGanArr[1];
-
-  // ✅ 같은 지지 '열' 인덱스 계산(첫 칸이 <th>라서 +2 사용)
+const dayGan = sajuGanArr[1];  
+  // ✅ 추가: 같은 지지 '열' 인덱스 계산(첫 칸이 <th>라서 +2 사용)
   const norm = v => (v ?? '').toString().trim();
   const highlightIdx = new Set(
     (sajuJijiArr || []).map(norm).map(v => jijiArr.indexOf(v)).filter(i => i >= 0)
   );
+// ...
+// 해당 열 인덱스에 대한 CSS
+const colCss = [...highlightIdx].map(i => `
+  /* 지지, 12운성, 12신살 모두 같은 열 칠하기 */
+  #sinsal-box table.sinsal-bottom tr#jiji-row     td:nth-child(${i + 2}),
+  #sinsal-box table.sinsal-bottom tr#unseong-row td:nth-child(${i + 2}),
+  #sinsal-box table.sinsal-bottom tr#sinsal-row  td:nth-child(${i + 2}) {
+    background:rgb(240, 204, 245) !important;
+    box-shadow: inset 0 0 0 9999px rgba(248, 245, 248, 0.18);
+  }
+`).join('');
+// ...
 
-  // 🔸 동적으로 생성된 열 강조 CSS
-  const colCss = [...highlightIdx].map(i => `
-    /* 지지, 12운성, 12신살 모두 같은 열 칠하기 */
-    #sinsal-box table.sinsal-bottom tr#jiji-row     td:nth-child(${i + 2}),
-    #sinsal-box table.sinsal-bottom tr#unseong-row  td:nth-child(${i + 2}),
-    #sinsal-box table.sinsal-bottom tr#sinsal-row   td:nth-child(${i + 2}) {
-      background: rgb(240, 204, 245) !important;
-      box-shadow: inset 0 0 0 9999px rgba(248, 245, 248, 0.18);
-    }
-  `).join('');
 
-  // 1) 상단 헤더
+  // 1. 상단 헤더
   const headerRows = `
     <tr>
       <th colspan="10"><span class="explainable" data-group="terms" data-term="12운성">12운성</span></th>
-      <th colspan="4"><span class="explainable" data-group="terms" data-term="12신살">12신살</span></th>
+      <th colspan="4"> <span class="explainable" data-group="terms" data-term="12신살">12신살</span></th>
     </tr>
     <tr>
       ${ganList.map(gan => {
-        const sipsin = getSipsin(dayGan, gan);  // 천간에 대한 십신명
-        const sipsinHtml = sipsin
-          ? `<span class="ten-god explainable" data-group="tengod" data-term="${sipsin}">${sipsin}</span>`
-          : '';
+const sipsin = getSipsin(dayGan, gan);  // 천간에 대한 십신명
+const sipsinHtml = sipsin
+  ? `<span class="ten-god explainable" data-group="tengod" data-term="${sipsin}">${sipsin}</span>`
+  : '';
 
-        return `
-          <td class="clickable${sajuGanArr.includes(gan) ? ' saju-blue' : ''}"
-              data-type="unseong"
-              data-gan="${gan}"
-              style="cursor:pointer; text-align:center;">
+return `<td class="clickable${sajuGanArr.includes(gan) ? ' saju-blue' : ''}" 
+            data-type="unseong" 
+            data-gan="${gan}" 
+            style="cursor:pointer; text-align:center;">
             <div>${gan}</div>
             <div style="font-size:0.8em; color:#555;">${sipsinHtml}</div>
-          </td>`;
-      }).join('')}
+        </td>`;
+
+}).join("")}
 
       ${samhapNames.map(key =>
-        `<td class="clickable${key === samhapKey ? ' saju-blue' : ''}"
-             data-type="sinsal" data-samhap="${key}" style="cursor:pointer;">${key}</td>`
+        `<td class="clickable${key === samhapKey ? ' saju-blue' : ''}" data-type="sinsal" data-samhap="${key}" style="cursor:pointer;">${key}</td>`
       ).join('')}
     </tr>
   `;
 
-  // 2) 아래쪽 12지지
-  const jijiRow = `
-    <tr id="jiji-row">
-      <th>지지</th>
-      ${jijiArr.map(jj =>
-        `<td class="jiji-clickable${(sajuJijiArr || []).map(norm).includes(jj) ? ' saju-blue' : ''}"
-             data-jiji="${jj}" style="cursor:pointer;">${jj}</td>`
-      ).join('')}
-    </tr>`;
+  // 2. 아래쪽 12지지
+const jijiRow = `<tr id="jiji-row">
+  <th>지지</th>
+  ${jijiArr.map(jj =>
+    `<td class="jiji-clickable${(sajuJijiArr || []).map(norm).includes(jj) ? ' saju-blue' : ''}" data-jiji="${jj}" style="cursor:pointer;">${jj}</td>`
+  ).join('')}
+</tr>`;
 
-  // 3) 운성/신살 행 — 초기엔 빈값('-'), 이후 동적 갱신 시 setExplainable()로 텍스트 + data-term 동기화
-  const unseongRow = `
-    <tr id="unseong-row">
-      <th><span class="explainable" data-group="terms" data-term="12운성">12운성</span></th>
-      ${jijiArr.map(() => `
-        <td><span class="unseong-tag explainable" data-group="unseong" data-term="">-</span></td>
-      `).join('')}
-    </tr>`;
+  // 운성/신살 행은 동적 갱신이므로, 클래스 없이 빈칸으로!
+  
+const unseongRow = `
+<tr id="unseong-row">
+  <th>
+    <span class="explainable" data-group="terms" data-term="12운성">12운성</span>
+  </th>
+  ${jijiArr.map(() => `
+    <td>
+      <span class="unseong-tag explainable" data-group="unseong" data-term="">-</span>
+    </td>
+  `).join('')}
+</tr>`;
+const sinsalRow = `
+<tr id="sinsal-row">
+  <th>
+    <span class="explainable" data-group="terms" data-term="12신살">12신살</span>
+  </th>
+  ${jijiArr.map(() => `
+    <td>
+      <span class="twelve-sinsal-tag explainable" data-group="sipsal12" data-term="">-</span>
+    </td>
+  `).join('')}
+</tr>`;
 
-  const sinsalRow = `
-    <tr id="sinsal-row">
-      <th><span class="explainable" data-group="terms" data-term="12신살">12신살</span></th>
-      ${jijiArr.map(() => `
-        <td><span class="twelve-sinsal-tag explainable" data-group="sipsal12" data-term="">-</span></td>
-      `).join('')}
-    </tr>`;
 
   const guide = `
     <tr>
@@ -665,18 +615,23 @@ export function renderSinsalTable({ sajuGanArr, samhapKey, sajuJijiArr }) {
         font-weight: bold;
         text-shadow: 0 1px 0 #e6f3ff;
       }
-      .green-mark {
-        color: #0b5e0b !important;
-        font-weight: bold;
-      }
+            /* ✅ 녹색 표시 스타일 */
+    .green-mark {
+     /* background-color: #d4f5d4 !important;  은은한 녹색 배경 */
+      color: #0b5e0b !important;            /* 진한 녹색 글씨 */
+      font-weight: bold;
+    }
+
 
       ${colCss} /* 🔸 동적으로 생성된 열 강조 CSS */
 
-      .unseong-tag { color:#1976d2 !important; font-weight:700; }
+        .unseong-tag { color:#1976d2 !important; font-weight:700; 
+        }
+
+
     </style>
   `;
 
-  // 최종 HTML 반환(외부에서 #sinsal-box 등에 innerHTML로 삽입)
   return `
     ${centerStyle}
     <table border="1" style="border-collapse:collapse; margin:auto; font-size:15px;">
@@ -684,7 +639,6 @@ export function renderSinsalTable({ sajuGanArr, samhapKey, sajuJijiArr }) {
         ${headerRows}
       </tbody>
     </table>
-
     <!-- 🔸 아래 표에만 식별 클래스(sinsal-bottom) 추가 -->
     <table class="sinsal-bottom" border="1" style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px;">
       <tbody>
@@ -696,16 +650,18 @@ export function renderSinsalTable({ sajuGanArr, samhapKey, sajuJijiArr }) {
       </tbody>
     </table>
 
-    <div style="text-align:center; margin:8px 0;">
-      [위의 표에서는 원하는 천간의 지지별 12운성(신살)을 바로 확인할 수 있습니다.]<br><br>
-      * 천간별 12운성표
-    </div>
 
-    <div id="unseong-block"></div>
+<div style="text-align:center; margin:8px 0;">
+[위의 표에서는 원하는 천간의 지지별 12운성(신살)을 바로 확인할 수 있습니다.]<br><br>
+  * 천간별 12운성표 
+</div>
+
+<div id="unseong-block"></div>
+
+
   `;
 }
-
-// 전역 노출(중복 정의 방지)
+// 파일: sinsalTable.js (renderSinsalTable가 정의된 그 파일)
 window.renderSinsalTable = window.renderSinsalTable || renderSinsalTable;
 
 
@@ -743,19 +699,61 @@ export function setCellValue(rowId, colIndex, value) {
 export function setRowValues(rowId, values) {
   const row = document.getElementById(rowId);
   if (!row) return;
+
   const tds = row.querySelectorAll('td');
+
+  // 어떤 span을 써야 하는지 행에 따라 선택
+  const spanSelector =
+    rowId === 'unseong-row' ? '.unseong-tag' :
+    rowId === 'sinsal-row'   ? '.twelve-sinsal-tag' :
+    null;
+
+  const spans = spanSelector ? row.querySelectorAll(`td ${spanSelector}`) : null;
+
   for (let i = 0; i < tds.length; i++) {
-    const v = values?.[i] ?? '';
-    tds[i].textContent = v;
+    const v = (values?.[i] ?? '').toString().trim();
+
+    // ✅ 툴팁 span이 있으면 그 안에만 값/데이터 넣기 (td 전체를 갈아치우지 않음)
+    if (spans && spans[i]) {
+      const span = spans[i];
+
+      // setExplainable 유틸 있으면 사용
+      if (typeof window.setExplainable === 'function') {
+        window.setExplainable(span, v || '-');
+      } else {
+        // 폴백: 텍스트 + data-term 동기화
+        span.textContent = v || '-';
+        if (v && v !== '-') {
+          span.dataset.term = v;
+          span.classList.add('explainable');
+        } else {
+          span.dataset.term = '';
+          span.classList.remove('explainable');
+        }
+      }
+    } else {
+      // 해당 행이 아니거나 span이 없다면 기존 방식 유지
+      tds[i].textContent = v;
+    }
+
+    // ✅ 강조 클래스 처리(셀 자체에)
     tds[i].classList.remove('green-mark');
     if (
-      (rowId === 'unseong-row' && GREEN.unseong.includes(v)) ||
-      (rowId === 'sinsal-row'   && GREEN.sinsal.includes(v))
+      (rowId === 'unseong-row' && window.GREEN?.unseong?.includes(v)) ||
+      (rowId === 'sinsal-row'   && window.GREEN?.sinsal?.includes(v))
     ) {
       tds[i].classList.add('green-mark');
     }
   }
+
+  // ✅ 마지막에 한 번: 혹시 빠진 곳 보정 + 팝업 초기화
+  if (typeof window.wireSajuTooltips === 'function') {
+    window.wireSajuTooltips(row);
+  } else if (typeof window.initTermHelp === 'function') {
+    window.initTermHelp();
+  }
 }
+
 
 
 
