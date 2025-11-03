@@ -4848,10 +4848,6 @@ renderSajuMiniFromCurrentOutput({
   getTenGod, convertHanToKorStem, convertKorToHanStem, colorize
 });
 
-// ✅ 고객명 제목 강제 갱신 (자동입력/지연 반영용)
-window.updateMiniTitle && window.updateMiniTitle();
-
-
 
     document.getElementById('basic-section').innerHTML = `
 
@@ -5608,24 +5604,6 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
     const vCtx   = (typeof ctx.customerName === 'string' ? ctx.customerName : (ctx.name || ''));
     return (vInput || vAttr || vText || vWin || vCtx || '').toString().trim();
   }
-// getCustomerName() 바로 아래나 setMiniTitle() 호출 직전에
-const __nameProbe = (function(){
-  const byId   = document.getElementById('customer-name');
-  const byName = document.querySelector('[name="customer-name"]');
-  const v = (byId && 'value' in byId ? byId.value : '')
-        || (byName && 'value' in byName ? byName.value : '')
-        || (byId?.getAttribute?.('value') || '')
-        || (byName?.getAttribute?.('value') || '')
-        || (window.customerName || '')
-        || (typeof ctx.customerName === 'string' ? ctx.customerName : (ctx.name||''));
-  console.log('[mini:title] probe →', {
-    hasBox: !!document.getElementById('saju-mini'),
-    byIdExists: !!byId,
-    byNameExists: !!byName,
-    valueNow: v
-  });
-  return v;
-})();
 
   // ── 제목 갱신
   const setMiniTitle = () => {
