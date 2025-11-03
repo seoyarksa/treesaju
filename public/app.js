@@ -5574,28 +5574,65 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
     box.querySelector('#saju-mini-close')?.addEventListener('click', () => box.remove());
   }
 
-  const body = box.querySelector('#saju-mini-body');
-  const C = (txt) => _colorize(txt);
+// ▼▼ 기존의 row()/body.innerHTML 부분을 이걸로 교체 ▼▼
+const body = box.querySelector('#saju-mini-body');
 
-  const row = (label, p) => `
-    <tr>
-      <th>${label}</th>
-      <td>
-        <div><strong>${C(p.gan || '-')}</strong> <small>(${p.ten || '-'})</small></div>
-        <div>지지: <strong>${C(p.jiji || '-')}</strong></div>
-        ${p.hides?.length ? `<div style="margin-top:4px;">지장간: ${p.hides.map(h => `<span class="chip">${h}</span>`).join('')}</div>` : ''}
-      </td>
-    </tr>`;
+// colorizer 폴백
+const C = (txt) => (typeof _colorize === 'function' ? _colorize(txt) : (txt ?? ''));
 
-  body.innerHTML = `
-    <table>
-      ${row('년주',  data.year)}
-      ${row('월주',  data.month)}
-      ${row('일주',  data.day)}
-      ${row('시주',  data.hour)}
-    </table>
-  `;
-}
+// 누락 방지용 보정
+const coerceCol = (p) => {
+  if (!p || typeof p !== 'object') return { gan: '-', ten: '-', jiji: '-', hides: [] };
+  return {
+    gan:  p.gan ?? '-',
+    ten:  p.ten ?? '-',
+    jiji: p.jiji ?? '-',
+    hides: Array.isArray(p.hides) ? p.hides : []
+  };
+};
+
+// 표는 [시주, 일주, 월주, 년주] 순서 (요구한 순서)
+const columns = [data?.hour, data?.day, data?.month, data?.year].map(coerceCol);
+
+body.innerHTML = `
+  <table class="mini-grid">
+    <thead>
+      <tr>
+        <th>시주</th>
+        <th>일주</th>
+        <th>월주</th>
+        <th>년주</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- 1행: 천간(십신) -->
+      <tr>
+        ${columns.map(p => `
+          <td>
+            <strong>${C(p.gan)}</strong> <small>(${C(p.ten)})</small>
+          </td>
+        `).join('')}
+      </tr>
+      <!-- 2행: 지지 -->
+      <tr>
+        ${columns.map(p => `
+          <td><strong>${C(p.jiji)}</strong></td>
+        `).join('')}
+      </tr>
+      <!-- 3행: 지장간 -->
+      <tr>
+        ${columns.map(p => `
+          <td>
+            ${p.hides.length
+              ? p.hides.map(h => `<span class="saju-chip">${h}</span>`).join('')
+              : '-'}
+          </td>
+        `).join('')}
+      </tr>
+    </tbody>
+  </table>
+`;
+
 
 
 
