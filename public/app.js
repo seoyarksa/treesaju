@@ -116,7 +116,6 @@ import { renderSinsalTable,
 
 console.log('🔥 app.js loaded');
 
-
 // =========================================
 // 출력 제한 로직 (비로그인 사용자 하루 3회 제한)
 // =========================================
@@ -156,54 +155,6 @@ if (!window.__miniSajuDelegated) {
   window.__miniSajuDelegated = true;
 }
 
-// ─── 고객명 찾기 & 감시 전역 헬퍼 ─────────────────────────────
-(function () {
-  function __findCustomerNameEl() {
-    // id, name, data-attr, placeholder, aria-label 폭넓게 탐색
-    return document.querySelector(
-      '#customer-name, [name="customer-name"], [data-customer-name], input[placeholder*="이름"], input[aria-label*="이름"]'
-    );
-  }
-
-  // 현재 고객명 읽기
-  window.__getCustomerName = function () {
-    const el = __findCustomerNameEl();
-    if (!el) return (window.customerName || '').toString().trim();
-    const v = ('value' in el) ? (el.value ?? '')
-                              : (el.getAttribute('value') || el.textContent || '');
-    return (v || window.customerName || '').toString().trim();
-  };
-
-  // 고객명 요소/값 변화를 감시해서 콜백 호출
-  window.__wireCustomerNameWatch = function (cb) {
-    if (window.__customerNameWatchWired) return;
-    window.__customerNameWatchWired = true;
-
-    const run = () => cb && cb(window.__getCustomerName());
-
-    // input/change 이벤트 위임(늦게 생겨도 동작)
-    document.addEventListener('input', (e) => {
-      const el = __findCustomerNameEl();
-      if (!el) return;
-      if (e.target === el || e.target.closest?.('#customer-name,[name="customer-name"],[data-customer-name]')) run();
-    }, true);
-
-    document.addEventListener('change', (e) => {
-      const el = __findCustomerNameEl();
-      if (!el) return;
-      if (e.target === el || e.target.closest?.('#customer-name,[name="customer-name"],[data-customer-name]')) run();
-    }, true);
-
-    // DOM 구조 변화를 감시(요소가 나중에 생겨도 catch)
-    const mo = new MutationObserver(run);
-    mo.observe(document.body, { childList: true, subtree: true });
-
-    // 초기 & 지연 트리거(자동 채움/URL 파라미터 케이스)
-    setTimeout(run, 0);
-    setTimeout(run, 200);
-    setTimeout(run, 600);
-  };
-})();
 
 
 // ===== app.js (안전망 포함, 전체 교체용) =====
@@ -5526,7 +5477,6 @@ requestAnimationFrame(() => {
 
 
 // ─── 미니 사주창: CSS 주입 ───
-// ─── 미니 사주창: CSS 주입 ───
 (function injectMiniSajuCSS(){
   if (document.getElementById('mini-saju-style')) return;
   const s = document.createElement('style');
@@ -5576,6 +5526,7 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
 
   const dayGanKorGan = ctx.dayGanKorGan || window.dayGanKorGan || '';
 
+  // (필수 값 없으면 그만)
   if (!dayGanji || !monthGanji || !yearGanji || !timeGanji) {
     console.warn('[mini] pillars missing — skip render');
     return;
@@ -5583,67 +5534,61 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
 
   // 3) 표 데이터 가공
   const data = {
-    hour:  { gan: timeGanji.gan,  ten: _getTenGod(dayGanKorGan, _convertHanToKorStem(timeGanji.gan)),  jiji: timeGanji.ji,  hides: timeLines.map( s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
-    day:   { gan: dayGanji.gan,   ten: '일간',                                                         jiji: dayGanji.ji,   hides: dayLines.map(  s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
+    hour:  { gan: timeGanji.gan,  ten: _getTenGod(dayGanKorGan, _convertHanToKorStem(timeGanji.gan)),  jiji: timeGanji.ji,  hides: timeLines.map(s  => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
+    day:   { gan: dayGanji.gan,   ten: '일간',                                                         jiji: dayGanji.ji,   hides: dayLines.map(s   => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
     month: { gan: monthGanji.gan, ten: _getTenGod(dayGanKorGan, _convertHanToKorStem(monthGanji.gan)), jiji: monthGanji.ji, hides: monthLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
-    year:  { gan: yearGanji.gan,  ten: _getTenGod(dayGanKorGan, _convertHanToKorStem(yearGanji.gan)),  jiji: yearGanji.ji,  hides: yearLines.map( s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
+    year:  { gan: yearGanji.gan,  ten: _getTenGod(dayGanKorGan, _convertHanToKorStem(yearGanji.gan)),  jiji: yearGanji.ji,  hides: yearLines.map(s  => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
   };
 
-  // ── 고객명 엘리먼트 탐색 & 읽기(여러 셀렉터 커버)
-  function findCustomerNameEl() {
-    return document.querySelector(
-      '#customer-name, [name="customer-name"], [data-customer-name], input[placeholder*="이름"], input[aria-label*="이름"]'
-    );
-  }
-  function getCustomerName() {
-    const el = findCustomerNameEl();
-    const vInput = el && ('value' in el) ? (el.value ?? '') : '';
-    const vAttr  = el?.getAttribute?.('value') ?? '';
-    const vText  = el && !('value' in el) ? (el.textContent ?? '') : '';
-    const vWin   = window.customerName ?? '';
-    const vCtx   = (typeof ctx.customerName === 'string' ? ctx.customerName : (ctx.name || ''));
-    return (vInput || vAttr || vText || vWin || vCtx || '').toString().trim();
-  }
+  // 4) 제목 세터 (항상 #customer-name을 읽어 표시)
+  const setMiniTitle = (label = 'setMiniTitle') => {
+    // id로 먼저 찾고, 없으면 .bar strong으로 폴백
+    let titleEl = document.querySelector('#saju-mini #saju-mini-title')
+               || document.querySelector('#saju-mini .bar strong');
+    if (!titleEl) {
+      console.warn(`[mini:title] ${label} → title 요소 없음`);
+      return;
+    }
 
-  // ── 제목 갱신
-  const setMiniTitle = () => {
-    const box = document.getElementById('saju-mini');
-    if (!box) return;
-    const titleEl = box.querySelector('#saju-mini-title') || box.querySelector('.bar strong');
-    if (!titleEl) return;
-    const name = getCustomerName();
+    const inputEl = document.getElementById('customer-name');
+    const v1 = inputEl?.value ?? '';
+    const v2 = inputEl?.getAttribute?.('value') ?? '';
+    const v3 = window.customerName ?? '';
+    const v4 = (typeof ctx.customerName === 'string' ? ctx.customerName : (ctx.name || ''));
+
+    const raw = (v1 || v2 || v3 || v4 || '');
+    const name = raw.trim();
+
     titleEl.textContent = name ? `사주팔자(${name})` : '사주팔자';
+
+    // 디버깅 로그(필요 없으면 주석 처리해도 됨)
+    console.log('[mini:title]', { label, value:v1, attr:v2, win:v3, ctx:v4, decided:name, text:titleEl.textContent });
   };
 
-  // ── 고객명 변화 감시(문서 위임 + DOM 변경 감시) : 1회만
-  function wireMiniTitleWatch() {
-    if (window.__miniTitleWatchWired) return;
-    window.__miniTitleWatchWired = true;
-
-    const trigger = () => setMiniTitle();
-    // input/change 위임: 요소가 나중에 생겨도 작동
-    document.addEventListener('input',  (e) => {
-      const t = e.target;
-      if (!t) return;
-      if (t.id === 'customer-name' || t.getAttribute?.('name') === 'customer-name' || t.hasAttribute?.('data-customer-name')) trigger();
-    }, true);
-    document.addEventListener('change', (e) => {
-      const t = e.target;
-      if (!t) return;
-      if (t.id === 'customer-name' || t.getAttribute?.('name') === 'customer-name' || t.hasAttribute?.('data-customer-name')) trigger();
-    }, true);
-
-    // DOM 변화 감시: 요소가 “나중에” 붙거나 값이 스크립트로 들어가도 반영
-    const mo = new MutationObserver(() => trigger());
-    mo.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true });
-
-    // 초기/지연 트리거(자동 채움 대비)
-    setTimeout(trigger, 0);
-    setTimeout(trigger, 200);
-    setTimeout(trigger, 600);
+  // 5) CSS 1회 주입
+  if (!document.getElementById('mini-saju-style')) {
+    const s = document.createElement('style');
+    s.id = 'mini-saju-style';
+    s.textContent = `
+      #saju-mini{position:fixed;right:16px;bottom:16px;z-index:9999;width:300px;max-width:calc(100vw - 24px);
+        background:#fff;border:1px solid #e5e5ea;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);overflow:hidden;
+        font-size:12px;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif;}
+      #saju-mini .bar{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:linear-gradient(180deg,#f7f7f9,#efeff3);
+        border-bottom:1px solid #ececf1;}
+      #saju-mini .body{max-height:260px;overflow:auto;padding:10px;}
+      #saju-mini table{width:100%;border-collapse:collapse;}
+      #saju-mini th,#saju-mini td{border-bottom:1px solid #f3f3f6;padding:4px 6px;text-align:left;vertical-align:top;}
+      #saju-mini th{color:#666;font-weight:600;}
+      #saju-mini small{color:#777;}
+      #saju-mini .saju-chip{display:inline-block;padding:1px 4px;border:1px solid #eee;border-radius:6px;margin:2px 2px 0 0;background:#fbfbfe;font-size:11px;}
+      #saju-mini .btn{border:0;background:#f1f1f6;width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:14px;line-height:1;}
+      #saju-mini .btn:hover{background:#e9e9f2;}
+      #saju-mini.is-min .body{display:none;}
+    `;
+    document.head.appendChild(s);
   }
 
-  // 5) 박스 생성(없으면 만들고, 있으면 재사용)
+  // 6) 박스 생성(없으면 만들고, 있으면 재사용)
   let box = document.getElementById('saju-mini');
   if (!box) {
     box = document.createElement('div');
@@ -5658,24 +5603,34 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
       </div>
       <div class="body" id="saju-mini-body"></div>
     `;
+    // (중요) DOM에 붙인 다음 제목 세팅
     document.body.appendChild(box);
+    setMiniTitle('after-append');
 
-    // 버튼
+    // 버튼 바인딩
     box.querySelector('#saju-mini-min')?.addEventListener('click', () => box.classList.toggle('is-min'));
     box.querySelector('#saju-mini-close')?.addEventListener('click', () => box.remove());
 
-    // 제목 즉시/감시 연결
-    setMiniTitle();
-    wireMiniTitleWatch();
+    // 고객명 입력 변화 감지(1회만 연결)
+    if (!window.__miniTitleWired) {
+      const input = document.getElementById('customer-name');
+      if (input) {
+        input.addEventListener('input',  () => setMiniTitle('input'));
+        input.addEventListener('change', () => setMiniTitle('change'));
+      } else {
+        console.warn('[mini:title] #customer-name 없음 → 입력 이벤트 연결 보류');
+      }
+      window.__miniTitleWired = true;
+    }
   } else {
-    // 혹시 예전 마크업이라 id 빠졌으면 보정
+    // 혹시 예전 마크업이라 id 빠졌으면 복구
     if (!box.querySelector('#saju-mini-title')) {
       const strong = box.querySelector('.bar strong');
       if (strong) strong.id = 'saju-mini-title';
     }
   }
 
-  // 6) 본문 표 렌더
+  // 7) 본문 표 렌더
   const body = box.querySelector('#saju-mini-body');
   const C = (txt) => (typeof _colorize === 'function' ? _colorize(txt) : (txt ?? ''));
   const coerceCol = (p) => (!p || typeof p !== 'object')
@@ -5702,17 +5657,16 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
           ${columns.map(p => `<td><strong>${C(p.jiji)}</strong></td>`).join('')}
         </tr>
         <tr>
-          ${columns.map(p => `<td>${p.hides.length ? p.hides.map(h => `<span class="chip">(${h})</span>`).join('') : '-'}</td>`).join('')}
+          ${columns.map(p => `<td>${p.hides.length ? p.hides.map(h => `<span class="saju-chip">(${h})</span>`).join('') : '-'}</td>`).join('')}
         </tr>
       </tbody>
     </table>
   `;
 
-  // 7) 렌더 직후 한 번 더 제목 동기화
+  // 8) 제목 즉시/지연 갱신(자동입력 대응)
   setMiniTitle();
-
-  // (원하면 외부에서 수동 갱신도 가능)
-  window.updateMiniTitle = () => setMiniTitle();
+  requestAnimationFrame(() => setMiniTitle('raf'));
+  setTimeout(() => setMiniTitle('t+300'), 300);
 }
 
 
@@ -5720,6 +5674,20 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
 
 
 
+(function wireMiniTitleLive(){
+  if (window.__miniTitleWired) return;
+  window.__miniTitleWired = true;
+
+  const input = document.getElementById('customer-name');
+  if (!input) return; // 페이지에 그 요소 없으면 패스
+
+  input.addEventListener('input', () => {
+    const el = document.querySelector('#saju-mini #saju-mini-title');
+    if (!el) return;
+    const v = input.value.trim();
+    el.textContent = v ? `사주팔자(${v})` : '사주팔자';
+  });
+})();
 
 
 
