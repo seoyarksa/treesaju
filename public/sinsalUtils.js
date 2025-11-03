@@ -535,8 +535,8 @@ const colCss = [...highlightIdx].map(i => `
   // 1. 상단 헤더
   const headerRows = `
     <tr>
-      <th colspan="10"><span class="explainable" data-group="terms" data-term="12운성">12운성</th>
-      <th colspan="4">12신살</th>
+      <th colspan="10"><span class="explainable" data-group="terms" data-term="">12운성</span></th>
+      <th colspan="4"><span class="explainable" data-group="terms" data-term="">12신살</span></th>
     </tr>
     <tr>
       ${ganList.map(gan => {
