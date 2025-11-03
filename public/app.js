@@ -5436,10 +5436,107 @@ requestAnimationFrame(() => {
   // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
 // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
 // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
-
+renderSajuMiniFromCurrentOutput();   // ← 이 줄만 추가
   }
 
 
+// ─── 미니 사주창: CSS 주입 ───
+(function injectMiniSajuCSS(){
+  if (document.getElementById('mini-saju-style')) return;
+  const s = document.createElement('style');
+  s.id = 'mini-saju-style';
+  s.textContent = `
+    #saju-mini {
+      position: fixed; right: 16px; bottom: 16px; z-index: 9999;
+      width: 300px; max-width: calc(100vw - 24px);
+      background:#fff; border:1px solid #e5e5ea; border-radius:12px;
+      box-shadow:0 10px 30px rgba(0,0,0,.18); overflow:hidden; font-size:14px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
+    }
+    #saju-mini .bar { display:flex; align-items:center; justify-content:space-between;
+      padding:8px 10px; background:linear-gradient(180deg,#f7f7f9,#efeff3); border-bottom:1px solid #ececf1;
+    }
+    #saju-mini .body { max-height:260px; overflow:auto; padding:10px; }
+    #saju-mini table { width:100%; border-collapse:collapse; }
+    #saju-mini th, #saju-mini td { border-bottom:1px solid #f3f3f6; padding:4px 6px; text-align:left; vertical-align:top; }
+    #saju-mini th { width:3.5em; color:#666; font-weight:600; }
+    #saju-mini small { color:#777; }
+    #saju-mini .chip { display:inline-block; padding:2px 6px; border:1px solid #eee; border-radius:6px; margin:2px 2px 0 0; background:#fbfbfe; }
+    #saju-mini .btn { border:0; background:#f1f1f6; width:24px; height:24px; border-radius:6px; cursor:pointer; font-size:14px; line-height:1; }
+    #saju-mini .btn:hover { background:#e9e9f2; }
+    #saju-mini.is-min .body { display:none; }
+  `;
+  document.head.appendChild(s);
+})();
+
+// ─── 미니 사주창: 렌더러 ───
+function renderSajuMiniFromCurrentOutput() {
+  // 메인 출력에서 이미 쓰는 변수들을 그대로 사용
+  // (dayGanKorGan, getTenGod, convertHanToKorStem, convertKorToHanStem, colorize 모두 기존 코드에 있음)
+  const data = {
+    hour: {
+      gan: timeGanji?.gan, ten: getTenGod?.(dayGanKorGan, convertHanToKorStem(timeGanji?.gan)),
+      jiji: timeGanji?.ji, hides: (timeLines||[]).map(s => `${convertKorToHanStem(s)} ${getTenGod?.(dayGanKorGan, s)}`)
+    },
+    day:  {
+      gan: dayGanji?.gan, ten: '일간',
+      jiji: dayGanji?.ji, hides: (dayLines||[]).map(s => `${convertKorToHanStem(s)} ${getTenGod?.(dayGanKorGan, s)}`)
+    },
+    month:{
+      gan: monthGanji?.gan, ten: getTenGod?.(dayGanKorGan, convertHanToKorStem(monthGanji?.gan)),
+      jiji: monthGanji?.ji, hides: (monthLines||[]).map(s => `${convertKorToHanStem(s)} ${getTenGod?.(dayGanKorGan, s)}`)
+    },
+    year: {
+      gan: yearGanji?.gan, ten: getTenGod?.(dayGanKorGan, convertHanToKorStem(yearGanji?.gan)),
+      jiji: yearGanji?.ji, hides: (yearLines||[]).map(s => `${convertKorToHanStem(s)} ${getTenGod?.(dayGanKorGan, s)}`)
+    },
+  };
+
+  // 요소 만들기(없으면 생성, 있으면 재사용)
+  let box = document.getElementById('saju-mini');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'saju-mini';
+    box.innerHTML = `
+      <div class="bar">
+        <strong>사주 요약</strong>
+        <div>
+          <button class="btn" id="saju-mini-min" title="접기">—</button>
+          <button class="btn" id="saju-mini-close" title="닫기">×</button>
+        </div>
+      </div>
+      <div class="body" id="saju-mini-body"></div>
+    `;
+    document.body.appendChild(box);
+    // 버튼 동작
+    box.querySelector('#saju-mini-min')?.addEventListener('click', () => box.classList.toggle('is-min'));
+    box.querySelector('#saju-mini-close')?.addEventListener('click', () => box.remove());
+  }
+
+  const body = box.querySelector('#saju-mini-body');
+
+  // colorize가 있으면 살짝 색감 유지
+  const C = (txt) => (typeof colorize === 'function' ? colorize(txt) : txt);
+
+  const row = (label, p) => `
+    <tr>
+      <th>${label}</th>
+      <td>
+        <div><strong>${C(p.gan || '-')}</strong> <small>(${p.ten || '-'})</small></div>
+        <div>지지: <strong>${C(p.jiji || '-')}</strong></div>
+        ${p.hides?.length ? `<div style="margin-top:4px;">지장간: ${p.hides.map(h => `<span class="chip">${h}</span>`).join('')}</div>` : ''}
+      </td>
+    </tr>`;
+
+  body.innerHTML = `
+    <table>
+      ${row('년주', data.year)}
+      ${row('월주', data.month)}
+      ${row('일주', data.day)}
+      ${row('시주', data.hour)}
+    </table>
+  `;
+}
 
 
 
