@@ -4682,7 +4682,7 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
       <td>
         <div>${colorize(timeGanji.gan)}</div>
         <div style="font-size:0.85rem; color:#888;">
-          (${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(timeGanji.gan)))})
+          ${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(timeGanji.gan)))}
         </div>
       </td>
       <td>
