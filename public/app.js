@@ -5526,7 +5526,6 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
 
   const dayGanKorGan = ctx.dayGanKorGan || window.dayGanKorGan || '';
 
-  // (필수 값 없으면 그만)
   if (!dayGanji || !monthGanji || !yearGanji || !timeGanji) {
     console.warn('[mini] pillars missing — skip render');
     return;
@@ -5540,30 +5539,52 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
     year:  { gan: yearGanji.gan,  ten: _getTenGod(dayGanKorGan, _convertHanToKorStem(yearGanji.gan)),  jiji: yearGanji.ji,  hides: yearLines.map(s  => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
   };
 
-  // 4) 제목 세터 (항상 #customer-name을 읽어 표시)
+  // ─────────────────────────────────────────────
+  // A) 고객명 읽기: id, name, data-attr까지 폭넓게 탐색
+  function getCustomerName() {
+    // 우선순위: input#customer-name.value → [name="customer-name"] → data-customer-name → window/customerName → ctx
+    const byId = document.getElementById('customer-name');
+    const byName = document.querySelector('[name="customer-name"]');
+    const dataAttr = document.querySelector('[data-customer-name]');
+    const vInput = byId && ('value' in byId) ? (byId.value ?? '') : '';
+    const vNameInput = byName && ('value' in byName) ? (byName.value ?? '') : '';
+    const vIdAttr = byId?.getAttribute?.('value') ?? '';
+    const vNameAttr = byName?.getAttribute?.('value') ?? '';
+    const vData = dataAttr?.getAttribute?.('data-customer-name') ?? '';
+    const vText = byId && !('value' in byId) ? (byId.textContent ?? '') : '';
+    const vWin  = window.customerName ?? '';
+    const vCtx  = (typeof ctx.customerName === 'string' ? ctx.customerName : (ctx.name || ''));
+    return (vInput || vNameInput || vIdAttr || vNameAttr || vData || vText || vWin || vCtx || '').trim();
+  }
+
+  // B) 제목 갱신
   const setMiniTitle = (label = 'setMiniTitle') => {
-    // id로 먼저 찾고, 없으면 .bar strong으로 폴백
-    let titleEl = document.querySelector('#saju-mini #saju-mini-title')
-               || document.querySelector('#saju-mini .bar strong');
-    if (!titleEl) {
-      console.warn(`[mini:title] ${label} → title 요소 없음`);
-      return;
-    }
-
-    const inputEl = document.getElementById('customer-name');
-    const v1 = inputEl?.value ?? '';
-    const v2 = inputEl?.getAttribute?.('value') ?? '';
-    const v3 = window.customerName ?? '';
-    const v4 = (typeof ctx.customerName === 'string' ? ctx.customerName : (ctx.name || ''));
-
-    const raw = (v1 || v2 || v3 || v4 || '');
-    const name = raw.trim();
-
+    const box = document.getElementById('saju-mini');
+    if (!box) return;
+    const titleEl = box.querySelector('#saju-mini-title') || box.querySelector('.bar strong');
+    if (!titleEl) return;
+    const name = getCustomerName();
     titleEl.textContent = name ? `사주팔자(${name})` : '사주팔자';
-
-    // 디버깅 로그(필요 없으면 주석 처리해도 됨)
-    console.log('[mini:title]', { label, value:v1, attr:v2, win:v3, ctx:v4, decided:name, text:titleEl.textContent });
   };
+
+  // C) 문서 위임 바인딩(1회): 고객명 요소가 늦게 생겨도 감지
+  function wireMiniTitleDelegation() {
+    if (window.__miniTitleDelegated) return;
+    const onChange = () => setMiniTitle('doc-delegated');
+    // input/textarea/select 모두 커버
+    document.addEventListener('input',  (e) => {
+      const t = e.target;
+      if (!t) return;
+      if (t.id === 'customer-name' || t.getAttribute?.('name') === 'customer-name') onChange();
+    }, true);
+    document.addEventListener('change', (e) => {
+      const t = e.target;
+      if (!t) return;
+      if (t.id === 'customer-name' || t.getAttribute?.('name') === 'customer-name') onChange();
+    }, true);
+    window.__miniTitleDelegated = true;
+  }
+  // ─────────────────────────────────────────────
 
   // 5) CSS 1회 주입
   if (!document.getElementById('mini-saju-style')) {
@@ -5603,27 +5624,15 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
       </div>
       <div class="body" id="saju-mini-body"></div>
     `;
-    // (중요) DOM에 붙인 다음 제목 세팅
     document.body.appendChild(box);
-    setMiniTitle('after-append');
-
-    // 버튼 바인딩
+    // 버튼
     box.querySelector('#saju-mini-min')?.addEventListener('click', () => box.classList.toggle('is-min'));
     box.querySelector('#saju-mini-close')?.addEventListener('click', () => box.remove());
-
-    // 고객명 입력 변화 감지(1회만 연결)
-    if (!window.__miniTitleWired) {
-      const input = document.getElementById('customer-name');
-      if (input) {
-        input.addEventListener('input',  () => setMiniTitle('input'));
-        input.addEventListener('change', () => setMiniTitle('change'));
-      } else {
-        console.warn('[mini:title] #customer-name 없음 → 입력 이벤트 연결 보류');
-      }
-      window.__miniTitleWired = true;
-    }
+    // 위임 바인딩(한 번만)
+    wireMiniTitleDelegation();
+    // 최초 세팅
+    setMiniTitle('after-append');
   } else {
-    // 혹시 예전 마크업이라 id 빠졌으면 복구
     if (!box.querySelector('#saju-mini-title')) {
       const strong = box.querySelector('.bar strong');
       if (strong) strong.id = 'saju-mini-title';
@@ -5663,10 +5672,13 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
     </table>
   `;
 
-  // 8) 제목 즉시/지연 갱신(자동입력 대응)
+  // 8) 제목 즉시/지연 갱신(자동입력/URL 자동 채움 대응)
   setMiniTitle();
   requestAnimationFrame(() => setMiniTitle('raf'));
   setTimeout(() => setMiniTitle('t+300'), 300);
+
+  // 수동 호출 용도(원하면 다른 코드에서 부를 수 있게)
+  window.updateMiniTitle = () => setMiniTitle('manual');
 }
 
 
