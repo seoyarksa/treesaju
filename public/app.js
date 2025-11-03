@@ -4209,7 +4209,7 @@ function tgTag(label) {
   border-collapse: collapse;
   table-layout: fixed;       /* ✅ 칸 비율로 강제 */
   word-break: break-word;
-  white-space: keep-all;       /* ✅ 줄바꿈 허용 */
+  white-space: normal;       /* ✅ 줄바꿈 허용 */
 }
 
 .daeyun-table,
@@ -4692,13 +4692,13 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
       <td>
         <div>${colorize(monthGanji.gan)}</div>
         <div style="font-size:0.85rem; color:#888;">
-          (${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(monthGanji.gan)))})
+          ${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(monthGanji.gan)))}
         </div>
       </td>
       <td>
         <div>${colorize(yearGanji.gan)}</div>
         <div style="font-size:0.85rem; color:#888;">
-          (${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(yearGanji.gan)))})
+          ${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(yearGanji.gan)))}
         </div>
       </td>
  
@@ -4728,10 +4728,10 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
     <div class="hidden-stem-wrapper">
       ${timeLines.map(s => `
         <div class="hidden-stem">
-          (${colorize(convertKorToHanStem(s), '0.85rem')}
+          ${colorize(convertKorToHanStem(s), '0.85rem')}
           <span style="font-size:0.75rem; color:#999;">
              ${tgTag(getTenGod(dayGanKorGan, s))}
-          </span>)
+          </span>
         </div>`).join('')}
     </div>
   </td>
