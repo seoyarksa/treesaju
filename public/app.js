@@ -5570,14 +5570,8 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
       <div class="body" id="saju-mini-body"></div>
     `;
     document.body.appendChild(box);
-box.__wired = false; // 생성 직후에도 동일 로직에서 묶음 처리
-  }
- // ✅ 축소/닫기 버튼은 박스가 있으면 항상(한 번만) 연결
- if (!box.__wired) {
-   box.querySelector('#saju-mini-min')?.addEventListener('click', () => box.classList.toggle('is-min'));
-   box.querySelector('#saju-mini-close')?.addEventListener('click', () => box.remove());
-   box.__wired = true;
- }
+    box.querySelector('#saju-mini-min')?.addEventListener('click', () => box.classList.toggle('is-min'));
+    box.querySelector('#saju-mini-close')?.addEventListener('click', () => box.remove());
   }
 
 // ▼▼ 기존의 row()/body.innerHTML 부분을 이걸로 교체 ▼▼
