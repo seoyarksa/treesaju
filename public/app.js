@@ -4764,6 +4764,14 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
 `;
 
 
+renderSajuMiniFromCurrentOutput({
+  timeGanji, dayGanji, monthGanji, yearGanji,
+  timeLines, dayLines, monthLines, yearLines,
+  dayGanKorGan,
+  getTenGod, convertHanToKorStem, convertKorToHanStem, colorize
+});
+
+
     document.getElementById('basic-section').innerHTML = `
 
 <!-- 당령 표시용 영역 -->
@@ -5436,12 +5444,6 @@ requestAnimationFrame(() => {
   // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
 // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
 // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
-renderSajuMiniFromCurrentOutput({
-  timeGanji, dayGanji, monthGanji, yearGanji,
-  timeLines, dayLines, monthLines, yearLines,
-  dayGanKorGan,
-  getTenGod, convertHanToKorStem, convertKorToHanStem, colorize
-});
 
   }
 
