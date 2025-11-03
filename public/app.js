@@ -129,6 +129,32 @@ console.log('🔥 app.js loaded');
 /************************************
  * 1) 비로그인 출력 제한
  ************************************/
+// ▼ 전역 한 번만! (렌더 함수 밖)
+if (!window.__miniSajuDelegated) {
+  document.addEventListener('click', (e) => {
+    const mini = document.getElementById('saju-mini');
+    if (!mini) return;
+
+    // 축소 버튼
+    if (e.target.closest('#saju-mini-min')) {
+      mini.classList.toggle('is-min');
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    // 닫기 버튼
+    if (e.target.closest('#saju-mini-close')) {
+      mini.remove();
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+  }, { capture: true }); // ← 캡처 단계에서 가로채 재렌더/버블 이슈 방지
+
+  window.__miniSajuDelegated = true;
+}
+
 // ===== app.js (안전망 포함, 전체 교체용) =====
 // 파일 상단 어딘가
 // 부모 창 전역
@@ -5570,8 +5596,7 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
       <div class="body" id="saju-mini-body"></div>
     `;
     document.body.appendChild(box);
-    box.querySelector('#saju-mini-min')?.addEventListener('click', () => box.classList.toggle('is-min'));
-    box.querySelector('#saju-mini-close')?.addEventListener('click', () => box.remove());
+
   }
 
 // ▼▼ 기존의 row()/body.innerHTML 부분을 이걸로 교체 ▼▼
