@@ -519,17 +519,22 @@ window.setExplainable = window.setExplainable || function setExplainable(span, t
 };
 
 // ✅ 추가: 값 찍힌 뒤 한번 호출해 보정(선택·권장)
-window.wireSajuTooltips = window.wireSajuTooltips || function (container = document.getElementById('sinsal-box') || document) {
+// 바꿔 넣기 (그대로 복붙)
+window.wireSajuTooltips = window.wireSajuTooltips || function (container = document) {
   const sel = '.unseong-tag, .twelve-sinsal-tag, .ten-god';
   container.querySelectorAll(sel).forEach(el => {
     const t = (el.textContent || '').trim();
     if (t && t !== '-') {
       el.dataset.term = t;
       el.classList.add('explainable');
+    } else {
+      el.dataset.term = '';
+      el.classList.remove('explainable');
     }
   });
   window.initTermHelp?.();
 };
+
 
 
 export function renderSinsalTable({ sajuGanArr, samhapKey, sajuJijiArr }) {
@@ -791,6 +796,10 @@ export function setRowValues(rowId, values) {
   } else if (typeof window.initTermHelp === 'function') {
     window.initTermHelp();
   }
+
+  // setRowValues(...) 마지막에
+wireSajuTooltips(document.getElementById('sinsal-box'));
+
 }
 
 
