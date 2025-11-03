@@ -512,85 +512,89 @@ export function renderSinsalTable({ sajuGanArr, samhapKey, sajuJijiArr }) {
   const jijiArr = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
   const sajuGanjiArr = sajuGanArr.map((gan, idx) => gan + sajuJijiArr[idx]);
 
-  const dayGan = sajuGanArr[1];
-
-  // ✅ 같은 지지 '열' 인덱스 계산(첫 칸이 <th>라서 +2 사용)
+const dayGan = sajuGanArr[1];  
+  // ✅ 추가: 같은 지지 '열' 인덱스 계산(첫 칸이 <th>라서 +2 사용)
   const norm = v => (v ?? '').toString().trim();
   const highlightIdx = new Set(
     (sajuJijiArr || []).map(norm).map(v => jijiArr.indexOf(v)).filter(i => i >= 0)
   );
+// ...
+// 해당 열 인덱스에 대한 CSS
+const colCss = [...highlightIdx].map(i => `
+  /* 지지, 12운성, 12신살 모두 같은 열 칠하기 */
+  #sinsal-box table.sinsal-bottom tr#jiji-row     td:nth-child(${i + 2}),
+  #sinsal-box table.sinsal-bottom tr#unseong-row td:nth-child(${i + 2}),
+  #sinsal-box table.sinsal-bottom tr#sinsal-row  td:nth-child(${i + 2}) {
+    background:rgb(240, 204, 245) !important;
+    box-shadow: inset 0 0 0 9999px rgba(248, 245, 248, 0.18);
+  }
+`).join('');
+// ...
 
-  // 해당 열 인덱스에 대한 CSS (지지/12운성/12신살 열 하이라이트 동일 적용)
-  const colCss = [...highlightIdx].map(i => `
-    #sinsal-box table.sinsal-bottom tr#jiji-row     td:nth-child(${i + 2}),
-    #sinsal-box table.sinsal-bottom tr#unseong-row td:nth-child(${i + 2}),
-    #sinsal-box table.sinsal-bottom tr#sinsal-row  td:nth-child(${i + 2}) {
-      background:rgb(240, 204, 245) !important;
-      box-shadow: inset 0 0 0 9999px rgba(248, 245, 248, 0.18);
-    }
-  `).join('');
 
-  // 1) 상단 헤더
+  // 1. 상단 헤더
   const headerRows = `
     <tr>
-      <th colspan="10">12운성</th>
-      <th colspan="4">12신살</th>
+      <th colspan="10"><span class="explainable" data-group="terms" data-term="12운성">12운성</span></th>
+      <th colspan="4"> <span class="explainable" data-group="terms" data-term="12신살">12신살</span></th>
     </tr>
     <tr>
       ${ganList.map(gan => {
-        // 🔹 일간 기준 십신 툴팁
-        const sipsin = getSipsin(dayGan, gan);
-        const sipsinHtml = sipsin
-          ? `<span class="ten-god explainable" data-group="tengod" data-term="${sipsin}">${sipsin}</span>`
-          : '';
+const sipsin = getSipsin(dayGan, gan);  // 천간에 대한 십신명
+const sipsinHtml = sipsin
+  ? `<span class="ten-god explainable" data-group="tengod" data-term="${sipsin}">${sipsin}</span>`
+  : '';
 
-        return `<td class="clickable${sajuGanArr.includes(gan) ? ' saju-blue' : ''}"
-                    data-type="unseong"
-                    data-gan="${gan}"
-                    style="cursor:pointer; text-align:center;">
-                    <div>${gan}</div>
-                    <div style="font-size:0.8em; color:#555;">${sipsinHtml}</div>
-                </td>`;
-      }).join("")}
+return `<td class="clickable${sajuGanArr.includes(gan) ? ' saju-blue' : ''}" 
+            data-type="unseong" 
+            data-gan="${gan}" 
+            style="cursor:pointer; text-align:center;">
+            <div>${gan}</div>
+            <div style="font-size:0.8em; color:#555;">${sipsinHtml}</div>
+        </td>`;
+
+}).join("")}
+
       ${samhapNames.map(key =>
         `<td class="clickable${key === samhapKey ? ' saju-blue' : ''}" data-type="sinsal" data-samhap="${key}" style="cursor:pointer;">${key}</td>`
       ).join('')}
     </tr>
   `;
 
-  // 2) 아래쪽 12지지
-  const jijiRow = `<tr id="jiji-row">
-    <th>지지</th>
-    ${jijiArr.map(jj =>
-      `<td class="jiji-clickable${(sajuJijiArr || []).map(norm).includes(jj) ? ' saju-blue' : ''}" data-jiji="${jj}" style="cursor:pointer;">${jj}</td>`
-    ).join('')}
-  </tr>`;
+  // 2. 아래쪽 12지지
+const jijiRow = `<tr id="jiji-row">
+  <th>지지</th>
+  ${jijiArr.map(jj =>
+    `<td class="jiji-clickable${(sajuJijiArr || []).map(norm).includes(jj) ? ' saju-blue' : ''}" data-jiji="${jj}" style="cursor:pointer;">${jj}</td>`
+  ).join('')}
+</tr>`;
 
-  // 3) 12운성 / 12신살 “값이 들어갈” 자리(빈 스팬 준비: 나중에 값 채우고 툴팁 훅이 data-term 세팅)
-  const unseongRow = `
-  <tr id="unseong-row">
-    <th>
-      <span class="explainable" data-group="terms" data-term="12운성">12운성</span>
-    </th>
-    ${jijiArr.map(() => `
-      <td>
-        <span class="unseong-tag explainable" data-group="unseong" data-term="">-</span>
-      </td>
-    `).join('')}
-  </tr>`;
-  const sinsalRow = `
-  <tr id="sinsal-row">
-    <th>
-      <span class="explainable" data-group="terms" data-term="12신살">12신살</span>
-    </th>
-    ${jijiArr.map(() => `
-      <td>
-        <span class="twelve-sinsal-tag explainable" data-group="sipsal12" data-term="">-</span>
-      </td>
-    `).join('')}
-  </tr>`;
+  // 운성/신살 행은 동적 갱신이므로, 클래스 없이 빈칸으로!
+  
+const unseongRow = `
+<tr id="unseong-row">
+  <th>
+    <span class="explainable" data-group="terms" data-term="12운성">12운성</span>
+  </th>
+  ${jijiArr.map(() => `
+    <td>
+      <span class="unseong-tag explainable" data-group="unseong" data-term="">-</span>
+    </td>
+  `).join('')}
+</tr>`;
+const sinsalRow = `
+<tr id="sinsal-row">
+  <th>
+    <span class="explainable" data-group="terms" data-term="12신살">12신살</span>
+  </th>
+  ${jijiArr.map(() => `
+    <td>
+      <span class="twelve-sinsal-tag explainable" data-group="sipsal12" data-term="">-</span>
+    </td>
+  `).join('')}
+</tr>`;
 
-  // 4) 가이드 + 스타일
+
   const guide = `
     <tr>
       <td colspan="13" style="font-size:13px; text-align:left; padding:5px;">
@@ -611,13 +615,20 @@ export function renderSinsalTable({ sajuGanArr, samhapKey, sajuJijiArr }) {
         font-weight: bold;
         text-shadow: 0 1px 0 #e6f3ff;
       }
-      .green-mark {
-        color: #0b5e0b !important;
-        font-weight: bold;
-      }
-      ${colCss}
-      .unseong-tag { color:#1976d2 !important; font-weight:700; }
-      .explainable { cursor: help !important; } /* 툴팁 커서 힌트 */
+            /* ✅ 녹색 표시 스타일 */
+    .green-mark {
+     /* background-color: #d4f5d4 !important;  은은한 녹색 배경 */
+      color: #0b5e0b !important;            /* 진한 녹색 글씨 */
+      font-weight: bold;
+    }
+
+
+      ${colCss} /* 🔸 동적으로 생성된 열 강조 CSS */
+
+        .unseong-tag { color:#1976d2 !important; font-weight:700; 
+        }
+
+
     </style>
   `;
 
@@ -628,6 +639,7 @@ export function renderSinsalTable({ sajuGanArr, samhapKey, sajuJijiArr }) {
         ${headerRows}
       </tbody>
     </table>
+    <!-- 🔸 아래 표에만 식별 클래스(sinsal-bottom) 추가 -->
     <table class="sinsal-bottom" border="1" style="border-collapse:collapse; margin:auto; font-size:14px; margin-top:8px;">
       <tbody>
         ${guide}
@@ -637,53 +649,20 @@ export function renderSinsalTable({ sajuGanArr, samhapKey, sajuJijiArr }) {
         <tr id="mini-unseong-row" style="display:none;"><td colspan="13" style="padding:6px;"></td></tr>
       </tbody>
     </table>
-    <div style="text-align:center; margin:8px 0;">
-      [위의 표에서는 원하는 천간의 지지별 12운성(신살)을 바로 확인할 수 있습니다.]<br><br>
-      * 천간별 12운성표
-    </div>
-    <div id="unseong-block"></div>
+
+
+<div style="text-align:center; margin:8px 0;">
+[위의 표에서는 원하는 천간의 지지별 12운성(신살)을 바로 확인할 수 있습니다.]<br><br>
+  * 천간별 12운성표 
+</div>
+
+<div id="unseong-block"></div>
+
+
   `;
 }
-
 // 파일: sinsalTable.js (renderSinsalTable가 정의된 그 파일)
 window.renderSinsalTable = window.renderSinsalTable || renderSinsalTable;
-
-/* =========================
-   ✅ 툴팁 주입 훅 (값 채운 뒤 호출)
-   ========================= */
-window.attachUnseongTooltips = function attachUnseongTooltips() {
-  // 1) 스팬이 이미 있으면 data-term만 채움
-  document.querySelectorAll('#unseong-row .unseong-tag').forEach(sp => {
-    const v = (sp.textContent || '').trim();
-    if (!v || v === '-' || v === '없음') return;
-    sp.classList.add('explainable');
-    sp.dataset.group = 'unseong';
-    sp.dataset.term  = v;
-  });
-  // 2) 혹시 스팬 없이 순수 텍스트 TD인 경우 래핑
-  document.querySelectorAll('#unseong-row td').forEach(td => {
-    if (td.querySelector('.unseong-tag')) return;
-    const v = (td.textContent || '').trim();
-    if (!v || v === '-' || v === '없음') return;
-    td.innerHTML = `<span class="unseong-tag explainable" data-group="unseong" data-term="${v}">${v}</span>`;
-  });
-};
-
-window.attachSinsalTooltips = function attachSinsalTooltips() {
-  document.querySelectorAll('#sinsal-row .twelve-sinsal-tag').forEach(sp => {
-    const v = (sp.textContent || '').trim();
-    if (!v || v === '-' || v === '없음') return;
-    sp.classList.add('explainable');
-    sp.dataset.group = 'sipsal12';
-    sp.dataset.term  = v;
-  });
-  document.querySelectorAll('#sinsal-row td').forEach(td => {
-    if (td.querySelector('.twelve-sinsal-tag')) return;
-    const v = (td.textContent || '').trim();
-    if (!v || v === '-' || v === '없음') return;
-    td.innerHTML = `<span class="twelve-sinsal-tag explainable" data-group="sipsal12" data-term="${v}">${v}</span>`;
-  });
-};
 
 
 /////12운성/신살 장생,제왕, 묘....등 강조//////////////////////////////
