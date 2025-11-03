@@ -472,7 +472,60 @@ body {
 #term-help-pop { pointer-events: none; }
 
 
+/*작은창 */
+.saju-mini{
+  position: fixed;     /* ✅ 스크롤해도 화면에 고정 */
+  right: 16px;
+  bottom: 16px;
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  background:#fff;
+  border:1px solid #ddd;
+  border-radius:12px;
+  box-shadow:0 10px 30px rgba(0,0,0,.18);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
+  font-size: 14px;
+  color:#222;
+  z-index: 9999;
+  overflow: hidden;
+}
 
+.saju-mini__bar{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:8px;
+  padding:8px 10px;
+  background: linear-gradient(180deg,#f7f7f9,#efeff3);
+  border-bottom:1px solid #e6e6ea;
+  cursor: move;                 /* 드래그 가능 느낌 */
+  user-select: none;
+}
+
+.saju-mini__actions{ display:flex; gap:6px; }
+.saju-mini__actions button{
+  border:0; background:#f1f1f6; width:24px; height:24px; border-radius:6px;
+  cursor:pointer; font-size:14px; line-height:1;
+}
+.saju-mini__actions button:hover{ background:#e9e9f2; }
+
+.saju-mini__body{
+  max-height: 260px;            /* 내용이 길면 내부 스크롤 */
+  overflow:auto;
+  padding:10px;
+}
+
+.saju-mini table{ width:100%; border-collapse:collapse; }
+.saju-mini th, .saju-mini td{
+  padding:4px 6px; border-bottom:1px solid #f0f0f2; text-align:left; vertical-align:top;
+}
+.saju-mini th{ width:3.5em; color:#666; font-weight:600; }
+.saju-mini small{ color:#666; }
+.saju-chip{
+  display:inline-block; padding:2px 6px; border:1px solid #e7e7ee; border-radius:6px; margin:2px 2px 0 0; background:#fbfbfe;
+}
+
+/* 접힘 상태 */
+.saju-mini.is-min .saju-mini__body{ display:none; }
+/* 작은 창 끝 */
 
 
 
