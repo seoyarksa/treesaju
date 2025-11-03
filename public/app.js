@@ -4199,6 +4199,22 @@ function tgTag(label) {
   border: 1px solid #000;     /* ✅ 각 데이터 칸에만 테두리 */
 }
 
+/* 한글/한자 줄바꿈 억제 (셀 전체) */
+.ganji-table td {
+  word-break: keep-all;       /* 임의 줄바꿈 방지 */
+}
+
+/* 셀의 두 번째 div(십신 표시 줄)만 한 줄 고정 + 넘치면 … 처리 */
+.ganji-table td > div:nth-child(2) {
+  display: block;             /* 블록 유지 */
+  white-space: nowrap;        /* 줄바꿈 금지 */
+  overflow: hidden;           /* 넘치면 숨김 */
+  text-overflow: ellipsis;    /* 생략표시 (…) */
+  line-height: 1.1;           /* 살짝 촘촘하게 */
+  /* 필요하면 글씨 더 줄이기:
+  font-size: 0.8rem;
+  */
+}
 
 
 .daeyun-table {
@@ -4660,7 +4676,7 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
     font-size: 0.7rem;
   }
 }
-.tengod-inline { white-space: nowrap; }
+
   
 </style>
 
@@ -4682,9 +4698,7 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
       <td>
         <div>${colorize(timeGanji.gan)}</div>
         <div style="font-size:0.85rem; color:#888;">
-          <span class="tengod-inline">
           (${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(timeGanji.gan)))})
-            </span>
         </div>
       </td>
       <td>
@@ -4694,17 +4708,13 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
       <td>
         <div>${colorize(monthGanji.gan)}</div>
         <div style="font-size:0.85rem; color:#888;">
-          <span class="tengod-inline">
           (${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(monthGanji.gan)))})
-            </span>
         </div>
       </td>
       <td>
         <div>${colorize(yearGanji.gan)}</div>
         <div style="font-size:0.85rem; color:#888;">
-          <span class="tengod-inline">
           (${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(yearGanji.gan)))})
-            </span>
         </div>
       </td>
  
