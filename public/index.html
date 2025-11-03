@@ -52,7 +52,7 @@ body {
   font-family: 'Nanum Gothic', sans-serif;
   margin: 0;
   padding: 0;
-  background-color: #ffffff;
+  background-color: #ffffff; /* ← 여기만 흰색으로 변경 */
 }
 
 /* 사주트리나무 그림 */
@@ -61,46 +61,32 @@ body {
   gap: 24px;
   align-items: flex-start;
   margin-top: 8px;
-
-  /* 고정된 그림이 겹치지 않도록 좌측 여백 확보 */
-  padding-left: clamp(120px, 22vw, 240px);
 }
-
-/* ⬇️ sticky → fixed 로 교체: 좌하단 고정 */
 .hero-left {
-  position: fixed !important;
-  left: max(12px, env(safe-area-inset-left));
-  bottom: max(12px, env(safe-area-inset-bottom));
-  top: auto !important;
-  z-index: 2147483000; /* 항상 최상단에 */
-  pointer-events: none; /* 클릭이 뒤 컨텐츠로 통과되게 (원하면 제거) */
+  flex: 1;
+  position: sticky;
+  top: 12px; /* 스크롤해도 살짝 고정되어 보이게 */
 }
-
-/* 이미지 크기/모서리 */
-.hero-left img {
-  display: block;
-  width: clamp(120px, 22vw, 240px);
-  height: auto;
-  border-radius: 14px;
-  box-shadow: none;
-  background-color: transparent;
-  pointer-events: auto; /* 이미지는 클릭 가능하게 (필요 없으면 제거) */
-}
-
-/* 오른쪽 영역은 그대로 */
 .hero-right {
   flex: 1.25;
   min-width: 360px;
 }
+.hero-left img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 14px; /* 필요 없으면 이것도 삭제 가능 */
+  box-shadow: none; /* ← 그림자 제거 */
+  background-color: transparent; /* 혹시 모를 여백색 차이 제거 */
+}
 
-/* 모바일에서도 좌하단 고정 유지 + 조금 더 작게 */
 @media (max-width: 900px) {
   .landing-wrap {
     display: block;
-    padding-left: clamp(100px, 30vw, 160px);
   }
-  .hero-left img {
-    width: clamp(100px, 30vw, 160px);
+  .hero-left {
+    position: static;
+    margin-bottom: 16px;
   }
 }
 
