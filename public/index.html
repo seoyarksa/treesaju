@@ -98,7 +98,7 @@ body {
   .hero-left { margin-bottom: 16px; }
 }
 
-}
+
 
   /* 구분선 */
 .section-split{
@@ -189,7 +189,11 @@ body {
 
 .explainable { cursor: pointer !important; }
 .explainable::after { display: none !important; }
-
+  .explainable {
+    cursor: help !important;
+    pointer-events: auto !important; /* ← 충돌 방지 */
+    display: inline-block;           /* 클릭 면적 안정화 */
+  }
 
 .tooltip {
   position: relative;
