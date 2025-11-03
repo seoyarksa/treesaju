@@ -56,38 +56,48 @@ body {
 }
 
 /* 사주트리나무 그림 */
+/* 두 컬럼 하단선 정렬 */
 .landing-wrap {
   display: flex;
   gap: 24px;
-  align-items: flex-start;
+  align-items: flex-end; /* ⬅️ 양쪽 아이템의 '아랫변'을 맞춤 */
   margin-top: 8px;
 }
+
+/* 왼쪽: 고정/스티키 금지 + 하단 정렬 보장 */
 .hero-left {
   flex: 1;
-  position: sticky;
-  top: 12px; /* 스크롤해도 살짝 고정되어 보이게 */
+  position: static;        /* sticky/fixed 쓰지 않기 */
+  align-self: flex-end;    /* ⬅️ 개별 하단 정렬(안전장치) */
 }
+
+/* 오른쪽: 폼 영역 */
 .hero-right {
   flex: 1.25;
   min-width: 360px;
 }
+
+/* 폼 마지막 요소에 불필요한 아래 마진이 있으면 제거(하단선 어긋남 방지) */
+.hero-right > :last-child {
+  margin-bottom: 0;
+}
+
+/* 이미지 자체는 그대로 */
 .hero-left img {
   display: block;
   width: 100%;
   height: auto;
-  border-radius: 14px; /* 필요 없으면 이것도 삭제 가능 */
-  box-shadow: none; /* ← 그림자 제거 */
-  background-color: transparent; /* 혹시 모를 여백색 차이 제거 */
+  border-radius: 14px;
+  box-shadow: none;
+  background: transparent;
 }
 
+/* 모바일은 세로 스택 */
 @media (max-width: 900px) {
-  .landing-wrap {
-    display: block;
-  }
-  .hero-left {
-    position: static;
-    margin-bottom: 16px;
-  }
+  .landing-wrap { display: block; }
+  .hero-left { margin-bottom: 16px; }
+}
+
 }
 
   /* 구분선 */
