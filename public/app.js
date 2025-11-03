@@ -5624,7 +5624,7 @@ body.innerHTML = `
         ${columns.map(p => `
           <td>
             ${p.hides.length
-              ? p.hides.map(h => `<span class="saju-chip">${h}</span>`).join('')
+              ? p.hides.map(h => `<span class="saju-chip">(${h})</span>`).join('')
               : '-'}
           </td>
         `).join('')}
