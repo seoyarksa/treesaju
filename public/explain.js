@@ -4,6 +4,7 @@
 //<span class="twelve-sinsal-tag explainable" data-group="sipsal12" data-term="${term}">  //12신살
 //<span class="explainable" data-group="terms" data-term="">12운성</span>  //일반용어
 //<span class="explainable" data-group="gyeokook" data-term="">식신격</span>  //격국이름
+//<span class="explainable" data-group="etcsinsal" data-term="">천을귀인</span>  //기타신살
 
 export const TERM_HELP = {
 
@@ -104,6 +105,21 @@ export const TERM_HELP = {
     
   },
 
+     //태과불급
+  taegwa: {
+    '수다토패(水多土敗)': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    
+  },
+
 
     //12운성설명
   unseong: {
@@ -150,6 +166,21 @@ export const TERM_HELP = {
     '화개살': '고독/수행/정리.'
   },
   
+//기타 신살류
+  etcsinsal: {
+    '천을귀인': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+  },
+
+
 };
 
 

@@ -881,7 +881,7 @@ const johuRow1 = `
            text-align:center;
            vertical-align:middle;
            white-space:nowrap;">
-             조후<br>용신<br>[<span style="color:blue;">${applyType}</span>]</td>
+             <span class="explainable" data-group="terms" data-term="">조후<br>용신</span><br>[<span style="color:blue;">${applyType}</span>]</td>
     <td style="background-color:#fff8dc;">기준</td>
     ${johuChars.map((ch, i) => {
       const desc = johuMeaning[i] || "";
