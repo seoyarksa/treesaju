@@ -4844,8 +4844,8 @@ renderSajuMiniFromCurrentOutput({
           <div id="dangryeongshik-container" style="margin-top: 0.5rem;"></div>
         </td>
         <td style="border:1px solid #ccc; padding:4px;"><div style="text-align:left; margin:8px 0; color:#0077cc;">
-  06] 격과 희기신의 도식도<br><br>
-</div>
+  06] 격과 희기신의 도식도
+</div><br><br>
 <div id="gyeok-flow"></div></td>
        
       </tr>
@@ -4984,8 +4984,8 @@ if (gyeokDisplayEl) {
 
   // 출력은 기존의 주격+보조격 로직(gyeokDisplayText)을 유지
   gyeokDisplayEl.innerHTML = `   <div style="text-align:left; margin:8px 0; color:#0077cc;">
-  05] 격국[보조격]의 구성<br>
-</div>격국: ${gyeokDisplayText} `;
+  05] <span class="explainable" data-group="terms" data-term="">격국</span>[보조격]의 구성
+</div><br><br><span class="explainable" data-group="terms" data-term="">격국</span>: ${gyeokDisplayText} `;
 
 
 }
