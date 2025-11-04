@@ -1119,42 +1119,43 @@ function generateNackhwaTable({ birthSaju, dayGanji }) {
       .nackhwa-table td, .nackhwa-table th { border:1px solid #000; padding:2px; }
       .highlight-cell { background-color: #ffeb99 !important; }
     </style>
-    <div style="text-align:center; margin-bottom:5px; font-weight:bold;">📋 낙화래정법</div>
+    <div style="text-align:center; margin-bottom:5px; font-weight:bold;"><span class="explainable" data-group="terms" data-term="">📋 낙화래정법</span></div>
     <table class="nackhwa-table">
       <tr>
         <td>단계</td>
-        <td>묘(苗)</td>
-        <td>근(根)/실(實)</td>
-        <td>화(花)</td>
-        <td>묘(苗)</td>
-        <td>근(根)/실(實)</td>
-        <td>화(花)</td>
+        <td><span class="explainable" data-group="terms" data-term="">묘(苗)</span></td>
+        <td><span class="explainable" data-group="terms" data-term="">근(根)/실(實)</span></td>
+        <td><span class="explainable" data-group="terms" data-term="">화(花)</span></td>
+        <td><span class="explainable" data-group="terms" data-term="">묘(苗)</span></td>
+        <td><span class="explainable" data-group="terms" data-term="">근(根)/실(實)</span></td>
+        <td><span class="explainable" data-group="terms" data-term="">화(花)</span></td>
       </tr>
       <tr>
         <td>형상</td>
         <tr>
   <td>형상</td>
-  <td colspan="4" style="background-color:#ffe0f0;">유형(有形)</td> <!-- 연분홍 -->
-  <td colspan="2" style="background-color:#d6eaff;">무형(無形)</td> <!-- 연파랑 -->
+  <td colspan="4" style="background-color:#ffe0f0;"><span class="explainable" data-group="terms" data-term="">무형(無形)</span></td> <!-- 연분홍 -->
+  <td colspan="1" style="background-color:#e8f0c8;">무형+유형</td> <!-- 노랑 -->
+  <td colspan="1" style="background-color:#d6eaff;"><span class="explainable" data-group="terms" data-term="">유형(有形)</span></td> <!-- 연파랑 -->
 </tr>
 
       </tr>
       <tr>
         <td>내용</td>
-        <td>이탈자/비부살</td>
+        <td><span class="explainable" data-group="terms" data-term="">이탈자/비부살</span></td>
           <td style="color:blue; font-weight:">이유/목적<br>(오늘문제)</td>
-          <td style="color:red; font-weight:">낙화(落花)</td>
-        <td>고민/음욕살</td>
-        <td>장벽살<br>(문제씨앗)</td>
-        <td>증오/암시(暗矢)</td>
+          <td style="color:red; font-weight:"><span class="explainable" data-group="terms" data-term="">낙화(落花)</span></td>
+        <td><span class="explainable" data-group="terms" data-term="">고민/음욕살</span></td>
+        <td><span class="explainable" data-group="terms" data-term="">장벽살<br>(문제씨앗)</span></td>
+        <td><span class="explainable" data-group="terms" data-term="">증오/암시(暗矢)</span></td>
       </tr>
       <tr>
         <td>기준천간</td>
           <td></td>
- <td >일간:<span style="font-size:1.2em;">${colorize(birthSaju.dayGanji.gan)}</span></td>
+ <td >일간:<span class="explainable" data-group="terms" data-term=""; style="font-size:1.2em;">${colorize(birthSaju.dayGanji.gan)}</span></td>
   <td></td>
   <td></td>
-  <td >오늘천간:<span style="font-size:1.2em;">${colorize(dayGanji.gan)}</span></td>
+  <td >오늘천간:<span class="explainable" data-group="terms" data-term=""; style="font-size:1.2em;">${colorize(dayGanji.gan)}</span></td>
   <td></td>
       </tr>
 <tr>
@@ -1163,7 +1164,7 @@ function generateNackhwaTable({ birthSaju, dayGanji }) {
     const val = stripTags(colorize(b));
     const highlight = birthBranches.includes(val) ? ' class="highlight-cell"' : '';
     const sipsin = getSipsin(dayMaster, b);
-    return `<td${highlight}><span style="font-size:1.5em;">${colorize(b)}</span><br><span class="explainable" data-group="tengod" data-term="${sipsin}";style="font-size:0.9em;">${sipsin}</span></td>`;
+    return `<td${highlight}><span class="explainable" data-group="terms" data-term=""; style="font-size:1.5em;">${colorize(b)}</span><br><span class="explainable" data-group="tengod" data-term="${sipsin}";style="font-size:0.9em;">${sipsin}</span></td>`;
   }).join("")}
 </tr>
 <tr>
@@ -1173,7 +1174,7 @@ function generateNackhwaTable({ birthSaju, dayGanji }) {
     const val = stripTags(colorize(chong));
     const highlight = birthBranches.includes(val) ? ' class="highlight-cell"' : '';
     const sipsin = chong ? getSipsin(dayMaster, chong) : '';
-    return `<td${highlight}><span style="font-size:1.5em;">${colorize(chong)}</span><br><span class="explainable" data-group="tengod" data-term="${sipsin}"; style="font-size:0.9em;">${sipsin}</span></td>`;
+    return `<td${highlight}><span class="explainable" data-group="terms" data-term=""; style="font-size:1.5em;">${colorize(chong)}</span><br><span class="explainable" data-group="tengod" data-term="${sipsin}"; style="font-size:0.9em;">${sipsin}</span></td>`;
   }).join("")}
 </tr>
 
