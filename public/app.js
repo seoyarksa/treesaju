@@ -4680,23 +4680,23 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
     <!-- 천간 -->
     <tr>
       <td>
-        <div>${colorize(timeGanji.gan)}</div>
+        <div><span class="explainable" data-group="terms" data-term="">${colorize(timeGanji.gan)}</span></div>
         <div style="font-size:0.85rem; color:#888;">
           ${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(timeGanji.gan)))}
         </div>
       </td>
       <td>
-        <div>${colorize(dayGanji.gan)}</div>
+        <div><span class="explainable" data-group="terms" data-term="">${colorize(dayGanji.gan)}</span></div>
         <div style="font-size:0.85rem; color:#888;">(일간)</div>
       </td>
       <td>
-        <div>${colorize(monthGanji.gan)}</div>
+        <div><span class="explainable" data-group="terms" data-term="">${colorize(monthGanji.gan)}</span></div>
         <div style="font-size:0.85rem; color:#888;">
           ${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(monthGanji.gan)))}
         </div>
       </td>
       <td>
-        <div>${colorize(yearGanji.gan)}</div>
+        <div><span class="explainable" data-group="terms" data-term="">${colorize(yearGanji.gan)}</span></div>
         <div style="font-size:0.85rem; color:#888;">
           ${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(yearGanji.gan)))}
         </div>
@@ -4716,10 +4716,10 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
 
     <!-- 지지 -->
     <tr>
-      <td>${colorize(timeGanji.ji)}</td>
-      <td>${colorize(dayGanji.ji)}</td>
-      <td>${colorize(monthGanji.ji)}</td>
-      <td>${colorize(yearGanji.ji)}</td>
+      <td><span class="explainable" data-group="terms" data-term="">${colorize(timeGanji.ji)}</span></td>
+      <td><span class="explainable" data-group="terms" data-term="">${colorize(dayGanji.ji)}</span></td>
+      <td><span class="explainable" data-group="terms" data-term="">${colorize(monthGanji.ji)}</span></td>
+      <td><span class="explainable" data-group="terms" data-term="">${colorize(yearGanji.ji)}</span></td>
     </tr>
 
     <!-- 지장간 + 육신 -->
@@ -4727,10 +4727,10 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
   <td>
     <div class="hidden-stem-wrapper">
       ${timeLines.map(s => `
-        <div class="hidden-stem">
-          ${colorize(convertKorToHanStem(s), '0.85rem')}
+        <div class="hidden-stem"><span class="explainable" data-group="terms" data-term="">
+          ${colorize(convertKorToHanStem(s), '0.85rem')}</span>
           <span style="font-size:0.75rem; color:#999;">
-             (${tgTag(getTenGod(dayGanKorGan, s))})
+             ${tgTag(getTenGod(dayGanKorGan, s))}
           </span>
         </div>`).join('')}
     </div>
@@ -4738,8 +4738,8 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
   <td>
     <div class="hidden-stem-wrapper">
       ${dayLines.map(s => `
-        <div class="hidden-stem">
-          ${colorize(convertKorToHanStem(s), '0.85rem')}
+        <div class="hidden-stem"><span class="explainable" data-group="terms" data-term="">
+          ${colorize(convertKorToHanStem(s), '0.85rem')}</span>
           <span style="font-size:0.75rem; color:#999;">
              ${tgTag(getTenGod(dayGanKorGan, s))}
           </span>
@@ -4749,8 +4749,8 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
   <td>
     <div class="hidden-stem-wrapper">
       ${monthLines.map(s => `
-        <div class="hidden-stem">
-          ${colorize(convertKorToHanStem(s), '0.85rem')}
+        <div class="hidden-stem"><span class="explainable" data-group="terms" data-term="">
+          ${colorize(convertKorToHanStem(s), '0.85rem')}</span>
           <span style="font-size:0.75rem; color:#999;">
             ${tgTag(getTenGod(dayGanKorGan, s))}
           </span>
@@ -4760,8 +4760,8 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
   <td>
     <div class="hidden-stem-wrapper">
       ${yearLines.map(s => `
-        <div class="hidden-stem">
-          ${colorize(convertKorToHanStem(s), '0.85rem')}
+        <div class="hidden-stem"><span class="explainable" data-group="terms" data-term="">
+          ${colorize(convertKorToHanStem(s), '0.85rem')}</span>
           <span style="font-size:0.75rem; color:#999;">
              ${tgTag(getTenGod(dayGanKorGan, s))}
           </span>
