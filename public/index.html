@@ -553,6 +553,51 @@ body {
 
 
 
+.plan ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.plan li {
+  margin-bottom: 8px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.dropdown-toggle {
+  cursor: pointer;
+  color: #0077cc;
+  text-decoration: underline;
+  display: inline-block;
+}
+
+.dropdown-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.5s ease;
+  background: #f9f9f9;
+  border-left: 3px solid #ccc;
+  border-radius: 6px;
+  margin-top: 6px;
+  padding: 0 12px;
+}
+
+.dropdown-content p {
+  white-space: pre-line;
+  word-break: keep-all;
+  font-size: 14px;
+  color: #333;
+  padding: 10px 0;
+}
+
+/* 펼쳐졌을 때 */
+.dropdown-item.open .dropdown-content {
+  max-height: 1200px; /* 내용에 따라 충분히 큰 값 */
+}
+
+
+
 </style>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -1691,6 +1736,16 @@ document.addEventListener("DOMContentLoaded", ()=>{ wireProfileEditEvents(); });
       }
     });
   })();
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.dropdown-toggle').forEach(el => {
+    el.addEventListener('click', () => {
+      const item = el.closest('.dropdown-item');
+      item.classList.toggle('open');
+    });
+  });
+});
 </script>
 
 
