@@ -1418,7 +1418,7 @@ return `
   <span style="color: red; font-weight: bold;">: ${dangryeong || '-'}</span>
 </td>
 <td style="border:1px solid #ccc; padding:4px;max-width:150px;">
-  <span style="background-color:#f0f0f0; padding:2px 4px;">사령</span>
+  <span class="explainable" data-group="terms" data-term=""; style="background-color:#f0f0f0; padding:2px 4px;">사령</span>
   <span style="color: blue;">: ${saryeong || '-'}</span>
 
 
@@ -1426,7 +1426,7 @@ return `
           
         </tr>
         <tr> 
-          <td style="border:1px solid #ccc; padding:4px;font-size:14px;" colspan="2">당령식: ${dangryeongshikHtml || '-'}
+          <td style="border:1px solid #ccc; padding:4px;font-size:14px;" colspan="2"><span class="explainable" data-group="terms" data-term="">당령식</span>: ${dangryeongshikHtml || '-'}
           </td>
           <td style=style="border:1px solid #ccc; padding:4px;" colspan="2"><div style="font-size:12px;margin-top:6px;">*색: <span style="color:red;">당령</span>, <span style="color:green;">제1희신,사령보좌</span>, <span style="color:blue;">사령</span>, <span style="color:orange;">기신</span> </div>
           </td>
