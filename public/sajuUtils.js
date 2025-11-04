@@ -510,7 +510,7 @@ export function getDangryeongCheongans(dangryeong) {
     })
     .join('');
 
-  return `<span class="explainable" data-group="terms" data-term="">사령식</span>: <span class="explainable" data-group="dang" data-term="${styled}">${styled}</span>`;
+  return `<span class="explainable" data-group="terms" data-term="">사령식</span>: <span class="explainable" data-group="dang" data-term="">${styled}</span>`;
 }
 
 
