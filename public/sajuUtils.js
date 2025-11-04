@@ -810,7 +810,9 @@ export function renderJohuCell() {
  // console.log("▶ 조후용신 적용 타입:", applyType);
 
   // 1행: 천간 나열
-  const rowTop = `<tr><td colspan="9" style="text-align:left; padding:4px; background:#FFDDDD;">` 
+  const rowTop = `  <div style="text-align:left; margin:8px 0; color:#0077cc;">
+  04] <span class="explainable" data-group="terms" data-term="">조후용신</span>과 역할
+</div><tr><td colspan="9" style="text-align:left; padding:4px; background:#FFDDDD;">` 
     + `사주(천간): ` 
     + formatGanList(ganList, "天")
     + `</td></tr>`;
