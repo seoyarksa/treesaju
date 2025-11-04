@@ -4866,7 +4866,9 @@ renderSajuMiniFromCurrentOutput({
 </tr>
 
   <tr>
-    <td colspan="2">
+    <td colspan="2"><div style="text-align:left; margin:8px 0; color:#0077cc;">
+  09] 천간과 지지에 따른 기타 신살들
+</div><br><br>
       <div id="etc-sinsal-box"></div>
     </td>
   </tr>
