@@ -163,7 +163,7 @@ switch (group) {
     from = '천간지지';
     break;
   case 'dang':
-    from = '당령식';
+    from = '당령사령';
     break;
   case 'gyeokook':
     from = '격국';
