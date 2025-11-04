@@ -323,7 +323,7 @@ const midHeader = `
   </tr>
   <tr class="midhead">
     ${branches.map((br, i) =>
-      `<th title="${colLabels[i]}" style="min-width:56px; background:#fff8d6;"><span class="explainable" data-group="ganji" data-term="${br || '-'}">${br || '-'}</span><</th>`
+      `<th title="${colLabels[i]}" style="min-width:56px; background:#fff8d6;"><span class="explainable" data-group="ganji" data-term="${br || '-'}">${br || '-'}</span></th>`
     ).join('')}
   </tr>
 `;
@@ -535,7 +535,7 @@ const colCss = [...highlightIdx].map(i => `
   // 1. 상단 헤더
   const headerRows = `
   <div style="text-align:left; margin:8px 0; color:#0077cc;">
-  09] 12운성[12신살] 찾아보기
+  09] <span class="explainable" data-group="terms" data-term="">12운성</span>[<span class="explainable" data-group="terms" data-term="">12신살</span>] 찾아보기
 </div>
     <tr>
       <th colspan="10"><span class="explainable" data-group="terms" data-term="">12운성</span></th>
