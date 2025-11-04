@@ -3,6 +3,7 @@
 //<span class="ten-god explainable" data-group="tengod" data-term="${tenHidden}">  //십신
 //<span class="twelve-sinsal-tag explainable" data-group="sipsal12" data-term="${term}">  //12신살
 //<span class="explainable" data-group="terms" data-term="">12운성</span>  //일반용어
+//<span class="explainable" data-group="gyeokook" data-term="">식신격</span>  //격국이름
 
 export const TERM_HELP = {
 
@@ -86,6 +87,22 @@ export const TERM_HELP = {
    
 
       },
+
+
+      //격국
+  gyeokook: {
+    '식신격': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    
+  },
 
 
     //12운성설명
