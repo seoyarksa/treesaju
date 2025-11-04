@@ -418,7 +418,7 @@ const midHeader = `
       return `
         <tr>
           <td>${label}</td>
-          <td>${base}</td>
+          <td><span class="explainable" data-group="ganji" data-term="${base}">${base}</span></td>
           ${cells}
         </tr>
       `;
