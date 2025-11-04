@@ -305,11 +305,11 @@ const header = `
   <tr>
     <th rowspan="2" style="min-width:72px; background:#e9f5ff;">기준</th>
     <th rowspan="2" style="min-width:44px; background:#e9f5ff;">값</th>
-    ${colLabels.map(lbl => `<th style="min-width:56px; background:#e9f5ff;"><span class="explainable" data-group="ganji" data-term="${lbl}">${lbl}</span></th>`).join('')}
+    ${colLabels.map(lbl => `<th style="min-width:56px; background:#e9f5ff;">${lbl}</th>`).join('')}
   </tr>
   <tr>
     ${branches.map((br, i) =>
-      `<th title="${colLabels[i]}" style="min-width:56px; background:#e9f5ff;">${br || '-'}</th>`
+      `<th title="${colLabels[i]}" style="min-width:56px; background:#e9f5ff;"><span class="explainable" data-group="ganji" data-term="${br || '-'}">${br || '-'}</span></th>`
     ).join('')}
   </tr>
 `;
