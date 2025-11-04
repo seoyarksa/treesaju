@@ -1411,15 +1411,15 @@ return `
   <div style="display: flex; justify-content: center; margin-top: 0;">
     <table class="dangryeong-table" style="border-collapse: collapse; width:100%; margin-top:0; font-size:0.75rem; text-align:center;">
       <tbody>
-
+<span class="explainable" data-group="terms" data-term="">
         <tr>
 <td style="border:1px solid #ccc; padding:4px;">
-  <span style="background-color:#f0f0f0; padding:2px 4px;">당령:</span>
-  <span style="color: red; font-weight: bold;">${dangryeong || '-'}</span>
+  <span class="explainable" data-group="terms" data-term=""; style="background-color:#f0f0f0; padding:2px 4px;">당령</span>
+  <span style="color: red; font-weight: bold;">: ${dangryeong || '-'}</span>
 </td>
 <td style="border:1px solid #ccc; padding:4px;max-width:150px;">
-  <span style="background-color:#f0f0f0; padding:2px 4px;">사령:</span>
-  <span style="color: blue;">${saryeong || '-'}</span>
+  <span style="background-color:#f0f0f0; padding:2px 4px;">사령</span>
+  <span style="color: blue;">: ${saryeong || '-'}</span>
 
 
           <td style="border:1px solid #ccc; padding:4px;min-width:250px;"colspan="2">${styledSaryeongshik}</td>
