@@ -197,7 +197,7 @@ export function renderBasicDaeyunTable({
     <table class="basic-daeyun-table">
       <thead>
         <tr>
-          <th colspan="10"><span class="explainable" data-group="terms" data-term="">대운수: ${daeyunAge.toFixed(2)}</span></th>
+          <th colspan="10"><span class="explainable" data-group="terms" data-term="">대운수</span>: ${daeyunAge.toFixed(2)}</th>
           <th colspan="10"><span class="explainable" data-group="terms" data-term="">세운시작년도: ${window.sewonYear}</span></th>
         </tr>
         <tr>
