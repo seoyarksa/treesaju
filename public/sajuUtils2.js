@@ -510,7 +510,7 @@ export function getDangryeongCheongans(dangryeong) {
     })
     .join('');
 
-  return `사령식: ${styled}`;
+  return `<span class="explainable" data-group="terms" data-term="">사령식</span>: ${styled}`;
 }
 
 
@@ -810,7 +810,9 @@ export function renderJohuCell() {
  // console.log("▶ 조후용신 적용 타입:", applyType);
 
   // 1행: 천간 나열
-  const rowTop = `<tr><td colspan="9" style="text-align:left; padding:4px; background:#FFDDDD;">` 
+  const rowTop = `  <div style="text-align:left; margin:8px 0; color:#0077cc;">
+  04] <span class="explainable" data-group="terms" data-term="">조후용신</span>과 역할
+</div><tr><td colspan="9" style="text-align:left; padding:4px; background:#FFDDDD;">` 
     + `사주(천간): ` 
     + formatGanList(ganList, "天")
     + `</td></tr>`;
@@ -879,7 +881,7 @@ const johuRow1 = `
            text-align:center;
            vertical-align:middle;
            white-space:nowrap;">
-             조후<br>용신<br>[<span style="color:blue;">${applyType}</span>]</td>
+             <span class="explainable" data-group="terms" data-term="">조후<br>용신</span><br>[<span style="color:blue;">${applyType}</span>]</td>
     <td style="background-color:#fff8dc;">기준</td>
     ${johuChars.map((ch, i) => {
       const desc = johuMeaning[i] || "";
@@ -2211,7 +2213,7 @@ console.log("📦 1차 필터링 + 중복제거 결과:", firstList);
     tableHTML = `
       <table style="border-collapse:collapse; width:100%; text-align:center;" border="1">
         <tr style="background:#f2f2f2;">
-          <th rowspan="${secondList.length + 1}" style="padding:4px; background:#e6f0ff;">태과불급+</th>
+          <th rowspan="${secondList.length + 1}" style="padding:4px; background:#e6f0ff;"><span class="explainable" data-group="terms" data-term="">태과불급</span>+</th>
           <th style="padding:4px; background:#fff8dc;">구분</th>
           <th style="padding:4px; background:#fff8dc;">원인</th>
           <th style="padding:4px; background:#fff8dc;">명칭</th>
@@ -2445,7 +2447,7 @@ for (let i = 0; i < window.allStemList.length; i++) {
 }
 
 const jihapStr = jihapResult.length
-  ? [...new Set(jihapResult)].join(", ")
+  ? [...new Set(jihapResult)].join("/ ")
   : "<span style='color:red;'>X</span>";
 
 
@@ -2460,16 +2462,19 @@ const jihapStr = jihapResult.length
  // console.groupEnd();
 
   return `
+    <div style="text-align:left; margin:8px 0; color:#0077cc;">
+  01] 타고난 환경조건
+</div>
     <table style="border-collapse:collapse;width:100%;text-align:center;font-size:12px;" border="1">
       <tbody>
         <tr style="background-color:#e6f7ff;">
-          <td>육합</td>
-          <td>삼합</td>
-          <td>방합</td>
-          <td>충</td>
-           <td>간합</td>
-          <td>형</td>
-          <td>배열</td>
+          <td><span class="explainable" data-group="terms" data-term="">육합</span></td>
+          <td><span class="explainable" data-group="terms" data-term="">삼합</span></td>
+          <td><span class="explainable" data-group="terms" data-term="">방합</span></td>
+          <td><span class="explainable" data-group="terms" data-term="">충</span></td>
+           <td><span class="explainable" data-group="terms" data-term="">간합</span></td>
+          <td><span class="explainable" data-group="terms" data-term="">형</span></td>
+          <td><span class="explainable" data-group="terms" data-term="">배열</span></td>
           
         </tr>
         <tr>
@@ -2485,10 +2490,10 @@ const jihapStr = jihapResult.length
         </tr>
 
          <tr>
-          <td style="background-color:#e6f7ff;">地합</td>
+          <td style="background-color:#e6f7ff;"><span class="explainable" data-group="terms" data-term="">地합</span></td>
           <td colspan="3">${jihapStr}</td>
          
-          <td style="background-color:#e6f7ff;">산업분류</td>
+          <td style="background-color:#e6f7ff;"><span class="explainable" data-group="terms" data-term="">산업분류</span></td>
            <td colspan="2">${industryCategory}</td>
         </tr>
       </tbody>

@@ -1951,14 +1951,17 @@ document.getElementById("gwBtnInicis").addEventListener("click", () => {
         <h3>구독 결제</h3>
         <p>전화번호 인증이 완료되었습니다. 상품을 선택하여 결제하세요.</p>
 
-        <div class="plan">
-          <ul>
-            <li><strong>3개월 일반 결제</strong>: 1일 60회 · <strong>3개월간 60,000원[일시불]</strong></li>
-            <li><strong>6개월 일반 결제</strong>: 1일 60회 · <strong>6개월간 100,000원[일시불]</strong></li>
-            <li><strong>프리미엄 정기구독 결제</strong> (기본): 1일 60회 · <strong>월 11,000원</strong></li>
-            <li><strong>프리미엄+ 정기구독 결제</strong> (플러스): 1일 150회 · <strong>월 16,500원</strong></li>
-          </ul>
-        </div>
+       <div class="plan">
+  <ul>
+    <li><strong>3개월 일반 결제</strong>: 1일 60회 · <strong>3개월간 60,000원[일시불]</strong></li>
+    <li><strong>6개월 일반 결제</strong>: 1일 60회 · <strong>6개월간 100,000원[일시불]</strong></li>
+    <li><strong>프리미엄 정기구독 결제</strong> (기본): 1일 60회 · <strong>월 11,000원</strong></li>
+    <li><strong>프리미엄+ 정기구독 결제</strong> (플러스): 1일 150회 · <strong>월 16,500원</strong></li>
+
+
+  </ul>
+</div>
+
 
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button class="btn-success" id="btn3m">3개월 일반 결제</button>
@@ -4680,23 +4683,23 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
     <!-- 천간 -->
     <tr>
       <td>
-        <div>${colorize(timeGanji.gan)}</div>
+        <div><span class="explainable" data-group="terms" data-term="">${colorize(timeGanji.gan)}</span></div>
         <div style="font-size:0.85rem; color:#888;">
           ${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(timeGanji.gan)))}
         </div>
       </td>
       <td>
-        <div>${colorize(dayGanji.gan)}</div>
-        <div style="font-size:0.85rem; color:#888;">(일간)</div>
+        <div><span class="explainable" data-group="terms" data-term="">${colorize(dayGanji.gan)}</span></div>
+        <div style="font-size:0.85rem; color:#888;"><span class="explainable" data-group="terms" data-term="">(일간)</span></div>
       </td>
       <td>
-        <div>${colorize(monthGanji.gan)}</div>
+        <div><span class="explainable" data-group="terms" data-term="">${colorize(monthGanji.gan)}</span></div>
         <div style="font-size:0.85rem; color:#888;">
           ${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(monthGanji.gan)))}
         </div>
       </td>
       <td>
-        <div>${colorize(yearGanji.gan)}</div>
+        <div><span class="explainable" data-group="terms" data-term="">${colorize(yearGanji.gan)}</span></div>
         <div style="font-size:0.85rem; color:#888;">
           ${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(yearGanji.gan)))}
         </div>
@@ -4716,10 +4719,10 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
 
     <!-- 지지 -->
     <tr>
-      <td>${colorize(timeGanji.ji)}</td>
-      <td>${colorize(dayGanji.ji)}</td>
-      <td>${colorize(monthGanji.ji)}</td>
-      <td>${colorize(yearGanji.ji)}</td>
+      <td><span class="explainable" data-group="terms" data-term="">${colorize(timeGanji.ji)}</span></td>
+      <td><span class="explainable" data-group="terms" data-term="">${colorize(dayGanji.ji)}</span></td>
+      <td><span class="explainable" data-group="terms" data-term="">${colorize(monthGanji.ji)}</span></td>
+      <td><span class="explainable" data-group="terms" data-term="">${colorize(yearGanji.ji)}</span></td>
     </tr>
 
     <!-- 지장간 + 육신 -->
@@ -4727,10 +4730,10 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
   <td>
     <div class="hidden-stem-wrapper">
       ${timeLines.map(s => `
-        <div class="hidden-stem">
-          ${colorize(convertKorToHanStem(s), '0.85rem')}
+        <div class="hidden-stem"><span class="explainable" data-group="terms" data-term="">
+          ${colorize(convertKorToHanStem(s), '0.85rem')}</span>
           <span style="font-size:0.75rem; color:#999;">
-             (${tgTag(getTenGod(dayGanKorGan, s))})
+             ${tgTag(getTenGod(dayGanKorGan, s))}
           </span>
         </div>`).join('')}
     </div>
@@ -4738,8 +4741,8 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
   <td>
     <div class="hidden-stem-wrapper">
       ${dayLines.map(s => `
-        <div class="hidden-stem">
-          ${colorize(convertKorToHanStem(s), '0.85rem')}
+        <div class="hidden-stem"><span class="explainable" data-group="terms" data-term="">
+          ${colorize(convertKorToHanStem(s), '0.85rem')}</span>
           <span style="font-size:0.75rem; color:#999;">
              ${tgTag(getTenGod(dayGanKorGan, s))}
           </span>
@@ -4749,8 +4752,8 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
   <td>
     <div class="hidden-stem-wrapper">
       ${monthLines.map(s => `
-        <div class="hidden-stem">
-          ${colorize(convertKorToHanStem(s), '0.85rem')}
+        <div class="hidden-stem"><span class="explainable" data-group="terms" data-term="">
+          ${colorize(convertKorToHanStem(s), '0.85rem')}</span>
           <span style="font-size:0.75rem; color:#999;">
             ${tgTag(getTenGod(dayGanKorGan, s))}
           </span>
@@ -4760,8 +4763,8 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
   <td>
     <div class="hidden-stem-wrapper">
       ${yearLines.map(s => `
-        <div class="hidden-stem">
-          ${colorize(convertKorToHanStem(s), '0.85rem')}
+        <div class="hidden-stem"><span class="explainable" data-group="terms" data-term="">
+          ${colorize(convertKorToHanStem(s), '0.85rem')}</span>
           <span style="font-size:0.75rem; color:#999;">
              ${tgTag(getTenGod(dayGanKorGan, s))}
           </span>
@@ -4840,7 +4843,8 @@ renderSajuMiniFromCurrentOutput({
         <td style="border:1px solid #ccc; padding:4px;">
           <div id="dangryeongshik-container" style="margin-top: 0.5rem;"></div>
         </td>
-        <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-flow"></div></td>
+        <td style="border:1px solid #ccc; padding:4px;">
+<div id="gyeok-flow"></div></td>
        
       </tr>
        <tr>
@@ -4852,13 +4856,17 @@ renderSajuMiniFromCurrentOutput({
         </tr>
         <!-- 태과불급 전용 한 칸 -->
 <tr>
-  <td colspan="2" style="border:1px solid #ccc; padding:4px; color:purple;" >
+  <td colspan="2" style="border:1px solid #ccc; padding:4px; color:purple;" ><div style="text-align:left; margin:8px 0; color:#0077cc;">
+  07] <span class="explainable" data-group="terms" data-term="">태과불급</span>에 따른 여러가지 현상들
+</div>
  <div id="taegwa-bulgeup-cell">${tb} </div><div id="simple-table-box"></div>
 </td>
 </tr>
 
   <tr>
-    <td colspan="2">
+    <td colspan="2"><div style="text-align:left; margin:8px 0; color:#0077cc;">
+  08] 천간과 지지에 따른 기타 신살들
+</div>
       <div id="etc-sinsal-box"></div>
     </td>
   </tr>
@@ -4977,7 +4985,9 @@ if (gyeokDisplayEl) {
   );
 
   // 출력은 기존의 주격+보조격 로직(gyeokDisplayText)을 유지
-  gyeokDisplayEl.innerHTML = ` 격국: ${gyeokDisplayText} `;
+  gyeokDisplayEl.innerHTML = `   <div style="text-align:left; margin:8px 0; color:#0077cc;">
+  05] <span class="explainable" data-group="terms" data-term="">격국</span>[&보조격]의 구성 및 도식도
+</div><br><br><span class="explainable" data-group="terms" data-term="">격국</span>: ${gyeokDisplayText} `;
 
 
 }

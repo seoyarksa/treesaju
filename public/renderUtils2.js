@@ -197,8 +197,8 @@ export function renderBasicDaeyunTable({
     <table class="basic-daeyun-table">
       <thead>
         <tr>
-          <th colspan="10">대운수: ${daeyunAge.toFixed(2)}</th>
-          <th colspan="10">세운시작년도: ${window.sewonYear}</th>
+          <th colspan="10"><span class="explainable" data-group="terms" data-term="">대운수</span>: ${daeyunAge.toFixed(2)}</th>
+          <th colspan="10"><span class="explainable" data-group="terms" data-term="">세운시작년도: ${window.sewonYear}</span></th>
         </tr>
         <tr>
           ${ages.map(age => `<th>${age}</th>`).join('')}
@@ -214,9 +214,9 @@ export function renderBasicDaeyunTable({
        class="daeyun-cell"
        data-stem="${stem}"
        data-branch="${branch}">
-                <div>${colorize(stem)}</div>
-                ${tenGod ? `<div style="font-size:0.75rem; color:#999;">(${tenGod})</div>` : ""}
-                <div>${colorize(branch)}</div>
+                <div><span class="explainable" data-group="terms" data-term="">${colorize(stem)}</span></div>
+                ${tenGod ? `<div style="font-size:0.75rem; color:#999;"><span class="explainable" data-group="tengod" data-term="${tenGod}">(${tenGod})</span></div>` : ""}
+                <div><span class="explainable" data-group="terms" data-term="">${colorize(branch)}</span></div>
               </td>
             `;
           }).join('')}
@@ -394,9 +394,9 @@ sewoonReversed.forEach(({ stem, branch, year }) => {
   td.style.verticalAlign = "middle";
 
   td.innerHTML = `
-    <div>${colorize(stem)}</div>
-    ${tenGod ? `<div style="font-size:0.75rem; color:#999;">(${tenGod})</div>` : ""}
-    <div>${colorize(branch)}</div>
+    <div><span class="explainable" data-group="terms" data-term="">${colorize(stem)}</span></div>
+    ${tenGod ? `<div style="font-size:0.75rem; color:#999;"><span class="explainable" data-group="tengod" data-term="${tenGod}">(${tenGod})</span></div>` : ""}
+    <div><span class="explainable" data-group="terms" data-term="">${colorize(branch)}</span></div>
   `;
 
   td.addEventListener("click", () => basicSewoonClick(td, stem, branch, year));
@@ -1119,42 +1119,43 @@ function generateNackhwaTable({ birthSaju, dayGanji }) {
       .nackhwa-table td, .nackhwa-table th { border:1px solid #000; padding:2px; }
       .highlight-cell { background-color: #ffeb99 !important; }
     </style>
-    <div style="text-align:center; margin-bottom:5px; font-weight:bold;">📋 낙화래정법</div>
+    <div style="text-align:center; margin-bottom:5px; font-weight:bold;"><span class="explainable" data-group="terms" data-term="">📋 낙화래정법</span></div>
     <table class="nackhwa-table">
       <tr>
         <td>단계</td>
-        <td>묘(苗)</td>
-        <td>근(根)/실(實)</td>
-        <td>화(花)</td>
-        <td>묘(苗)</td>
-        <td>근(根)/실(實)</td>
-        <td>화(花)</td>
+        <td><span class="explainable" data-group="terms" data-term="">묘(苗)</span></td>
+        <td><span class="explainable" data-group="terms" data-term="">근(根)/실(實)</span></td>
+        <td><span class="explainable" data-group="terms" data-term="">화(花)</span></td>
+        <td><span class="explainable" data-group="terms" data-term="">묘(苗)</span></td>
+        <td><span class="explainable" data-group="terms" data-term="">근(根)/실(實)</span></td>
+        <td><span class="explainable" data-group="terms" data-term="">화(花)</span></td>
       </tr>
       <tr>
         <td>형상</td>
         <tr>
   <td>형상</td>
-  <td colspan="4" style="background-color:#ffe0f0;">유형(有形)</td> <!-- 연분홍 -->
-  <td colspan="2" style="background-color:#d6eaff;">무형(無形)</td> <!-- 연파랑 -->
+  <td colspan="4" style="background-color:#ffe0f0;"><span class="explainable" data-group="terms" data-term="">무형(無形)</span></td> <!-- 연분홍 -->
+  <td colspan="1" style="background-color:#e8f0c8;">무형+유형</td> <!-- 노랑 -->
+  <td colspan="1" style="background-color:#d6eaff;"><span class="explainable" data-group="terms" data-term="">유형(有形)</span></td> <!-- 연파랑 -->
 </tr>
 
       </tr>
       <tr>
         <td>내용</td>
-        <td>이탈자/비부살</td>
+        <td><span class="explainable" data-group="terms" data-term="">이탈자/비부살</span></td>
           <td style="color:blue; font-weight:">이유/목적<br>(오늘문제)</td>
-          <td style="color:red; font-weight:">낙화(落花)</td>
-        <td>고민/음욕살</td>
-        <td>장벽살<br>(문제씨앗)</td>
-        <td>증오/암시(暗矢)</td>
+          <td style="color:red; font-weight:"><span class="explainable" data-group="terms" data-term="">낙화(落花)</span></td>
+        <td><span class="explainable" data-group="terms" data-term="">고민/음욕살</span></td>
+        <td><span class="explainable" data-group="terms" data-term="">장벽살<br>(문제씨앗)</span></td>
+        <td><span class="explainable" data-group="terms" data-term="">증오/암시(暗矢)</span></td>
       </tr>
       <tr>
         <td>기준천간</td>
           <td></td>
- <td >일간:<span style="font-size:1.2em;">${colorize(birthSaju.dayGanji.gan)}</span></td>
+ <td >일간:<span class="explainable" data-group="terms" data-term=""; style="font-size:1.2em;">${colorize(birthSaju.dayGanji.gan)}</span></td>
   <td></td>
   <td></td>
-  <td >오늘천간:<span style="font-size:1.2em;">${colorize(dayGanji.gan)}</span></td>
+  <td >오늘천간:<span class="explainable" data-group="terms" data-term=""; style="font-size:1.2em;">${colorize(dayGanji.gan)}</span></td>
   <td></td>
       </tr>
 <tr>
@@ -1163,7 +1164,7 @@ function generateNackhwaTable({ birthSaju, dayGanji }) {
     const val = stripTags(colorize(b));
     const highlight = birthBranches.includes(val) ? ' class="highlight-cell"' : '';
     const sipsin = getSipsin(dayMaster, b);
-    return `<td${highlight}><span style="font-size:1.5em;">${colorize(b)}</span><br><span style="font-size:0.9em;">${sipsin}</span></td>`;
+    return `<td${highlight}><span class="explainable" data-group="terms" data-term=""; style="font-size:1.5em;">${colorize(b)}</span><br><span class="explainable" data-group="tengod" data-term="${sipsin}";style="font-size:0.9em;">${sipsin}</span></td>`;
   }).join("")}
 </tr>
 <tr>
@@ -1173,7 +1174,7 @@ function generateNackhwaTable({ birthSaju, dayGanji }) {
     const val = stripTags(colorize(chong));
     const highlight = birthBranches.includes(val) ? ' class="highlight-cell"' : '';
     const sipsin = chong ? getSipsin(dayMaster, chong) : '';
-    return `<td${highlight}><span style="font-size:1.5em;">${colorize(chong)}</span><br><span style="font-size:0.9em;">${sipsin}</span></td>`;
+    return `<td${highlight}><span class="explainable" data-group="terms" data-term=""; style="font-size:1.5em;">${colorize(chong)}</span><br><span class="explainable" data-group="tengod" data-term="${sipsin}"; style="font-size:0.9em;">${sipsin}</span></td>`;
   }).join("")}
 </tr>
 
@@ -1407,25 +1408,28 @@ return `
 }
 
   </style>
+    <div style="text-align:left; margin:8px 0; color:#0077cc;">
+  02] <span class="explainable" data-group="terms" data-term="">당령</span>&<span class="explainable" data-group="terms" data-term="">사령</span>(타고난 환경과 그것을 활용할 수 있는 능력, 타고난 임무&능력)
+</div>
   <div style="display: flex; justify-content: center; margin-top: 0;">
     <table class="dangryeong-table" style="border-collapse: collapse; width:100%; margin-top:0; font-size:0.75rem; text-align:center;">
       <tbody>
 
         <tr>
 <td style="border:1px solid #ccc; padding:4px;">
-  <span style="background-color:#f0f0f0; padding:2px 4px;">당령:</span>
-  <span style="color: red; font-weight: bold;">${dangryeong || '-'}</span>
+  <span class="explainable" data-group="terms" data-term=""; style="background-color:#f0f0f0; padding:2px 4px;">당령</span>
+  <span style="color: red; font-weight: bold;">: ${dangryeong || '-'}</span>
 </td>
 <td style="border:1px solid #ccc; padding:4px;max-width:150px;">
-  <span style="background-color:#f0f0f0; padding:2px 4px;">사령:</span>
-  <span style="color: blue;">${saryeong || '-'}</span>
+  <span class="explainable" data-group="terms" data-term=""; style="background-color:#f0f0f0; padding:2px 4px;">사령</span>
+  <span style="color: blue;">: ${saryeong || '-'}</span>
 
 
           <td style="border:1px solid #ccc; padding:4px;min-width:250px;"colspan="2">${styledSaryeongshik}</td>
           
         </tr>
         <tr> 
-          <td style="border:1px solid #ccc; padding:4px;font-size:14px;" colspan="2">당령식: ${dangryeongshikHtml || '-'}
+          <td style="border:1px solid #ccc; padding:4px;font-size:14px;" colspan="2"><span class="explainable" data-group="terms" data-term="">당령식</span>: ${dangryeongshikHtml || '-'}
           </td>
           <td style=style="border:1px solid #ccc; padding:4px;" colspan="2"><div style="font-size:12px;margin-top:6px;">*색: <span style="color:red;">당령</span>, <span style="color:green;">제1희신,사령보좌</span>, <span style="color:blue;">사령</span>, <span style="color:orange;">기신</span> </div>
           </td>
@@ -1861,6 +1865,9 @@ let rightCell = `
 
 // 전체 1행 2칸짜리 큰 표
 let html = `
+  <div style="text-align:left; margin:8px 0; color:#0077cc;">
+ 03] <span class="explainable" data-group="terms" data-term="">당령희신</span>과 <span class="explainable" data-group="terms" data-term="">당령기신</span>
+</div>
  <table style="border-collapse:collapse; width:100%; border:none;">
     <tr>
       <td style="vertical-align:top; padding:8px; border:none;">

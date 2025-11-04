@@ -534,6 +534,9 @@ const colCss = [...highlightIdx].map(i => `
 
   // 1. 상단 헤더
   const headerRows = `
+  <div style="text-align:left; margin:8px 0; color:#0077cc;">
+  09] 12운성[12신살] 찾아보기
+</div>
     <tr>
       <th colspan="10"><span class="explainable" data-group="terms" data-term="">12운성</span></th>
       <th colspan="4"><span class="explainable" data-group="terms" data-term="">12신살</span></th>
@@ -576,7 +579,7 @@ const sinsalRow  = `<tr id="sinsal-row"><th>12신살</th>${jijiArr.map(() => `<t
   const guide = `
     <tr>
       <td colspan="13" style="font-size:13px; text-align:left; padding:5px;">
-        원하는 <span style="color:orange;">천간,삼합</span>을 클릭 or 아래 <span style="color:orange;">지지</span> 클릭시 해당 12운성[신살]을 확인가능
+        * 원하는 <span style="color:orange;">천간,삼합</span>을 클릭 or 아래 <span style="color:orange;">지지</span> 클릭시 해당 12운성[신살]을 확인가능
         <br>[<span style="color:red;">戊,己</span>는 제외, <span style="color:blue;">파란색 간지</span>는 내 사주팔자의 간지]
       </td>
     </tr>
@@ -630,8 +633,9 @@ const sinsalRow  = `<tr id="sinsal-row"><th>12신살</th>${jijiArr.map(() => `<t
 
 
 <div style="text-align:center; margin:8px 0;">
-[위의 표에서는 원하는 천간의 지지별 12운성(신살)을 바로 확인할 수 있습니다.]<br><br>
-  * 천간별 12운성표 
+[위의 표에서는 원하는 천간의 지지별 12운성(신살)을 바로 확인할 수 있습니다.]<br></div>
+<div style="text-align:left; margin:8px 0; color:#0077cc;">
+  10] 천간별 <span class="explainable" data-group="terms" data-term="">12운성</span>[<span class="explainable" data-group="terms" data-term="">12신살</span>]표 
 </div>
 
 <div id="unseong-block"></div>
