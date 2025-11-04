@@ -2213,7 +2213,7 @@ console.log("📦 1차 필터링 + 중복제거 결과:", firstList);
     tableHTML = `
       <table style="border-collapse:collapse; width:100%; text-align:center;" border="1">
         <tr style="background:#f2f2f2;">
-          <th rowspan="${secondList.length + 1}" style="padding:4px; background:#e6f0ff;">태과불급+</th>
+          <th rowspan="${secondList.length + 1}" style="padding:4px; background:#e6f0ff;"><span class="explainable" data-group="terms" data-term="">태과불급</span>+</th>
           <th style="padding:4px; background:#fff8dc;">구분</th>
           <th style="padding:4px; background:#fff8dc;">원인</th>
           <th style="padding:4px; background:#fff8dc;">명칭</th>
