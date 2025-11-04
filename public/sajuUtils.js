@@ -2460,16 +2460,19 @@ const jihapStr = jihapResult.length
  // console.groupEnd();
 
   return `
+    <div style="text-align:left; margin:8px 0;">
+  01] 타고난 환경조건
+</div>
     <table style="border-collapse:collapse;width:100%;text-align:center;font-size:12px;" border="1">
       <tbody>
         <tr style="background-color:#e6f7ff;">
-          <td>육합</td>
-          <td>삼합</td>
-          <td>방합</td>
-          <td>충</td>
-           <td>간합</td>
-          <td>형</td>
-          <td>배열</td>
+          <td><span class="explainable" data-group="terms" data-term="">육합</span></td>
+          <td><span class="explainable" data-group="terms" data-term="">삼합</span></td>
+          <td><span class="explainable" data-group="terms" data-term="">방합</span></td>
+          <td><span class="explainable" data-group="terms" data-term="">충</span></td>
+           <td><span class="explainable" data-group="terms" data-term="">간합</span></td>
+          <td><span class="explainable" data-group="terms" data-term="">형</span></td>
+          <td><span class="explainable" data-group="terms" data-term="">배열</span></td>
           
         </tr>
         <tr>
@@ -2485,10 +2488,10 @@ const jihapStr = jihapResult.length
         </tr>
 
          <tr>
-          <td style="background-color:#e6f7ff;">地합</td>
+          <td style="background-color:#e6f7ff;"><span class="explainable" data-group="terms" data-term="">地합</span></td>
           <td colspan="3">${jihapStr}</td>
          
-          <td style="background-color:#e6f7ff;">산업분류</td>
+          <td style="background-color:#e6f7ff;"><span class="explainable" data-group="terms" data-term="">산업분류</span></td>
            <td colspan="2">${industryCategory}</td>
         </tr>
       </tbody>
