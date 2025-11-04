@@ -632,8 +632,9 @@ const sinsalRow  = `<tr id="sinsal-row"><th>12신살</th>${jijiArr.map(() => `<t
     </table>
 
 
+<div style="text-align:center; margin:8px 0;">
+[위의 표에서는 원하는 천간의 지지별 12운성(신살)을 바로 확인할 수 있습니다.]<br></div>
 <div style="text-align:left; margin:8px 0;">
-[위의 표에서는 원하는 천간의 지지별 12운성(신살)을 바로 확인할 수 있습니다.]<br><br>
   10] 천간별 <span class="explainable" data-group="terms" data-term="">12운성</span>[<span class="explainable" data-group="terms" data-term="">12신살</span>]표 
 </div>
 
