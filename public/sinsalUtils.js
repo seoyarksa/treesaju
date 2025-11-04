@@ -323,7 +323,7 @@ const midHeader = `
   </tr>
   <tr class="midhead">
     ${branches.map((br, i) =>
-      `<th title="${colLabels[i]}" style="min-width:56px; background:#fff8d6;">${br || '-'}</th>`
+      `<th title="${colLabels[i]}" style="min-width:56px; background:#fff8d6;"><span class="explainable" data-group="ganji" data-term="${br || '-'}">${br || '-'}</span><</th>`
     ).join('')}
   </tr>
 `;
@@ -359,7 +359,7 @@ const midHeader = `
       return `
         <tr>
           <td>${label || ''}</td>
-          <td>${bStem || '-'}${tenToShow ? ` <span class="ten-god explainable" data-group="tengod" data-term="${tenToShow}">(${tenToShow})</span>` : ''}</td>
+          <td><span class="explainable" data-group="ganji" data-term="${bStem || '-'}">${bStem || '-'}</span>${tenToShow ? ` <span class="ten-god explainable" data-group="tengod" data-term="${tenToShow}">(${tenToShow})</span>` : ''}</td>
           ${cells.map(u => `<td><span class="unseong-tag explainable" data-group="unseong" data-term="${u}">${u}</span></td>`).join('')}
         </tr>
       `;
