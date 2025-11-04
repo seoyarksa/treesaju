@@ -2087,7 +2087,7 @@ if (!normalizedSecondaryName || normalizedSecondaryName.trim() === "X") {
 
   let IlganGyeokTablehtml = `
   <div style="text-align:left; margin:8px 0; color:#0077cc;">
-  07] 격의 등급(성패) & 육신의 왕쇠강약
+  06] 격의 등급(성패) & 육신의 왕쇠강약
 </div>
 <table border="1" 
        style="border-collapse: collapse; text-align:center; width: 100%; margin-bottom:0; font-size:14px;">

@@ -4843,9 +4843,7 @@ renderSajuMiniFromCurrentOutput({
         <td style="border:1px solid #ccc; padding:4px;">
           <div id="dangryeongshik-container" style="margin-top: 0.5rem;"></div>
         </td>
-        <td style="border:1px solid #ccc; padding:4px;"><div style="text-align:left; margin:8px 0; color:#0077cc;">
-  06] 격과 희기신의 도식도
-</div><br><br>
+        <td style="border:1px solid #ccc; padding:4px;">
 <div id="gyeok-flow"></div></td>
        
       </tr>
@@ -4859,7 +4857,7 @@ renderSajuMiniFromCurrentOutput({
         <!-- 태과불급 전용 한 칸 -->
 <tr>
   <td colspan="2" style="border:1px solid #ccc; padding:4px; color:purple;" ><div style="text-align:left; margin:8px 0; color:#0077cc;">
-  08] <span class="explainable" data-group="terms" data-term="">태과불급</span>에 따른 여러가지 현상들
+  07] <span class="explainable" data-group="terms" data-term="">태과불급</span>에 따른 여러가지 현상들
 </div>
  <div id="taegwa-bulgeup-cell">${tb} </div><div id="simple-table-box"></div>
 </td>
@@ -4867,7 +4865,7 @@ renderSajuMiniFromCurrentOutput({
 
   <tr>
     <td colspan="2"><div style="text-align:left; margin:8px 0; color:#0077cc;">
-  09] 천간과 지지에 따른 기타 신살들
+  08] 천간과 지지에 따른 기타 신살들
 </div>
       <div id="etc-sinsal-box"></div>
     </td>
@@ -4988,7 +4986,7 @@ if (gyeokDisplayEl) {
 
   // 출력은 기존의 주격+보조격 로직(gyeokDisplayText)을 유지
   gyeokDisplayEl.innerHTML = `   <div style="text-align:left; margin:8px 0; color:#0077cc;">
-  05] <span class="explainable" data-group="terms" data-term="">격국</span>[&보조격]의 구성
+  05] <span class="explainable" data-group="terms" data-term="">격국</span>[&보조격]의 구성 및 도식도
 </div><br><br><span class="explainable" data-group="terms" data-term="">격국</span>: ${gyeokDisplayText} `;
 
 
