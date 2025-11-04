@@ -1408,10 +1408,13 @@ return `
 }
 
   </style>
+    <div style="text-align:left; margin:8px 0; color:#0077cc;">
+  02] 당령&사령(타고난 환경과 그것을 활용할 수 있는 능력, 타고난 임무&능력)
+</div>
   <div style="display: flex; justify-content: center; margin-top: 0;">
     <table class="dangryeong-table" style="border-collapse: collapse; width:100%; margin-top:0; font-size:0.75rem; text-align:center;">
       <tbody>
-<span class="explainable" data-group="terms" data-term="">
+
         <tr>
 <td style="border:1px solid #ccc; padding:4px;">
   <span class="explainable" data-group="terms" data-term=""; style="background-color:#f0f0f0; padding:2px 4px;">당령</span>
