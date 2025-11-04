@@ -4687,7 +4687,7 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
       </td>
       <td>
         <div><span class="explainable" data-group="terms" data-term="">${colorize(dayGanji.gan)}</span></div>
-        <div style="font-size:0.85rem; color:#888;">(일간)</div>
+        <div style="font-size:0.85rem; color:#888;"><span class="explainable" data-group="terms" data-term="">(일간)</span></div>
       </td>
       <td>
         <div><span class="explainable" data-group="terms" data-term="">${colorize(monthGanji.gan)}</span></div>
