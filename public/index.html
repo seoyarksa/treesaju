@@ -553,84 +553,6 @@ body {
 
 
 
-.plan ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.plan li {
-  margin-bottom: 8px;
-  font-size: 15px;
-  line-height: 1.6;
-}
-
-.dropdown-toggle {
-  cursor: pointer;
-  color: #0077cc;
-  text-decoration: underline;
-  display: inline-block;
-}
-
-.dropdown-content {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.5s ease;
-  background: #f9f9f9;
-  border-left: 3px solid #ccc;
-  border-radius: 6px;
-  margin-top: 6px;
-  padding: 0 12px;
-}
-
-.dropdown-content p {
-  white-space: pre-line;
-  word-break: keep-all;
-  font-size: 14px;
-  color: #333;
-  padding: 10px 0;
-}
-
-/* 펼쳐졌을 때 */
-.dropdown-item.open .dropdown-content {
-  max-height: 1200px; /* 내용에 따라 충분히 큰 값 */
-}
-
-/* ✅ 부모 드롭이 열릴 때 내부 드롭다운이 가려지지 않도록 처리 */
-.dropdown-item.open > .dropdown-content {
-  overflow: visible;
-}
-
-/* ✅ 내부 드롭 구조 (드롭 안의 드롭) */
-.inner-dropdown {
-  margin-top: 10px;
-}
-
-.inner-toggle {
-  cursor: pointer;
-  color: #0077cc;
-  display: inline-block;
-  text-decoration: underline;
-}
-
-.inner-content {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.4s ease;
-  background: #fff;
-  border-left: 2px solid #bbb;
-  border-radius: 5px;
-  margin-top: 6px;
-  padding: 0 10px;
-}
-
-/* 열렸을 때 */
-.inner-dropdown.open .inner-content {
-  max-height: 1000px;
-}
-
-
-
 </style>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -1772,27 +1694,7 @@ document.addEventListener("DOMContentLoaded", ()=>{ wireProfileEditEvents(); });
 </script>
 
 
-<!--  환불규정 드롭바 -->
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  // 상위 드롭다운
-  document.querySelectorAll(".dropdown-toggle").forEach(el => {
-    el.addEventListener("click", () => {
-      const item = el.closest(".dropdown-item");
-      item.classList.toggle("open");
-    });
-  });
 
-  // 내부 드롭다운
-  document.querySelectorAll(".inner-toggle").forEach(el => {
-    el.addEventListener("click", e => {
-      e.stopPropagation(); // ✅ 상위 이벤트 차단
-      const inner = el.closest(".inner-dropdown");
-      inner.classList.toggle("open");
-    });
-  });
-});
-</script>
 
 
 </body>
