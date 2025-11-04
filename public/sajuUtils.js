@@ -2460,7 +2460,7 @@ const jihapStr = jihapResult.length
  // console.groupEnd();
 
   return `
-    <div style="text-align:left; margin:8px 0;">
+    <div style="text-align:left; margin:8px 0; color:#0077cc;">
   01] 타고난 환경조건
 </div>
     <table style="border-collapse:collapse;width:100%;text-align:center;font-size:12px;" border="1">
