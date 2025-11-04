@@ -1865,6 +1865,9 @@ let rightCell = `
 
 // 전체 1행 2칸짜리 큰 표
 let html = `
+  <div style="text-align:left; margin:8px 0; color:#0077cc;">
+ 03] <span class="explainable" data-group="terms" data-term="">당령희신</span>과 <span class="explainable" data-group="terms" data-term="">당령기신</span>
+</div>
  <table style="border-collapse:collapse; width:100%; border:none;">
     <tr>
       <td style="vertical-align:top; padding:8px; border:none;">
