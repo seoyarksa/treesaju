@@ -4858,7 +4858,9 @@ renderSajuMiniFromCurrentOutput({
         </tr>
         <!-- 태과불급 전용 한 칸 -->
 <tr>
-  <td colspan="2" style="border:1px solid #ccc; padding:4px; color:purple;" >
+  <td colspan="2" style="border:1px solid #ccc; padding:4px; color:purple;" ><div style="text-align:left; margin:8px 0; color:#0077cc;">
+  08] <span class="explainable" data-group="terms" data-term="">태과불급</span>에 따른 여러가지 현상들
+</div><br><br>
  <div id="taegwa-bulgeup-cell">${tb} </div><div id="simple-table-box"></div>
 </td>
 </tr>
