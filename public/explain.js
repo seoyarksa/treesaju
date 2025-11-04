@@ -5,6 +5,9 @@
 //<span class="explainable" data-group="terms" data-term="">12운성</span>  //일반용어
 //<span class="explainable" data-group="gyeokook" data-term="">식신격</span>  //격국이름
 //<span class="explainable" data-group="etcsinsal" data-term="">천을귀인</span>  //기타신살
+//<span class="explainable" data-group="ganji" data-term="">    </span>  //천간지지
+//<span class="explainable" data-group="dang" data-term="">    </span>  //당령식
+//<span class="explainable" data-group="taegwa" data-term="">천을귀인</span>  //태과불급
 
 export const TERM_HELP = {
 
@@ -93,6 +96,22 @@ export const TERM_HELP = {
 
       },
 
+
+    //당령사령천간
+  dang: {
+    
+
+    '辛癸甲': '辛사령시   , 癸사령시  ',
+    '': '',
+    '': '',
+    '': '',
+    '己辛癸甲丙': '癸당령시  , 甲당령시  ',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+      },
 
       //격국
   gyeokook: {

@@ -568,7 +568,7 @@ return `<td class="clickable${sajuGanArr.includes(gan) ? ' saju-blue' : ''}"
 const jijiRow = `<tr id="jiji-row">
   <th>지지</th>
   ${jijiArr.map(jj =>
-    `<td class="jiji-clickable${(sajuJijiArr || []).map(norm).includes(jj) ? ' saju-blue' : ''}" data-jiji="${jj}" style="cursor:pointer;">${jj}</td>`
+    `<td class="jiji-clickable${(sajuJijiArr || []).map(norm).includes(jj) ? ' saju-blue' : ''}" data-jiji="${jj}" style="cursor:pointer;"><span class="explainable" data-group="ganji" data-term="${jj}">${jj}</span></td>`
   ).join('')}
 </tr>`;
 

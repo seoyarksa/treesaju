@@ -162,6 +162,9 @@ switch (group) {
   case 'ganji':
     from = '천간지지';
     break;
+  case 'dang':
+    from = '당령식';
+    break;
   case 'gyeokook':
     from = '격국';
     break;
