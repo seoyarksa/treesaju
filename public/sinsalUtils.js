@@ -534,6 +534,9 @@ const colCss = [...highlightIdx].map(i => `
 
   // 1. 상단 헤더
   const headerRows = `
+  <div style="text-align:center; margin:8px 0;">
+  09] 12운성[12신살] 찾아보기
+</div>
     <tr>
       <th colspan="10"><span class="explainable" data-group="terms" data-term="">12운성</span></th>
       <th colspan="4"><span class="explainable" data-group="terms" data-term="">12신살</span></th>
@@ -631,7 +634,7 @@ const sinsalRow  = `<tr id="sinsal-row"><th>12신살</th>${jijiArr.map(() => `<t
 
 <div style="text-align:center; margin:8px 0;">
 [위의 표에서는 원하는 천간의 지지별 12운성(신살)을 바로 확인할 수 있습니다.]<br><br>
-  * 천간별 12운성표 
+  10] 천간별 <span class="explainable" data-group="terms" data-term="">12운성</span>[<span class="explainable" data-group="terms" data-term="">12신살</span>]표 
 </div>
 
 <div id="unseong-block"></div>
