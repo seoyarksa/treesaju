@@ -5892,28 +5892,45 @@ window.addEventListener("beforeunload", () => {
 
     // ✅ 로그인 상태 변경 감시 (이중 새로고침 방지)
     let __reloading = false;
-    window.supabaseClient.auth.onAuthStateChange((event, newSession) => {
-      console.log("[AuthStateChange]", event);
+    // ✅ 1) 탭 고유 ID 생성 (세션 스토리지 기준)
+if (!sessionStorage.getItem("tabId")) {
+  sessionStorage.setItem("tabId", crypto.randomUUID());
+}
+const TAB_ID = sessionStorage.getItem("tabId");
 
-      if (event === "SIGNED_OUT") {
-        if (window.__profileCh) {
-          try { window.supabaseClient.removeChannel(window.__profileCh); } catch (_) {}
-          window.__profileCh = null;
-        }
-      }
+// ✅ 2) 로그인 시 현재 탭 ID 저장
+window.supabaseClient.auth.onAuthStateChange(async (event, session) => {
+  console.log("[AuthStateChange]", event);
 
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
-        if (!__reloading) {
-          __reloading = true;
-          if (window.location.hash) {
-            history.replaceState(null, "", window.location.pathname + window.location.search);
-          }
-          window.location.reload();
-        }
-        return;
-      }
-      updateAuthUI(newSession);
-    });
+  // 저장된 탭 ID (로그인 시점에만 기록)
+  if (event === "SIGNED_IN" && session?.user) {
+    localStorage.setItem("lastAuthTabId", TAB_ID);
+  }
+
+  // 로그아웃 시점에도 기록 (선택적)
+  if (event === "SIGNED_OUT") {
+    localStorage.setItem("lastAuthTabId", TAB_ID);
+  }
+
+  // ✅ 3) 조건부 새로고침
+  if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+    const lastTab = localStorage.getItem("lastAuthTabId");
+    // ⚡ 로그인/로그아웃을 수행한 "현재 탭"만 새로고침
+    if (lastTab === TAB_ID) {
+      window.location.reload();
+    } else {
+      console.log("[AuthStateChange] 다른 탭 이벤트 감지 — 새로고침 생략");
+      updateAuthUI(session); // UI만 부드럽게 갱신
+    }
+    return;
+  }
+
+  // ✅ TOKEN_REFRESHED (자동갱신)은 새로고침 안 함
+  if (event === "TOKEN_REFRESHED") {
+    updateAuthUI(session);
+  }
+});
+
 
     // ✅ 사주 기록 클릭 → 입력폼 채워넣기 + 출력
     document.addEventListener("click", async (e) => {
