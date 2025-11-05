@@ -2816,18 +2816,15 @@ if (formDate === todayKey && window.lastOutputData) {
 // === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
 // === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
 // === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
+// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
 window.addEventListener('load', async () => {
   try {
-    // ✅ ① 이미 이 탭에서 한 번 자동 실행했으면 재실행 안 함
     if (sessionStorage.getItem('autoRenderedToday')) {
       console.log('[AUTO-RENDER] 이미 오늘 자동 사주 실행함 → 스킵');
       return;
     }
-
-    // ✅ ② 첫 실행이므로 플래그 저장
     sessionStorage.setItem('autoRenderedToday', '1');
 
-    // ✅ ③ 오늘 날짜 기준 정보 세팅
     const now = new Date();
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -2838,27 +2835,20 @@ window.addEventListener('load', async () => {
     const ampm = hour24 < 12 ? 'AM' : 'PM';
     const hour12 = hour24 % 12;
 
-    // === 입력 요소 로딩 대기 ===
-    const waitFor = (sel) => new Promise((resolve) => {
-      const el = document.querySelector(sel);
-      if (el) return resolve(el);
-      const obs = new MutationObserver(() => {
-        const e = document.querySelector(sel);
-        if (e) {
-          obs.disconnect();
-          resolve(e);
+    await new Promise((resolve) => {
+      const check = setInterval(() => {
+        if (document.querySelector('#saju-form')) {
+          clearInterval(check);
+          resolve();
         }
-      });
-      obs.observe(document.body, { childList: true, subtree: true });
+      }, 100);
     });
-    await waitFor('#saju-form');
 
-    // === 폼 값 자동 세팅 ===
     document.getElementById('birth-date').value = `${yyyy}${mm}${dd}`;
     document.getElementById('calendar-type').value = 'solar';
     document.getElementById('gender').value = 'male';
 
-    // ✅ AM/PM 라디오 버튼 실제 선택
+    // ✅ 추가: 라디오 버튼을 실제로 체크 표시 (이게 없으면 “오전/오후 선택하세요” 뜸)
     const ampmRadio = document.querySelector(`input[name='ampm'][value='${ampm}']`);
     if (ampmRadio) {
       ampmRadio.checked = true;
@@ -2880,21 +2870,10 @@ window.addEventListener('load', async () => {
 
     console.log(`[AUTO] ${yyyy}-${mm}-${dd} ${ampm} ${hour12}:${minute} (양력/남자 기준)`);
 
-    // === 출력 실행 (카운트 제외) ===
     if (typeof renderSaju === 'function') {
       await renderSaju(todayForm);
       console.log('[AUTO] renderSaju 완료');
-
-      // === lastOutputData 저장 ===
-      const normalized = JSON.stringify(todayForm);
-      localStorage.setItem('lastSajuForm', normalized);
-      window.lastOutputData = normalized;
-
-      console.log('[AUTO-RENDER] 플래그 저장 완료');
-    } else {
-      console.warn('⚠️ renderSaju 함수가 정의되지 않았습니다.');
     }
-
   } catch (err) {
     console.error('자동 사주 로딩 실패:', err);
   }
