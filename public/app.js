@@ -5892,6 +5892,30 @@ window.addEventListener("beforeunload", () => {
 
     // ✅ 로그인 상태 변경 감시 (이중 새로고침 방지)
    // ✅ 탭 고유 ID
+
+   // ──────────────────────────────
+// 🔍 새로고침 원인 추적 로그 전용
+// ──────────────────────────────
+window.addEventListener("storage", (e) => {
+  if (e.key && e.key.includes("supabase.auth.token")) {
+    console.warn("[STORAGE] Supabase auth token 변경 감지:", e);
+  }
+});
+
+window.addEventListener("focus", () => {
+  console.warn("[FOCUS] 창에 복귀");
+});
+window.addEventListener("blur", () => {
+  console.warn("[BLUR] 창에서 벗어남");
+});
+
+window.supabaseClient.auth.onAuthStateChange((event, session) => {
+  console.warn("[AUTH-EVENT]", event, {
+    fromTab: window.__returnFromAnotherTab,
+    sessionUser: session?.user?.id || "없음",
+  });
+});
+
 if (!sessionStorage.getItem("tabId")) {
   sessionStorage.setItem("tabId", crypto.randomUUID());
 }
