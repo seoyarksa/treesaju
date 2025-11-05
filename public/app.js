@@ -2885,29 +2885,54 @@ window.addEventListener('load', async () => {
 
     console.log(`[AUTO] ${yyyy}-${mm}-${dd} ${ampm} ${hour12}:${minute} (양력/남자 기준)`);
 
-    if (typeof renderSaju === 'function') {
-      await renderSaju(todayForm);
+// === 출력 실행 (카운트 제외) ===
+if (typeof renderSaju === 'function') {
+  // 🕒 폼 자동 세팅 후 DOM 반영을 기다리기 위해 약간의 지연 추가
+  setTimeout(async () => {
+    await renderSaju(todayForm);
+    console.log('[AUTO] renderSaju 완료');
 
-      setTimeout(() => {
-        const normalized = JSON.stringify(todayForm);
-        lastOutputData = normalized;
-        localStorage.setItem('lastSajuForm', normalized);
-        console.log('[AUTO] lastOutputData 저장 완료:', normalized);
-        sajuBtn.disabled = false;
-      }, 300);
+    // 0.3초 후 lastOutputData 저장
+    setTimeout(() => {
+      const normalized = JSON.stringify({
+        name: '오늘 기준',
+        birthDate: `${yyyy}${mm}${dd}`,
+        calendarType: 'solar',
+        gender: 'male',
+        ampm,
+        hour: String(hour12),
+        minute: String(minute),
+      });
 
-      const sinsalBtn = document.getElementById('sinsalBtn');
-      const sajuBtn = document.getElementById('sajuSubmit');
-      sajuBtn?.classList.remove('active');
-      sinsalBtn?.classList.add('active');
-      window.currentMode = 'sinsal';
+      lastOutputData = normalized;
+      localStorage.setItem('lastSajuForm', normalized);
+      console.log('[AUTO] lastOutputData 저장 완료 (hour/minute 포함):', normalized);
 
-      if (typeof normalizeForm === 'function') {
-        const normalized = JSON.stringify(normalizeForm(todayForm));
-        window.lastOutputData = normalized;
-        localStorage.setItem('lastSajuForm', normalized);
-        console.log('[AUTO] 신살보기 모드 자동 출력 후 상태 동기화 완료');
-      }
+      // 저장 완료 후 버튼 다시 활성화
+      sajuBtn.disabled = false;
+    }, 300);
+
+    // === 버튼 상태도 '신살보기'로 세팅 ===
+    const sinsalBtn = document.getElementById('sinsalBtn');
+    const sajuBtn = document.getElementById('sajuSubmit');
+    sajuBtn?.classList.remove('active');
+    sinsalBtn?.classList.add('active');
+
+    // 내부 모드 변수 동기화 (있을 경우)
+    window.currentMode = 'sinsal';
+
+    // === 자동 로딩 입력값 정규화 후 저장 ===
+    if (typeof normalizeForm === 'function') {
+      const normalized = JSON.stringify(normalizeForm(todayForm));
+      window.lastOutputData = normalized;
+      localStorage.setItem('lastSajuForm', normalized);
+      console.log('[AUTO] 신살보기 모드 자동 출력 후 상태 동기화 완료');
+    } else {
+      console.warn('⚠️ normalizeForm 함수가 정의되어 있지 않습니다.');
+    }
+  }, 100); // ✅ DOM 업데이트 기다린 후 실행
+
+
     } else {
       console.warn('⚠️ renderSaju 함수가 아직 정의되지 않았습니다.');
     }
