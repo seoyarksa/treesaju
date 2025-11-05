@@ -4941,7 +4941,7 @@ if (secondaryGyeokResult?.primary && secondaryGyeokResult?.secondary) {
     <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;">
       ${window.gyeokName}${window.gyeokStem ? '' : ''}
     </span>
-    <span style="font-size:0.92em;"> (보조격: </span>
+    <span class="explainable" data-group="terms" data-term="보조격"; style="font-size:0.92em;"> (보조격: </span>
     <span id="gyeok-secondary" style="cursor:pointer; color:#ff8844;">
       ${secondaryGyeokResult.char}
     </span>
