@@ -2596,7 +2596,15 @@ async function handleSajuSubmit(e) {
     console.log("🧩 [LOG3] normalizeForm(formData):", normalizeForm(formData));
     console.log("🧩 [LOG4] formKey (JSON):", formKey);
     console.log("🧩 [LOG5] lastOutputData (JSON 문자열):", lastOutputData);
-
+if (!formData.name || formData.name.trim() === "") {
+  try {
+    const prev = JSON.parse(localStorage.getItem("lastOutputData") || "{}");
+    if (prev.name) {
+      formData.name = prev.name;
+      console.log("[focus 복귀] 고객명 복원:", formData.name);
+    }
+  } catch {}
+}
 
     // 2) 로그인 여부 확인
     const { data: { session } } = await window.supabaseClient.auth.getSession();
