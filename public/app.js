@@ -5969,8 +5969,11 @@ if (!sessionStorage.getItem("tabId")) {
 const TAB_ID = sessionStorage.getItem("tabId");
 
 
+// ✅ Supabase 세션 감시 (리로드 안정화 버전)
 let __lastFocusedAt = Date.now();
+window.__returnFromAnotherTab = false;
 
+// 탭 포커스 추적
 window.addEventListener("focus", () => {
   const now = Date.now();
   if (now - __lastFocusedAt > 3000) {
@@ -5979,26 +5982,78 @@ window.addEventListener("focus", () => {
   }
   __lastFocusedAt = now;
 });
-
 window.addEventListener("blur", () => {
   console.log("[BLUR] 창에서 벗어남");
   __lastFocusedAt = Date.now();
 });
 
+// ✅ 상태 백업 함수
+function backupSajuState() {
+  try {
+    const backup = {
+      name: document.getElementById("customer-name")?.value || "",
+      saju: window.saju || null,
+      gyeok: window.gyeok || null,
+      sinsal: window.sinsal || null,
+      birthDate: window.birthDate || "",
+      gender: window.gender || "",
+      ampm: window.ampm || "",
+      hour: window.hour || "",
+      minute: window.minute || "",
+    };
+    localStorage.setItem("lastOutputData", JSON.stringify(backup));
+    console.log("[backup] 사주 상태 저장 완료:", backup);
+  } catch (e) {
+    console.warn("[backup] 실패:", e);
+  }
+}
 
+// ✅ 상태 복원 함수
+function restoreSajuState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("lastOutputData") || "{}");
+    if (!saved || !saved.saju || !saved.gyeok) return;
 
-///새로고침
+    console.log("[restore] 이전 사주 복원 시작:", saved.name);
+    const nameInput = document.getElementById("customer-name");
+    if (nameInput) nameInput.value = saved.name || "";
+
+    window.saju = saved.saju;
+    window.gyeok = saved.gyeok;
+    window.sinsal = saved.sinsal;
+
+    renderGyeokFlowStyled(saved.gyeok, saved.saju);
+    if (typeof rerenderSinsal === "function") rerenderSinsal();
+    if (typeof renderSajuMiniFromCurrentOutput === "function") renderSajuMiniFromCurrentOutput();
+
+    console.log("[restore] 복원 완료 ✅");
+  } catch (e) {
+    console.warn("[restore] 복원 실패:", e);
+  }
+}
+
+// ✅ 페이지 로드 시 1회 복원 시도
+document.addEventListener("DOMContentLoaded", () => {
+  restoreSajuState();
+});
+
+// ✅ Supabase 인증 감시
 window.supabaseClient.auth.onAuthStateChange((event, session) => {
   console.log("[AuthStateChange]", event, "returnFromAnotherTab:", window.__returnFromAnotherTab);
 
-  // 1️⃣ 초기 세션 / 토큰 갱신 → 새로고침 X
-  if (event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {
+  // 초기 로딩 시엔 절대 리로드 금지
+  if (event === "INITIAL_SESSION") {
     updateAuthUI(session);
     return;
   }
 
-  // 2️⃣ 로그인/로그아웃 이벤트
+  if (event === "TOKEN_REFRESHED") {
+    updateAuthUI(session);
+    return;
+  }
+
   if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+    // 다른 탭에서 돌아온 경우
     if (window.__returnFromAnotherTab) {
       console.log("[AuthStateChange] 탭 복귀 감지 → reload 생략 (3초 후 복구)");
       updateAuthUI(session);
@@ -6009,39 +6064,17 @@ window.supabaseClient.auth.onAuthStateChange((event, session) => {
       return;
     }
 
-    console.log("[AuthStateChange] 강제 리로드 준비 → 현재 상태 백업");
+    // 일반적인 로그인/로그아웃 시 리로드 (단, 첫 로딩 이후에만)
+    console.log("[AuthStateChange] 리로드 전 백업 실행");
+    backupSajuState();
 
-    // ✅ 현재 사주 상태 백업 (리로드 전)
-    try {
-      const backup = {
-        name: document.getElementById("customer-name")?.value || "",
-        saju: window.saju || null,
-        gyeok: window.gyeok || null,
-        sinsal: window.sinsal || null,
-        birthDate: window.birthDate || "",
-        gender: window.gender || "",
-        ampm: window.ampm || "",
-        hour: window.hour || "",
-        minute: window.minute || "",
-      };
-      localStorage.setItem("lastOutputData", JSON.stringify(backup));
-      console.log("[AuthStateChange] 사주 상태 백업 완료:", backup);
-    } catch (e) {
-      console.warn("[AuthStateChange] 상태 백업 실패:", e);
-    }
-
-    // ✅ 강제 리로드 (완전 초기화 후 복원 가능)
     setTimeout(() => {
-      try {
-        window.location.href = window.location.href;
-      } catch (err) {
-        console.warn("[reload fallback]", err);
-        window.location.assign(window.location.href);
-      }
-    }, 150);
-    return;
+      console.log("[AuthStateChange] 페이지 새로고침 실행");
+      window.location.reload();
+    }, 200);
   }
 });
+
 
 
 
