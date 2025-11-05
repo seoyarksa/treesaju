@@ -2815,13 +2815,6 @@ if (formDate === todayKey && window.lastOutputData) {
 // === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
 window.addEventListener('load', async () => {
   try {
-    // ✅ 하루 1회만 자동 실행 (기존 작동 유지)
-    const todayKey = new Date().toISOString().slice(0, 10);
-    if (localStorage.getItem('autoRenderedToday') === todayKey) {
-      console.log('[AUTO-RENDER] 오늘 이미 자동 실행됨 → 스킵');
-      return;
-    }
-
     const now = new Date();
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -2886,25 +2879,28 @@ window.addEventListener('load', async () => {
     if (typeof renderSaju === 'function') {
       await renderSaju(todayForm);
 
-      // 0.3초 후 lastOutputData 저장
-      setTimeout(() => {
-        const normalized = JSON.stringify({
-          name: '오늘 기준',
-          birthDate: `${yyyy}${mm}${dd}`,
-          calendarType: 'solar',
-          gender: 'male',
-          ampm,
-          hour: String(hour12),
-          minute: String(minute),
-        });
+      
+   // 0.3초 후 lastOutputData 저장
+  setTimeout(() => {
+    const normalized = JSON.stringify({
+      name: '오늘 기준',
+      birthDate: `${yyyy}${mm}${dd}`,
+      calendarType: 'solar',
+      gender: 'male',
+      ampm,
+      hour: String(hour12),
+      minute: String(minute),
+    });
 
-        lastOutputData = normalized;
-        localStorage.setItem('lastSajuForm', normalized);
-        console.log('[AUTO] lastOutputData 저장 완료 (hour/minute 포함):', normalized);
+    lastOutputData = normalized;
+    localStorage.setItem('lastSajuForm', normalized);
+    console.log('[AUTO] lastOutputData 저장 완료 (hour/minute 포함):', normalized);
 
-        // 저장 완료 후 버튼 다시 활성화
-        sajuBtn.disabled = false;
-      }, 300);
+    // 저장 완료 후 버튼 다시 활성화
+    sajuBtn.disabled = false;
+  }, 300);
+
+
 
       // === 버튼 상태도 '신살보기'로 세팅 ===
       const sinsalBtn = document.getElementById('sinsalBtn');
@@ -2925,8 +2921,6 @@ window.addEventListener('load', async () => {
         console.warn('⚠️ normalizeForm 함수가 정의되어 있지 않습니다.');
       }
 
-      // ✅ 자동 실행 완료 시 오늘 날짜 저장
-      localStorage.setItem('autoRenderedToday', todayKey);
 
     } else {
       console.warn('⚠️ renderSaju 함수가 아직 정의되지 않았습니다.');
@@ -2938,14 +2932,7 @@ window.addEventListener('load', async () => {
 
 
 
-//탭이동시 이전자료 복원
-document.addEventListener('DOMContentLoaded', () => {
-  const saved = localStorage.getItem('lastSajuForm');
-  if (saved && typeof renderSaju === 'function') {
-    renderSaju(JSON.parse(saved));
-    console.log('[AUTO-RESTORE] 이전 사주 복원 완료');
-  }
-});
+
 
 
 
