@@ -1099,7 +1099,7 @@ const extraPart = match && match[2] ? match[2] : ''; // 예: "(갑목)"
       </tr>
 
      <tr>
-  <td style="border:1px solid #ccc; padding:2px; background:#fff8dc;">命</td>
+  <td style="border:1px solid #ccc; padding:2px; background:#fff8dc;"><span class="explainable" data-group="gyeokook" data-term="">命</span></td>
   ${["격","상신","구신","기신1","기신2"].map((role) => {
     const color = ROLE_COLOR_MAP[role] || "black";
 
@@ -1157,7 +1157,7 @@ const extraPart = match && match[2] ? match[2] : ''; // 예: "(갑목)"
 
 
 <tr>
-  <td style="border:1px solid #ccc; padding:2px; background:#fff8dc;">運</td>
+  <td style="border:1px solid #ccc; padding:2px; background:#fff8dc;"><span class="explainable" data-group="gyeokook" data-term="">運</span></td>
   ${["격","상신","구신","기신1","기신2"].map((role) => {
     const color = ROLE_COLOR_MAP[role] || "black";
 
@@ -1226,7 +1226,7 @@ const extraPart = match && match[2] ? match[2] : ''; // 예: "(갑목)"
 
 
 <tr>
-  <td style="border:1px solid #ccc; padding:2px; background:#fff8dc;">天合</td>
+  <td style="border:1px solid #ccc; padding:2px; background:#fff8dc;"><span class="explainable" data-group="gyeokook" data-term="">天合</span></td>
   ${["격","상신","구신","기신1","기신2"].map((role, i) => {
     const color = ROLE_COLOR_MAP[role] || "black";
 
@@ -1297,7 +1297,7 @@ const extraPart = match && match[2] ? match[2] : ''; // 예: "(갑목)"
 
 
 <tr>
-  <td style="border:1px solid #ccc; padding:2px; background:#fff8dc;">地合</td>
+  <td style="border:1px solid #ccc; padding:2px; background:#fff8dc;"><span class="explainable" data-group="gyeokook" data-term="">地合</span></td>
   ${["격","상신","구신","기신1","기신2"].map((role, i) => {
     const color = ROLE_COLOR_MAP[role] || "black";
 
@@ -2178,7 +2178,7 @@ if (!normalizedSecondaryName || normalizedSecondaryName.trim() === "X") {
   </thead>
   <tbody>
       <tr>
-        <td style="padding:3px;background:#e6f0ff;">천간의 근</td>
+        <td style="padding:3px;background:#e6f0ff;"><span class="explainable" data-group="terms" data-term="">천간의 근</span></td>
         <td style="padding:3px;">${hourRoots}</td>
         <td style="padding:3px;"><span style="color:blue;">${dayRoots}</span></td>
         <td style="padding:3px;">${monthRoots}</td>
@@ -2205,7 +2205,7 @@ if (!normalizedSecondaryName || normalizedSecondaryName.trim() === "X") {
 
       </tr>
   <tr>
-  <td style="padding:3px;background:#e6f0ff;">왕쇠강약</td>
+  <td style="padding:3px;background:#e6f0ff;"><span class="explainable" data-group="terms" data-term="">왕쇠강약</span></td>
 <td style="padding:3px;">${ganStrengthResults[hourGanHan]?.score.toFixed(1) || "-"}</td>
 <td style="padding:3px;"><span style="color:blue;">${ganStrengthResults[dayGanHan]?.score.toFixed(1) || "-"}</span></td>
 <td style="padding:3px;">${ganStrengthResults[monthGanHan]?.score.toFixed(1) || "-"}</td>
