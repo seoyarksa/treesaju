@@ -3329,7 +3329,20 @@ function pad(num) {
 
 
   const dateStr = document.getElementById('birth-date').value;
-const ampmInput = document.querySelector('input[name="ampm"]:checked');
+// ✅ [추가] 자동 로딩 대비: ampm이 비어 있으면 현재 시각 기준으로 자동 선택
+let ampmInput = document.querySelector('input[name="ampm"]:checked');
+if (!ampmInput) {
+  const now = new Date();
+  const ampmGuess = now.getHours() < 12 ? 'AM' : 'PM';
+  const radio = document.querySelector(`input[name="ampm"][value="${ampmGuess}"]`);
+  if (radio) {
+    radio.checked = true;
+    radio.dispatchEvent(new Event('change', { bubbles: true }));
+    console.log(`[AUTO] 오전/오후 자동 선택됨 → ${ampmGuess}`);
+    ampmInput = radio; // ✅ 갱신
+  }
+}
+
 const ampm = ampmInput ? ampmInput.value : null;
 if (!ampm) {
   alert('오전/오후를 선택하세요');
