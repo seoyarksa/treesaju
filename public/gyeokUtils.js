@@ -842,7 +842,8 @@ if (relation === '생') {
 
       <!-- 상신 -->
       <div style="grid-column: 1 / 2; grid-row: 5; text-align: center;">
-        ${formatParsedYukshinList('상신', sangsinParsedArr, sangsinStems, 'blue')}
+      <span class="explainable" data-group="terms" data-term="상신">
+        ${formatParsedYukshinList('상신', sangsinParsedArr, sangsinStems, 'blue')}</span>
       </div>
       <!-- 상신 → 격이름 -->
 <div style="grid-column: 2 / 3; grid-row: 5; text-align: center;">
@@ -871,7 +872,8 @@ if (relation === '생') {
 
       <!-- 구신 -->
       <div style="grid-column: 5 / 6; grid-row: 5; text-align: center;">
-        ${formatParsedYukshinList('구신', gusinParsedArr, gusinStems, 'green')}
+      <span class="explainable" data-group="terms" data-term="구신">
+        ${formatParsedYukshinList('구신', gusinParsedArr, gusinStems, 'green')}</span>
       </div>
       
       <!-- 격이름 ↑ 기신2 -->
@@ -886,7 +888,8 @@ if (relation === '생') {
 
 
       <div style="grid-column: 3 / 4; grid-row: 8; text-align: center;">
-        ${formatParsedYukshinList('기신2', gisin2ParsedArr, gisin2Stems, 'red')}
+      <span class="explainable" data-group="terms" data-term="기신2">
+        ${formatParsedYukshinList('기신2', gisin2ParsedArr, gisin2Stems, 'red')}</span>
       </div>
     </div>
     <div style="text-align:center; margin-top:6px; font-size:12px; font-family:monospace;">
@@ -902,7 +905,8 @@ if (relation === '생') {
     return `
 <div style="display: grid; grid-template-columns: auto 30px auto 30px auto; grid-template-rows: 38px 36px 36px auto auto auto; justify-content: center; align-items: center; font-family: monospace; font-size: 0.9rem; gap: 4px;">
   <div style="grid-column: 1 / 2; grid-row: 1; text-align: center;">
-    ${formatParsedYukshinList('기신1', gisin1ParsedArr, gisin1Stems, 'red')}
+  <span class="explainable" data-group="terms" data-term="기신1">
+    ${formatParsedYukshinList('기신1', gisin1ParsedArr, gisin1Stems, 'red')}</span>
   </div>
   <div style="grid-column: 2 / 3; grid-row: 1; text-align: center;">
     <svg width="25" height="28" style="vertical-align:middle; display:block; margin:0 auto;">
@@ -911,7 +915,8 @@ if (relation === '생') {
     </svg>
   </div>
   <div style="grid-column: 3 / 4; grid-row: 1; text-align: center;">
-    ${formatParsedYukshinList('상신', sangsinParsedArr, sangsinStems, 'blue')}
+  <span class="explainable" data-group="terms" data-term="상신">
+    ${formatParsedYukshinList('상신', sangsinParsedArr, sangsinStems, 'blue')}</span>
   </div>
   <div style="grid-column: 4 / 5; grid-row: 1; text-align: center;">
     <svg width="25" height="28" style="vertical-align:middle; display:block; margin:0 auto;">
@@ -920,7 +925,8 @@ if (relation === '생') {
     </svg>
   </div>
   <div style="grid-column: 5 / 6; grid-row: 1; text-align: center;">
-    ${formatParsedYukshinList('구신', gusinParsedArr, gusinStems, 'green')}
+  <span class="explainable" data-group="terms" data-term="구신">
+    ${formatParsedYukshinList('구신', gusinParsedArr, gusinStems, 'green')}</span>
   </div>
   <!-- 2행: 상신↓, 구신↑(같은 행, 같은 svg height, y좌표) -->
   <div style="grid-column: 3 / 4; grid-row: 2; text-align: center;">
@@ -940,7 +946,8 @@ if (relation === '생') {
     ${formatParsedYukshinList('격', gyeokParsedArr, gyeokname2Stems, 'black', false)}
   </div>
   <div style="grid-column: 5 / 6; grid-row: 3; text-align: center;">
-    ${formatParsedYukshinList('기신2', gisin2ParsedArr, gisin2Stems, 'red')}
+  <span class="explainable" data-group="terms" data-term="기신2">
+    ${formatParsedYukshinList('기신2', gisin2ParsedArr, gisin2Stems, 'red')}</span>
   </div>
 </div>
     <div style="text-align:center; margin-top:6px; font-size:12px; font-family:monospace;">
