@@ -2596,15 +2596,7 @@ async function handleSajuSubmit(e) {
     console.log("🧩 [LOG3] normalizeForm(formData):", normalizeForm(formData));
     console.log("🧩 [LOG4] formKey (JSON):", formKey);
     console.log("🧩 [LOG5] lastOutputData (JSON 문자열):", lastOutputData);
-if (!formData.name || formData.name.trim() === "") {
-  try {
-    const prev = JSON.parse(localStorage.getItem("lastOutputData") || "{}");
-    if (prev.name) {
-      formData.name = prev.name;
-      console.log("[focus 복귀] 고객명 복원:", formData.name);
-    }
-  } catch {}
-}
+
 
     // 2) 로그인 여부 확인
     const { data: { session } } = await window.supabaseClient.auth.getSession();
@@ -2813,6 +2805,23 @@ if (formDate === todayKey && window.lastOutputData) {
         alert("요청 처리 중 오류가 발생했습니다.");
       }
     }
+
+
+localStorage.setItem("lastOutputData", JSON.stringify({
+  name: formData.name,
+  birthDate: formData.birthDate,
+  calendarType: formData.calendarType,
+  gender: formData.gender,
+  ampm: formData.ampm,
+  hour: formData.hour,
+  minute: formData.minute,
+  saju: window.saju || null,
+  gyeok: window.gyeok || null,
+}));
+
+
+
+
   } catch (err) {
     console.error("❌ handleSajuSubmit error:", err);
     alert("요청 처리 중 오류가 발생했습니다.");
@@ -5757,6 +5766,25 @@ async function renderUserProfile() {
 
 // === 초기화 (하나로 통합)
 document.addEventListener("DOMContentLoaded", async () => {
+
+   const last = JSON.parse(localStorage.getItem("lastOutputData") || "{}");
+  if (last.birthDate && last.saju && last.gyeok) {
+    console.log("[restore] 이전 사주 데이터 복원:", last.name);
+    document.getElementById("customer-name").value = last.name || "";
+    document.getElementById("birth-date").value = last.birthDate;
+    document.getElementById("calendar-type").value = last.calendarType;
+    document.getElementById("gender").value = last.gender;
+    document.querySelector(`input[name="ampm"][value="${last.ampm}"]`).checked = true;
+    document.getElementById("hour-select").value = last.hour;
+    document.getElementById("minute-select").value = last.minute;
+
+    // 사주, 격국, 신살 복원
+    window.saju = last.saju;
+    window.gyeok = last.gyeok;
+    renderGyeokFlowStyled(window.gyeok, window.saju);
+    rerenderSinsal?.();
+  }
+
   try {
     console.log("[app] DOM ready");
 
