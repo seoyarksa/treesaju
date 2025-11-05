@@ -314,77 +314,7 @@ function getKSTDateKey() {
 // ✅ 출력횟수 표시 (회원 구분 없음)
 
 
-//새로고침시 리로딩
-function saveCurrentSajuState() {
-  try {
-    const name = document.getElementById("customer-name")?.value || "";
-    const backup = {
-      name,
-      saju: window.saju || null,
-      gyeok: window.gyeok || null,
-      sinsal: window.sinsal || null,
-      birthDate: window.birthDate || "",
-      gender: window.gender || "",
-      ampm: window.ampm || "",
-      hour: window.hour || "",
-      minute: window.minute || "",
-    };
-    localStorage.setItem("sajuBackup", JSON.stringify(backup));
-    console.log("[sajuBackup] 저장 완료:", backup);
-  } catch (err) {
-    console.error("[sajuBackup] 저장 실패:", err);
-  }
-}
 
-function restoreSajuState() {
-  try {
-    const saved = JSON.parse(localStorage.getItem("sajuBackup") || "{}");
-    if (!saved.saju || !saved.gyeok) {
-      console.log("[restoreSajuState] 복원할 데이터 없음");
-      return;
-    }
-
-    console.log("[restoreSajuState] 복원 시작:", saved.name);
-
-    // 입력창 복원
-    const nameInput = document.getElementById("customer-name");
-    if (nameInput) nameInput.value = saved.name || "";
-
-    // 전역 변수 복원
-    window.saju = saved.saju;
-    window.gyeok = saved.gyeok;
-    window.sinsal = saved.sinsal;
-
-    // 사주 표 다시 렌더링
-    renderGyeokFlowStyled(saved.gyeok, saved.saju);
-    if (typeof rerenderSinsal === "function") rerenderSinsal();
-    if (typeof renderSajuMiniFromCurrentOutput === "function") {
-      renderSajuMiniFromCurrentOutput();
-    }
-
-    console.log("[restoreSajuState] 복원 완료 ✅");
-  } catch (err) {
-    console.error("[restoreSajuState] 복원 실패:", err);
-  }
-}
-
-let lastBlurTime = 0;
-
-window.addEventListener("blur", () => {
-  lastBlurTime = Date.now();
-});
-
-window.addEventListener("focus", () => {
-  const now = Date.now();
-  // 3초 이상 다른 탭에 있었다면 → 복귀로 판단
-  if (now - lastBlurTime > 3000) {
-    console.log("[focus] 다른 탭 복귀 감지 → 이전 데이터 복원 시도");
-    restoreSajuState();
-  }
-});
-
-
-//새로고침시 리로딩 끝
 
 
 // === 2) 로그인 UI 토글
@@ -5957,6 +5887,77 @@ window.addEventListener("beforeunload", () => {
     // SIGNED_OUT 때 구독 정리만 추가하면 좋아요.
 
     // ✅ 로그인 상태 변경 감시 (이중 새로고침 방지)
+    //새로고침시 리로딩
+function saveCurrentSajuState() {
+  try {
+    const name = document.getElementById("customer-name")?.value || "";
+    const backup = {
+      name,
+      saju: window.saju || null,
+      gyeok: window.gyeok || null,
+      sinsal: window.sinsal || null,
+      birthDate: window.birthDate || "",
+      gender: window.gender || "",
+      ampm: window.ampm || "",
+      hour: window.hour || "",
+      minute: window.minute || "",
+    };
+    localStorage.setItem("sajuBackup", JSON.stringify(backup));
+    console.log("[sajuBackup] 저장 완료:", backup);
+  } catch (err) {
+    console.error("[sajuBackup] 저장 실패:", err);
+  }
+}
+
+function restoreSajuState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("sajuBackup") || "{}");
+    if (!saved.saju || !saved.gyeok) {
+      console.log("[restoreSajuState] 복원할 데이터 없음");
+      return;
+    }
+
+    console.log("[restoreSajuState] 복원 시작:", saved.name);
+
+    // 입력창 복원
+    const nameInput = document.getElementById("customer-name");
+    if (nameInput) nameInput.value = saved.name || "";
+
+    // 전역 변수 복원
+    window.saju = saved.saju;
+    window.gyeok = saved.gyeok;
+    window.sinsal = saved.sinsal;
+
+    // 사주 표 다시 렌더링
+    renderGyeokFlowStyled(saved.gyeok, saved.saju);
+    if (typeof rerenderSinsal === "function") rerenderSinsal();
+    if (typeof renderSajuMiniFromCurrentOutput === "function") {
+      renderSajuMiniFromCurrentOutput();
+    }
+
+    console.log("[restoreSajuState] 복원 완료 ✅");
+  } catch (err) {
+    console.error("[restoreSajuState] 복원 실패:", err);
+  }
+}
+
+let lastBlurTime = 0;
+
+window.addEventListener("blur", () => {
+  lastBlurTime = Date.now();
+});
+
+window.addEventListener("focus", () => {
+  const now = Date.now();
+  // 3초 이상 다른 탭에 있었다면 → 복귀로 판단
+  if (now - lastBlurTime > 3000) {
+    console.log("[focus] 다른 탭 복귀 감지 → 이전 데이터 복원 시도");
+    restoreSajuState();
+  }
+});
+
+
+//새로고침시 리로딩 끝
     let __reloading = false;
     window.supabaseClient.auth.onAuthStateChange((event, newSession) => {
       console.log("[AuthStateChange]", event);
