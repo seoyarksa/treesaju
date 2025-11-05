@@ -2104,7 +2104,7 @@ if (!normalizedSecondaryName || normalizedSecondaryName.trim() === "X") {
 
   let IlganGyeokTablehtml = `
   <div style="text-align:left; margin:8px 0; color:#0077cc;">
-  06] <span class="explainable" data-group="terms" data-term="">격의 등급(성패)</span> & 육신의 <span class="explainable" data-group="terms" data-term="">왕쇠강약</span>
+  06] <span class="explainable" data-group="terms" data-term="">격의 등급</span>(<span class="explainable" data-group="terms" data-term="">성패</span>) & 육신의 <span class="explainable" data-group="terms" data-term="">왕쇠강약</span>
 </div>
 <table border="1" 
        style="border-collapse: collapse; text-align:center; width: 100%; margin-bottom:0; font-size:14px;">
