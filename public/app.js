@@ -4923,8 +4923,8 @@ let gyeokDisplayText = '판별불가';
 if (secondaryGyeokResult?.primary && secondaryGyeokResult?.secondary) {
   // 생지(복수격)
   gyeokDisplayText = `
-    <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;" class="explainable" data-group="gyeokook" data-term="${window.gyeokName}"><b>
-      ${window.gyeokName}${window.gyeokStem ? '' : ''}
+    <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;"><b>
+     ${window.gyeokName}${window.gyeokStem ? '' : ''}
     </b></span>
     <span style="font-size:0.92em;"> (보조격: </span>
     <span id="gyeok-secondary" style="cursor:pointer; color:#ff8844;">

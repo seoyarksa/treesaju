@@ -1077,7 +1077,7 @@ export function renderhapshinTable() {
     <table style="border-collapse: collapse; width:100%; margin-top:0; font-size:0.75rem; text-align:center;">
       <tr>
         <td style="border:1px solid #ccc; padding:2px; width:6%;background:#e6f0ff;">기준</td>
-        <td style="border:1px solid #ccc; padding:2px; width:14%; color:${ROLE_COLOR_MAP["격"]};font-weight:bold; background:#e6f0ff;">${gyeokName}</td>
+        <td style="border:1px solid #ccc; padding:2px; width:14%; color:${ROLE_COLOR_MAP["격"]};font-weight:bold; background:#e6f0ff;"><span class="explainable" data-group="gyeokook" data-term="">${gyeokName}</span></td>
         ${headers.map(h => `<td style="border:1px solid #ccc; padding:2px;background:#e6f0ff;">${h}</td>`).join("")}
       </tr>
 
