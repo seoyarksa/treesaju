@@ -5893,39 +5893,49 @@ window.addEventListener("beforeunload", () => {
     // ✅ 로그인 상태 변경 감시 (이중 새로고침 방지)
     let __reloading = false;
     // ✅ 1) 탭 고유 ID 생성 (세션 스토리지 기준)
+// ✅ 탭 고유 ID
 if (!sessionStorage.getItem("tabId")) {
   sessionStorage.setItem("tabId", crypto.randomUUID());
 }
 const TAB_ID = sessionStorage.getItem("tabId");
 
-// ✅ 2) 로그인 시 현재 탭 ID 저장
-window.supabaseClient.auth.onAuthStateChange(async (event, session) => {
-  console.log("[AuthStateChange]", event);
+// ✅ 다른 탭 포커스 감지용 플래그
+let __lastFocusedAt = Date.now();
 
-  // 저장된 탭 ID (로그인 시점에만 기록)
-  if (event === "SIGNED_IN" && session?.user) {
-    localStorage.setItem("lastAuthTabId", TAB_ID);
+// ✅ 탭 활성화 감시 (다른 탭 갔다 올 때는 일정 시간 이상 차이남)
+window.addEventListener("focus", () => {
+  const now = Date.now();
+  // 3초 이상 다른 탭에 있었다면, "포커스 복귀"로 인식
+  if (now - __lastFocusedAt > 3000) {
+    console.log("[focus] 돌아옴 — autoReload OFF 모드");
+    window.__returnFromAnotherTab = true;  // ✅ 플래그 세팅
   }
+  __lastFocusedAt = now;
+});
+window.addEventListener("blur", () => {
+  __lastFocusedAt = Date.now();
+});
 
-  // 로그아웃 시점에도 기록 (선택적)
-  if (event === "SIGNED_OUT") {
-    localStorage.setItem("lastAuthTabId", TAB_ID);
-  }
+// ✅ Auth 상태 감시
+window.supabaseClient.auth.onAuthStateChange((event, session) => {
+  console.log("[AuthStateChange]", event, "returnFromAnotherTab:", window.__returnFromAnotherTab);
 
-  // ✅ 3) 조건부 새로고침
+  // 로그인/로그아웃 시점 기록
   if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
-    const lastTab = localStorage.getItem("lastAuthTabId");
-    // ⚡ 로그인/로그아웃을 수행한 "현재 탭"만 새로고침
-    if (lastTab === TAB_ID) {
-      window.location.reload();
-    } else {
-      console.log("[AuthStateChange] 다른 탭 이벤트 감지 — 새로고침 생략");
-      updateAuthUI(session); // UI만 부드럽게 갱신
+    // ⚡ 다른 탭에서 돌아온 직후면 reload 금지
+    if (window.__returnFromAnotherTab) {
+      console.log("[AuthStateChange] 탭 복귀 감지 → reload 생략");
+      window.__returnFromAnotherTab = false;
+      updateAuthUI(session);
+      return;
     }
+
+    // ⚡ 평소처럼 동작 (버튼 클릭, 정상 로그인/로그아웃)
+    window.location.reload();
     return;
   }
 
-  // ✅ TOKEN_REFRESHED (자동갱신)은 새로고침 안 함
+  // 자동 토큰 갱신은 새로고침 안 함
   if (event === "TOKEN_REFRESHED") {
     updateAuthUI(session);
   }
