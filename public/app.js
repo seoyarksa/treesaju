@@ -4924,7 +4924,7 @@ if (secondaryGyeokResult?.primary && secondaryGyeokResult?.secondary) {
   // 생지(복수격)
   gyeokDisplayText = `
     <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;"><b>
-      <span class="explainable" data-group="gyeokook" data-term="">${window.gyeokName}</span>${window.gyeokStem ? '' : ''}
+      <span class="explainable" data-group="gyeokook" data-term="${window.gyeokName}">${window.gyeokName}</span>${window.gyeokStem ? '' : ''}
     </b></span>
     <span style="font-size:0.92em;"> (보조격: </span>
     <span id="gyeok-secondary" style="cursor:pointer; color:#ff8844;">
