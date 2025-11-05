@@ -5980,18 +5980,12 @@ window.addEventListener("storage", (e) => {
 window.supabaseClient.auth.onAuthStateChange((event, session) => {
   console.log("[AuthStateChange]", event, "returnFromAnotherTab:", window.__returnFromAnotherTab);
 
-  if (event === "INITIAL_SESSION") {
-    updateAuthUI(session);
-    return;
-  }
-
-  if (event === "TOKEN_REFRESHED") {
+  if (event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {
     updateAuthUI(session);
     return;
   }
 
   if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
-    // ✅ 복귀 직후에는 새로고침 막고, 3초 후 플래그 초기화
     if (window.__returnFromAnotherTab) {
       console.log("[AuthStateChange] 탭 복귀 감지 → reload 생략 (3초 후 복구)");
       updateAuthUI(session);
@@ -6002,11 +5996,20 @@ window.supabaseClient.auth.onAuthStateChange((event, session) => {
       return;
     }
 
-    console.log("[AuthStateChange] 새로고침 실행");
-    window.location.reload();
+    console.log("[AuthStateChange] 강제 리로드 실행");
+    setTimeout(() => {
+      try {
+        // 강력 리로드
+        window.location.href = window.location.href;
+      } catch (e) {
+        console.error("[reload fail]", e);
+        window.location.assign(window.location.href);
+      }
+    }, 100);
     return;
   }
 });
+
 
 
 
