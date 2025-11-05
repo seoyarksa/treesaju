@@ -2825,7 +2825,7 @@ window.addEventListener('load', async () => {
     const ampm = hour24 < 12 ? 'AM' : 'PM';
     const hour12 = hour24 % 12;
 
-    // === 폼 렌더 기다리기 ===
+    // === 폼 준비 대기 ===
     const waitFor = (sel) =>
       new Promise((resolve) => {
         const el = document.querySelector(sel);
@@ -2841,7 +2841,7 @@ window.addEventListener('load', async () => {
       });
     await waitFor('#saju-form');
 
-    // ✅ 1️⃣ 먼저 기존 저장된 사주(localStorage.lastSajuForm)가 있으면 복원
+    // ✅ 1️⃣ 기존 저장된 사주 복원 (동일 탭 새로고침 시)
     const saved = localStorage.getItem('lastSajuForm');
     if (saved) {
       try {
@@ -2850,8 +2850,8 @@ window.addEventListener('load', async () => {
           console.log('[AUTO-RESTORE] 기존 사주 복원 시도:', parsed);
           if (typeof renderSaju === 'function') {
             await renderSaju(parsed);
-            console.log('[AUTO-RESTORE] 이전 사주 복원 완료');
-            return; // ← ✅ 복원 성공 시 오늘사주 새로 안 돌림
+            console.log('[AUTO-RESTORE] 이전 사주 복원 완료 ✅');
+            return;
           }
         }
       } catch (e) {
@@ -2859,15 +2859,19 @@ window.addEventListener('load', async () => {
       }
     }
 
-    // ✅ 2️⃣ 기존 데이터 없으면 “오늘 기준 사주” 자동 출력
+    // ✅ 2️⃣ 새 탭 첫 로딩 시 자동 사주 출력
     const birthInput = document.getElementById('birth-date');
     if (birthInput) birthInput.value = `${yyyy}${mm}${dd}`;
+
     const calendarSel = document.getElementById('calendar-type');
     if (calendarSel) calendarSel.value = 'solar';
+
     const genderSel = document.getElementById('gender');
     if (genderSel) genderSel.value = 'male';
+
     const ampmRadio = document.querySelector(`input[name='ampm'][value='${ampm}']`);
     if (ampmRadio) ampmRadio.checked = true;
+
     const hourSel = document.getElementById('hour-select');
     if (hourSel) hourSel.value = String(hour12);
     const minSel = document.getElementById('minute-select');
@@ -2885,61 +2889,44 @@ window.addEventListener('load', async () => {
 
     console.log(`[AUTO] ${yyyy}-${mm}-${dd} ${ampm} ${hour12}:${minute} (양력/남자 기준)`);
 
-// === 출력 실행 (카운트 제외) ===
-if (typeof renderSaju === 'function') {
-  // 🕒 폼 자동 세팅 후 DOM 반영을 기다리기 위해 약간의 지연 추가
-  setTimeout(async () => {
-    await renderSaju(todayForm);
-    console.log('[AUTO] renderSaju 완료');
+    // ✅ DOM 반영 후 안전하게 100ms 기다렸다가 renderSaju 실행
+    setTimeout(async () => {
+      if (typeof renderSaju !== 'function') {
+        console.warn('⚠️ renderSaju 함수 없음');
+        return;
+      }
 
-    // 0.3초 후 lastOutputData 저장
-    setTimeout(() => {
-      const normalized = JSON.stringify({
-        name: '오늘 기준',
-        birthDate: `${yyyy}${mm}${dd}`,
-        calendarType: 'solar',
-        gender: 'male',
-        ampm,
-        hour: String(hour12),
-        minute: String(minute),
-      });
+      await renderSaju(todayForm);
+      console.log('[AUTO] renderSaju 완료 ✅');
 
-      lastOutputData = normalized;
-      localStorage.setItem('lastSajuForm', normalized);
-      console.log('[AUTO] lastOutputData 저장 완료 (hour/minute 포함):', normalized);
+      // 0.3초 후 lastOutputData 저장
+      setTimeout(() => {
+        const normalized = JSON.stringify(todayForm);
+        lastOutputData = normalized;
+        localStorage.setItem('lastSajuForm', normalized);
+        console.log('[AUTO] lastOutputData 저장 완료:', normalized);
+        const sajuBtn = document.getElementById('sajuSubmit');
+        if (sajuBtn) sajuBtn.disabled = false;
+      }, 300);
 
-      // 저장 완료 후 버튼 다시 활성화
-      sajuBtn.disabled = false;
-    }, 300);
+      const sinsalBtn = document.getElementById('sinsalBtn');
+      const sajuBtn = document.getElementById('sajuSubmit');
+      sajuBtn?.classList.remove('active');
+      sinsalBtn?.classList.add('active');
+      window.currentMode = 'sinsal';
 
-    // === 버튼 상태도 '신살보기'로 세팅 ===
-    const sinsalBtn = document.getElementById('sinsalBtn');
-    const sajuBtn = document.getElementById('sajuSubmit');
-    sajuBtn?.classList.remove('active');
-    sinsalBtn?.classList.add('active');
-
-    // 내부 모드 변수 동기화 (있을 경우)
-    window.currentMode = 'sinsal';
-
-    // === 자동 로딩 입력값 정규화 후 저장 ===
-    if (typeof normalizeForm === 'function') {
-      const normalized = JSON.stringify(normalizeForm(todayForm));
-      window.lastOutputData = normalized;
-      localStorage.setItem('lastSajuForm', normalized);
-      console.log('[AUTO] 신살보기 모드 자동 출력 후 상태 동기화 완료');
-    } else {
-      console.warn('⚠️ normalizeForm 함수가 정의되어 있지 않습니다.');
-    }
-  }, 100); // ✅ DOM 업데이트 기다린 후 실행
-
-
-    } else {
-      console.warn('⚠️ renderSaju 함수가 아직 정의되지 않았습니다.');
-    }
+      if (typeof normalizeForm === 'function') {
+        const normalized = JSON.stringify(normalizeForm(todayForm));
+        window.lastOutputData = normalized;
+        localStorage.setItem('lastSajuForm', normalized);
+        console.log('[AUTO] 신살보기 모드 자동 출력 후 상태 동기화 완료');
+      }
+    }, 100); // ← 이 100ms가 핵심 (폼 반영 후 실행)
   } catch (err) {
     console.error('자동 사주 로딩 실패:', err);
   }
 });
+
 
 
 
