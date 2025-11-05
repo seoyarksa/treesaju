@@ -2826,7 +2826,7 @@ window.addEventListener('load', async () => {
     const ampm = hour24 < 12 ? 'AM' : 'PM';
     const hour12 = hour24 % 12; // 0~11 범위
 
-    // 요소가 모두 렌더될 때까지 대기 (SPA 대비)
+    // 요소가 모두 렌더될 때까지 대기
     const waitFor = (sel) =>
       new Promise((resolve) => {
         const el = document.querySelector(sel);
@@ -2840,10 +2840,24 @@ window.addEventListener('load', async () => {
         });
         obs.observe(document.body, { childList: true, subtree: true });
       });
+    await waitFor('#saju-form');
 
-    await waitFor('#saju-form'); // 폼이 준비된 후 실행
+    // === ✅ 기존 사주 복원 시도 ===
+    const saved = localStorage.getItem('lastSajuForm');
+    const todayKey = `${yyyy}${mm}${dd}`;
+    const lastRunKey = localStorage.getItem('lastAutoRunDate');
 
-    // === 입력값 자동 세팅 ===
+    // === case 1️⃣: 새로고침 / 기존 데이터 존재 시 ===
+    if (saved && lastRunKey === todayKey) {
+      const parsed = JSON.parse(saved);
+      console.log('[AUTO-RESTORE] 오늘 이미 실행됨 → 이전 사주 복원');
+      if (typeof renderSaju === 'function') {
+        await renderSaju(parsed);
+        return;
+      }
+    }
+
+    // === case 2️⃣: 오늘 처음 실행 (새 탭) ===
     const birthInput = document.getElementById('birth-date');
     if (birthInput) birthInput.value = `${yyyy}${mm}${dd}`;
 
@@ -2857,8 +2871,7 @@ window.addEventListener('load', async () => {
     if (ampmRadio) ampmRadio.checked = true;
 
     const hourSel = document.getElementById('hour-select');
-    if (hourSel) hourSel.value = String(hour12); // 반드시 문자열로 세팅
-
+    if (hourSel) hourSel.value = String(hour12);
     const minSel = document.getElementById('minute-select');
     if (minSel) minSel.value = String(minute);
 
@@ -2879,28 +2892,15 @@ window.addEventListener('load', async () => {
     if (typeof renderSaju === 'function') {
       await renderSaju(todayForm);
 
-      
-   // 0.3초 후 lastOutputData 저장
-  setTimeout(() => {
-    const normalized = JSON.stringify({
-      name: '오늘 기준',
-      birthDate: `${yyyy}${mm}${dd}`,
-      calendarType: 'solar',
-      gender: 'male',
-      ampm,
-      hour: String(hour12),
-      minute: String(minute),
-    });
-
-    lastOutputData = normalized;
-    localStorage.setItem('lastSajuForm', normalized);
-    console.log('[AUTO] lastOutputData 저장 완료 (hour/minute 포함):', normalized);
-
-    // 저장 완료 후 버튼 다시 활성화
-    sajuBtn.disabled = false;
-  }, 300);
-
-
+      // 0.3초 후 lastOutputData 저장
+      setTimeout(() => {
+        const normalized = JSON.stringify(todayForm);
+        lastOutputData = normalized;
+        localStorage.setItem('lastSajuForm', normalized);
+        localStorage.setItem('lastAutoRunDate', todayKey); // ✅ 오늘 자동실행 기록
+        console.log('[AUTO] lastOutputData 저장 완료 (hour/minute 포함):', normalized);
+        sajuBtn.disabled = false;
+      }, 300);
 
       // === 버튼 상태도 '신살보기'로 세팅 ===
       const sinsalBtn = document.getElementById('sinsalBtn');
@@ -2920,7 +2920,6 @@ window.addEventListener('load', async () => {
       } else {
         console.warn('⚠️ normalizeForm 함수가 정의되어 있지 않습니다.');
       }
-
 
     } else {
       console.warn('⚠️ renderSaju 함수가 아직 정의되지 않았습니다.');
