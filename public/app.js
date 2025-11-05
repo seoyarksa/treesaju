@@ -5939,30 +5939,39 @@ window.addEventListener("storage", (e) => {
   }
 });
 
+
+///새로고침
 window.supabaseClient.auth.onAuthStateChange((event, session) => {
   console.log("[AuthStateChange]", event, "returnFromAnotherTab:", window.__returnFromAnotherTab);
 
-  // 🚫 단순 복귀/초기 세션 → 새로고침 금지
   if (event === "INITIAL_SESSION") {
     updateAuthUI(session);
     return;
   }
 
-  if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
-    if (window.__returnFromAnotherTab) {
-      console.log("[AuthStateChange] 탭 복귀 감지 → reload 생략");
-      updateAuthUI(session);
-      setTimeout(() => { window.__returnFromAnotherTab = false; }, 1000);
-      return;
-    }
-    window.location.reload();
+  if (event === "TOKEN_REFRESHED") {
+    updateAuthUI(session);
     return;
   }
 
-  if (event === "TOKEN_REFRESHED") {
-    updateAuthUI(session);
+  if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+    // ✅ 복귀 직후에는 새로고침 막고, 3초 후 플래그 초기화
+    if (window.__returnFromAnotherTab) {
+      console.log("[AuthStateChange] 탭 복귀 감지 → reload 생략 (3초 후 복구)");
+      updateAuthUI(session);
+      setTimeout(() => {
+        console.log("[AuthStateChange] 복귀 모드 해제");
+        window.__returnFromAnotherTab = false;
+      }, 3000);
+      return;
+    }
+
+    console.log("[AuthStateChange] 새로고침 실행");
+    window.location.reload();
+    return;
   }
 });
+
 
 
     // ✅ 사주 기록 클릭 → 입력폼 채워넣기 + 출력
