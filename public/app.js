@@ -5891,55 +5891,55 @@ window.addEventListener("beforeunload", () => {
     // SIGNED_OUT 때 구독 정리만 추가하면 좋아요.
 
     // ✅ 로그인 상태 변경 감시 (이중 새로고침 방지)
-    let __reloading = false;
-    // ✅ 1) 탭 고유 ID 생성 (세션 스토리지 기준)
 // ✅ 탭 고유 ID
 if (!sessionStorage.getItem("tabId")) {
   sessionStorage.setItem("tabId", crypto.randomUUID());
 }
 const TAB_ID = sessionStorage.getItem("tabId");
 
-// ✅ 다른 탭 포커스 감지용 플래그
 let __lastFocusedAt = Date.now();
-
-// ✅ 탭 활성화 감시 (다른 탭 갔다 올 때는 일정 시간 이상 차이남)
 window.addEventListener("focus", () => {
   const now = Date.now();
-  // 3초 이상 다른 탭에 있었다면, "포커스 복귀"로 인식
   if (now - __lastFocusedAt > 3000) {
     console.log("[focus] 돌아옴 — autoReload OFF 모드");
-    window.__returnFromAnotherTab = true;  // ✅ 플래그 세팅
+    window.__returnFromAnotherTab = true;
   }
   __lastFocusedAt = now;
 });
-window.addEventListener("blur", () => {
-  __lastFocusedAt = Date.now();
+window.addEventListener("blur", () => { __lastFocusedAt = Date.now(); });
+
+window.addEventListener("storage", (e) => {
+  if (e.key && e.key.includes("supabase.auth.token")) {
+    console.log("[storage] 다른 탭에서 세션 변경 감지");
+    window.__returnFromAnotherTab = true;
+  }
 });
 
-// ✅ Auth 상태 감시
 window.supabaseClient.auth.onAuthStateChange((event, session) => {
   console.log("[AuthStateChange]", event, "returnFromAnotherTab:", window.__returnFromAnotherTab);
 
-  // 로그인/로그아웃 시점 기록
+  // 🚫 단순 복귀/초기 세션 → 새로고침 금지
+  if (event === "INITIAL_SESSION") {
+    updateAuthUI(session);
+    return;
+  }
+
   if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
-    // ⚡ 다른 탭에서 돌아온 직후면 reload 금지
     if (window.__returnFromAnotherTab) {
       console.log("[AuthStateChange] 탭 복귀 감지 → reload 생략");
-      window.__returnFromAnotherTab = false;
       updateAuthUI(session);
+      setTimeout(() => { window.__returnFromAnotherTab = false; }, 1000);
       return;
     }
-
-    // ⚡ 평소처럼 동작 (버튼 클릭, 정상 로그인/로그아웃)
     window.location.reload();
     return;
   }
 
-  // 자동 토큰 갱신은 새로고침 안 함
   if (event === "TOKEN_REFRESHED") {
     updateAuthUI(session);
   }
 });
+
 
 
     // ✅ 사주 기록 클릭 → 입력폼 채워넣기 + 출력

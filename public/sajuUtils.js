@@ -2316,7 +2316,7 @@ export function renderSimpleTable() {
       <tr style="background:#f9f9f9;">
         <th>多한 글자</th>
         <th>부족한 글자</th>
-        <th>태과불급 忌 유발 글자/th>
+        <th>태과불급 忌 유발 글자</th>
         <th>선택된 運의 글자[촉발자]</th>
       </tr>
       <tr>
