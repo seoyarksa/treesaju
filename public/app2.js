@@ -4683,23 +4683,23 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
     <!-- 천간 -->
     <tr>
       <td>
-        <div><span class="explainable" data-group="terms" data-term="">${colorize(timeGanji.gan)}</span></div>
+        <div><span class="explainable" data-group="ganji" data-term="">${colorize(timeGanji.gan)}</span></div>
         <div style="font-size:0.85rem; color:#888;">
           ${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(timeGanji.gan)))}
         </div>
       </td>
       <td>
-        <div><span class="explainable" data-group="terms" data-term="">${colorize(dayGanji.gan)}</span></div>
+        <div><span class="explainable" data-group="ganji" data-term="">${colorize(dayGanji.gan)}</span></div>
         <div style="font-size:0.85rem; color:#888;"><span class="explainable" data-group="terms" data-term="">(일간)</span></div>
       </td>
       <td>
-        <div><span class="explainable" data-group="terms" data-term="">${colorize(monthGanji.gan)}</span></div>
+        <div><span class="explainable" data-group="ganji" data-term="">${colorize(monthGanji.gan)}</span></div>
         <div style="font-size:0.85rem; color:#888;">
           ${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(monthGanji.gan)))}
         </div>
       </td>
       <td>
-        <div><span class="explainable" data-group="terms" data-term="">${colorize(yearGanji.gan)}</span></div>
+        <div><span class="explainable" data-group="ganji" data-term="">${colorize(yearGanji.gan)}</span></div>
         <div style="font-size:0.85rem; color:#888;">
           ${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(yearGanji.gan)))}
         </div>
@@ -4719,10 +4719,10 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
 
     <!-- 지지 -->
     <tr>
-      <td><span class="explainable" data-group="terms" data-term="">${colorize(timeGanji.ji)}</span></td>
-      <td><span class="explainable" data-group="terms" data-term="">${colorize(dayGanji.ji)}</span></td>
-      <td><span class="explainable" data-group="terms" data-term="">${colorize(monthGanji.ji)}</span></td>
-      <td><span class="explainable" data-group="terms" data-term="">${colorize(yearGanji.ji)}</span></td>
+      <td><span class="explainable" data-group="ganji" data-term="">${colorize(timeGanji.ji)}</span></td>
+      <td><span class="explainable" data-group="ganji" data-term="">${colorize(dayGanji.ji)}</span></td>
+      <td><span class="explainable" data-group="ganji" data-term="">${colorize(monthGanji.ji)}</span></td>
+      <td><span class="explainable" data-group="ganji" data-term="">${colorize(yearGanji.ji)}</span></td>
     </tr>
 
     <!-- 지장간 + 육신 -->
@@ -4730,7 +4730,7 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
   <td>
     <div class="hidden-stem-wrapper">
       ${timeLines.map(s => `
-        <div class="hidden-stem"><span class="explainable" data-group="terms" data-term="">
+        <div class="hidden-stem"><span class="explainable" data-group="ganji" data-term="">
           ${colorize(convertKorToHanStem(s), '0.85rem')}</span>
           <span style="font-size:0.75rem; color:#999;">
              ${tgTag(getTenGod(dayGanKorGan, s))}
@@ -4741,7 +4741,7 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
   <td>
     <div class="hidden-stem-wrapper">
       ${dayLines.map(s => `
-        <div class="hidden-stem"><span class="explainable" data-group="terms" data-term="">
+        <div class="hidden-stem"><span class="explainable" data-group="ganji" data-term="">
           ${colorize(convertKorToHanStem(s), '0.85rem')}</span>
           <span style="font-size:0.75rem; color:#999;">
              ${tgTag(getTenGod(dayGanKorGan, s))}
@@ -4752,7 +4752,7 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
   <td>
     <div class="hidden-stem-wrapper">
       ${monthLines.map(s => `
-        <div class="hidden-stem"><span class="explainable" data-group="terms" data-term="">
+        <div class="hidden-stem"><span class="explainable" data-group="ganji" data-term="">
           ${colorize(convertKorToHanStem(s), '0.85rem')}</span>
           <span style="font-size:0.75rem; color:#999;">
             ${tgTag(getTenGod(dayGanKorGan, s))}
@@ -4763,7 +4763,7 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
   <td>
     <div class="hidden-stem-wrapper">
       ${yearLines.map(s => `
-        <div class="hidden-stem"><span class="explainable" data-group="terms" data-term="">
+        <div class="hidden-stem"><span class="explainable" data-group="ganji" data-term="">
           ${colorize(convertKorToHanStem(s), '0.85rem')}</span>
           <span style="font-size:0.75rem; color:#999;">
              ${tgTag(getTenGod(dayGanKorGan, s))}
@@ -4924,9 +4924,9 @@ if (secondaryGyeokResult?.primary && secondaryGyeokResult?.secondary) {
   // 생지(복수격)
   gyeokDisplayText = `
     <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;"><b>
-      ${window.gyeokName}${window.gyeokStem ? '' : ''}
+     ${window.gyeokName}${window.gyeokStem ? '' : ''}
     </b></span>
-    <span style="font-size:0.92em;"> (보조격: </span>
+    <span class="explainable" data-group="terms" data-term="보조격"; style="font-size:0.92em;"> (보조격: </span>
     <span id="gyeok-secondary" style="cursor:pointer; color:#ff8844;">
       <b>${secondaryGyeokResult.secondary.char}</b>
     </span>
@@ -4941,7 +4941,7 @@ if (secondaryGyeokResult?.primary && secondaryGyeokResult?.secondary) {
     <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;">
       ${window.gyeokName}${window.gyeokStem ? '' : ''}
     </span>
-    <span style="font-size:0.92em;"> (보조격: </span>
+    <span class="explainable" data-group="terms" data-term="보조격"; style="font-size:0.92em;"> (보조격: </span>
     <span id="gyeok-secondary" style="cursor:pointer; color:#ff8844;">
       ${secondaryGyeokResult.char}
     </span>
@@ -4986,7 +4986,7 @@ if (gyeokDisplayEl) {
 
   // 출력은 기존의 주격+보조격 로직(gyeokDisplayText)을 유지
   gyeokDisplayEl.innerHTML = `   <div style="text-align:left; margin:8px 0; color:#0077cc;">
-  05] <span class="explainable" data-group="terms" data-term="">격국</span>[&보조격]의 구성 및 도식도
+  05] <span class="explainable" data-group="terms" data-term="">격국</span>[&<span class="explainable" data-group="terms" data-term="">보조격</span>]의 구성 및 도식도
 </div><br><br><span class="explainable" data-group="terms" data-term="">격국</span>: ${gyeokDisplayText} `;
 
 

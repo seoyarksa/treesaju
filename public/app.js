@@ -5891,56 +5891,29 @@ window.addEventListener("beforeunload", () => {
     // SIGNED_OUT 때 구독 정리만 추가하면 좋아요.
 
     // ✅ 로그인 상태 변경 감시 (이중 새로고침 방지)
-// ✅ 탭 고유 ID
-if (!sessionStorage.getItem("tabId")) {
-  sessionStorage.setItem("tabId", crypto.randomUUID());
-}
-const TAB_ID = sessionStorage.getItem("tabId");
+    let __reloading = false;
+    window.supabaseClient.auth.onAuthStateChange((event, newSession) => {
+      console.log("[AuthStateChange]", event);
 
-let __lastFocusedAt = Date.now();
-window.addEventListener("focus", () => {
-  const now = Date.now();
-  if (now - __lastFocusedAt > 3000) {
-    console.log("[focus] 돌아옴 — autoReload OFF 모드");
-    window.__returnFromAnotherTab = true;
-  }
-  __lastFocusedAt = now;
-});
-window.addEventListener("blur", () => { __lastFocusedAt = Date.now(); });
+      if (event === "SIGNED_OUT") {
+        if (window.__profileCh) {
+          try { window.supabaseClient.removeChannel(window.__profileCh); } catch (_) {}
+          window.__profileCh = null;
+        }
+      }
 
-window.addEventListener("storage", (e) => {
-  if (e.key && e.key.includes("supabase.auth.token")) {
-    console.log("[storage] 다른 탭에서 세션 변경 감지");
-    window.__returnFromAnotherTab = true;
-  }
-});
-
-window.supabaseClient.auth.onAuthStateChange((event, session) => {
-  console.log("[AuthStateChange]", event, "returnFromAnotherTab:", window.__returnFromAnotherTab);
-
-  // 🚫 단순 복귀/초기 세션 → 새로고침 금지
-  if (event === "INITIAL_SESSION") {
-    updateAuthUI(session);
-    return;
-  }
-
-  if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
-    if (window.__returnFromAnotherTab) {
-      console.log("[AuthStateChange] 탭 복귀 감지 → reload 생략");
-      updateAuthUI(session);
-      setTimeout(() => { window.__returnFromAnotherTab = false; }, 1000);
-      return;
-    }
-    window.location.reload();
-    return;
-  }
-
-  if (event === "TOKEN_REFRESHED") {
-    updateAuthUI(session);
-  }
-});
-
-
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+        if (!__reloading) {
+          __reloading = true;
+          if (window.location.hash) {
+            history.replaceState(null, "", window.location.pathname + window.location.search);
+          }
+          window.location.reload();
+        }
+        return;
+      }
+      updateAuthUI(newSession);
+    });
 
     // ✅ 사주 기록 클릭 → 입력폼 채워넣기 + 출력
     document.addEventListener("click", async (e) => {
