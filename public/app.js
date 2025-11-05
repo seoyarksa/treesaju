@@ -2822,11 +2822,10 @@ window.addEventListener('load', async () => {
     const hour24 = now.getHours();
     const minute = now.getMinutes();
 
-    // 🕒 오전/오후 판정
     const ampm = hour24 < 12 ? 'AM' : 'PM';
-    const hour12 = hour24 % 12; // 0~11 범위
+    const hour12 = hour24 % 12;
 
-    // 요소가 모두 렌더될 때까지 대기 (SPA 대비)
+    // === 폼 렌더 기다리기 ===
     const waitFor = (sel) =>
       new Promise((resolve) => {
         const el = document.querySelector(sel);
@@ -2840,29 +2839,40 @@ window.addEventListener('load', async () => {
         });
         obs.observe(document.body, { childList: true, subtree: true });
       });
+    await waitFor('#saju-form');
 
-    await waitFor('#saju-form'); // 폼이 준비된 후 실행
+    // ✅ 1️⃣ 먼저 기존 저장된 사주(localStorage.lastSajuForm)가 있으면 복원
+    const saved = localStorage.getItem('lastSajuForm');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed?.birthDate) {
+          console.log('[AUTO-RESTORE] 기존 사주 복원 시도:', parsed);
+          if (typeof renderSaju === 'function') {
+            await renderSaju(parsed);
+            console.log('[AUTO-RESTORE] 이전 사주 복원 완료');
+            return; // ← ✅ 복원 성공 시 오늘사주 새로 안 돌림
+          }
+        }
+      } catch (e) {
+        console.warn('기존 사주 복원 실패:', e);
+      }
+    }
 
-    // === 입력값 자동 세팅 ===
+    // ✅ 2️⃣ 기존 데이터 없으면 “오늘 기준 사주” 자동 출력
     const birthInput = document.getElementById('birth-date');
     if (birthInput) birthInput.value = `${yyyy}${mm}${dd}`;
-
     const calendarSel = document.getElementById('calendar-type');
     if (calendarSel) calendarSel.value = 'solar';
-
     const genderSel = document.getElementById('gender');
     if (genderSel) genderSel.value = 'male';
-
     const ampmRadio = document.querySelector(`input[name='ampm'][value='${ampm}']`);
     if (ampmRadio) ampmRadio.checked = true;
-
     const hourSel = document.getElementById('hour-select');
-    if (hourSel) hourSel.value = String(hour12); // 반드시 문자열로 세팅
-
+    if (hourSel) hourSel.value = String(hour12);
     const minSel = document.getElementById('minute-select');
     if (minSel) minSel.value = String(minute);
 
-    // === formData 구성 ===
     const todayForm = {
       name: '오늘 기준',
       birthDate: `${yyyy}${mm}${dd}`,
@@ -2875,53 +2885,29 @@ window.addEventListener('load', async () => {
 
     console.log(`[AUTO] ${yyyy}-${mm}-${dd} ${ampm} ${hour12}:${minute} (양력/남자 기준)`);
 
-    // === 출력 실행 (카운트 제외) ===
     if (typeof renderSaju === 'function') {
       await renderSaju(todayForm);
 
-      
-   // 0.3초 후 lastOutputData 저장
-  setTimeout(() => {
-    const normalized = JSON.stringify({
-      name: '오늘 기준',
-      birthDate: `${yyyy}${mm}${dd}`,
-      calendarType: 'solar',
-      gender: 'male',
-      ampm,
-      hour: String(hour12),
-      minute: String(minute),
-    });
+      setTimeout(() => {
+        const normalized = JSON.stringify(todayForm);
+        lastOutputData = normalized;
+        localStorage.setItem('lastSajuForm', normalized);
+        console.log('[AUTO] lastOutputData 저장 완료:', normalized);
+        sajuBtn.disabled = false;
+      }, 300);
 
-    lastOutputData = normalized;
-    localStorage.setItem('lastSajuForm', normalized);
-    console.log('[AUTO] lastOutputData 저장 완료 (hour/minute 포함):', normalized);
-
-    // 저장 완료 후 버튼 다시 활성화
-    sajuBtn.disabled = false;
-  }, 300);
-
-
-
-      // === 버튼 상태도 '신살보기'로 세팅 ===
       const sinsalBtn = document.getElementById('sinsalBtn');
       const sajuBtn = document.getElementById('sajuSubmit');
       sajuBtn?.classList.remove('active');
       sinsalBtn?.classList.add('active');
-
-      // 내부 모드 변수 동기화 (있을 경우)
       window.currentMode = 'sinsal';
 
-      // === 자동 로딩 입력값 정규화 후 저장 ===
       if (typeof normalizeForm === 'function') {
         const normalized = JSON.stringify(normalizeForm(todayForm));
         window.lastOutputData = normalized;
         localStorage.setItem('lastSajuForm', normalized);
         console.log('[AUTO] 신살보기 모드 자동 출력 후 상태 동기화 완료');
-      } else {
-        console.warn('⚠️ normalizeForm 함수가 정의되어 있지 않습니다.');
       }
-
-
     } else {
       console.warn('⚠️ renderSaju 함수가 아직 정의되지 않았습니다.');
     }
