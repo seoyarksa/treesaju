@@ -2868,6 +2868,33 @@ window.addEventListener('load', async () => {
       minute: String(minute),
     };
 
+    // === 자동 사주 출력 직전 ===
+
+// 🔹 1. 오전/오후 라디오 버튼 반영
+const ampmRadio = document.querySelector(`input[name='ampm'][value='${ampm}']`);
+if (ampmRadio) {
+  ampmRadio.checked = true;
+  ampmRadio.dispatchEvent(new Event('change', { bubbles: true }));
+  console.log(`[AUTO] 오전/오후 자동 선택됨 → ${ampm}`);
+}
+
+// 🔹 2. 성별 select 반영
+const genderSel = document.getElementById('gender');
+if (genderSel) {
+  genderSel.value = todayForm.gender; // "male" or "female"
+  genderSel.dispatchEvent(new Event('change', { bubbles: true }));
+  console.log(`[AUTO] 성별 자동 선택됨 → ${todayForm.gender}`);
+}
+
+// 🔹 3. 양력/음력 select 반영
+const calendarSel = document.getElementById('calendar-type');
+if (calendarSel) {
+  calendarSel.value = todayForm.calendarType; // "solar" or "lunar"
+  calendarSel.dispatchEvent(new Event('change', { bubbles: true }));
+  console.log(`[AUTO] 달력유형 자동 선택됨 → ${todayForm.calendarType}`);
+}
+
+
     console.log(`[AUTO] ${yyyy}-${mm}-${dd} ${ampm} ${hour12}:${minute} (양력/남자 기준)`);
 
     if (typeof renderSaju === 'function') {
@@ -3329,20 +3356,7 @@ function pad(num) {
 
 
   const dateStr = document.getElementById('birth-date').value;
-// ✅ [추가] 자동 로딩 대비: ampm이 비어 있으면 현재 시각 기준으로 자동 선택
-let ampmInput = document.querySelector('input[name="ampm"]:checked');
-if (!ampmInput) {
-  const now = new Date();
-  const ampmGuess = now.getHours() < 12 ? 'AM' : 'PM';
-  const radio = document.querySelector(`input[name="ampm"][value="${ampmGuess}"]`);
-  if (radio) {
-    radio.checked = true;
-    radio.dispatchEvent(new Event('change', { bubbles: true }));
-    console.log(`[AUTO] 오전/오후 자동 선택됨 → ${ampmGuess}`);
-    ampmInput = radio; // ✅ 갱신
-  }
-}
-
+const ampmInput = document.querySelector('input[name="ampm"]:checked');
 const ampm = ampmInput ? ampmInput.value : null;
 if (!ampm) {
   alert('오전/오후를 선택하세요');
