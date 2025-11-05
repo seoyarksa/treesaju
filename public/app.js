@@ -4926,7 +4926,7 @@ if (secondaryGyeokResult?.primary && secondaryGyeokResult?.secondary) {
     <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;"><b>
      ${window.gyeokName}${window.gyeokStem ? '' : ''}
     </b></span>
-    <span style="font-size:0.92em;"> (보조격: </span>
+    <span class="explainable" data-group="terms" data-term="보조격"; style="font-size:0.92em;"> (보조격: </span>
     <span id="gyeok-secondary" style="cursor:pointer; color:#ff8844;">
       <b>${secondaryGyeokResult.secondary.char}</b>
     </span>
@@ -4986,7 +4986,7 @@ if (gyeokDisplayEl) {
 
   // 출력은 기존의 주격+보조격 로직(gyeokDisplayText)을 유지
   gyeokDisplayEl.innerHTML = `   <div style="text-align:left; margin:8px 0; color:#0077cc;">
-  05] <span class="explainable" data-group="terms" data-term="">격국</span>[&보조격]의 구성 및 도식도
+  05] <span class="explainable" data-group="terms" data-term="">격국</span>[&<span class="explainable" data-group="terms" data-term="">보조격</span>]의 구성 및 도식도
 </div><br><br><span class="explainable" data-group="terms" data-term="">격국</span>: ${gyeokDisplayText} `;
 
 
