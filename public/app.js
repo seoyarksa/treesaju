@@ -317,6 +317,10 @@ function getKSTDateKey() {
 
 
 
+
+
+
+
 // === 2) 로그인 UI 토글
 
 async function updateAuthUI(session) {
@@ -2809,8 +2813,21 @@ if (formDate === todayKey && window.lastOutputData) {
 
 
 // === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
+// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
 window.addEventListener('load', async () => {
   try {
+    const todayKey = new Date().toISOString().slice(0,10); // ex: 2025-11-03
+    const renderedKey = localStorage.getItem('autoRenderedDate');
+
+    // ✅ 이미 오늘 렌더링된 적이 있다면 스킵
+    if (renderedKey === todayKey) {
+      console.log('[AUTO-RENDER] 이미 오늘 자동 사주 실행함 → 스킵');
+      return;
+    }
+
+    // ✅ 여기서 최초 실행으로 판단되면 키를 저장
+    localStorage.setItem('autoRenderedDate', todayKey);
+
     const now = new Date();
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -2837,26 +2854,15 @@ window.addEventListener('load', async () => {
         obs.observe(document.body, { childList: true, subtree: true });
       });
 
-    await waitFor('#saju-form'); // 폼이 준비된 후 실행
+    await waitFor('#saju-form'); // 폼 준비 대기
 
     // === 입력값 자동 세팅 ===
-    const birthInput = document.getElementById('birth-date');
-    if (birthInput) birthInput.value = `${yyyy}${mm}${dd}`;
-
-    const calendarSel = document.getElementById('calendar-type');
-    if (calendarSel) calendarSel.value = 'solar';
-
-    const genderSel = document.getElementById('gender');
-    if (genderSel) genderSel.value = 'male';
-
-    const ampmRadio = document.querySelector(`input[name='ampm'][value='${ampm}']`);
-    if (ampmRadio) ampmRadio.checked = true;
-
-    const hourSel = document.getElementById('hour-select');
-    if (hourSel) hourSel.value = String(hour12); // 반드시 문자열로 세팅
-
-    const minSel = document.getElementById('minute-select');
-    if (minSel) minSel.value = String(minute);
+    document.getElementById('birth-date').value = `${yyyy}${mm}${dd}`;
+    document.getElementById('calendar-type').value = 'solar';
+    document.getElementById('gender').value = 'male';
+    document.querySelector(`input[name='ampm'][value='${ampm}']`).checked = true;
+    document.getElementById('hour-select').value = String(hour12);
+    document.getElementById('minute-select').value = String(minute);
 
     // === formData 구성 ===
     const todayForm = {
@@ -2875,54 +2881,24 @@ window.addEventListener('load', async () => {
     if (typeof renderSaju === 'function') {
       await renderSaju(todayForm);
 
-      
-   // 0.3초 후 lastOutputData 저장
-  setTimeout(() => {
-    const normalized = JSON.stringify({
-      name: '오늘 기준',
-      birthDate: `${yyyy}${mm}${dd}`,
-      calendarType: 'solar',
-      gender: 'male',
-      ampm,
-      hour: String(hour12),
-      minute: String(minute),
-    });
-
-    lastOutputData = normalized;
-    localStorage.setItem('lastSajuForm', normalized);
-    console.log('[AUTO] lastOutputData 저장 완료 (hour/minute 포함):', normalized);
-
-    // 저장 완료 후 버튼 다시 활성화
-    sajuBtn.disabled = false;
-  }, 300);
-
-
-
-      // === 버튼 상태도 '신살보기'로 세팅 ===
-      const sinsalBtn = document.getElementById('sinsalBtn');
-      const sajuBtn = document.getElementById('sajuSubmit');
-      sajuBtn?.classList.remove('active');
-      sinsalBtn?.classList.add('active');
-
-      // 내부 모드 변수 동기화 (있을 경우)
-      window.currentMode = 'sinsal';
-
-      // === 자동 로딩 입력값 정규화 후 저장 ===
-      if (typeof normalizeForm === 'function') {
-        const normalized = JSON.stringify(normalizeForm(todayForm));
-        window.lastOutputData = normalized;
-        localStorage.setItem('lastSajuForm', normalized);
-        console.log('[AUTO] 신살보기 모드 자동 출력 후 상태 동기화 완료');
-      } else {
-        console.warn('⚠️ normalizeForm 함수가 정의되어 있지 않습니다.');
-      }
-
-
+      // ✅ 출력 결과를 localStorage에 저장 (복원용)
+      localStorage.setItem('lastSajuForm', JSON.stringify(todayForm));
+      console.log('[AUTO] renderSaju 실행 완료 및 저장');
     } else {
       console.warn('⚠️ renderSaju 함수가 아직 정의되지 않았습니다.');
     }
+
   } catch (err) {
     console.error('자동 사주 로딩 실패:', err);
+  }
+});
+
+//탭이동시 이전자료 복원
+document.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('lastSajuForm');
+  if (saved && typeof renderSaju === 'function') {
+    renderSaju(JSON.parse(saved));
+    console.log('[AUTO-RESTORE] 이전 사주 복원 완료');
   }
 });
 
@@ -5887,77 +5863,6 @@ window.addEventListener("beforeunload", () => {
     // SIGNED_OUT 때 구독 정리만 추가하면 좋아요.
 
     // ✅ 로그인 상태 변경 감시 (이중 새로고침 방지)
-    //새로고침시 리로딩
-function saveCurrentSajuState() {
-  try {
-    const name = document.getElementById("customer-name")?.value || "";
-    const backup = {
-      name,
-      saju: window.saju || null,
-      gyeok: window.gyeok || null,
-      sinsal: window.sinsal || null,
-      birthDate: window.birthDate || "",
-      gender: window.gender || "",
-      ampm: window.ampm || "",
-      hour: window.hour || "",
-      minute: window.minute || "",
-    };
-    localStorage.setItem("sajuBackup", JSON.stringify(backup));
-    console.log("[sajuBackup] 저장 완료:", backup);
-  } catch (err) {
-    console.error("[sajuBackup] 저장 실패:", err);
-  }
-}
-
-function restoreSajuState() {
-  try {
-    const saved = JSON.parse(localStorage.getItem("sajuBackup") || "{}");
-    if (!saved.saju || !saved.gyeok) {
-      console.log("[restoreSajuState] 복원할 데이터 없음");
-      return;
-    }
-
-    console.log("[restoreSajuState] 복원 시작:", saved.name);
-
-    // 입력창 복원
-    const nameInput = document.getElementById("customer-name");
-    if (nameInput) nameInput.value = saved.name || "";
-
-    // 전역 변수 복원
-    window.saju = saved.saju;
-    window.gyeok = saved.gyeok;
-    window.sinsal = saved.sinsal;
-
-    // 사주 표 다시 렌더링
-    renderGyeokFlowStyled(saved.gyeok, saved.saju);
-    if (typeof rerenderSinsal === "function") rerenderSinsal();
-    if (typeof renderSajuMiniFromCurrentOutput === "function") {
-      renderSajuMiniFromCurrentOutput();
-    }
-
-    console.log("[restoreSajuState] 복원 완료 ✅");
-  } catch (err) {
-    console.error("[restoreSajuState] 복원 실패:", err);
-  }
-}
-
-let lastBlurTime = 0;
-
-window.addEventListener("blur", () => {
-  lastBlurTime = Date.now();
-});
-
-window.addEventListener("focus", () => {
-  const now = Date.now();
-  // 3초 이상 다른 탭에 있었다면 → 복귀로 판단
-  if (now - lastBlurTime > 3000) {
-    console.log("[focus] 다른 탭 복귀 감지 → 이전 데이터 복원 시도");
-    restoreSajuState();
-  }
-});
-
-
-//새로고침시 리로딩 끝
     let __reloading = false;
     window.supabaseClient.auth.onAuthStateChange((event, newSession) => {
       console.log("[AuthStateChange]", event);
@@ -5975,8 +5880,6 @@ window.addEventListener("focus", () => {
           if (window.location.hash) {
             history.replaceState(null, "", window.location.pathname + window.location.search);
           }
-
-          saveCurrentSajuState();
           window.location.reload();
         }
         return;
@@ -6373,7 +6276,6 @@ try {
   console.warn('[tooltip] install failed:', e);
 }
 
-  restoreSajuState();
 
   } catch (err) {
     console.error("[init] fatal:", err);
