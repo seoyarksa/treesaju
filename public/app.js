@@ -2812,7 +2812,10 @@ if (formDate === todayKey && window.lastOutputData) {
 }
 
 
-
+// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
+// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
+// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
+// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
 // === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
 window.addEventListener('load', async () => {
   try {
@@ -2844,15 +2847,16 @@ window.addEventListener('load', async () => {
     document.getElementById('birth-date').value = `${yyyy}${mm}${dd}`;
     document.getElementById('calendar-type').value = 'solar';
     document.getElementById('gender').value = 'male';
+
+    // ✅ 추가: 라디오 버튼을 실제로 체크 표시 (이게 없으면 “오전/오후 선택하세요” 뜸)
+    const ampmRadio = document.querySelector(`input[name='ampm'][value='${ampm}']`);
+    if (ampmRadio) {
+      ampmRadio.checked = true;
+      ampmRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
     document.getElementById('hour-select').value = String(hour12);
     document.getElementById('minute-select').value = String(minute);
-
-await waitFor('#saju-form');
-await waitFor('#birth-date');
-await waitFor('input[name="ampm"][value="AM"]');
-await waitFor('#gender');
-await waitFor('#calendar-type');
-
 
     const todayForm = {
       name: '오늘 기준',
@@ -2864,32 +2868,7 @@ await waitFor('#calendar-type');
       minute: String(minute),
     };
 
-    // === 자동 사주 출력 직전 ===
-
-// 🔹 1. 오전/오후 라디오 버튼 반영
-const ampmRadio = document.querySelector(`input[name='ampm'][value='${ampm}']`);
-if (ampmRadio) {
-  ampmRadio.checked = true;
-  ampmRadio.dispatchEvent(new Event('change', { bubbles: true }));
-  console.log(`[AUTO] 오전/오후 자동 선택됨 → ${ampm}`);
-}
-
-// 🔹 2. 성별 select 반영
-const genderSel = document.getElementById('gender');
-if (genderSel) {
-  genderSel.value = todayForm.gender; // "male" or "female"
-  genderSel.dispatchEvent(new Event('change', { bubbles: true }));
-  console.log(`[AUTO] 성별 자동 선택됨 → ${todayForm.gender}`);
-}
-
-// 🔹 3. 양력/음력 select 반영
-const calendarSel = document.getElementById('calendar-type');
-if (calendarSel) {
-  calendarSel.value = todayForm.calendarType; // "solar" or "lunar"
-  calendarSel.dispatchEvent(new Event('change', { bubbles: true }));
-  console.log(`[AUTO] 달력유형 자동 선택됨 → ${todayForm.calendarType}`);
-}
-
+    
 
     console.log(`[AUTO] ${yyyy}-${mm}-${dd} ${ampm} ${hour12}:${minute} (양력/남자 기준)`);
 
