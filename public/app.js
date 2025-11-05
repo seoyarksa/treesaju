@@ -5767,33 +5767,31 @@ async function renderUserProfile() {
 // === 초기화 (하나로 통합)
 document.addEventListener("DOMContentLoaded", async () => {
 
-   const last = JSON.parse(localStorage.getItem("lastOutputData") || "{}");
-  if (last.birthDate && last.saju && last.gyeok) {
-    console.log("[restore] 이전 사주 데이터 복원:", last.name);
-    document.getElementById("customer-name").value = last.name || "";
-    document.getElementById("birth-date").value = last.birthDate;
-    document.getElementById("calendar-type").value = last.calendarType;
-    document.getElementById("gender").value = last.gender;
-    document.querySelector(`input[name="ampm"][value="${last.ampm}"]`).checked = true;
-    document.getElementById("hour-select").value = last.hour;
-    document.getElementById("minute-select").value = last.minute;
-
-    // 사주, 격국, 신살 복원
-    window.saju = last.saju;
-    window.gyeok = last.gyeok;
-    renderGyeokFlowStyled(window.gyeok, window.saju);
-    rerenderSinsal?.();
-  }
-  try {
+   try {
     const saved = JSON.parse(localStorage.getItem("lastOutputData") || "{}");
-    if (saved && saved.saju && saved.gyeok) {
-      console.log("[restore] 이전 사주 복원 시작:", saved.name);
-      document.getElementById("customer-name").value = saved.name || "";
-      window.saju = saved.saju;
-      window.gyeok = saved.gyeok;
-      renderGyeokFlowStyled(saved.gyeok, saved.saju);
-      rerenderSinsal?.();
+    if (!saved || !saved.saju || !saved.gyeok) return;
+
+    console.log("[restore] 이전 사주 복원 시작:", saved.name);
+
+    // 입력값 복원
+    const nameInput = document.getElementById("customer-name");
+    if (nameInput) nameInput.value = saved.name || "";
+
+    // 전역 데이터 복원
+    window.saju = saved.saju;
+    window.gyeok = saved.gyeok;
+    window.sinsal = saved.sinsal;
+
+    // 출력 다시 렌더링
+    renderGyeokFlowStyled(saved.gyeok, saved.saju);
+    if (typeof rerenderSinsal === "function") rerenderSinsal();
+
+    // 미니 사주창 복원
+    if (typeof renderSajuMiniFromCurrentOutput === "function") {
+      renderSajuMiniFromCurrentOutput();
     }
+
+    console.log("[restore] 복원 완료 ✅");
   } catch (e) {
     console.warn("[restore] 복원 실패:", e);
   }
@@ -5970,7 +5968,9 @@ if (!sessionStorage.getItem("tabId")) {
 }
 const TAB_ID = sessionStorage.getItem("tabId");
 
+
 let __lastFocusedAt = Date.now();
+
 window.addEventListener("focus", () => {
   const now = Date.now();
   if (now - __lastFocusedAt > 3000) {
@@ -5979,27 +5979,25 @@ window.addEventListener("focus", () => {
   }
   __lastFocusedAt = now;
 });
-window.addEventListener("blur", () => { __lastFocusedAt = Date.now(); });
 
-window.addEventListener("storage", (e) => {
-  if (e.key && e.key.includes("supabase.auth.token")) {
-    console.log("[storage] 다른 탭에서 세션 변경 감지");
-    window.__returnFromAnotherTab = true;
-  }
+window.addEventListener("blur", () => {
+  console.log("[BLUR] 창에서 벗어남");
+  __lastFocusedAt = Date.now();
 });
+
 
 
 ///새로고침
 window.supabaseClient.auth.onAuthStateChange((event, session) => {
   console.log("[AuthStateChange]", event, "returnFromAnotherTab:", window.__returnFromAnotherTab);
 
-  // 1️⃣ 초기 세션 및 토큰 갱신은 그냥 UI만 업데이트
+  // 1️⃣ 초기 세션 / 토큰 갱신 → 새로고침 X
   if (event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {
     updateAuthUI(session);
     return;
   }
 
-  // 2️⃣ 로그인/로그아웃 시 리로드 처리
+  // 2️⃣ 로그인/로그아웃 이벤트
   if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
     if (window.__returnFromAnotherTab) {
       console.log("[AuthStateChange] 탭 복귀 감지 → reload 생략 (3초 후 복구)");
@@ -6011,19 +6009,20 @@ window.supabaseClient.auth.onAuthStateChange((event, session) => {
       return;
     }
 
-    console.log("[AuthStateChange] 강제 리로드 준비 → 상태 저장 후 리로드");
+    console.log("[AuthStateChange] 강제 리로드 준비 → 현재 상태 백업");
 
-    // 🔹 현재 사주 상태를 localStorage에 백업
+    // ✅ 현재 사주 상태 백업 (리로드 전)
     try {
       const backup = {
         name: document.getElementById("customer-name")?.value || "",
         saju: window.saju || null,
         gyeok: window.gyeok || null,
-        birthDate: window.birthDate,
-        birthMonth: window.birthMonth,
-        birthDay: window.birthDay,
-        birthHour: window.birthHour,
-        gender: window.gender,
+        sinsal: window.sinsal || null,
+        birthDate: window.birthDate || "",
+        gender: window.gender || "",
+        ampm: window.ampm || "",
+        hour: window.hour || "",
+        minute: window.minute || "",
       };
       localStorage.setItem("lastOutputData", JSON.stringify(backup));
       console.log("[AuthStateChange] 사주 상태 백업 완료:", backup);
@@ -6031,7 +6030,7 @@ window.supabaseClient.auth.onAuthStateChange((event, session) => {
       console.warn("[AuthStateChange] 상태 백업 실패:", e);
     }
 
-    // 🔹 리로드 강제 (reload보다 확실한 방법)
+    // ✅ 강제 리로드 (완전 초기화 후 복원 가능)
     setTimeout(() => {
       try {
         window.location.href = window.location.href;
@@ -6043,6 +6042,7 @@ window.supabaseClient.auth.onAuthStateChange((event, session) => {
     return;
   }
 });
+
 
 
 
