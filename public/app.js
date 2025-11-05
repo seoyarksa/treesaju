@@ -5784,6 +5784,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderGyeokFlowStyled(window.gyeok, window.saju);
     rerenderSinsal?.();
   }
+  try {
+    const saved = JSON.parse(localStorage.getItem("lastOutputData") || "{}");
+    if (saved && saved.saju && saved.gyeok) {
+      console.log("[restore] 이전 사주 복원 시작:", saved.name);
+      document.getElementById("customer-name").value = saved.name || "";
+      window.saju = saved.saju;
+      window.gyeok = saved.gyeok;
+      renderGyeokFlowStyled(saved.gyeok, saved.saju);
+      rerenderSinsal?.();
+    }
+  } catch (e) {
+    console.warn("[restore] 복원 실패:", e);
+  }
 
   try {
     console.log("[app] DOM ready");
@@ -5980,11 +5993,13 @@ window.addEventListener("storage", (e) => {
 window.supabaseClient.auth.onAuthStateChange((event, session) => {
   console.log("[AuthStateChange]", event, "returnFromAnotherTab:", window.__returnFromAnotherTab);
 
+  // 1️⃣ 초기 세션 및 토큰 갱신은 그냥 UI만 업데이트
   if (event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {
     updateAuthUI(session);
     return;
   }
 
+  // 2️⃣ 로그인/로그아웃 시 리로드 처리
   if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
     if (window.__returnFromAnotherTab) {
       console.log("[AuthStateChange] 탭 복귀 감지 → reload 생략 (3초 후 복구)");
@@ -5996,19 +6011,39 @@ window.supabaseClient.auth.onAuthStateChange((event, session) => {
       return;
     }
 
-    console.log("[AuthStateChange] 강제 리로드 실행");
+    console.log("[AuthStateChange] 강제 리로드 준비 → 상태 저장 후 리로드");
+
+    // 🔹 현재 사주 상태를 localStorage에 백업
+    try {
+      const backup = {
+        name: document.getElementById("customer-name")?.value || "",
+        saju: window.saju || null,
+        gyeok: window.gyeok || null,
+        birthDate: window.birthDate,
+        birthMonth: window.birthMonth,
+        birthDay: window.birthDay,
+        birthHour: window.birthHour,
+        gender: window.gender,
+      };
+      localStorage.setItem("lastOutputData", JSON.stringify(backup));
+      console.log("[AuthStateChange] 사주 상태 백업 완료:", backup);
+    } catch (e) {
+      console.warn("[AuthStateChange] 상태 백업 실패:", e);
+    }
+
+    // 🔹 리로드 강제 (reload보다 확실한 방법)
     setTimeout(() => {
       try {
-        // 강력 리로드
         window.location.href = window.location.href;
-      } catch (e) {
-        console.error("[reload fail]", e);
+      } catch (err) {
+        console.warn("[reload fallback]", err);
         window.location.assign(window.location.href);
       }
-    }, 100);
+    }, 150);
     return;
   }
 });
+
 
 
 
