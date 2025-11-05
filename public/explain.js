@@ -7,7 +7,7 @@
 //<span class="explainable" data-group="etcsinsal" data-term="">천을귀인</span>  //기타신살
 //<span class="explainable" data-group="ganji" data-term="">    </span>  //천간지지
 //<span class="explainable" data-group="dang" data-term="">    </span>  //당령식
-//<span class="explainable" data-group="taegwa" data-term="">천을귀인</span>  //태과불급
+//<span class="explainable" data-group="taegwa" data-term="">   </span>  //태과불급
 
 export const TERM_HELP = {
 
@@ -157,6 +157,20 @@ export const TERM_HELP = {
     '': '',
     '': '',
     '': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '불투': '',
+    '多': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '': '',
+    '원인': '여러가지 현상이 발생하는 이유가 되는 글자(기운)',
+    '藥': '태과불급의 비정상적 현상을 개선하고 치료하는 약이되는 글자나 방식',
     '': '',
     '': '',
     '': '',
