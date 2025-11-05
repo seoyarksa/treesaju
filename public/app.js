@@ -2814,20 +2814,16 @@ if (formDate === todayKey && window.lastOutputData) {
 
 // === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
 // === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
+// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
 window.addEventListener('load', async () => {
   try {
-    const todayKey = new Date().toISOString().slice(0,10); // ex: 2025-11-03
-    const renderedKey = localStorage.getItem('autoRenderedDate');
-
-    // ✅ 이미 오늘 렌더링된 적이 있다면 스킵
-    if (renderedKey === todayKey) {
+    // ✅ 오늘 사주 이미 실행했는지 체크
+    if (sessionStorage.getItem('autoRenderedToday')) {
       console.log('[AUTO-RENDER] 이미 오늘 자동 사주 실행함 → 스킵');
       return;
     }
 
-    // ✅ 여기서 최초 실행으로 판단되면 키를 저장
-    localStorage.setItem('autoRenderedDate', todayKey);
-
+    // === 실행 로직 (기존 코드 그대로) ===
     const now = new Date();
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -2835,11 +2831,9 @@ window.addEventListener('load', async () => {
     const hour24 = now.getHours();
     const minute = now.getMinutes();
 
-    // 🕒 오전/오후 판정
     const ampm = hour24 < 12 ? 'AM' : 'PM';
-    const hour12 = hour24 % 12; // 0~11 범위
+    const hour12 = hour24 % 12;
 
-    // 요소가 모두 렌더될 때까지 대기 (SPA 대비)
     const waitFor = (sel) =>
       new Promise((resolve) => {
         const el = document.querySelector(sel);
@@ -2854,17 +2848,9 @@ window.addEventListener('load', async () => {
         obs.observe(document.body, { childList: true, subtree: true });
       });
 
-    await waitFor('#saju-form'); // 폼 준비 대기
-await waitFor("input[name='ampm']");
-    // === 입력값 자동 세팅 ===
-    document.getElementById('birth-date').value = `${yyyy}${mm}${dd}`;
-    document.getElementById('calendar-type').value = 'solar';
-    document.getElementById('gender').value = 'male';
-    document.querySelector(`input[name='ampm'][value='${ampm}']`).checked = true;
-    document.getElementById('hour-select').value = String(hour12);
-    document.getElementById('minute-select').value = String(minute);
+    await waitFor('#saju-form');
+    await waitFor("input[name='ampm']");
 
-    // === formData 구성 ===
     const todayForm = {
       name: '오늘 기준',
       birthDate: `${yyyy}${mm}${dd}`,
@@ -2877,16 +2863,14 @@ await waitFor("input[name='ampm']");
 
     console.log(`[AUTO] ${yyyy}-${mm}-${dd} ${ampm} ${hour12}:${minute} (양력/남자 기준)`);
 
-    // === 출력 실행 (카운트 제외) ===
     if (typeof renderSaju === 'function') {
       await renderSaju(todayForm);
-
-      // ✅ 출력 결과를 localStorage에 저장 (복원용)
-      localStorage.setItem('lastSajuForm', JSON.stringify(todayForm));
-      console.log('[AUTO] renderSaju 실행 완료 및 저장');
-    } else {
-      console.warn('⚠️ renderSaju 함수가 아직 정의되지 않았습니다.');
+      console.log('[AUTO] renderSaju 완료');
     }
+
+    // ✅ 실행 후 세션 플래그 저장 (다시 자동실행되지 않음)
+    sessionStorage.setItem('autoRenderedToday', '1');
+    console.log('[AUTO-RENDER] 플래그 저장 완료');
 
   } catch (err) {
     console.error('자동 사주 로딩 실패:', err);
