@@ -2201,9 +2201,9 @@ console.log("📦 1차 필터링 + 중복제거 결과:", firstList);
 
       return `
         <tr>
-          <td style="border:1px solid #ccc; padding:4px;">${구분}</td>
+          <td style="border:1px solid #ccc; padding:4px;"><span class="explainable" data-group="taegwa" data-term="">${구분}</span></td>
           <td style="border:1px solid #ccc; padding:4px;"><span style="color:red;">${원인}</span></td>
-          <td style="border:1px solid #ccc; padding:4px;"><strong>${tags}</strong></td>
+          <td style="border:1px solid #ccc; padding:4px;"><strong><span class="explainable" data-group="taegwa" data-term="">${tags}</span></strong></td>
           <td style="border:1px solid #ccc; padding:4px;">${조건}</td>
           <td style="border:1px solid #ccc; padding:4px;"><span style="color:blue;">${yakStr}</span></td>
         </tr>
