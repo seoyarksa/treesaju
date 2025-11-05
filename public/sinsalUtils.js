@@ -1374,21 +1374,21 @@ const allXGanji = maskedGanji.every(v => {
 // ✅ 각 표별로 독립적으로 줄 삭제
 const rowGan = shouldDeleteRow(maskedGan) ? '' : `
   <tr>
-    <td>${sinsalName}</td>
+    <td><span class="explainable" data-group="etcsinsal" data-term="">${sinsalName}</span></td>
     ${maskedGan.map(v => `<td>${v || ''}</td>`).join('')}
   </tr>
 `;
 
 const rowJiji = shouldDeleteRow(maskedJiji) ? '' : `
   <tr>
-    <td>${sinsalName}</td>
+    <td><span class="explainable" data-group="etcsinsal" data-term="">${sinsalName}</span></td>
     ${maskedJiji.map(v => `<td>${v || ''}</td>`).join('')}
   </tr>
 `;
 
 const rowGanji = shouldDeleteRow(maskedGanji) ? '' : `
   <tr>
-    <td style="text-align:center;">${sinsalName}</td>
+    <td><span class="explainable" data-group="etcsinsal" data-term="">${sinsalName}</span></td>
     ${maskedGanji.map(v => `<td>${v || ''}</td>`).join('')}
   </tr>
 `;
