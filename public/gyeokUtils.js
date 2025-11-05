@@ -1058,7 +1058,7 @@ export function renderhapshinTable() {
 
   // 윗줄 (각 항목에 색 적용)
   const headers = [
-    `<span style="color:${ROLE_COLOR_MAP["상신"]}">상신[${withGan(map.sangsin)}]</span>`,
+    `<span style="color:${ROLE_COLOR_MAP["상신"]}"; class="explainable" data-group="terms" data-term="상신">상신[${withGan(map.sangsin)}]</span>`,
     `<span style="color:${ROLE_COLOR_MAP["구신"]}">구신[${withGan(map.gusin)}]</span>`,
     `<span style="color:${ROLE_COLOR_MAP["기신1"]}">기신1[${withGan(map.gisin1)}]</span>`,
     `<span style="color:${ROLE_COLOR_MAP["기신2"]}">기신2[${withGan(map.gisin2)}]</span>`
