@@ -824,9 +824,12 @@ if (relation === '생') {
   return `
     <div style="display: grid; grid-template-columns: auto 30px auto 30px auto; grid-template-rows: repeat(8, auto); justify-content: center; align-items: center; font-family: monospace; font-size: 0.9rem; gap: 4px;">
       <!-- 기신1 -->
-      <div style="grid-column: 1 / 2; grid-row: 1; text-align: center;">
-        ${formatParsedYukshinList('기신1', gisin1ParsedArr, gisin1Stems, 'red')}
-      </div>
+<div style="grid-column: 1 / 2; grid-row: 1; text-align: center;">
+  <span class="explainable" data-group="terms" data-term="기신1">
+    기신1
+  </span>
+  ${formatParsedYukshinList('기신1', gisin1ParsedArr, gisin1Stems, 'red')}
+</div>
       <!-- 기신1 ↓ 상신 -->
    
 <div style="grid-column: 1 / 2; grid-row: 4; text-align: center;">
@@ -2112,7 +2115,7 @@ if (!normalizedSecondaryName || normalizedSecondaryName.trim() === "X") {
   </thead>
   <tbody>
     <tr>
-      <td style="padding:3px;background:#e6f0ff;">주격</td>
+      <td style="padding:3px;background:#e6f0ff;"><span class="explainable" data-group="terms" data-term="">주격</span></td>
       <td style="padding:3px;">${gyeokName || '-'}</td>
       <td style="padding:3px;">${mainGrade ? mainGrade.final : '-'}</td>
     <td style="padding:3px;">${mainRequired}</td>
@@ -2122,7 +2125,7 @@ if (!normalizedSecondaryName || normalizedSecondaryName.trim() === "X") {
       <td style="padding:3px;">${seongpaeMain}</td>
     </tr>
     <tr>
-      <td style="padding:3px;background:#e6f0ff;">보조격</td>
+      <td style="padding:3px;background:#e6f0ff;"><span class="explainable" data-group="terms" data-term="">보조격</span></td>
         <td style="padding:3px;">${rawSecondaryName}</td>
   <td style="padding:3px;">${secondaryGrade ? secondaryGrade.final : '-'}</td>
 <td style="padding:3px;">${secondaryRequired}</td>
