@@ -2817,13 +2817,16 @@ if (formDate === todayKey && window.lastOutputData) {
 // === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
 // === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
 // === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
+// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
 window.addEventListener('load', async () => {
   try {
-    if (sessionStorage.getItem('autoRenderedToday')) {
+    // 🔹 중복 방지: 오늘 날짜 기준으로 1회만 실행
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const already = localStorage.getItem('autoRenderedToday');
+    if (already === todayKey) {
       console.log('[AUTO-RENDER] 이미 오늘 자동 사주 실행함 → 스킵');
       return;
     }
-    sessionStorage.setItem('autoRenderedToday', '1');
 
     const now = new Date();
     const yyyy = now.getFullYear();
@@ -2832,32 +2835,56 @@ window.addEventListener('load', async () => {
     const hour24 = now.getHours();
     const minute = now.getMinutes();
 
+    // 🕒 오전/오후 판정
     const ampm = hour24 < 12 ? 'AM' : 'PM';
-    const hour12 = hour24 % 12;
+    const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
 
-    await new Promise((resolve) => {
-      const check = setInterval(() => {
-        if (document.querySelector('#saju-form')) {
-          clearInterval(check);
-          resolve();
-        }
-      }, 100);
-    });
+    // 요소가 모두 렌더될 때까지 대기 (SPA 대비)
+    const waitFor = (sel) =>
+      new Promise((resolve) => {
+        const el = document.querySelector(sel);
+        if (el) return resolve(el);
+        const obs = new MutationObserver(() => {
+          const e = document.querySelector(sel);
+          if (e) {
+            obs.disconnect();
+            resolve(e);
+          }
+        });
+        obs.observe(document.body, { childList: true, subtree: true });
+      });
 
-    document.getElementById('birth-date').value = `${yyyy}${mm}${dd}`;
-    document.getElementById('calendar-type').value = 'solar';
-    document.getElementById('gender').value = 'male';
+    await waitFor('#saju-form'); // 폼이 준비된 후 실행
 
-    // ✅ 추가: 라디오 버튼을 실제로 체크 표시 (이게 없으면 “오전/오후 선택하세요” 뜸)
+    // === 입력값 자동 세팅 ===
+    const birthInput = document.getElementById('birth-date');
+    if (birthInput) birthInput.value = `${yyyy}${mm}${dd}`;
+
+    const calendarSel = document.getElementById('calendar-type');
+    if (calendarSel) {
+      calendarSel.value = 'solar';
+      calendarSel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    const genderSel = document.getElementById('gender');
+    if (genderSel) {
+      genderSel.value = 'male';
+      genderSel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
     const ampmRadio = document.querySelector(`input[name='ampm'][value='${ampm}']`);
     if (ampmRadio) {
       ampmRadio.checked = true;
       ampmRadio.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    document.getElementById('hour-select').value = String(hour12);
-    document.getElementById('minute-select').value = String(minute);
+    const hourSel = document.getElementById('hour-select');
+    if (hourSel) hourSel.value = String(hour12);
 
+    const minSel = document.getElementById('minute-select');
+    if (minSel) minSel.value = String(minute);
+
+    // === formData 구성 ===
     const todayForm = {
       name: '오늘 기준',
       birthDate: `${yyyy}${mm}${dd}`,
@@ -2868,18 +2895,24 @@ window.addEventListener('load', async () => {
       minute: String(minute),
     };
 
-    
-
     console.log(`[AUTO] ${yyyy}-${mm}-${dd} ${ampm} ${hour12}:${minute} (양력/남자 기준)`);
 
+    // === 출력 실행 (카운트 제외) ===
     if (typeof renderSaju === 'function') {
       await renderSaju(todayForm);
       console.log('[AUTO] renderSaju 완료');
+
+      // 🔹 오늘 실행 플래그 저장 (중복 방지)
+      localStorage.setItem('autoRenderedToday', todayKey);
+      console.log('[AUTO-RENDER] 플래그 저장 완료');
+    } else {
+      console.warn('⚠️ renderSaju 함수가 아직 정의되지 않았습니다.');
     }
   } catch (err) {
     console.error('자동 사주 로딩 실패:', err);
   }
 });
+
 
 
 //탭이동시 이전자료 복원
