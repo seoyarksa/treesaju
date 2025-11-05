@@ -2848,12 +2848,7 @@ window.addEventListener('load', async () => {
     document.getElementById('calendar-type').value = 'solar';
     document.getElementById('gender').value = 'male';
 
-    // ✅ 추가: 라디오 버튼을 실제로 체크 표시 (이게 없으면 “오전/오후 선택하세요” 뜸)
-    const ampmRadio = document.querySelector(`input[name='ampm'][value='${ampm}']`);
-    if (ampmRadio) {
-      ampmRadio.checked = true;
-      ampmRadio.dispatchEvent(new Event('change', { bubbles: true }));
-    }
+
 
     document.getElementById('hour-select').value = String(hour12);
     document.getElementById('minute-select').value = String(minute);
