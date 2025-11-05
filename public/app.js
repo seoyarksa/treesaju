@@ -2855,7 +2855,7 @@ window.addEventListener('load', async () => {
       });
 
     await waitFor('#saju-form'); // 폼 준비 대기
-
+await waitFor("input[name='ampm']");
     // === 입력값 자동 세팅 ===
     document.getElementById('birth-date').value = `${yyyy}${mm}${dd}`;
     document.getElementById('calendar-type').value = 'solar';
