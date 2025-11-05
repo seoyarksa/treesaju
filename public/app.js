@@ -2812,10 +2812,7 @@ if (formDate === todayKey && window.lastOutputData) {
 }
 
 
-// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
-// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
-// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
-// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
+
 // === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
 window.addEventListener('load', async () => {
   try {
@@ -2847,11 +2844,15 @@ window.addEventListener('load', async () => {
     document.getElementById('birth-date').value = `${yyyy}${mm}${dd}`;
     document.getElementById('calendar-type').value = 'solar';
     document.getElementById('gender').value = 'male';
-
-
-
     document.getElementById('hour-select').value = String(hour12);
     document.getElementById('minute-select').value = String(minute);
+
+await waitFor('#saju-form');
+await waitFor('#birth-date');
+await waitFor('input[name="ampm"][value="AM"]');
+await waitFor('#gender');
+await waitFor('#calendar-type');
+
 
     const todayForm = {
       name: '오늘 기준',
