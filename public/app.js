@@ -5902,19 +5902,16 @@ window.addEventListener("beforeunload", () => {
         }
       }
 
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
-        if (!__reloading) {
-          __reloading = true;
-          if (window.location.hash) {
-            history.replaceState(null, "", window.location.pathname + window.location.search);
-          }
-          window.location.reload();
-        }
-        return;
-      }
-      updateAuthUI(newSession);
-    });
+       // ✅ 기존에는 SIGNED_IN / SIGNED_OUT 시 reload를 수행했음
+  //    이제는 reload 대신 updateAuthUI()만 호출하도록 변경
+  if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "TOKEN_REFRESHED") {
+    updateAuthUI(newSession);
+    return;
+  }
 
+  // ✅ 기타 이벤트는 단순 UI 갱신 (중복 대비)
+  updateAuthUI(newSession);
+});
     // ✅ 사주 기록 클릭 → 입력폼 채워넣기 + 출력
     document.addEventListener("click", async (e) => {
       if (e.target.classList.contains("saju-record-link")) {
