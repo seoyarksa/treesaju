@@ -2805,23 +2805,6 @@ if (formDate === todayKey && window.lastOutputData) {
         alert("요청 처리 중 오류가 발생했습니다.");
       }
     }
-
-
-localStorage.setItem("lastOutputData", JSON.stringify({
-  name: formData.name,
-  birthDate: formData.birthDate,
-  calendarType: formData.calendarType,
-  gender: formData.gender,
-  ampm: formData.ampm,
-  hour: formData.hour,
-  minute: formData.minute,
-  saju: window.saju || null,
-  gyeok: window.gyeok || null,
-}));
-
-
-
-
   } catch (err) {
     console.error("❌ handleSajuSubmit error:", err);
     alert("요청 처리 중 오류가 발생했습니다.");
@@ -5766,36 +5749,6 @@ async function renderUserProfile() {
 
 // === 초기화 (하나로 통합)
 document.addEventListener("DOMContentLoaded", async () => {
-
-   try {
-    const saved = JSON.parse(localStorage.getItem("lastOutputData") || "{}");
-    if (!saved || !saved.saju || !saved.gyeok) return;
-
-    console.log("[restore] 이전 사주 복원 시작:", saved.name);
-
-    // 입력값 복원
-    const nameInput = document.getElementById("customer-name");
-    if (nameInput) nameInput.value = saved.name || "";
-
-    // 전역 데이터 복원
-    window.saju = saved.saju;
-    window.gyeok = saved.gyeok;
-    window.sinsal = saved.sinsal;
-
-    // 출력 다시 렌더링
-    renderGyeokFlowStyled(saved.gyeok, saved.saju);
-    if (typeof rerenderSinsal === "function") rerenderSinsal();
-
-    // 미니 사주창 복원
-    if (typeof renderSajuMiniFromCurrentOutput === "function") {
-      renderSajuMiniFromCurrentOutput();
-    }
-
-    console.log("[restore] 복원 완료 ✅");
-  } catch (e) {
-    console.warn("[restore] 복원 실패:", e);
-  }
-
   try {
     console.log("[app] DOM ready");
 
@@ -5938,148 +5891,29 @@ window.addEventListener("beforeunload", () => {
     // SIGNED_OUT 때 구독 정리만 추가하면 좋아요.
 
     // ✅ 로그인 상태 변경 감시 (이중 새로고침 방지)
-   // ✅ 탭 고유 ID
+    let __reloading = false;
+    window.supabaseClient.auth.onAuthStateChange((event, newSession) => {
+      console.log("[AuthStateChange]", event);
 
-   // ──────────────────────────────
-// 🔍 새로고침 원인 추적 로그 전용
-// ──────────────────────────────
-window.addEventListener("storage", (e) => {
-  if (e.key && e.key.includes("supabase.auth.token")) {
-    console.warn("[STORAGE] Supabase auth token 변경 감지:", e);
-  }
-});
+      if (event === "SIGNED_OUT") {
+        if (window.__profileCh) {
+          try { window.supabaseClient.removeChannel(window.__profileCh); } catch (_) {}
+          window.__profileCh = null;
+        }
+      }
 
-window.addEventListener("focus", () => {
-  console.warn("[FOCUS] 창에 복귀");
-});
-window.addEventListener("blur", () => {
-  console.warn("[BLUR] 창에서 벗어남");
-});
-
-window.supabaseClient.auth.onAuthStateChange((event, session) => {
-  console.warn("[AUTH-EVENT]", event, {
-    fromTab: window.__returnFromAnotherTab,
-    sessionUser: session?.user?.id || "없음",
-  });
-});
-
-if (!sessionStorage.getItem("tabId")) {
-  sessionStorage.setItem("tabId", crypto.randomUUID());
-}
-const TAB_ID = sessionStorage.getItem("tabId");
-
-
-// ✅ Supabase 세션 감시 (리로드 안정화 버전)
-let __lastFocusedAt = Date.now();
-window.__returnFromAnotherTab = false;
-
-// 탭 포커스 추적
-window.addEventListener("focus", () => {
-  const now = Date.now();
-  if (now - __lastFocusedAt > 3000) {
-    console.log("[focus] 돌아옴 — autoReload OFF 모드");
-    window.__returnFromAnotherTab = true;
-  }
-  __lastFocusedAt = now;
-});
-window.addEventListener("blur", () => {
-  console.log("[BLUR] 창에서 벗어남");
-  __lastFocusedAt = Date.now();
-});
-
-// ✅ 상태 백업 함수
-function backupSajuState() {
-  try {
-    const backup = {
-      name: document.getElementById("customer-name")?.value || "",
-      saju: window.saju || null,
-      gyeok: window.gyeok || null,
-      sinsal: window.sinsal || null,
-      birthDate: window.birthDate || "",
-      gender: window.gender || "",
-      ampm: window.ampm || "",
-      hour: window.hour || "",
-      minute: window.minute || "",
-    };
-    localStorage.setItem("lastOutputData", JSON.stringify(backup));
-    console.log("[backup] 사주 상태 저장 완료:", backup);
-  } catch (e) {
-    console.warn("[backup] 실패:", e);
-  }
-}
-
-// ✅ 상태 복원 함수
-function restoreSajuState() {
-  try {
-    const saved = JSON.parse(localStorage.getItem("lastOutputData") || "{}");
-    if (!saved || !saved.saju || !saved.gyeok) return;
-
-    console.log("[restore] 이전 사주 복원 시작:", saved.name);
-    const nameInput = document.getElementById("customer-name");
-    if (nameInput) nameInput.value = saved.name || "";
-
-    window.saju = saved.saju;
-    window.gyeok = saved.gyeok;
-    window.sinsal = saved.sinsal;
-
-    renderGyeokFlowStyled(saved.gyeok, saved.saju);
-    if (typeof rerenderSinsal === "function") rerenderSinsal();
-    if (typeof renderSajuMiniFromCurrentOutput === "function") renderSajuMiniFromCurrentOutput();
-
-    console.log("[restore] 복원 완료 ✅");
-  } catch (e) {
-    console.warn("[restore] 복원 실패:", e);
-  }
-}
-
-// ✅ 페이지 로드 시 1회 복원 시도
-document.addEventListener("DOMContentLoaded", () => {
-  restoreSajuState();
-});
-
-// ✅ Supabase 인증 감시
-window.supabaseClient.auth.onAuthStateChange((event, session) => {
-  console.log("[AuthStateChange]", event, "returnFromAnotherTab:", window.__returnFromAnotherTab);
-
-  // 초기 로딩 시엔 절대 리로드 금지
-  if (event === "INITIAL_SESSION") {
-    updateAuthUI(session);
-    return;
-  }
-
-  if (event === "TOKEN_REFRESHED") {
-    updateAuthUI(session);
-    return;
-  }
-
-  if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
-    // 다른 탭에서 돌아온 경우
-    if (window.__returnFromAnotherTab) {
-      console.log("[AuthStateChange] 탭 복귀 감지 → reload 생략 (3초 후 복구)");
-      updateAuthUI(session);
-      setTimeout(() => {
-        console.log("[AuthStateChange] 복귀 모드 해제");
-        window.__returnFromAnotherTab = false;
-      }, 3000);
-      return;
-    }
-
-    // 일반적인 로그인/로그아웃 시 리로드 (단, 첫 로딩 이후에만)
-    console.log("[AuthStateChange] 리로드 전 백업 실행");
-    backupSajuState();
-
-    setTimeout(() => {
-      console.log("[AuthStateChange] 페이지 새로고침 실행");
-      window.location.reload();
-    }, 200);
-  }
-});
-
-
-
-
-
-
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+        if (!__reloading) {
+          __reloading = true;
+          if (window.location.hash) {
+            history.replaceState(null, "", window.location.pathname + window.location.search);
+          }
+          window.location.reload();
+        }
+        return;
+      }
+      updateAuthUI(newSession);
+    });
 
     // ✅ 사주 기록 클릭 → 입력폼 채워넣기 + 출력
     document.addEventListener("click", async (e) => {
