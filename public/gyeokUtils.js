@@ -826,9 +826,8 @@ if (relation === '생') {
       <!-- 기신1 -->
 <div style="grid-column: 1 / 2; grid-row: 1; text-align: center;">
   <span class="explainable" data-group="terms" data-term="기신1">
-    기신1
-  </span>
-  ${formatParsedYukshinList('기신1', gisin1ParsedArr, gisin1Stems, 'red')}
+     
+  ${formatParsedYukshinList('기신1', gisin1ParsedArr, gisin1Stems, 'red')}</span>
 </div>
       <!-- 기신1 ↓ 상신 -->
    
