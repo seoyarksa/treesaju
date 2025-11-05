@@ -2813,18 +2813,12 @@ if (formDate === todayKey && window.lastOutputData) {
 
 
 // === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
-// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
-// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
-// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
-// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
-// === 첫 로딩 시 오늘 날짜 기준 사주 자동 출력 (카운트 제외) ===
 window.addEventListener('load', async () => {
   try {
-    // 🔹 중복 방지: 오늘 날짜 기준으로 1회만 실행
+    // ✅ 하루 1회만 자동 실행 (기존 작동 유지)
     const todayKey = new Date().toISOString().slice(0, 10);
-    const already = localStorage.getItem('autoRenderedToday');
-    if (already === todayKey) {
-      console.log('[AUTO-RENDER] 이미 오늘 자동 사주 실행함 → 스킵');
+    if (localStorage.getItem('autoRenderedToday') === todayKey) {
+      console.log('[AUTO-RENDER] 오늘 이미 자동 실행됨 → 스킵');
       return;
     }
 
@@ -2837,7 +2831,7 @@ window.addEventListener('load', async () => {
 
     // 🕒 오전/오후 판정
     const ampm = hour24 < 12 ? 'AM' : 'PM';
-    const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+    const hour12 = hour24 % 12; // 0~11 범위
 
     // 요소가 모두 렌더될 때까지 대기 (SPA 대비)
     const waitFor = (sel) =>
@@ -2861,25 +2855,16 @@ window.addEventListener('load', async () => {
     if (birthInput) birthInput.value = `${yyyy}${mm}${dd}`;
 
     const calendarSel = document.getElementById('calendar-type');
-    if (calendarSel) {
-      calendarSel.value = 'solar';
-      calendarSel.dispatchEvent(new Event('change', { bubbles: true }));
-    }
+    if (calendarSel) calendarSel.value = 'solar';
 
     const genderSel = document.getElementById('gender');
-    if (genderSel) {
-      genderSel.value = 'male';
-      genderSel.dispatchEvent(new Event('change', { bubbles: true }));
-    }
+    if (genderSel) genderSel.value = 'male';
 
     const ampmRadio = document.querySelector(`input[name='ampm'][value='${ampm}']`);
-    if (ampmRadio) {
-      ampmRadio.checked = true;
-      ampmRadio.dispatchEvent(new Event('change', { bubbles: true }));
-    }
+    if (ampmRadio) ampmRadio.checked = true;
 
     const hourSel = document.getElementById('hour-select');
-    if (hourSel) hourSel.value = String(hour12);
+    if (hourSel) hourSel.value = String(hour12); // 반드시 문자열로 세팅
 
     const minSel = document.getElementById('minute-select');
     if (minSel) minSel.value = String(minute);
@@ -2900,11 +2885,49 @@ window.addEventListener('load', async () => {
     // === 출력 실행 (카운트 제외) ===
     if (typeof renderSaju === 'function') {
       await renderSaju(todayForm);
-      console.log('[AUTO] renderSaju 완료');
 
-      // 🔹 오늘 실행 플래그 저장 (중복 방지)
+      // 0.3초 후 lastOutputData 저장
+      setTimeout(() => {
+        const normalized = JSON.stringify({
+          name: '오늘 기준',
+          birthDate: `${yyyy}${mm}${dd}`,
+          calendarType: 'solar',
+          gender: 'male',
+          ampm,
+          hour: String(hour12),
+          minute: String(minute),
+        });
+
+        lastOutputData = normalized;
+        localStorage.setItem('lastSajuForm', normalized);
+        console.log('[AUTO] lastOutputData 저장 완료 (hour/minute 포함):', normalized);
+
+        // 저장 완료 후 버튼 다시 활성화
+        sajuBtn.disabled = false;
+      }, 300);
+
+      // === 버튼 상태도 '신살보기'로 세팅 ===
+      const sinsalBtn = document.getElementById('sinsalBtn');
+      const sajuBtn = document.getElementById('sajuSubmit');
+      sajuBtn?.classList.remove('active');
+      sinsalBtn?.classList.add('active');
+
+      // 내부 모드 변수 동기화 (있을 경우)
+      window.currentMode = 'sinsal';
+
+      // === 자동 로딩 입력값 정규화 후 저장 ===
+      if (typeof normalizeForm === 'function') {
+        const normalized = JSON.stringify(normalizeForm(todayForm));
+        window.lastOutputData = normalized;
+        localStorage.setItem('lastSajuForm', normalized);
+        console.log('[AUTO] 신살보기 모드 자동 출력 후 상태 동기화 완료');
+      } else {
+        console.warn('⚠️ normalizeForm 함수가 정의되어 있지 않습니다.');
+      }
+
+      // ✅ 자동 실행 완료 시 오늘 날짜 저장
       localStorage.setItem('autoRenderedToday', todayKey);
-      console.log('[AUTO-RENDER] 플래그 저장 완료');
+
     } else {
       console.warn('⚠️ renderSaju 함수가 아직 정의되지 않았습니다.');
     }
