@@ -2112,11 +2112,11 @@ if (!normalizedSecondaryName || normalizedSecondaryName.trim() === "X") {
     <tr style="background:#fff8dc;">
       <th style="padding:3px;">구분</th>
       <th style="padding:3px;">격이름</th>
-      <th style="padding:3px;">격등급</th>
-      <th style="padding:3px;">격의 요구조건</th>
-      <th style="padding:3px;">일간의 환경</th>
-      <th style="padding:3px;">勢비교</th>
-      <th style="padding:3px;">성패[최종]</th>
+      <th style="padding:3px;"><span class="explainable" data-group="terms" data-term="">격등급</span></th>
+      <th style="padding:3px;"><span class="explainable" data-group="terms" data-term="">격의 요구조건</span></th>
+      <th style="padding:3px;"><span class="explainable" data-group="terms" data-term="">일간의 환경</span></th>
+      <th style="padding:3px;"><span class="explainable" data-group="terms" data-term="">勢비교</span></th>
+      <th style="padding:3px;"><span class="explainable" data-group="terms" data-term="">성패</span>[최종]</th>
     </tr>
   </thead>
   <tbody>
