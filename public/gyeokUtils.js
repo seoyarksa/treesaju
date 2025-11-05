@@ -1038,6 +1038,9 @@ export function renderhapshinTable() {
   const dayGan    = window.saju?.dayGan;
   const gyeokName = window.gyeokName;
   const gyeokStem = window.gyeokStem;
+  const match = (gyeokName || '').match(/^([가-힣]+)\s*(\(.*\))?$/);
+const pureName = match ? match[1] : gyeokName;      // 예: "정인"
+const extraPart = match && match[2] ? match[2] : ''; // 예: "(갑목)"
 
   const normalizedName = (gyeokName || "")
     .trim()
@@ -1059,9 +1062,9 @@ export function renderhapshinTable() {
   // 윗줄 (각 항목에 색 적용)
   const headers = [
     `<span style="color:${ROLE_COLOR_MAP["상신"]}"; class="explainable" data-group="terms" data-term="상신">상신[${withGan(map.sangsin)}]</span>`,
-    `<span style="color:${ROLE_COLOR_MAP["구신"]}">구신[${withGan(map.gusin)}]</span>`,
-    `<span style="color:${ROLE_COLOR_MAP["기신1"]}">기신1[${withGan(map.gisin1)}]</span>`,
-    `<span style="color:${ROLE_COLOR_MAP["기신2"]}">기신2[${withGan(map.gisin2)}]</span>`
+    `<span style="color:${ROLE_COLOR_MAP["구신"]}"; class="explainable" data-group="terms" data-term="구신">구신[${withGan(map.gusin)}]</span>`,
+    `<span style="color:${ROLE_COLOR_MAP["기신1"]}"; class="explainable" data-group="terms" data-term="기신1">기신1[${withGan(map.gisin1)}]</span>`,
+    `<span style="color:${ROLE_COLOR_MAP["기신2"]}"; class="explainable" data-group="terms" data-term="기신2">기신2[${withGan(map.gisin2)}]</span>`
   ];
 
   // 합신 (격 포함 5개)
@@ -1077,7 +1080,12 @@ export function renderhapshinTable() {
     <table style="border-collapse: collapse; width:100%; margin-top:0; font-size:0.75rem; text-align:center;">
       <tr>
         <td style="border:1px solid #ccc; padding:2px; width:6%;background:#e6f0ff;">기준</td>
-        <td style="border:1px solid #ccc; padding:2px; width:14%; color:${ROLE_COLOR_MAP["격"]};font-weight:bold; background:#e6f0ff;"><span class="explainable" data-group="gyeokook" data-term="">${gyeokName}</span></td>
+          <td style="border:1px solid #ccc; padding:2px; width:14%; color:${ROLE_COLOR_MAP["격"]};
+             font-weight:bold; background:#e6f0ff;">
+    <span class="explainable" data-group="gyeokook" data-term="${pureName}">
+      ${pureName}
+    </span>${extraPart}
+  </td>
         ${headers.map(h => `<td style="border:1px solid #ccc; padding:2px;background:#e6f0ff;">${h}</td>`).join("")}
       </tr>
 
