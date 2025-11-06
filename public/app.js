@@ -5622,7 +5622,7 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
     <table class="mini-grid">
       <thead>
         <tr>
-          <th>시주</th><th>일주</th><th>월주</th><th>년주</th><th>大</th><th>世</th>
+          <th>시주</th><th>일주</th><th>월주</th><th>년주</th><th>大運</th><th>世運</th>
         </tr>
       </thead>
       <tbody>
