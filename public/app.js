@@ -5734,6 +5734,59 @@ console.log('[mini:init] selected=', window.selectedDaewoon, window.selectedSewo
 ['mini-daeyun-hides','mini-sewoon-hides'].forEach(id => console.log('[mini:cell]', id, !!document.getElementById(id)));
 
 
+
+// === [최종 보정] 대/세 지장간 칩을 끝까지 유지 ===
+(function miniFinalFillAndKeep(){
+  const MAP   = window.HanhiddenStemsMap || {};
+  const base  = window.dayGanKorGan || '';
+  const h2k   = (typeof _convertHanToKorStem === 'function' ? _convertHanToKorStem
+               : (window.convertHanToKorStem || (s=>s)));
+  const getTG = (typeof _getTenGod === 'function' ? _getTenGod : window.getTenGod) || null;
+
+  function makeChips(ji){
+    const arr = (MAP && MAP[ji]) || [];
+    if (!arr.length) return '-';
+    return arr.map(han=>{
+      const ten = (getTG && base) ? (getTG(base, h2k(han)) || '') : '';
+      return `<span class="saju-chip">(${han}${ten ? ' ' + ten : ''})</span>`;
+    }).join('');
+  }
+
+  function extract(prefix){
+    const gtxt = document.getElementById(`${prefix}-gan`)?.textContent || '';
+    const jtxt = document.getElementById(`${prefix}-ji`)?.textContent  || '';
+    const gan  = (gtxt.match(/[甲乙丙丁戊己庚辛壬癸]/)||[])[0] || '';
+    const ji   = (jtxt.match(/[子丑寅卯辰巳午未申酉戌亥]/)||[])[0] || '';
+    return { gan, ji };
+  }
+
+  function applyOnce(){
+    const d = extract('mini-daeyun');
+    const s = extract('mini-sewoon');
+    const dEl = document.getElementById('mini-daeyun-hides');
+    const sEl = document.getElementById('mini-sewoon-hides');
+    if (dEl && d.ji) dEl.innerHTML = makeChips(d.ji);
+    if (sEl && s.ji) sEl.innerHTML = makeChips(s.ji);
+  }
+
+  // 1) 지금 한 번
+  applyOnce();
+  // 2) 렌더 끝난 뒤 다시 한 번(덮어쓰는 코드 이후)
+  requestAnimationFrame(applyOnce);
+  setTimeout(applyOnce, 0);
+  setTimeout(applyOnce, 120);
+
+  // 3) 이후 클릭으로 값 바뀔 때도 보정
+  window.sajuMini = window.sajuMini || {};
+  const prevD = window.sajuMini.setDaeyun;
+  const prevS = window.sajuMini.setSewoon;
+  function wrapApply(fn){ return function(){ fn && fn.apply(this, arguments); applyOnce(); }; }
+  window.sajuMini.setDaeyun = wrapApply(prevD);
+  window.sajuMini.setSewoon = wrapApply(prevS);
+})();
+
+
+
 // === [폴백] 대/세 셀에서 간/지 추출 → 지장간 칩 채우기 ===
 (function miniFillFromCellsWhenNoSelection(){
   // 1) 간/지 한자 추출기
