@@ -5498,45 +5498,48 @@ requestAnimationFrame(() => {
   }
 
 
+//미니창 시작///////////////////////////////
+// ──────────────────────────────────────────────────────────
+// Mini Saju: Clean, Single-Block Implementation
+// ──────────────────────────────────────────────────────────
 
-// ─── 미니 사주창: CSS 주입 ───
+// 1) CSS (once)
 (function injectMiniSajuCSS(){
   if (document.getElementById('mini-saju-style')) return;
   const s = document.createElement('style');
   s.id = 'mini-saju-style';
   s.textContent = `
-    #saju-mini {
-      position: fixed; right: 16px; bottom: 16px; z-index: 9999;
-      width: 300px; max-width: calc(100vw - 24px);
+    #saju-mini{
+      position:fixed; right:16px; bottom:16px; z-index:2147483647;
+      width: 360px; max-width: calc(100vw - 24px);
       background:#fff; border:1px solid #e5e5ea; border-radius:12px;
-      box-shadow:0 10px 30px rgba(0,0,0,.18); overflow:hidden; font-size:14px;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
+      box-shadow:0 10px 30px rgba(0,0,0,.18); overflow:hidden;
+      font-size:14px; font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif;
     }
-    #saju-mini .bar { display:flex; align-items:center; justify-content:space-between;
-      padding:8px 10px; background:linear-gradient(180deg,#f7f7f9,#efeff3); border-bottom:1px solid #ececf1;
-    }
-    #saju-mini .body { max-height:260px; overflow:auto; padding:10px; }
-    #saju-mini table { width:100%; border-collapse:collapse; }
-    #saju-mini th, #saju-mini td { border-bottom:1px solid #f3f3f6; padding:4px 6px; text-align:left; vertical-align:top; }
-    #saju-mini th { width:3.5em; color:#666; font-weight:600; }
-    #saju-mini small { color:#777; }
-    #saju-mini .chip { display:inline-block; padding:2px 6px; border:1px solid #eee; border-radius:6px; margin:2px 2px 0 0; background:#fbfbfe; }
-    #saju-mini .btn { border:0; background:#f1f1f6; width:24px; height:24px; border-radius:6px; cursor:pointer; font-size:14px; line-height:1; }
-    #saju-mini .btn:hover { background:#e9e9f2; }
-    #saju-mini.is-min .body { display:none; }
+    #saju-mini .saju-mini__bar{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;
+      background:linear-gradient(180deg,#f7f7f9,#efeff3); border-bottom:1px solid #ececf1; cursor:grab; user-select:none;}
+    #saju-mini .saju-mini__body{max-height:260px; overflow:auto; padding:10px;}
+    #saju-mini table{width:100%; border-collapse:collapse;}
+    #saju-mini th,#saju-mini td{border-bottom:1px solid #f3f3f6; padding:4px 6px; text-align:center; vertical-align:top;}
+    #saju-mini small{color:#666;}
+    #saju-mini .saju-chip{display:inline-block; padding:1px 4px; border:1px solid #eee; border-radius:6px; margin:2px 2px 0 0; background:#fbfbfe; font-size:11px;}
+    #saju-mini .btn{border:0; background:#f1f1f6; width:24px; height:24px; border-radius:6px; cursor:pointer; font-size:14px; line-height:1;}
+    #saju-mini .btn:hover{background:#e9e9f2;}
+    #saju-mini.is-min .saju-mini__body{display:none;}
+    #saju-mini.is-dragging, #saju-mini.is-dragging * { cursor:grabbing !important; user-select:none; }
   `;
   document.head.appendChild(s);
 })();
 
-// ─── 미니 사주창: 렌더러 ───
+// 2) Renderer
 function renderSajuMiniFromCurrentOutput(ctx = {}) {
-  // 1) 의존 함수(없으면 안전 폴백)
+  // deps
   const _getTenGod           = ctx.getTenGod           || window.getTenGod           || (() => '');
   const _convertHanToKorStem = ctx.convertHanToKorStem || window.convertHanToKorStem || (x => x);
   const _convertKorToHanStem = ctx.convertKorToHanStem || window.convertKorToHanStem || (x => x);
   const _colorize            = ctx.colorize            || window.colorize            || (x => x);
 
-  // 2) 데이터 (ctx → window)
+  // data
   const timeGanji  = ctx.timeGanji  || window.timeGanji;
   const dayGanji   = ctx.dayGanji   || window.dayGanji;
   const monthGanji = ctx.monthGanji || window.monthGanji;
@@ -5549,13 +5552,8 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
 
   const dayGanKorGan = ctx.dayGanKorGan || window.dayGanKorGan || '';
 
-  // (필수 값 없으면 그만)
-  if (!dayGanji || !monthGanji || !yearGanji || !timeGanji) {
-    console.warn('[mini] pillars missing — skip render');
-    return;
-  }
+  if (!dayGanji || !monthGanji || !yearGanji || !timeGanji) return;
 
-  // 3) 표 데이터 가공
   const data = {
     hour:  { gan: timeGanji.gan,  ten: _getTenGod(dayGanKorGan, _convertHanToKorStem(timeGanji.gan)),  jiji: timeGanji.ji,  hides: timeLines.map(s  => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
     day:   { gan: dayGanji.gan,   ten: '일간',                                                         jiji: dayGanji.ji,   hides: dayLines.map(s   => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
@@ -5563,729 +5561,279 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
     year:  { gan: yearGanji.gan,  ten: _getTenGod(dayGanKorGan, _convertHanToKorStem(yearGanji.gan)),  jiji: yearGanji.ji,  hides: yearLines.map(s  => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
   };
 
-  // 4) 제목 세터 (항상 #customer-name을 읽어 표시)
-  const setMiniTitle = (label = 'setMiniTitle') => {
-    // id로 먼저 찾고, 없으면 .bar strong으로 폴백
+  // title setter
+  const setMiniTitle = () => {
     let titleEl = document.querySelector('#saju-mini #saju-mini-title')
-    || document.querySelector('#saju-mini .saju-mini__bar strong') // ← 이 줄 추가
+               || document.querySelector('#saju-mini .saju-mini__bar strong')
                || document.querySelector('#saju-mini .bar strong');
-    if (!titleEl) {
-      console.warn(`[mini:title] ${label} → title 요소 없음`);
-      return;
-    }
-
+    if (!titleEl) return;
     const inputEl = document.getElementById('customer-name');
     const v1 = inputEl?.value ?? '';
     const v2 = inputEl?.getAttribute?.('value') ?? '';
     const v3 = window.customerName ?? '';
     const v4 = (typeof ctx.customerName === 'string' ? ctx.customerName : (ctx.name || ''));
-
-    const raw = (v1 || v2 || v3 || v4 || '');
-    const name = raw.trim();
-
+    const name = (v1 || v2 || v3 || v4 || '').trim();
     titleEl.textContent = name ? `사주팔자[드래그시 위치이동가능](${name})` : '사주팔자[드래그시 위치이동가능]';
-
-    // 디버깅 로그(필요 없으면 주석 처리해도 됨)
-    console.log('[mini:title]', { label, value:v1, attr:v2, win:v3, ctx:v4, decided:name, text:titleEl.textContent });
   };
 
-
-  // ── (추가) 미니 컨텍스트 공유: 본 렌더에서 쓰는 의존성 그대로 노출 ──
-window.__miniCtx = {
-  getTenGod:           _getTenGod,
-  convertHanToKorStem: _convertHanToKorStem,
-  convertKorToHanStem: _convertKorToHanStem,
-  dayGanKorGan:        dayGanKorGan || window.dayGanKorGan || '',
-  // 지장간 맵은 있으면 사용(없어도 안전)
-  jijiToSibganMap:     window.jijiToSibganMap || {},
-};
-
-
-
-  // 5) CSS 1회 주입
-  if (!document.getElementById('mini-saju-style')) {
-    const s = document.createElement('style');
-    s.id = 'mini-saju-style';
-    s.textContent = `
-      #saju-mini{position:fixed;right:16px;bottom:16px;z-index:9999;width:300px;max-width:calc(100vw - 24px);
-        background:#fff;border:1px solid #e5e5ea;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);overflow:hidden;
-        font-size:12px;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif;}
-      #saju-mini .bar{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:linear-gradient(180deg,#f7f7f9,#efeff3);
-        border-bottom:1px solid #ececf1;}
-      #saju-mini .body{max-height:260px;overflow:auto;padding:10px;}
-      #saju-mini table{width:100%;border-collapse:collapse;}
-      #saju-mini th,#saju-mini td{border-bottom:1px solid #f3f3f6;padding:4px 6px;text-align:left;vertical-align:top;}
-      #saju-mini th{color:#666;font-weight:600;}
-      #saju-mini small{color:#777;}
-      #saju-mini .saju-chip{display:inline-block;padding:1px 4px;border:1px solid #eee;border-radius:6px;margin:2px 2px 0 0;background:#fbfbfe;font-size:11px;}
-      #saju-mini .btn{border:0;background:#f1f1f6;width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:14px;line-height:1;}
-      #saju-mini .btn:hover{background:#e9e9f2;}
-      #saju-mini.is-min .body{display:none;}
-    `;
-    document.head.appendChild(s);
-  }
-
-  // 6) 박스 생성(없으면 만들고, 있으면 재사용)
+  // ensure box
   let box = document.getElementById('saju-mini');
   if (!box) {
     box = document.createElement('div');
-// 박스 생성할 때 (네 코드의 box.innerHTML 부분 교체)
-box.id = 'saju-mini';
-box.className = 'saju-mini';
-box.innerHTML = `
-  <div class="saju-mini__bar">   <!-- 드래그 핸들 -->
-    <strong id="saju-mini-title">사주팔자 미니창</strong>
-    <div class="saju-mini__actions">
-      <button class="btn" id="saju-mini-min" title="접기">—</button>
-      <button class="btn" id="saju-mini-close" title="닫기">×</button>
-    </div>
-  </div>
-  <div class="saju-mini__body" id="saju-mini-body"></div>
-`;
-
-    // (중요) DOM에 붙인 다음 제목 세팅
+    box.id = 'saju-mini';
+    box.innerHTML = `
+      <div class="saju-mini__bar">
+        <strong id="saju-mini-title">사주팔자</strong>
+        <div class="saju-mini__actions">
+          <button class="btn" id="saju-mini-min" title="접기">—</button>
+          <button class="btn" id="saju-mini-close" title="닫기">×</button>
+        </div>
+      </div>
+      <div class="saju-mini__body" id="saju-mini-body"></div>
+    `;
     document.body.appendChild(box);
-    setMiniTitle('after-append');
-
-    // 버튼 바인딩
+    setMiniTitle();
     box.querySelector('#saju-mini-min')?.addEventListener('click', () => box.classList.toggle('is-min'));
     box.querySelector('#saju-mini-close')?.addEventListener('click', () => box.remove());
-
-    // 고객명 입력 변화 감지(1회만 연결)
     if (!window.__miniTitleWired) {
       const input = document.getElementById('customer-name');
       if (input) {
-        input.addEventListener('input',  () => setMiniTitle('input'));
-        input.addEventListener('change', () => setMiniTitle('change'));
-      } else {
-        console.warn('[mini:title] #customer-name 없음 → 입력 이벤트 연결 보류');
+        input.addEventListener('input',  setMiniTitle);
+        input.addEventListener('change', setMiniTitle);
       }
       window.__miniTitleWired = true;
     }
-  } else {
-    // 혹시 예전 마크업이라 id 빠졌으면 복구
-    if (!box.querySelector('#saju-mini-title')) {
-      const strong = box.querySelector('.bar strong');
-      if (strong) strong.id = 'saju-mini-title';
-    }
   }
 
- // 7) 본문 표 렌더 (+ 대운/세운을 사주칸과 같은 형식으로)
-const body = box.querySelector('#saju-mini-body');
-const C = (txt) => (typeof _colorize === 'function' ? _colorize(txt) : (txt ?? ''));
+  // table
+  const body = box.querySelector('#saju-mini-body');
+  const C = (txt) => (typeof _colorize === 'function' ? _colorize(txt) : (txt ?? ''));
+  const coerceCol = (p) => (!p || typeof p !== 'object')
+    ? { gan:'-', ten:'', jiji:'-', hides:[] }
+    : { gan: p.gan ?? '-', ten: p.ten ?? '', jiji: p.jiji ?? '-', hides: Array.isArray(p.hides) ? p.hides : [] };
+  const pillars = [data.hour, data.day, data.month, data.year].map(coerceCol);
 
-const coerceCol = (p) => (!p || typeof p !== 'object')
-  ? { gan:'-', ten:'', jiji:'-', hides:[] }
-  : { gan: p.gan ?? '-', ten: p.ten ?? '', jiji: p.jiji ?? '-', hides: Array.isArray(p.hides) ? p.hides : [] };
-
-const pillars = [data.hour, data.day, data.month, data.year].map(coerceCol);
-
-// 저장된 大/世 객체 {gan, ji, ten} (연도 같은 건 저장하지 않음)
-const MINI_DAEYUN_KEY = 'sajuMiniSelDaeyun_v2';
-const MINI_SEWOON_KEY = 'sajuMiniSelSewoon_v2';
-function __miniLoadSel(key){
-  try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch { return {}; }
-}
-const D = __miniLoadSel(MINI_DAEYUN_KEY);
-const S = __miniLoadSel(MINI_SEWOON_KEY);
-
-const Dgan = D?.gan || '-';
-const Dten = D?.ten ? ` <small>(${C(D.ten)})</small>` : '';
-const Dji  = D?.ji  || '-';
-
-const Sgan = S?.gan || '-';
-const Sten = S?.ten ? ` <small>(${C(S.ten)})</small>` : '';
-const Sji  = S?.ji  || '-';
-
-// 렌더
-body.innerHTML = `
-  <table class="mini-grid">
-    <thead>
-      <tr>
-        <th>시주</th>
-        <th>일주</th>
-        <th>월주</th>
-        <th>년주</th>
-        <th>大</th>
-        <th>世</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        ${pillars.map(p => `<td><strong>${C(p.gan)}</strong>${p.ten ? ` <small>(${C(p.ten)})</small>` : ''}</td>`).join('')}
-        <td id="mini-daeyun-gan"><strong>${C(Dgan)}</strong>${Dten}</td>
-        <td id="mini-sewoon-gan"><strong>${C(Sgan)}</strong>${Sten}</td>
-      </tr>
-      <tr>
-        ${pillars.map(p => `<td><strong>${C(p.jiji)}</strong></td>`).join('')}
-        <td id="mini-daeyun-ji"><strong>${C(Dji)}</strong></td>
-        <td id="mini-sewoon-ji"><strong>${C(Sji)}</strong></td>
-      </tr>
-      <tr>
-        ${pillars.map(p => `<td>${p.hides.length ? p.hides.map(h => `<span class="saju-chip">(${h})</span>`).join('') : '-'}</td>`).join('')}
-        <td id="mini-daeyun-hides">-</td>
-        <td id="mini-sewoon-hides">-</td>
-      </tr>
-    </tbody>
-  </table>
-`;
-console.log('[mini:init] mapKeys=', Object.keys(window.HanhiddenStemsMap||{}));
-console.log('[mini:init] selected=', window.selectedDaewoon, window.selectedSewoon);
-['mini-daeyun-hides','mini-sewoon-hides'].forEach(id => console.log('[mini:cell]', id, !!document.getElementById(id)));
-
-
-
-// === [최종 보정] 대/세 지장간 칩을 끝까지 유지 ===
-(function miniFinalFillAndKeep(){
-  const MAP   = window.HanhiddenStemsMap || {};
-  const base  = window.dayGanKorGan || '';
-  const h2k   = (typeof _convertHanToKorStem === 'function' ? _convertHanToKorStem
-               : (window.convertHanToKorStem || (s=>s)));
-  const getTG = (typeof _getTenGod === 'function' ? _getTenGod : window.getTenGod) || null;
-
-  function makeChips(ji){
-    const arr = (MAP && MAP[ji]) || [];
-    if (!arr.length) return '-';
-    return arr.map(han=>{
-      const ten = (getTG && base) ? (getTG(base, h2k(han)) || '') : '';
-      return `<span class="saju-chip">(${han}${ten ? ' ' + ten : ''})</span>`;
-    }).join('');
-  }
-
-  function extract(prefix){
-    const gtxt = document.getElementById(`${prefix}-gan`)?.textContent || '';
-    const jtxt = document.getElementById(`${prefix}-ji`)?.textContent  || '';
-    const gan  = (gtxt.match(/[甲乙丙丁戊己庚辛壬癸]/)||[])[0] || '';
-    const ji   = (jtxt.match(/[子丑寅卯辰巳午未申酉戌亥]/)||[])[0] || '';
-    return { gan, ji };
-  }
-
-  function applyOnce(){
-    const d = extract('mini-daeyun');
-    const s = extract('mini-sewoon');
-    const dEl = document.getElementById('mini-daeyun-hides');
-    const sEl = document.getElementById('mini-sewoon-hides');
-    if (dEl && d.ji) dEl.innerHTML = makeChips(d.ji);
-    if (sEl && s.ji) sEl.innerHTML = makeChips(s.ji);
-  }
-
-  // 1) 지금 한 번
-  applyOnce();
-  // 2) 렌더 끝난 뒤 다시 한 번(덮어쓰는 코드 이후)
-  requestAnimationFrame(applyOnce);
-  setTimeout(applyOnce, 0);
-  setTimeout(applyOnce, 120);
-
-  // 3) 이후 클릭으로 값 바뀔 때도 보정
-  window.sajuMini = window.sajuMini || {};
-  const prevD = window.sajuMini.setDaeyun;
-  const prevS = window.sajuMini.setSewoon;
-  function wrapApply(fn){ return function(){ fn && fn.apply(this, arguments); applyOnce(); }; }
-  window.sajuMini.setDaeyun = wrapApply(prevD);
-  window.sajuMini.setSewoon = wrapApply(prevS);
-})();
-
-
-
-// === [폴백] 대/세 셀에서 간/지 추출 → 지장간 칩 채우기 ===
-(function miniFillFromCellsWhenNoSelection(){
-  // 1) 간/지 한자 추출기
-  const STEM_RE   = /[甲乙丙丁戊己庚辛壬癸]/;
-  const BRANCH_RE = /[子丑寅卯辰巳午未申酉戌亥]/;
-
-  function extractGanJi(prefix){
-    const gtxt = document.getElementById(`${prefix}-gan`)?.textContent || "";
-    const jtxt = document.getElementById(`${prefix}-ji`)?.textContent  || "";
-    const gan  = (gtxt.match(STEM_RE)||[])[0] || "";
-    const ji   = (jtxt.match(BRANCH_RE)||[])[0] || "";
-    return { gan, ji };
-  }
-
-  // 2) 지장간 칩 생성(HanhiddenStemsMap 사용)
-function makeHides(jiHan){
-  const map = window.HanhiddenStemsMap || {};
-  const arr = map[jiHan] || [];
-  if (!arr.length) return "-";
-
-  // ★ 십신 계산 준비: _getTenGod / _convertHanToKorStem 우선 사용 + 폴백 맵
-  const getTenGod = (typeof _getTenGod === "function" ? _getTenGod : window.getTenGod) || null;
-  const STEM_H2K = { '甲':'갑','乙':'을','丙':'병','丁':'정','戊':'무','己':'기','庚':'경','辛':'신','壬':'임','癸':'계' };
-  const h2k = (typeof _convertHanToKorStem === "function" ? _convertHanToKorStem
-             : (window.convertHanToKorStem || (s => STEM_H2K[s] || s)));
-  const base = window.dayGanKorGan || "";
-
-  return arr.map(han => {
-    const ten = (getTenGod && base) ? (getTenGod(base, h2k(han)) || "") : "";
-    return `<span class="saju-chip">(${han}${ten ? " " + ten : ""})</span>`;
-  }).join("");
-}
-
-
-  // 3) 적용
-  function apply(prefix, gan, ji){
-    // 간(+십신) 보정: 표에 이미 있으니 건드리지 않고, 지장간만 채움
-    const hEl = document.getElementById(`${prefix}-hides`);
-    if (!hEl) return;
-    hEl.innerHTML = ji ? makeHides(ji) : "-";
-  }
-
-  // 4) 선택값이 비어 있으면 셀에서 추출해서 채우기
-  const dSel = window.selectedDaewoon || {};
-  const sSel = window.selectedSewoon  || {};
-
-  if (!dSel.stem || !dSel.branch) {
-    const { gan, ji } = extractGanJi("mini-daeyun");
-    if (gan && ji) apply("mini-daeyun", gan, ji);
-  }
-  if (!sSel.stem || !sSel.branch) {
-    const { gan, ji } = extractGanJi("mini-sewoon");
-    if (gan && ji) apply("mini-sewoon", gan, ji);
-  }
-  console.log('[mini:filled-from-cells]',
-  document.getElementById('mini-daeyun-hides')?.innerText,
-  document.getElementById('mini-sewoon-hides')?.innerText);
-
-})();
-
-
-
-/* ===== 미니 大/世 출력 — 단일/최소 버전 ===== */
-(function miniApplyDaSe(){
-  // 필요 자원 (이미 위에서 쓰는 걸 그대로 사용)
-
-  const getTenGod    = _getTenGod || window.getTenGod || null;
-  const han2korStem  = _convertHanToKorStem || window.convertHanToKorStem || (s=>s);
-  const dayKor       = (typeof dayGanKorGan !== 'undefined' ? dayGanKorGan : window.dayGanKorGan) || '';
-
-  // 칩 HTML 생성 (지장간 한자 배열 → 칩)
-function makeHides(jiHan){
-  console.log('[mini:makeHides] ji=', jiHan, 'arr=', (window.HanhiddenStemsMap||{})[jiHan]);
-
-  const map = window.HanhiddenStemsMap;            // ★ 매 호출마다 최신 전역 참조
-  const arr = map && map[jiHan] ? map[jiHan] : []; // 키는 한자 지지(예: '戌','巳')
-  if (!arr.length) return '-';
-  return arr.map(hanStem=>{
-    const ten = (getTenGod && dayKor) ? (getTenGod(dayKor, han2korStem(hanStem)) || '') : '';
-    return `<span class="saju-chip">(${hanStem}${ten ? ' ' + ten : ''})</span>`;
-  }).join('');
-}
-
-
-  // 한 번에 반영
-  function apply(prefix, stemHan, jiHan){
-    // 1) 간(+십신)
-    const ten = (getTenGod && dayKor) ? (getTenGod(dayKor, han2korStem(stemHan)) || '') : '';
-    const elG = document.getElementById(`${prefix}-gan`);
-    if (elG) elG.innerHTML = `<strong>${stemHan || '-'}</strong>${ten ? ` <small>(${ten})</small>` : ''}`;
-
-    // 2) 지지
-    const elJ = document.getElementById(`${prefix}-ji`);
-    if (elJ) elJ.innerHTML = `<strong>${jiHan || '-'}</strong>`;
-
-    // 3) 지장간 칩
-    const elH = document.getElementById(`${prefix}-hides`);
-    if (elH) elH.innerHTML = jiHan ? (makeHides(jiHan) || '-') : '-';
-    console.log('[mini:apply]', prefix, {gan:stemHan, ji:jiHan, html: document.getElementById(`${prefix}-hides`)?.innerHTML});
-
-  }
-
-  // 초기 채우기: 선택값 우선 → 없으면 localStorage 값(D/S) 사용
   const MINI_DAEYUN_KEY = 'sajuMiniSelDaeyun_v2';
   const MINI_SEWOON_KEY = 'sajuMiniSelSewoon_v2';
-  const D = (window.selectedDaewoon && window.selectedDaewoon.stem && window.selectedDaewoon.branch)
-              ? window.selectedDaewoon
-              : (JSON.parse(localStorage.getItem(MINI_DAEYUN_KEY) || '{}'));
-  const S = (window.selectedSewoon && window.selectedSewoon.stem && window.selectedSewoon.branch)
-              ? window.selectedSewoon
-              : (JSON.parse(localStorage.getItem(MINI_SEWOON_KEY) || '{}'));
+  const D = (JSON.parse(localStorage.getItem(MINI_DAEYUN_KEY) || '{}')) || {};
+  const S = (JSON.parse(localStorage.getItem(MINI_SEWOON_KEY) || '{}')) || {};
 
-  if (D?.stem && D?.branch) apply('mini-daeyun', D.stem, D.branch);
-  if (S?.stem && S?.branch) apply('mini-sewoon', S.stem, S.branch);
-
-  // 클릭 시에도 간단히 갱신: 기존 setter 있으면 유지하고, 없으면 만들어서 쓰기
-  window.sajuMini = window.sajuMini || {};
-  const prevD = window.sajuMini.setDaeyun;
-  const prevS = window.sajuMini.setSewoon;
-
-  // "丙戌" / 분리 인자 모두 지원
-  const STEMS = '甲乙丙丁戊己庚辛壬癸'.split('');
-  const BR    = '子丑寅卯辰巳午未申酉戌亥'.split('');
-  function parseGanJi(a,b){
-    if (b != null) return {gan:String(a||''), ji:String(b||'')};
-    const s=String(a||''); 
-    return { gan: STEMS.find(ch=>s.includes(ch))||'', ji: BR.find(ch=>s.includes(ch))||'' };
-  }
-
-  window.sajuMini.setDaeyun = function(a,b){
-    console.log('[mini:setDaeyun]', a, b);
-    const { gan, ji } = parseGanJi(a,b);
-    if (prevD) prevD.apply(this, arguments);
-    if (gan && ji) {
-      apply('mini-daeyun', gan, ji);
-      try { localStorage.setItem(MINI_DAEYUN_KEY, JSON.stringify({ gan, ji })); } catch {}
-    }
-  };
-
-  window.sajuMini.setSewoon = function(a,b){
-    console.log('[mini:setSewoon]', a, b);
-    const { gan, ji } = parseGanJi(a,b);
-    if (prevS) prevS.apply(this, arguments);
-    if (gan && ji) {
-      apply('mini-sewoon', gan, ji);
-      try { localStorage.setItem(MINI_SEWOON_KEY, JSON.stringify({ gan, ji })); } catch {}
-    }
-  };
-})();
-
-
-
-
-// === [미니창 패치] 대운/세운도 사주와 동일 포맷으로 표시 ===
-// 미니창이 이미 들고 있는 계산기들을 그대로 공유
-window.__miniCalc = {
-  tenFromHan: (ganHan) => {
-    try {
-      return _getTenGod?.(dayGanKorGan || window.dayGanKorGan, _convertHanToKorStem?.(ganHan)) || '';
-    } catch { return ''; }
-  },
-  hidesFromHanJi: (jiHan) => {
-    try {
-      const map = window.jijiToSibganMap || {};
-      const raw = map[jiHan] || map[_convertHanToKorStem?.(jiHan) || ''] || [];
-      const arr = [];
-      for (const item of raw) {
-        const kor = (typeof item === 'string') ? item : (item.stem || item.kor || '');
-        const han = _convertKorToHanStem?.(kor) || kor || '';
-        const ten = _getTenGod?.(dayGanKorGan || window.dayGanKorGan, kor) || '';
-        const mid = (typeof item === 'object' && item.isMiddle) ? ' (중기)' : '';
-        arr.push(`${han} ${ten}${mid}`.trim());
-      }
-      return arr;
-    } catch { return []; }
-  }
-};
-
-// 문자열 "丙戌"도, 분리 인자(gan, ji)도 받도록 파서
-(function ensureMiniSetters(){
-  const STEMS = '甲乙丙丁戊己庚辛壬癸'.split('');
-  const BR    = '子丑寅卯辰巳午未申酉戌亥'.split('');
-  function parseGanJi(a,b){
-    if (b != null) return { gan: String(a||'').trim(), ji: String(b||'').trim() };
-    const s = String(a||'').trim();
-    const gan = STEMS.find(ch => s.includes(ch)) || '';
-    const ji  = BR.find(ch   => s.includes(ch)) || '';
-    return { gan, ji };
-  }
-  function apply(prefix, gan, ji){
-    const ten   = window.__miniCalc?.tenFromHan(gan) || '';
-    const hides = window.__miniCalc?.hidesFromHanJi(ji) || [];
-    const elG = document.getElementById(`${prefix}-gan`);
-    const elJ = document.getElementById(`${prefix}-ji`);
-    const elH = document.getElementById(`${prefix}-hides`);
-    if (elG) elG.innerHTML = `<strong>${gan || '-'}</strong>${ten ? ` <small>(${ten})</small>` : ''}`;
-    if (elJ) elJ.innerHTML = `<strong>${ji  || '-'}</strong>`;
-    if (elH) elH.innerHTML = hides.length ? hides.map(t=>`<span class="saju-chip">(${t})</span>`).join('') : '-';
-  }
-
-  window.sajuMini = window.sajuMini || {};
-  window.sajuMini.setDaeyun = (a,b) => {
-    const { gan, ji } = parseGanJi(a,b);
-    apply('mini-daeyun', gan, ji);
-  };
-  window.sajuMini.setSewoon = (a,b) => {
-    const { gan, ji } = parseGanJi(a,b);
-    apply('mini-sewoon', gan, ji);
-  };
-})();
-
-
-  // 8) 제목 즉시/지연 갱신(자동입력 대응)
-  setMiniTitle();
-  requestAnimationFrame(() => setMiniTitle('raf'));
-  setTimeout(() => setMiniTitle('t+300'), 300);
-}
-
-
-
-
-
-// === Mini 大/世 지장간: HanhiddenStemsMap만 사용 (간단/안정)
-(function miniHiddenStemsFillMinimal(){
-  // 1) 전제: 전역에 맵이 있어야 함 (이미 true 확인됨)
-  const MAP = window.HanhiddenStemsMap;           // 예: { '戌': ['戊','辛','丁'], '巳': ['丙','戊','庚'], ... }
-  if (!MAP) return;
-
-  // 2) (선택) 십신이 가능하면 붙이고, 아니면 한자만 출력
-  const getTenGod = window.getTenGod || null;     // 없으면 null
-  const dayKor    = window.dayGanKorGan || '';    // 예: '기'
-  const han2korStem = window.convertHanToKorStem || (s => s);
-
-  function makeChips(jiHan) {
-    const arr = MAP[jiHan] || [];                 // 한자 지지 키로 바로 찾음
-    if (!arr.length) return '-';
-    return arr.map(hanStem => {
-      const ten = (getTenGod && dayKor) ? (getTenGod(dayKor, han2korStem(hanStem)) || '') : '';
-      return `<span class="saju-chip">(${hanStem}${ten ? ' ' + ten : ''})</span>`;
-    }).join('');
-  }
-
-  function setHides(cellId, jiHan) {
-    const el = document.getElementById(cellId);
-    if (!el) return;
-    el.innerHTML = jiHan ? makeChips(jiHan) : '-';
-  }
-
-  // 3) 현재 선택값으로 즉시 채우기
-  if (window.selectedDaewoon?.branch) setHides('mini-daeyun-hides', window.selectedDaewoon.branch);
-  if (window.selectedSewoon?.branch)  setHides('mini-sewoon-hides', window.selectedSewoon.branch);
-
-  // 4) 클릭 시에도 자동 반영 (기존 setter를 얇게 감싸서 hides만 갱신)
-  window.sajuMini = window.sajuMini || {};
-  const prevD = window.sajuMini.setDaeyun;
-  const prevS = window.sajuMini.setSewoon;
-
-  // "丙戌" 또는 분리 인자 둘 다 지원
-  const STEMS = '甲乙丙丁戊己庚辛壬癸'.split('');
-  const BR    = '子丑寅卯辰巳午未申酉戌亥'.split('');
-  function parseGanJi(a,b){
-    if (b != null) return { gan: String(a||''), ji: String(b||'') };
-    const s = String(a||'');
-    return {
-      gan: STEMS.find(ch => s.includes(ch)) || '',
-      ji:  BR.find(ch   => s.includes(ch)) || ''
-    };
-  }
-
-  window.sajuMini.setDaeyun = function(a,b){
-    if (prevD) prevD.apply(this, arguments);      // 기존 동작 유지
-    const { ji } = parseGanJi(a,b);
-    setHides('mini-daeyun-hides', ji);
-  };
-  window.sajuMini.setSewoon = function(a,b){
-    if (prevS) prevS.apply(this, arguments);
-    const { ji } = parseGanJi(a,b);
-    setHides('mini-sewoon-hides', ji);
-  };
-})();
-
-
-
-
-
-
-
-
-
-// 0) CSS: 드래그 표시/선택 방지
-(function injectMiniSajuDragCSS(){
-  if (document.getElementById('mini-saju-drag-style')) return;
-  const s = document.createElement('style');
-  s.id = 'mini-saju-drag-style';
-  s.textContent = `
-    #saju-mini .bar { cursor: grab; }
-    #saju-mini.is-dragging, #saju-mini.is-dragging * { cursor: grabbing !important; user-select: none; }
+  body.innerHTML = `
+    <table class="mini-grid">
+      <thead>
+        <tr>
+          <th>시주</th><th>일주</th><th>월주</th><th>년주</th><th>大</th><th>世</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          ${pillars.map(p => `<td><strong>${C(p.gan)}</strong>${p.ten ? ` <small>(${C(p.ten)})</small>` : ''}</td>`).join('')}
+          <td id="mini-daeyun-gan"><strong>${C(D.gan||'-')}</strong>${D.ten ? ` <small>(${C(D.ten)})</small>` : ''}</td>
+          <td id="mini-sewoon-gan"><strong>${C(S.gan||'-')}</strong>${S.ten ? ` <small>(${C(S.ten)})</small>` : ''}</td>
+        </tr>
+        <tr>
+          ${pillars.map(p => `<td><strong>${C(p.jiji)}</strong></td>`).join('')}
+          <td id="mini-daeyun-ji"><strong>${C(D.ji||'-')}</strong></td>
+          <td id="mini-sewoon-ji"><strong>${C(S.ji||'-')}</strong></td>
+        </tr>
+        <tr>
+          ${pillars.map(p => `<td>${p.hides.length ? p.hides.map(h => `<span class="saju-chip">(${h})</span>`).join('') : '-'}</td>`).join('')}
+          <td id="mini-daeyun-hides">-</td>
+          <td id="mini-sewoon-hides">-</td>
+        </tr>
+      </tbody>
+    </table>
   `;
-  document.head.appendChild(s);
-})();
 
-// 1) 위치 저장/복원 유틸
-const MINI_POS_KEY = 'sajuMiniPos';
-const MINI_MIN_KEY = 'sajuMiniMinimized';
+  // 3) Final fill (지장간/십신) — 선택값이 없어도 표에서 추출, 덮어쓰기에도 유지
+  (function miniFinalFillAndKeep(){
+    const h2k = (typeof _convertHanToKorStem === 'function' ? _convertHanToKorStem
+                : (window.convertHanToKorStem || (s=>({甲:'갑',乙:'을',丙:'병',丁:'정',戊:'무',己:'기',庚:'경',辛:'신',壬:'임',癸:'계'}[s]||s))));
+    const getTG = (typeof _getTenGod === 'function' ? _getTenGod : window.getTenGod) || null;
+    const base  = dayGanKorGan || window.dayGanKorGan || '';
 
-function __miniLoadPos() {
-  try {
-    const raw = localStorage.getItem(MINI_POS_KEY);
-    if (!raw) return null;
-    const obj = JSON.parse(raw);
-    if (typeof obj?.left === 'number' && typeof obj?.top === 'number') return obj;
-  } catch {}
-  return null;
-}
+    const STEM_RE   = /[甲乙丙丁戊己庚辛壬癸]/;
+    const BRANCH_RE = /[子丑寅卯辰巳午未申酉戌亥]/;
 
-function __miniSavePos(left, top) {
-  try { localStorage.setItem(MINI_POS_KEY, JSON.stringify({ left, top })); } catch {}
-}
-
-function __miniApplyPos(box, left, top) {
-  // fixed 기준 좌상단 배치로 전환
-  box.style.left = `${left}px`;
-  box.style.top  = `${top}px`;
-  box.style.right = 'auto';
-  box.style.bottom = 'auto';
-}
-
-function __miniClampToViewport(left, top, box) {
-  const pad = 8;
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const rect = box.getBoundingClientRect();
-  const w = rect.width || 300;
-  const h = rect.height || 220;
-  const clampedLeft = Math.min(Math.max(left, pad), Math.max(vw - w - pad, pad));
-  const clampedTop  = Math.min(Math.max(top,  pad), Math.max(vh - h - pad, pad));
-  return { left: clampedLeft, top: clampedTop };
-}
-
-// 2) 드래그 바인딩
-function __miniMakeDraggable(box) {
-  const handle = box.querySelector('.bar, .saju-mini__bar');
-  if (!handle) return;
-
-  let startX = 0, startY = 0, baseLeft = 0, baseTop = 0;
-
-  const onPointerMove = (e) => {
-    if (!box.classList.contains('is-dragging')) return;
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
-    let left = baseLeft + dx;
-    let top  = baseTop + dy;
-    ({ left, top } = __miniClampToViewport(left, top, box));
-    __miniApplyPos(box, left, top);
-  };
-
-  const onPointerUp = (e) => {
-    if (!box.classList.contains('is-dragging')) return;
-    box.classList.remove('is-dragging');
-    document.removeEventListener('pointermove', onPointerMove);
-    document.removeEventListener('pointerup', onPointerUp);
-
-    const rect = box.getBoundingClientRect();
-    __miniSavePos(rect.left, rect.top);
-  };
-
-  handle.addEventListener('pointerdown', (e) => {
-    // 텍스트 드래그/더블클릭 등 방지
-    e.preventDefault();
-
-    // 현재 위치 기준 계산(기본 우하단 고정 상태일 수도 있으므로 좌표 환산)
-    const rect = box.getBoundingClientRect();
-    startX = e.clientX;
-    startY = e.clientY;
-    baseLeft = rect.left;
-    baseTop  = rect.top;
-
-    // 드래그 모드 진입 + 좌상단 고정 모드로 전환
-    box.classList.add('is-dragging');
-    __miniApplyPos(box, baseLeft, baseTop);
-
-    document.addEventListener('pointermove', onPointerMove);
-    document.addEventListener('pointerup', onPointerUp);
-  }, { passive: false });
-
-  // 화면 크기 변할 때 화면 바깥으로 나가지 않도록 스냅
-  window.addEventListener('resize', () => {
-    const pos = __miniLoadPos();
-    if (!pos) return;
-    let { left, top } = __miniClampToViewport(pos.left, pos.top, box);
-    __miniApplyPos(box, left, top);
-    __miniSavePos(left, top);
-  });
-}
-
-// 3) 최소화 상태 저장/복원
-function __miniRestoreMinimized(box) {
-  const v = localStorage.getItem(MINI_MIN_KEY);
-  if (v === '1') box.classList.add('is-min');
-}
-function __miniWireMinimizePersist(box) {
-  const btn = box.querySelector('#saju-mini-min');
-  if (!btn) return;
-  btn.addEventListener('click', () => {
-    const minimized = box.classList.toggle('is-min');
-    try { localStorage.setItem(MINI_MIN_KEY, minimized ? '1' : '0'); } catch {}
-  });
-}
-
-// 4) 렌더 직후 한 번만 호출 (네 renderSajuMiniFromCurrentOutput 내부 “박스 생성” 이후 위치에 추가)
-// 4) 렌더 직후 초기화 + DOM 감시(박스가 생길 때마다 자동 배선/복원)
-(function setupMiniSajuObserver(){
-  const SEL = '#saju-mini';
-
-  function initMiniSajuPositioning(box) {
-    if (!box || box.dataset.wired === '1') return;
-    box.dataset.wired = '1';
-
-    // 드래그/최소화 배선
-    __miniMakeDraggable(box);
-    __miniWireMinimizePersist(box);
-    __miniRestoreMinimized(box);
-
-    // 저장된 위치 복원(없으면 현 상태 유지)
-    const pos = __miniLoadPos();
-    if (pos) {
-      let { left, top } = __miniClampToViewport(pos.left, pos.top, box);
-      __miniApplyPos(box, left, top);
-      __miniSavePos(left, top); // 클램프된 값으로 갱신
-    } else {
-      // 최초 한 번: 현재 위치(우하단 fixed) 좌표로 환산해 저장(선택)
-      const r = box.getBoundingClientRect();
-      __miniSavePos(r.left, r.top);
+    function extract(prefix){
+      const gtxt = document.getElementById(`${prefix}-gan`)?.textContent || '';
+      const jtxt = document.getElementById(`${prefix}-ji`)?.textContent  || '';
+      const gan  = (gtxt.match(STEM_RE)||[])[0] || '';
+      const ji   = (jtxt.match(BRANCH_RE)||[])[0] || '';
+      return { gan, ji };
     }
-  }
 
-  // 이미 떠 있으면 즉시 초기화
-  const exist = document.querySelector(SEL);
-  if (exist) initMiniSajuPositioning(exist);
+    function makeChips(ji){
+      const map = window.HanhiddenStemsMap || {};
+      const arr = map[ji] || [];
+      if (!arr.length) return '-';
+      return arr.map(han=>{
+        const ten = (getTG && base) ? (getTG(base, h2k(han)) || '') : '';
+        return `<span class="saju-chip">(${han}${ten ? ' ' + ten : ''})</span>`;
+      }).join('');
+    }
 
-  // 이후로는 DOM 감시: 미니창이 새로 붙을 때마다 자동 배선
-  const mo = new MutationObserver((ms) => {
-    for (const m of ms) {
-      if (m.type !== 'childList') continue;
-      // 추가된 노드들 중 saju-mini 탐색
-      for (const n of m.addedNodes) {
-        if (!(n instanceof Element)) continue;
-        if (n.id === 'saju-mini') {
-          initMiniSajuPositioning(n);
-        } else {
-          const found = n.querySelector?.(SEL);
-          if (found) initMiniSajuPositioning(found);
+    function applyOnce(){
+      const d = extract('mini-daeyun');
+      const s = extract('mini-sewoon');
+      const dEl = document.getElementById('mini-daeyun-hides');
+      const sEl = document.getElementById('mini-sewoon-hides');
+      if (dEl && d.ji) dEl.innerHTML = makeChips(d.ji);
+      if (sEl && s.ji) sEl.innerHTML = makeChips(s.ji);
+    }
+
+    applyOnce();
+    requestAnimationFrame(applyOnce);
+    setTimeout(applyOnce, 0);
+    setTimeout(applyOnce, 120);
+
+    // expose setters
+    window.sajuMini = window.sajuMini || {};
+    const prevD = window.sajuMini.setDaeyun;
+    const prevS = window.sajuMini.setSewoon;
+
+    const STEMS = '甲乙丙丁戊己庚辛壬癸'.split('');
+    const BR    = '子丑寅卯辰巳午未申酉戌亥'.split('');
+    function parseGanJi(a,b){
+      if (b != null) return {gan:String(a||''), ji:String(b||'')};
+      const s=String(a||''); 
+      return { gan: STEMS.find(ch=>s.includes(ch))||'', ji: BR.find(ch=>s.includes(ch))||'' };
+    }
+
+    function save(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
+    const MINI_DAEYUN_KEY = 'sajuMiniSelDaeyun_v2';
+    const MINI_SEWOON_KEY = 'sajuMiniSelSewoon_v2';
+
+    function wrap(fn, key, prefix){
+      return function(a,b){
+        const { gan, ji } = parseGanJi(a,b);
+        if (fn) fn.apply(this, arguments);
+        if (gan && ji) {
+          // 간(+십신)
+          const elG = document.getElementById(`${prefix}-gan`);
+          const ten = (getTG && base) ? (getTG(base, h2k(gan)) || '') : '';
+          if (elG) elG.innerHTML = `<strong>${gan}</strong>${ten ? ` <small>(${ten})</small>` : ''}`;
+          // 지지
+          const elJ = document.getElementById(`${prefix}-ji`);
+          if (elJ) elJ.innerHTML = `<strong>${ji}</strong>`;
+          // 지장간
+          const elH = document.getElementById(`${prefix}-hides`);
+          if (elH) elH.innerHTML = makeChips(ji);
+          save(key, { gan, ji, ten });
         }
       }
     }
-  });
-  mo.observe(document.body || document.documentElement, { childList: true, subtree: true });
 
-  // 편의 API(필요하면 콘솔/코드에서 호출)
+    window.sajuMini.setDaeyun = wrap(prevD, MINI_DAEYUN_KEY, 'mini-daeyun');
+    window.sajuMini.setSewoon = wrap(prevS, MINI_SEWOON_KEY, 'mini-sewoon');
+  })();
+
+  // title refresh
+  setMiniTitle();
+  requestAnimationFrame(setMiniTitle);
+  setTimeout(setMiniTitle, 300);
+}
+
+// 3) Drag & position (persist)
+(function setupMiniDragAndPersist(){
+  const POS_KEY = 'sajuMiniPos';
+  const MIN_KEY = 'sajuMiniMinimized';
+
+  function loadPos(){ try{ return JSON.parse(localStorage.getItem(POS_KEY) || 'null'); }catch{ return null; } }
+  function savePos(left, top){ try{ localStorage.setItem(POS_KEY, JSON.stringify({left, top})); }catch{} }
+  function applyPos(box, left, top){
+    box.style.left = `${left}px`; box.style.top = `${top}px`;
+    box.style.right = 'auto'; box.style.bottom = 'auto';
+  }
+  function clamp(left, top, box){
+    const pad=8, vw=window.innerWidth, vh=window.innerHeight;
+    const r=box.getBoundingClientRect(), w=r.width||360, h=r.height||220;
+    return { left: Math.min(Math.max(left,pad), Math.max(vw-w-pad,pad)),
+             top:  Math.min(Math.max(top, pad), Math.max(vh-h-pad,pad)) };
+  }
+
+  function makeDraggable(box){
+    const handle = box.querySelector('.saju-mini__bar, .bar');
+    if (!handle) return;
+    let sx=0, sy=0, bx=0, by=0;
+    const move = (e)=>{ if(!box.classList.contains('is-dragging')) return;
+      const {left, top} = clamp(bx + (e.clientX - sx), by + (e.clientY - sy), box);
+      applyPos(box, left, top);
+    };
+    const up = ()=>{
+      if(!box.classList.contains('is-dragging')) return;
+      box.classList.remove('is-dragging');
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      const r = box.getBoundingClientRect(); savePos(r.left, r.top);
+    };
+    handle.addEventListener('pointerdown', (e)=>{
+      e.preventDefault();
+      const r = box.getBoundingClientRect();
+      sx = e.clientX; sy = e.clientY; bx = r.left; by = r.top;
+      box.classList.add('is-dragging'); applyPos(box, bx, by);
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', up);
+    }, {passive:false});
+    window.addEventListener('resize', ()=>{
+      const pos = loadPos(); if(!pos) return;
+      const {left, top} = clamp(pos.left, pos.top, box);
+      applyPos(box, left, top); savePos(left, top);
+    });
+  }
+
+  function restoreMin(box){
+    if (localStorage.getItem(MIN_KEY) === '1') box.classList.add('is-min');
+    box.querySelector('#saju-mini-min')?.addEventListener('click', ()=>{
+      const m = box.classList.toggle('is-min'); try{ localStorage.setItem(MIN_KEY, m ? '1' : '0'); }catch{}
+    });
+  }
+
+  function init(box){
+    if (!box || box.dataset.wired === '1') return;
+    box.dataset.wired = '1';
+    makeDraggable(box);
+    restoreMin(box);
+    const pos = loadPos();
+    if (pos) { const {left, top} = clamp(pos.left, pos.top, box); applyPos(box, left, top); savePos(left, top); }
+    else { const r = box.getBoundingClientRect(); savePos(r.left, r.top); }
+  }
+
+  const exist = document.getElementById('saju-mini'); if (exist) init(exist);
+  const mo = new MutationObserver(ms=>{
+    for (const m of ms) if (m.type === 'childList')
+      for (const n of m.addedNodes) {
+        if (!(n instanceof Element)) continue;
+        if (n.id === 'saju-mini') init(n);
+        else { const f = n.querySelector?.('#saju-mini'); if (f) init(f); }
+      }
+  });
+  mo.observe(document.body || document.documentElement, {childList:true, subtree:true});
+
+  // helper APIs
   window.sajuMini = window.sajuMini || {};
-  window.sajuMini.reinit = () => {
-    const box = document.querySelector(SEL);
-    if (box) {
-      box.dataset.wired = '';
-      initMiniSajuPositioning(box);
-    }
-  };
-  window.sajuMini.getPosition = () => __miniLoadPos();
-  window.sajuMini.savePosition = () => {
-    const box = document.querySelector(SEL);
-    if (!box) return;
-    const r = box.getBoundingClientRect();
-    __miniSavePos(r.left, r.top);
-  };
-  window.sajuMini.resetPosition = (corner = 'br') => {
-    const box = document.querySelector(SEL);
-    if (!box) return;
-    // 코너 스냅: br(우하), tr(우상), bl(좌하), tl(좌상)
-    const pad = 16;
-    const w = box.getBoundingClientRect().width || 300;
-    const h = box.getBoundingClientRect().height || 220;
+  window.sajuMini.reinit = ()=>{ const b=document.getElementById('saju-mini'); if (b){ b.dataset.wired=''; init(b); } };
+  window.sajuMini.getPosition = ()=>{ try{ return JSON.parse(localStorage.getItem(POS_KEY)||'null'); }catch{ return null; } };
+  window.sajuMini.resetPosition = (corner='br')=>{
+    const b=document.getElementById('saju-mini'); if(!b) return;
+    const pad=16, r=b.getBoundingClientRect(), w=r.width||360, h=r.height||220;
     let left, top;
-    switch (corner) {
-      case 'tr': left = window.innerWidth - w - pad; top = pad; break;
-      case 'bl': left = pad; top = window.innerHeight - h - pad; break;
-      case 'tl': left = pad; top = pad; break;
-      case 'br':
-      default:   left = window.innerWidth - w - pad; top = window.innerHeight - h - pad; break;
-    }
-    ({ left, top } = __miniClampToViewport(left, top, box));
-    __miniApplyPos(box, left, top);
-    __miniSavePos(left, top);
+    switch (corner){ case 'tr': left=window.innerWidth-w-pad; top=pad; break;
+      case 'bl': left=pad; top=window.innerHeight-h-pad; break;
+      case 'tl': left=pad; top=pad; break;
+      default: left=window.innerWidth-w-pad; top=window.innerHeight-h-pad; }
+    const p=clamp(left, top, b); applyPos(b, p.left, p.top); savePos(p.left, p.top);
   };
 })();
 
+// ──────────────────────────────────────────────────────────
+// 사용 예:
+//   renderSajuMiniFromCurrentOutput(); // 렌더
+//   sajuMini.setDaeyun('丙戌');        // 대운 갱신
+//   sajuMini.setSewoon('乙巳');        // 세운 갱신
+// ──────────────────────────────────────────────────────────
 
-
-
-
+//미니창 끝///////////////////////////////
 
 
 
