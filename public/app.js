@@ -5940,34 +5940,6 @@ async function renderUserProfile() {
  
 
 // === 초기화 (하나로 통합)
-async function softRefreshUI(session){
-  // 세션 반영
-  try { updateAuthUI?.(session); } catch {}
-  // 카운터/프로필 등 필요한 데이터만 재조회해서 화면 수치 갱신
-  try {
-    if (session?.user?.id) {
-      const { data: profile } = await window.supabaseClient
-        .from("profiles")
-        .select("role, created_at, daily_limit, daily_usage_date, daily_usage_count")
-        .eq("user_id", session.user.id)
-        .single();
-      const today = getKSTDateKey();
-      const todayCount =
-        String(profile?.daily_usage_date||'').slice(0,10) === today
-          ? Number(profile?.daily_usage_count||0) : 0;
-      const limit = Number.isFinite(profile?.daily_limit)
-        ? Number(profile.daily_limit)
-        : Number(getDailyLimit(profile));
-      updateCountDisplayFromGate({
-        limit: Number.isFinite(limit) ? limit : Infinity,
-        remaining: Number.isFinite(limit) ? Math.max(limit - todayCount, 0) : Infinity,
-        todayCount,
-        totalCount: 0
-      });
-    }
-  } catch (e) { console.warn('[softRefreshUI]', e); }
-}
-
 document.addEventListener("DOMContentLoaded", async () => {
 
   // 🔻 ① 여기에 자동 복원 코드 넣기
@@ -6137,7 +6109,7 @@ window.addEventListener("beforeunload", () => {
 
     // ✅ 로그인 상태 변경 감시 (이중 새로고침 방지)
     let __reloading = false;
-   window.supabaseClient.auth.onAuthStateChange(async (event, session) => {
+    window.supabaseClient.auth.onAuthStateChange((event, newSession) => {
       console.log("[AuthStateChange]", event);
 
       if (event === "SIGNED_OUT") {
@@ -6157,11 +6129,15 @@ window.addEventListener("beforeunload", () => {
         updateAuthUI(newSession);
          return;
        }
-        if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
-   await softRefreshUI(session);   // 아래 1줄 함수 참고
-   return;
- }
-}
+       if (!__reloading) {
+         __reloading = true;
+         if (window.location.hash) {
+           history.replaceState(null, "", window.location.pathname + window.location.search);
+         }
+         window.location.reload();
+       }
+       return;
+     }
       updateAuthUI(newSession);
     });
 
