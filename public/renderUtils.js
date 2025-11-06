@@ -441,7 +441,7 @@ export function basicSewoonClick(td, stem, branch, year) {
 
 
 // 미니창 반영 (바로 표시 + 저장)
-window.sajuMini?.setSewoon(`${stem}${branch}`, String(year || ''));
+window.sajuMini?.setSewoon(`${stem}${branch}`);
 
   // 리스트 갱신
   const lists = getAllCompareLists(window.saju);
