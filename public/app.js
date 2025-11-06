@@ -6179,61 +6179,69 @@ function bindAuthPipelines() {
         // ─────────────────────────────────────────────
         // ✅ 추가된 부분: 로그인 시 “오늘 사주” 자동 출력
         // ─────────────────────────────────────────────
-        setTimeout(async () => {
-          try {
-            console.log("[AutoSaju] 로그인 감지 → 오늘 사주 자동 출력 시작");
+setTimeout(async () => {
+  try {
+    console.log("[AutoSaju] 로그인 감지 → 오늘 사주 자동 출력 시작");
 
-  const today = new Date();
-const hours = today.getHours();
-const ampm = hours >= 12 ? "PM" : "AM"; // ✅ 오전/오후 자동 계산
+    const now = new Date();
+    const hours = now.getHours();
+    const ampm = hours >= 12 ? "PM" : "AM";
+    const twelveHour = hours % 12 || 12;  // 0시는 12시로 변환
 
-const todayPayload = {
-  year: today.getFullYear(),
-  month: today.getMonth() + 1,
-  day: today.getDate(),
-  hour: hours % 12 || 12,  // 0시는 12시로 변환
-  minute: today.getMinutes(),
-  ampm,                    // ✅ 이 필드 추가!
-  calendarType: "solar",
-  gender: "male",
-};
+    const todayPayload = {
+      year: now.getFullYear(),
+      month: now.getMonth() + 1,
+      day: now.getDate(),
+      hour: twelveHour,       // ✅ 12시간제
+      minute: now.getMinutes(),
+      ampm,                   // ✅ 반드시 포함
+      calendarType: "solar",
+      gender: "male",
+    };
 
+    console.log("[AutoSaju] todayPayload:", todayPayload);
 
-            const res = await fetch("/api/saju", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(todayPayload),
-            });
+    const res = await fetch("/api/saju", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(todayPayload),
+    });
 
-            if (!res.ok) {
-              console.warn("[AutoSaju] API 응답 오류:", res.status);
-              return;
-            }
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("[AutoSaju] Fetch 실패:", res.status, text);
+      alert("오늘 사주 자동 출력 실패: " + res.status);
+      return;
+    }
 
-            const todayData = await res.json();
-            if (!todayData?.ganji) return;
+    const todayData = await res.json();
+    if (!todayData?.ganji) {
+      console.warn("[AutoSaju] 데이터 구조 이상:", todayData);
+      return;
+    }
 
-            const yearGanji2 = splitGanji(todayData.ganji.year);
-            const monthGanji2 = splitGanji(todayData.ganji.month);
-            const dayGanji2 = splitGanji(todayData.ganji.day);
-            const timeGanji2 = splitGanji(todayData.ganji.time);
-            const dayGanKorGan2 = convertHanToKorStem(dayGanji2.gan);
+    const yearGanji2 = splitGanji(todayData.ganji.year);
+    const monthGanji2 = splitGanji(todayData.ganji.month);
+    const dayGanji2 = splitGanji(todayData.ganji.day);
+    const timeGanji2 = splitGanji(todayData.ganji.time);
+    const dayGanKorGan2 = convertHanToKorStem(dayGanji2.gan);
 
-            renderTodaySajuBox({
-              yearGanji: yearGanji2,
-              monthGanji: monthGanji2,
-              dayGanji: dayGanji2,
-              timeGanji: timeGanji2,
-              dayGanKorGan: dayGanKorGan2,
-              todayStr: `${todayPayload.year}-${String(todayPayload.month).padStart(2, "0")}-${String(todayPayload.day).padStart(2, "0")}`,
-              birthSaju: { yearGanji: yearGanji2, monthGanji: monthGanji2, dayGanji: dayGanji2, timeGanji: timeGanji2 },
-            });
+    renderTodaySajuBox({
+      yearGanji: yearGanji2,
+      monthGanji: monthGanji2,
+      dayGanji: dayGanji2,
+      timeGanji: timeGanji2,
+      dayGanKorGan: dayGanKorGan2,
+      todayStr: `${todayPayload.year}-${String(todayPayload.month).padStart(2, "0")}-${String(todayPayload.day).padStart(2, "0")}`,
+      birthSaju: { yearGanji: yearGanji2, monthGanji: monthGanji2, dayGanji: dayGanji2, timeGanji: timeGanji2 },
+    });
 
-            console.log("[AutoSaju] 오늘 사주 자동 렌더 완료 ✅");
-          } catch (err) {
-            console.error("[AutoSaju] 예외:", err);
-          }
-        }, 800); // 🔹 한 프레임 뒤 실행 (UI 업데이트 이후)
+    console.log("[AutoSaju] 오늘 사주 자동 렌더 완료 ✅");
+  } catch (err) {
+    console.error("[AutoSaju] 예외 발생:", err);
+  }
+}, 800);
+ // 🔹 한 프레임 뒤 실행 (UI 업데이트 이후)
       }
 
       if (event === "SIGNED_OUT") {
