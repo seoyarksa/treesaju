@@ -5799,17 +5799,20 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
   let box = document.getElementById('saju-mini');
   if (!box) {
     box = document.createElement('div');
-    box.id = 'saju-mini';
-    box.innerHTML = `
-      <div class="bar">
-        <strong id="saju-mini-title">사주팔자</strong>
-        <div>
-          <button class="btn" id="saju-mini-min" title="접기">—</button>
-          <button class="btn" id="saju-mini-close" title="닫기">×</button>
-        </div>
-      </div>
-      <div class="body" id="saju-mini-body"></div>
-    `;
+// 박스 생성할 때 (네 코드의 box.innerHTML 부분 교체)
+box.id = 'saju-mini';
+box.className = 'saju-mini';
+box.innerHTML = `
+  <div class="saju-mini__bar">   <!-- 드래그 핸들 -->
+    <strong id="saju-mini-title">사주팔자</strong>
+    <div class="saju-mini__actions">
+      <button class="btn" id="saju-mini-min" title="접기">—</button>
+      <button class="btn" id="saju-mini-close" title="닫기">×</button>
+    </div>
+  </div>
+  <div class="saju-mini__body" id="saju-mini-body"></div>
+`;
+
     // (중요) DOM에 붙인 다음 제목 세팅
     document.body.appendChild(box);
     setMiniTitle('after-append');
