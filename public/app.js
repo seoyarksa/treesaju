@@ -5518,7 +5518,7 @@ requestAnimationFrame(() => {
         #e8f0c8 8px calc(100% - 8px),
         #e8f0c8 calc(100% - 8px) 100%
       ) !important;
-      border-bottom: 1px solid #e6e6ea !important;
+      border-bottom: 2px solid #e6e6ea !important;
     }
   `;
   document.head.appendChild(s);
