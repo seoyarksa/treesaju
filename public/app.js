@@ -5726,50 +5726,67 @@ body.innerHTML = `
 
 
 
-// 대운/세운 미니창 셋터 (아주 단순)
-// 대/세 셋터 (간/지/십신만 저장·반영) — 어디서든 1회만 선언
-(function exposeMiniSelAPIs_v2(){
+
+// === 大/世 셋터 (문자열 "丙戌"도 받고, 분리 인자도 받고, 객체도 받는 관용 API) ===
+(function exposeMiniSelAPIs_v3(){
   const MINI_DAEYUN_KEY = 'sajuMiniSelDaeyun_v2';
   const MINI_SEWOON_KEY = 'sajuMiniSelSewoon_v2';
   const save = (k,v)=>{ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} };
   const setHTML = (id, html)=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; };
 
+  // 유효 천간/지지 목록
+  const STEMS = '甲乙丙丁戊己庚辛壬癸'.split('');
+  const BRANCHES = '子丑寅卯辰巳午未申酉戌亥'.split('');
+
+  // "丙戌" / "乙巳" 같은 2글자 문자열 → {gan:'丙', ji:'戌'}
+  function parseGanJi(input){
+    const s = String(input||'').trim();
+    if (!s) return { gan:'', ji:'' };
+    // 1) 정확히 2글자라면 천간+지지로 가정
+    if (s.length === 2 && STEMS.includes(s[0]) && BRANCHES.includes(s[1])) {
+      return { gan: s[0], ji: s[1] };
+    }
+    // 2) 혹시 섞여 들어온 경우(간/지 순서 무관) → 찾아서 매핑
+    const gan = STEMS.find(ch => s.includes(ch)) || '';
+    const ji  = BRANCHES.find(ch => s.includes(ch)) || '';
+    return { gan, ji };
+  }
+
+  function normArgs(arg1, arg2, arg3){
+    // 지원 형태:
+    //   ( '丙戌' )
+    //   ( stem, branch )
+    //   ( {gan:'丙', ji:'戌', ten:'정인'} )
+    //   ( stem, branch, ten )
+    if (typeof arg1 === 'object' && arg1) {
+      return { gan: String(arg1.gan||'').trim(), ji: String(arg1.ji||'').trim(), ten: String(arg1.ten||'').trim() };
+    }
+    if (arg2 == null && arg3 == null) {
+      // "丙戌" 같이 한 덩어리만 넘어온 경우
+      return { ...parseGanJi(arg1), ten: '' };
+    }
+    return { gan: String(arg1||'').trim(), ji: String(arg2||'').trim(), ten: String(arg3||'').trim() };
+  }
+
   window.sajuMini = window.sajuMini || {};
 
-  // 사용법: setDaeyun('丙','戌','정인') 또는 setDaeyun({gan:'丙', ji:'戌', ten:'정인'})
-  window.sajuMini.setDaeyun = (ganOrObj, ji, ten='')=>{
-    let gan;
-    if (typeof ganOrObj === 'object') ({ gan, ji, ten = '' } = ganOrObj || {});
-    else gan = ganOrObj;
-
-    gan = String(gan||'').trim();
-    ji  = String(ji ||'').trim();
-    ten = String(ten||'').trim();
-
+  window.sajuMini.setDaeyun = (a,b,c)=>{
+    const { gan, ji, ten } = normArgs(a,b,c);
     const v = { gan: gan || '-', ji: ji || '-', ten: ten || '' };
     save(MINI_DAEYUN_KEY, v);
-
-    setHTML('mini-daeyun-gan', `<strong>${gan || '-'}</strong>${ten ? ` <small>(${ten})</small>` : ''}`);
-    setHTML('mini-daeyun-ji',  `<strong>${ji  || '-'}</strong>`);
+    setHTML('mini-daeyun-gan', `<strong>${v.gan}</strong>${v.ten ? ` <small>(${v.ten})</small>` : ''}`);
+    setHTML('mini-daeyun-ji',  `<strong>${v.ji}</strong>`);
   };
 
-  // 사용법: setSewoon('乙','巳','편관') 또는 setSewoon({gan:'乙', ji:'巳', ten:'편관'})
-  window.sajuMini.setSewoon = (ganOrObj, ji, ten='')=>{
-    let gan;
-    if (typeof ganOrObj === 'object') ({ gan, ji, ten = '' } = ganOrObj || {});
-    else gan = ganOrObj;
-
-    gan = String(gan||'').trim();
-    ji  = String(ji ||'').trim();
-    ten = String(ten||'').trim();
-
+  window.sajuMini.setSewoon = (a,b,c)=>{
+    const { gan, ji, ten } = normArgs(a,b,c);
     const v = { gan: gan || '-', ji: ji || '-', ten: ten || '' };
     save(MINI_SEWOON_KEY, v);
-
-    setHTML('mini-sewoon-gan', `<strong>${gan || '-'}</strong>${ten ? ` <small>(${ten})</small>` : ''}`);
-    setHTML('mini-sewoon-ji',  `<strong>${ji  || '-'}</strong>`);
+    setHTML('mini-sewoon-gan', `<strong>${v.gan}</strong>${v.ten ? ` <small>(${v.ten})</small>` : ''}`);
+    setHTML('mini-sewoon-ji',  `<strong>${v.ji}</strong>`);
   };
 })();
+
 
 
 
