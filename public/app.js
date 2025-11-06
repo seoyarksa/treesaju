@@ -5728,6 +5728,9 @@ body.innerHTML = `
     </tbody>
   </table>
 `;
+console.log('[mini:init] mapKeys=', Object.keys(window.HanhiddenStemsMap||{}));
+console.log('[mini:init] selected=', window.selectedDaewoon, window.selectedSewoon);
+['mini-daeyun-hides','mini-sewoon-hides'].forEach(id => console.log('[mini:cell]', id, !!document.getElementById(id)));
 
 
 /* ===== 미니 大/世 출력 — 단일/최소 버전 ===== */
@@ -5740,6 +5743,8 @@ body.innerHTML = `
 
   // 칩 HTML 생성 (지장간 한자 배열 → 칩)
 function makeHides(jiHan){
+  console.log('[mini:makeHides] ji=', jiHan, 'arr=', (window.HanhiddenStemsMap||{})[jiHan]);
+
   const map = window.HanhiddenStemsMap;            // ★ 매 호출마다 최신 전역 참조
   const arr = map && map[jiHan] ? map[jiHan] : []; // 키는 한자 지지(예: '戌','巳')
   if (!arr.length) return '-';
@@ -5764,6 +5769,8 @@ function makeHides(jiHan){
     // 3) 지장간 칩
     const elH = document.getElementById(`${prefix}-hides`);
     if (elH) elH.innerHTML = jiHan ? (makeHides(jiHan) || '-') : '-';
+    console.log('[mini:apply]', prefix, {gan:stemHan, ji:jiHan, html: document.getElementById(`${prefix}-hides`)?.innerHTML});
+
   }
 
   // 초기 채우기: 선택값 우선 → 없으면 localStorage 값(D/S) 사용
@@ -5794,6 +5801,7 @@ function makeHides(jiHan){
   }
 
   window.sajuMini.setDaeyun = function(a,b){
+    console.log('[mini:setDaeyun]', a, b);
     const { gan, ji } = parseGanJi(a,b);
     if (prevD) prevD.apply(this, arguments);
     if (gan && ji) {
@@ -5803,6 +5811,7 @@ function makeHides(jiHan){
   };
 
   window.sajuMini.setSewoon = function(a,b){
+    console.log('[mini:setSewoon]', a, b);
     const { gan, ji } = parseGanJi(a,b);
     if (prevS) prevS.apply(this, arguments);
     if (gan && ji) {
