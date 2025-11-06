@@ -6183,16 +6183,21 @@ function bindAuthPipelines() {
           try {
             console.log("[AutoSaju] 로그인 감지 → 오늘 사주 자동 출력 시작");
 
-            const today = new Date();
-            const todayPayload = {
-              year: today.getFullYear(),
-              month: today.getMonth() + 1,
-              day: today.getDate(),
-              hour: today.getHours(),
-              minute: today.getMinutes(),
-              calendarType: "solar",
-              gender: "male",
-            };
+  const today = new Date();
+const hours = today.getHours();
+const ampm = hours >= 12 ? "PM" : "AM"; // ✅ 오전/오후 자동 계산
+
+const todayPayload = {
+  year: today.getFullYear(),
+  month: today.getMonth() + 1,
+  day: today.getDate(),
+  hour: hours % 12 || 12,  // 0시는 12시로 변환
+  minute: today.getMinutes(),
+  ampm,                    // ✅ 이 필드 추가!
+  calendarType: "solar",
+  gender: "male",
+};
+
 
             const res = await fetch("/api/saju", {
               method: "POST",
