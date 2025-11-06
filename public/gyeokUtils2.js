@@ -824,9 +824,11 @@ if (relation === '생') {
   return `
     <div style="display: grid; grid-template-columns: auto 30px auto 30px auto; grid-template-rows: repeat(8, auto); justify-content: center; align-items: center; font-family: monospace; font-size: 0.9rem; gap: 4px;">
       <!-- 기신1 -->
-      <div style="grid-column: 1 / 2; grid-row: 1; text-align: center;">
-        ${formatParsedYukshinList('기신1', gisin1ParsedArr, gisin1Stems, 'red')}
-      </div>
+<div style="grid-column: 1 / 2; grid-row: 1; text-align: center;">
+  <span class="explainable" data-group="terms" data-term="기신1">
+     
+  ${formatParsedYukshinList('기신1', gisin1ParsedArr, gisin1Stems, 'red')}</span>
+</div>
       <!-- 기신1 ↓ 상신 -->
    
 <div style="grid-column: 1 / 2; grid-row: 4; text-align: center;">
@@ -840,7 +842,8 @@ if (relation === '생') {
 
       <!-- 상신 -->
       <div style="grid-column: 1 / 2; grid-row: 5; text-align: center;">
-        ${formatParsedYukshinList('상신', sangsinParsedArr, sangsinStems, 'blue')}
+      <span class="explainable" data-group="terms" data-term="상신">
+        ${formatParsedYukshinList('상신', sangsinParsedArr, sangsinStems, 'blue')}</span>
       </div>
       <!-- 상신 → 격이름 -->
 <div style="grid-column: 2 / 3; grid-row: 5; text-align: center;">
@@ -869,7 +872,8 @@ if (relation === '생') {
 
       <!-- 구신 -->
       <div style="grid-column: 5 / 6; grid-row: 5; text-align: center;">
-        ${formatParsedYukshinList('구신', gusinParsedArr, gusinStems, 'green')}
+      <span class="explainable" data-group="terms" data-term="구신">
+        ${formatParsedYukshinList('구신', gusinParsedArr, gusinStems, 'green')}</span>
       </div>
       
       <!-- 격이름 ↑ 기신2 -->
@@ -884,7 +888,8 @@ if (relation === '생') {
 
 
       <div style="grid-column: 3 / 4; grid-row: 8; text-align: center;">
-        ${formatParsedYukshinList('기신2', gisin2ParsedArr, gisin2Stems, 'red')}
+      <span class="explainable" data-group="terms" data-term="기신2">
+        ${formatParsedYukshinList('기신2', gisin2ParsedArr, gisin2Stems, 'red')}</span>
       </div>
     </div>
     <div style="text-align:center; margin-top:6px; font-size:12px; font-family:monospace;">
@@ -900,7 +905,8 @@ if (relation === '생') {
     return `
 <div style="display: grid; grid-template-columns: auto 30px auto 30px auto; grid-template-rows: 38px 36px 36px auto auto auto; justify-content: center; align-items: center; font-family: monospace; font-size: 0.9rem; gap: 4px;">
   <div style="grid-column: 1 / 2; grid-row: 1; text-align: center;">
-    ${formatParsedYukshinList('기신1', gisin1ParsedArr, gisin1Stems, 'red')}
+  <span class="explainable" data-group="terms" data-term="기신1">
+    ${formatParsedYukshinList('기신1', gisin1ParsedArr, gisin1Stems, 'red')}</span>
   </div>
   <div style="grid-column: 2 / 3; grid-row: 1; text-align: center;">
     <svg width="25" height="28" style="vertical-align:middle; display:block; margin:0 auto;">
@@ -909,7 +915,8 @@ if (relation === '생') {
     </svg>
   </div>
   <div style="grid-column: 3 / 4; grid-row: 1; text-align: center;">
-    ${formatParsedYukshinList('상신', sangsinParsedArr, sangsinStems, 'blue')}
+  <span class="explainable" data-group="terms" data-term="상신">
+    ${formatParsedYukshinList('상신', sangsinParsedArr, sangsinStems, 'blue')}</span>
   </div>
   <div style="grid-column: 4 / 5; grid-row: 1; text-align: center;">
     <svg width="25" height="28" style="vertical-align:middle; display:block; margin:0 auto;">
@@ -918,7 +925,8 @@ if (relation === '생') {
     </svg>
   </div>
   <div style="grid-column: 5 / 6; grid-row: 1; text-align: center;">
-    ${formatParsedYukshinList('구신', gusinParsedArr, gusinStems, 'green')}
+  <span class="explainable" data-group="terms" data-term="구신">
+    ${formatParsedYukshinList('구신', gusinParsedArr, gusinStems, 'green')}</span>
   </div>
   <!-- 2행: 상신↓, 구신↑(같은 행, 같은 svg height, y좌표) -->
   <div style="grid-column: 3 / 4; grid-row: 2; text-align: center;">
@@ -938,7 +946,8 @@ if (relation === '생') {
     ${formatParsedYukshinList('격', gyeokParsedArr, gyeokname2Stems, 'black', false)}
   </div>
   <div style="grid-column: 5 / 6; grid-row: 3; text-align: center;">
-    ${formatParsedYukshinList('기신2', gisin2ParsedArr, gisin2Stems, 'red')}
+  <span class="explainable" data-group="terms" data-term="기신2">
+    ${formatParsedYukshinList('기신2', gisin2ParsedArr, gisin2Stems, 'red')}</span>
   </div>
 </div>
     <div style="text-align:center; margin-top:6px; font-size:12px; font-family:monospace;">
@@ -1038,6 +1047,9 @@ export function renderhapshinTable() {
   const dayGan    = window.saju?.dayGan;
   const gyeokName = window.gyeokName;
   const gyeokStem = window.gyeokStem;
+  const match = (gyeokName || '').match(/^([가-힣]+)\s*(\(.*\))?$/);
+const pureName = match ? match[1] : gyeokName;      // 예: "정인"
+const extraPart = match && match[2] ? match[2] : ''; // 예: "(갑목)"
 
   const normalizedName = (gyeokName || "")
     .trim()
@@ -1058,10 +1070,10 @@ export function renderhapshinTable() {
 
   // 윗줄 (각 항목에 색 적용)
   const headers = [
-    `<span style="color:${ROLE_COLOR_MAP["상신"]}">상신[${withGan(map.sangsin)}]</span>`,
-    `<span style="color:${ROLE_COLOR_MAP["구신"]}">구신[${withGan(map.gusin)}]</span>`,
-    `<span style="color:${ROLE_COLOR_MAP["기신1"]}">기신1[${withGan(map.gisin1)}]</span>`,
-    `<span style="color:${ROLE_COLOR_MAP["기신2"]}">기신2[${withGan(map.gisin2)}]</span>`
+    `<span style="color:${ROLE_COLOR_MAP["상신"]}"; class="explainable" data-group="terms" data-term="상신">상신[${withGan(map.sangsin)}]</span>`,
+    `<span style="color:${ROLE_COLOR_MAP["구신"]}"; class="explainable" data-group="terms" data-term="구신">구신[${withGan(map.gusin)}]</span>`,
+    `<span style="color:${ROLE_COLOR_MAP["기신1"]}"; class="explainable" data-group="terms" data-term="기신1">기신1[${withGan(map.gisin1)}]</span>`,
+    `<span style="color:${ROLE_COLOR_MAP["기신2"]}"; class="explainable" data-group="terms" data-term="기신2">기신2[${withGan(map.gisin2)}]</span>`
   ];
 
   // 합신 (격 포함 5개)
@@ -1077,12 +1089,17 @@ export function renderhapshinTable() {
     <table style="border-collapse: collapse; width:100%; margin-top:0; font-size:0.75rem; text-align:center;">
       <tr>
         <td style="border:1px solid #ccc; padding:2px; width:6%;background:#e6f0ff;">기준</td>
-        <td style="border:1px solid #ccc; padding:2px; width:14%; color:${ROLE_COLOR_MAP["격"]};font-weight:bold; background:#e6f0ff;">${gyeokName}</td>
+          <td style="border:1px solid #ccc; padding:2px; width:14%; color:${ROLE_COLOR_MAP["격"]};
+             font-weight:bold; background:#e6f0ff;">
+    <span class="explainable" data-group="gyeokook" data-term="${pureName}">
+      ${pureName}
+    </span>${extraPart}
+  </td>
         ${headers.map(h => `<td style="border:1px solid #ccc; padding:2px;background:#e6f0ff;">${h}</td>`).join("")}
       </tr>
 
      <tr>
-  <td style="border:1px solid #ccc; padding:2px; background:#fff8dc;">命</td>
+  <td style="border:1px solid #ccc; padding:2px; background:#fff8dc;"><span class="explainable" data-group="gyeokook" data-term="">命</span></td>
   ${["격","상신","구신","기신1","기신2"].map((role) => {
     const color = ROLE_COLOR_MAP[role] || "black";
 
@@ -1140,7 +1157,7 @@ export function renderhapshinTable() {
 
 
 <tr>
-  <td style="border:1px solid #ccc; padding:2px; background:#fff8dc;">運</td>
+  <td style="border:1px solid #ccc; padding:2px; background:#fff8dc;"><span class="explainable" data-group="gyeokook" data-term="">運</span></td>
   ${["격","상신","구신","기신1","기신2"].map((role) => {
     const color = ROLE_COLOR_MAP[role] || "black";
 
@@ -1209,7 +1226,7 @@ export function renderhapshinTable() {
 
 
 <tr>
-  <td style="border:1px solid #ccc; padding:2px; background:#fff8dc;">天合</td>
+  <td style="border:1px solid #ccc; padding:2px; background:#fff8dc;"><span class="explainable" data-group="gyeokook" data-term="">天合</span></td>
   ${["격","상신","구신","기신1","기신2"].map((role, i) => {
     const color = ROLE_COLOR_MAP[role] || "black";
 
@@ -1280,7 +1297,7 @@ export function renderhapshinTable() {
 
 
 <tr>
-  <td style="border:1px solid #ccc; padding:2px; background:#fff8dc;">地合</td>
+  <td style="border:1px solid #ccc; padding:2px; background:#fff8dc;"><span class="explainable" data-group="gyeokook" data-term="">地合</span></td>
   ${["격","상신","구신","기신1","기신2"].map((role, i) => {
     const color = ROLE_COLOR_MAP[role] || "black";
 
@@ -2087,7 +2104,7 @@ if (!normalizedSecondaryName || normalizedSecondaryName.trim() === "X") {
 
   let IlganGyeokTablehtml = `
   <div style="text-align:left; margin:8px 0; color:#0077cc;">
-  06] 격의 등급(성패) & 육신의 왕쇠강약
+  06] <span class="explainable" data-group="terms" data-term="">격의 등급</span>(<span class="explainable" data-group="terms" data-term="">성패</span>) & 육신의 <span class="explainable" data-group="terms" data-term="">왕쇠강약</span>
 </div>
 <table border="1" 
        style="border-collapse: collapse; text-align:center; width: 100%; margin-bottom:0; font-size:14px;">
@@ -2095,16 +2112,16 @@ if (!normalizedSecondaryName || normalizedSecondaryName.trim() === "X") {
     <tr style="background:#fff8dc;">
       <th style="padding:3px;">구분</th>
       <th style="padding:3px;">격이름</th>
-      <th style="padding:3px;">격등급</th>
-      <th style="padding:3px;">격의 요구조건</th>
-      <th style="padding:3px;">일간의 환경</th>
-      <th style="padding:3px;">勢비교</th>
-      <th style="padding:3px;">성패[최종]</th>
+      <th style="padding:3px;"><span class="explainable" data-group="terms" data-term="">격등급</span></th>
+      <th style="padding:3px;"><span class="explainable" data-group="terms" data-term="">격의 요구조건</span></th>
+      <th style="padding:3px;"><span class="explainable" data-group="terms" data-term="">일간의 환경</span></th>
+      <th style="padding:3px;"><span class="explainable" data-group="terms" data-term="">勢비교</span></th>
+      <th style="padding:3px;"><span class="explainable" data-group="terms" data-term="">성패</span>[최종]</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td style="padding:3px;background:#e6f0ff;">주격</td>
+      <td style="padding:3px;background:#e6f0ff;"><span class="explainable" data-group="terms" data-term="">주격</span></td>
       <td style="padding:3px;">${gyeokName || '-'}</td>
       <td style="padding:3px;">${mainGrade ? mainGrade.final : '-'}</td>
     <td style="padding:3px;">${mainRequired}</td>
@@ -2114,7 +2131,7 @@ if (!normalizedSecondaryName || normalizedSecondaryName.trim() === "X") {
       <td style="padding:3px;">${seongpaeMain}</td>
     </tr>
     <tr>
-      <td style="padding:3px;background:#e6f0ff;">보조격</td>
+      <td style="padding:3px;background:#e6f0ff;"><span class="explainable" data-group="terms" data-term="">보조격</span></td>
         <td style="padding:3px;">${rawSecondaryName}</td>
   <td style="padding:3px;">${secondaryGrade ? secondaryGrade.final : '-'}</td>
 <td style="padding:3px;">${secondaryRequired}</td>
@@ -2161,7 +2178,7 @@ if (!normalizedSecondaryName || normalizedSecondaryName.trim() === "X") {
   </thead>
   <tbody>
       <tr>
-        <td style="padding:3px;background:#e6f0ff;">천간의 근</td>
+        <td style="padding:3px;background:#e6f0ff;"><span class="explainable" data-group="terms" data-term="">천간의 근</span></td>
         <td style="padding:3px;">${hourRoots}</td>
         <td style="padding:3px;"><span style="color:blue;">${dayRoots}</span></td>
         <td style="padding:3px;">${monthRoots}</td>
@@ -2188,7 +2205,7 @@ if (!normalizedSecondaryName || normalizedSecondaryName.trim() === "X") {
 
       </tr>
   <tr>
-  <td style="padding:3px;background:#e6f0ff;">왕쇠강약</td>
+  <td style="padding:3px;background:#e6f0ff;"><span class="explainable" data-group="terms" data-term="">왕쇠강약</span></td>
 <td style="padding:3px;">${ganStrengthResults[hourGanHan]?.score.toFixed(1) || "-"}</td>
 <td style="padding:3px;"><span style="color:blue;">${ganStrengthResults[dayGanHan]?.score.toFixed(1) || "-"}</span></td>
 <td style="padding:3px;">${ganStrengthResults[monthGanHan]?.score.toFixed(1) || "-"}</td>

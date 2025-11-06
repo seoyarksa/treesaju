@@ -159,6 +159,22 @@ switch (group) {
   case 'terms':
     from = '용어설명';
     break;
+  case 'ganji':
+    from = '천간지지';
+    break;
+  case 'dang':
+    from = '당령사령';
+    break;
+  case 'gyeokook':
+    from = '격국';
+    break;
+  case 'taegwa':
+    from = '태과불급';
+    break;
+  case 'etcsinsal':
+    from = '기타신살';
+    break;
+
   default:
     from = '12운성';
 }

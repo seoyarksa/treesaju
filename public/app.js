@@ -5543,86 +5543,30 @@ localStorage.setItem("lastSajuResult", JSON.stringify(resultData));
 
 // ✅ 전역 Click Delegation (한 번만 설치)
 //    개별 버튼에 바인딩하던 걸 모두 여기에서 라우팅합니다.
+(function bindGlobalDelegates(){
+  if (window.__DELEGATES_BOUND__) return;
+  window.__DELEGATES_BOUND__ = true;
 
-// =========================
-// 🚧 방탄 Click 라우터 V2
-//  - 오버레이 제거/무력화
-//  - 캡처 단계(click) 위임 (버튼 바인딩 상실 대응)
-//  - 탭 복귀/페이지캐시 복귀 시 재정비
-// =========================
-(function installBulletproofClickRouter(){
-  if (window.__CLICK_ROUTER_V2__) return;
-  window.__CLICK_ROUTER_V2__ = true;
+  // 클릭 중복 방지 (빠른 더블클릭 보호)
+  let lastClickAt = 0;
 
-  let lastXY = { x: window.innerWidth/2, y: 20 };
-
-  // 0) 마우스 위치 추적 (오버레이 타격 지점)
-  ['mousemove','pointermove','touchstart','touchmove'].forEach(ev=>{
-    window.addEventListener(ev, (e)=>{
-      const pt = e.touches?.[0] || e;
-      lastXY = { x: Math.round(pt.clientX || 10), y: Math.round(pt.clientY || 10) };
-    }, { passive:true });
-  });
-
-  // 1) 흔한 오버레이/백드롭 무력화 유틸
-  function nukeBlockers() {
-    // a) 화면 최상단 요소 hit 테스트
-    const topEl = document.elementFromPoint(lastXY.x, lastXY.y);
-    const suspects = new Set();
-
-    if (topEl) suspects.add(topEl);
-    document.querySelectorAll(`
-      .modal-backdrop, .overlay, .backdrop, #overlay,
-      [data-backdrop="true"], [data-overlay="true"], .dimmed, .drawer-backdrop
-    `).forEach(el => suspects.add(el));
-
-    suspects.forEach(el => {
-      const cs = getComputedStyle(el);
-      // 보이면서 pointer-events로 클릭 먹으면 무력화
-      if (cs.display !== 'none' && cs.visibility !== 'hidden' && cs.pointerEvents !== 'none') {
-        el.style.pointerEvents = 'none';
-      }
-      // z-index가 비정상적으로 높고 꽉 차 있으면 숨김 처리 (안전선)
-      const zi = parseInt(cs.zIndex || '0', 10);
-      if (zi >= 9999 && (el === topEl)) {
-        el.style.pointerEvents = 'none';
-      }
-    });
-
-    // b) 루트의 pointer-events 복구
-    const root = document.getElementById('app') || document.body || document.documentElement;
-    const rcs = getComputedStyle(root);
-    if (rcs.pointerEvents === 'none') root.style.pointerEvents = 'auto';
-  }
-
-  // 2) 탭/페이지 복귀 시 재정비
-  function rehabOnReturn(){
-    // 오버레이 무력화 + SPA 버튼에 disabled가 걸려 있으면 해제
-    nukeBlockers();
-    document.querySelectorAll('button[disabled][data-hot], .btn[disabled][data-hot]').forEach(b=>{
-      // data-hot 표시된 버튼은 UI 렌더 타이밍 오류로 disabled된 경우가 많음
-      b.removeAttribute('disabled');
-    });
-  }
-  window.addEventListener('pageshow', (e)=>{ if (e.persisted) rehabOnReturn(); });
-  document.addEventListener('visibilitychange', ()=>{ if (document.visibilityState === 'visible') rehabOnReturn(); });
-  window.addEventListener('focus', rehabOnReturn);
-
-  // 3) 캡처 단계 위임 라우터 (오버레이보다 먼저 가로챔)
   document.addEventListener('click', async (e) => {
-    // hit 전 오버레이 무력화
-    nukeBlockers();
+    const now = Date.now();
+    if (now - lastClickAt < 150) return; // 150ms 내 중복 방지
+    lastClickAt = now;
 
-    // 클릭 타깃 취득
     const el = e.target;
-    const match = (sel) => el.matches?.(sel) || el.closest?.(sel);
 
-    // a) 공통: a[href="#"] 기본동작 차단 (스파 링크 먹통 방지)
-    const a = el.closest?.('a[href="#"], a[href=""]');
-    if (a) e.preventDefault();
+    // ─────────────────────────────
+    // 0) 혹시 상시 깔린 오버레이가 클릭을 먹는 경우가 있어 제거
+    killStuckOverlay();
 
-    // b) 로그아웃
-    if (match('#logoutBtn, [data-action="logout"], .btn-logout, [data-role="logout"]')) {
+    // 도우미
+    const is = (sel) => el.matches?.(sel) || el.closest?.(sel);
+
+    // ─────────────────────────────
+    // 1) 로그아웃
+    if (is('#logoutBtn')) {
       e.preventDefault();
       try {
         window.__MANUAL_LOGOUT__ = true;
@@ -5634,58 +5578,90 @@ localStorage.setItem("lastSajuResult", JSON.stringify(resultData));
       return;
     }
 
-    // c) 회원정보수정 열기/저장 (아이디/데이터속성 다양하게 커버)
-    if (match('#profileEditOpenBtn, [data-action="profile-edit-open"], .btn-profile-edit')) {
+    // ─────────────────────────────
+    // 2) 회원정보 수정(예: 저장 버튼/열기 버튼 등)
+    //    wireProfileEditEvents 안에서 개별 바인딩했다면 죽을 수 있음 → 위임으로 보강
+    if (is('#profileEditOpenBtn')) {
       e.preventDefault();
       openProfileEditModal?.();
       return;
     }
-    if (match('#profileSaveBtn, [data-action="profile-save"], .btn-profile-save')) {
+    if (is('#profileSaveBtn')) {
       e.preventDefault();
-      await saveProfileChanges?.();
+      await saveProfileChanges?.(); // 너의 기존 함수 호출
       return;
     }
 
-    // d) 구독/결제 정보
-    if (match('#subscribeBtn, #billingBtn, #openPlanModalBtn, [data-action="open-billing"], .btn-billing')) {
+    // ─────────────────────────────
+    // 3) 정기구독/결제 정보(예상되는 버튼 id들 커버)
+    if (is('#subscribeBtn, #billingBtn, #openPlanModalBtn')) {
       e.preventDefault();
-      openSubscriptionModal?.();
+      openSubscriptionModal?.(); // 네가 쓰는 기존 함수명에 맞춰주세요
       return;
     }
 
-    // e) 사주정보 출력 (기본/신살 토글 포함)
-    if (match('#sajuSubmit, [data-action="saju-basic"], .btn-saju')) {
+    // ─────────────────────────────
+    // 4) 사주 출력
+    if (is('#sajuSubmit')) {
       e.preventDefault();
       const form = document.getElementById('saju-form');
       if (form) {
         window.outputMode = 'basic';
-        try { form.requestSubmit(); } catch { form.submit(); }
-      }
-      return;
-    }
-    if (match('#sinsalBtn, [data-action="saju-sinsal"], .btn-sinsal')) {
-      e.preventDefault();
-      const form = document.getElementById('saju-form');
-      if (form) {
-        window.outputMode = 'sinsal';
-        try { form.requestSubmit(); } catch { form.submit(); }
+        try { form.requestSubmit(); } catch(_) { form.submit(); }
       }
       return;
     }
 
-    // f) 12운성/12신살 전환 버튼(만약 별도 버튼이면)
-    if (match('#unseongBtn, [data-action="unseong"]')) {
+    // 5) 12운성/12신살 탭 토글 (가능한 id/데이터속성 모두 커버)
+    if (is('#sinsalBtn, [data-action="switch-mode"][data-mode="sinsal"]')) {
       e.preventDefault();
-      // 필요시 전환 로직 호출
-      // updateResultRow({ type:'unseong', gan: window.saju?.dayGan });
+      const form = document.getElementById('saju-form');
+      if (form) {
+        window.outputMode = 'sinsal';
+        try { form.requestSubmit(); } catch(_) { form.submit(); }
+      }
       return;
     }
-    if (match('#sinsalOnlyBtn, [data-action="sinsal"]')) {
+    if (is('#unseongBtn, [data-action="switch-mode"][data-mode="basic"]')) {
       e.preventDefault();
-      // updateResultRow({ type:'sinsal', samhap: getSamhapKeyByJiji(window.saju?.yearBranch) });
+      const form = document.getElementById('saju-form');
+      if (form) {
+        window.outputMode = 'basic';
+        try { form.requestSubmit(); } catch(_) { form.submit(); }
+      }
       return;
     }
-  }, { capture: true }); // ⭐ 캡처 단계에서 잡아 overlay에 앞서 처리
+
+    // (참고) 이미 위임으로 처리한 것들: .saju-record-link / .delete-record-btn 등은 그대로 유지
+  }, { passive: true });
+
+  // 탭 복귀/페이지 캐시 복원 시 혹시 내부에서 다시 바인딩해도
+  // 위임은 살아 있으므로 추가 조치 불필요. 그래도 안전하게 모달 닫기/포인터 복구.
+  window.addEventListener('pageshow', (e) => { if (e.persisted) killStuckOverlay(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') killStuckOverlay(); });
+
+  // 오버레이/포인터 이슈 방지 유틸
+  function killStuckOverlay(){
+    // 흔한 오버레이/백드롭 후보들
+    const blockers = document.querySelectorAll(`
+      .modal-backdrop, .overlay, .backdrop, #overlay, [data-backdrop="true"]
+    `);
+    blockers.forEach(b => {
+      const cs = getComputedStyle(b);
+      // 화면에 보이면서 pointer-events가 켜져 있으면 클릭을 가로챌 수 있음
+      if (cs.display !== 'none' && cs.visibility !== 'hidden' && cs.pointerEvents !== 'none') {
+        // 우선 pointer-events만 꺼서 안전하게 클릭 통과
+        b.style.pointerEvents = 'none';
+      }
+    });
+
+    // 혹시 전체 래퍼가 pointer-events:none 되어 있으면 복구
+    const app = document.getElementById('app') || document.body;
+    const cs = getComputedStyle(app);
+    if (cs.pointerEvents === 'none') {
+      app.style.pointerEvents = 'auto';
+    }
+  }
 })();
 
 // ✅ 페이지 로드 시 직전 사주 자동 복원

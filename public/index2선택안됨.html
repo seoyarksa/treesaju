@@ -551,6 +551,12 @@ body {
 
 /* 작은 창 끝 */
 
+/* 숨김 상태면 이벤트 절대 못 가로채게 */
+.modal-backdrop[hidden], .overlay[hidden], .backdrop[hidden] { pointer-events: none !important; }
+/* display:none/visibility:hidden 상태일 때도 방어 */
+.modal-backdrop, .overlay, .backdrop {
+  visibility: inherit;
+}
 
 
 </style>

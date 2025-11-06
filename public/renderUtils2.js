@@ -214,16 +214,16 @@ export function renderBasicDaeyunTable({
        class="daeyun-cell"
        data-stem="${stem}"
        data-branch="${branch}">
-                <div><span class="explainable" data-group="terms" data-term="">${colorize(stem)}</span></div>
+                <div><span class="explainable" data-group="ganji" data-term="">${colorize(stem)}</span></div>
                 ${tenGod ? `<div style="font-size:0.75rem; color:#999;"><span class="explainable" data-group="tengod" data-term="${tenGod}">(${tenGod})</span></div>` : ""}
-                <div><span class="explainable" data-group="terms" data-term="">${colorize(branch)}</span></div>
+                <div><span class="explainable" data-group="ganji" data-term="">${colorize(branch)}</span></div>
               </td>
             `;
           }).join('')}
         </tr>
         <tr>
   <td colspan="20" style="border:1px solid #ccc; padding:4px; color:red;" >
- * 대운이나 세운을 클릭하면 해당 대운&세운의 작용을 확인할 수 있습니다. 
+ * 대운이나 세운을 클릭[글자옆 여백을 클릭]하면 해당 대운&세운의 작용을 확인할 수 있습니다. 
 </td>
 </tr>
       </tbody>
@@ -1152,10 +1152,10 @@ function generateNackhwaTable({ birthSaju, dayGanji }) {
       <tr>
         <td>기준천간</td>
           <td></td>
- <td >일간:<span class="explainable" data-group="terms" data-term=""; style="font-size:1.2em;">${colorize(birthSaju.dayGanji.gan)}</span></td>
+ <td >일간:<span class="explainable" data-group="ganji" data-term=""; style="font-size:1.2em;">${colorize(birthSaju.dayGanji.gan)}</span></td>
   <td></td>
   <td></td>
-  <td >오늘천간:<span class="explainable" data-group="terms" data-term=""; style="font-size:1.2em;">${colorize(dayGanji.gan)}</span></td>
+  <td >오늘천간:<span class="explainable" data-group="ganji" data-term=""; style="font-size:1.2em;">${colorize(dayGanji.gan)}</span></td>
   <td></td>
       </tr>
 <tr>
@@ -1164,7 +1164,7 @@ function generateNackhwaTable({ birthSaju, dayGanji }) {
     const val = stripTags(colorize(b));
     const highlight = birthBranches.includes(val) ? ' class="highlight-cell"' : '';
     const sipsin = getSipsin(dayMaster, b);
-    return `<td${highlight}><span class="explainable" data-group="terms" data-term=""; style="font-size:1.5em;">${colorize(b)}</span><br><span class="explainable" data-group="tengod" data-term="${sipsin}";style="font-size:0.9em;">${sipsin}</span></td>`;
+    return `<td${highlight}><span class="explainable" data-group="ganji" data-term=""; style="font-size:1.5em;">${colorize(b)}</span><br><span class="explainable" data-group="tengod" data-term="${sipsin}";style="font-size:0.9em;">${sipsin}</span></td>`;
   }).join("")}
 </tr>
 <tr>
@@ -1174,7 +1174,7 @@ function generateNackhwaTable({ birthSaju, dayGanji }) {
     const val = stripTags(colorize(chong));
     const highlight = birthBranches.includes(val) ? ' class="highlight-cell"' : '';
     const sipsin = chong ? getSipsin(dayMaster, chong) : '';
-    return `<td${highlight}><span class="explainable" data-group="terms" data-term=""; style="font-size:1.5em;">${colorize(chong)}</span><br><span class="explainable" data-group="tengod" data-term="${sipsin}"; style="font-size:0.9em;">${sipsin}</span></td>`;
+    return `<td${highlight}><span class="explainable" data-group="ganji" data-term=""; style="font-size:1.5em;">${colorize(chong)}</span><br><span class="explainable" data-group="tengod" data-term="${sipsin}"; style="font-size:0.9em;">${sipsin}</span></td>`;
   }).join("")}
 </tr>
 
@@ -1429,7 +1429,7 @@ return `
           
         </tr>
         <tr> 
-          <td style="border:1px solid #ccc; padding:4px;font-size:14px;" colspan="2"><span class="explainable" data-group="terms" data-term="">당령식</span>: ${dangryeongshikHtml || '-'}
+          <td style="border:1px solid #ccc; padding:4px;font-size:14px;" colspan="2"><span class="explainable" data-group="terms" data-term="">당령식</span>: <span class="explainable" data-group="dang" data-term="">${dangryeongshikHtml || '-'}</span>
           </td>
           <td style=style="border:1px solid #ccc; padding:4px;" colspan="2"><div style="font-size:12px;margin-top:6px;">*색: <span style="color:red;">당령</span>, <span style="color:green;">제1희신,사령보좌</span>, <span style="color:blue;">사령</span>, <span style="color:orange;">기신</span> </div>
           </td>

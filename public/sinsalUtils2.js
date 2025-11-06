@@ -309,7 +309,7 @@ const header = `
   </tr>
   <tr>
     ${branches.map((br, i) =>
-      `<th title="${colLabels[i]}" style="min-width:56px; background:#e9f5ff;">${br || '-'}</th>`
+      `<th title="${colLabels[i]}" style="min-width:56px; background:#e9f5ff;"><span class="explainable" data-group="ganji" data-term="${br || '-'}">${br || '-'}</span></th>`
     ).join('')}
   </tr>
 `;
@@ -323,7 +323,7 @@ const midHeader = `
   </tr>
   <tr class="midhead">
     ${branches.map((br, i) =>
-      `<th title="${colLabels[i]}" style="min-width:56px; background:#fff8d6;">${br || '-'}</th>`
+      `<th title="${colLabels[i]}" style="min-width:56px; background:#fff8d6;"><span class="explainable" data-group="ganji" data-term="${br || '-'}">${br || '-'}</span></th>`
     ).join('')}
   </tr>
 `;
@@ -359,7 +359,7 @@ const midHeader = `
       return `
         <tr>
           <td>${label || ''}</td>
-          <td>${bStem || '-'}${tenToShow ? ` <span class="ten-god explainable" data-group="tengod" data-term="${tenToShow}">(${tenToShow})</span>` : ''}</td>
+          <td><span class="explainable" data-group="ganji" data-term="${bStem || '-'}">${bStem || '-'}</span>${tenToShow ? ` <span class="ten-god explainable" data-group="tengod" data-term="${tenToShow}">(${tenToShow})</span>` : ''}</td>
           ${cells.map(u => `<td><span class="unseong-tag explainable" data-group="unseong" data-term="${u}">${u}</span></td>`).join('')}
         </tr>
       `;
@@ -386,7 +386,7 @@ const midHeader = `
         return `
           <tr>
             ${idx === 0 ? `<td rowspan="${hsList.length}">${label}</td>` : ''}
-            <td>${hs}${tenHidden ? ` <span class="ten-god explainable" data-group="tengod" data-term="${tenHidden}">(${tenHidden})</span>` : ''}</td>
+            <td><span class="explainable" data-group="ganji" data-term="${hs}">${hs}</span>${tenHidden ? ` <span class="ten-god explainable" data-group="tengod" data-term="${tenHidden}">(${tenHidden})</span>` : ''}</td>
             ${cells.map(u => `<td><span class="unseong-tag explainable" data-group="unseong" data-term="${u}">${u}</span></td>`).join('')}
           </tr>
         `;
@@ -418,7 +418,7 @@ const midHeader = `
       return `
         <tr>
           <td>${label}</td>
-          <td>${base}</td>
+          <td><span class="explainable" data-group="ganji" data-term="${base}">${base}</span></td>
           ${cells}
         </tr>
       `;
@@ -535,7 +535,7 @@ const colCss = [...highlightIdx].map(i => `
   // 1. 상단 헤더
   const headerRows = `
   <div style="text-align:left; margin:8px 0; color:#0077cc;">
-  09] 12운성[12신살] 찾아보기
+  09] <span class="explainable" data-group="terms" data-term="">12운성</span>[<span class="explainable" data-group="terms" data-term="">12신살</span>] 찾아보기
 </div>
     <tr>
       <th colspan="10"><span class="explainable" data-group="terms" data-term="">12운성</span></th>
@@ -552,7 +552,7 @@ return `<td class="clickable${sajuGanArr.includes(gan) ? ' saju-blue' : ''}"
             data-type="unseong" 
             data-gan="${gan}" 
             style="cursor:pointer; text-align:center;">
-            <div>${gan}</div>
+            <div><span class="explainable" data-group="ganji" data-term="">${gan}</span></div>
             <div style="font-size:0.8em; color:#555;">${sipsinHtml}</div>
         </td>`;
 
@@ -568,7 +568,7 @@ return `<td class="clickable${sajuGanArr.includes(gan) ? ' saju-blue' : ''}"
 const jijiRow = `<tr id="jiji-row">
   <th>지지</th>
   ${jijiArr.map(jj =>
-    `<td class="jiji-clickable${(sajuJijiArr || []).map(norm).includes(jj) ? ' saju-blue' : ''}" data-jiji="${jj}" style="cursor:pointer;">${jj}</td>`
+    `<td class="jiji-clickable${(sajuJijiArr || []).map(norm).includes(jj) ? ' saju-blue' : ''}" data-jiji="${jj}" style="cursor:pointer;"><span class="explainable" data-group="ganji" data-term="${jj}">${jj}</span></td>`
   ).join('')}
 </tr>`;
 
@@ -1374,21 +1374,21 @@ const allXGanji = maskedGanji.every(v => {
 // ✅ 각 표별로 독립적으로 줄 삭제
 const rowGan = shouldDeleteRow(maskedGan) ? '' : `
   <tr>
-    <td>${sinsalName}</td>
+    <td><span class="explainable" data-group="etcsinsal" data-term="">${sinsalName}</span></td>
     ${maskedGan.map(v => `<td>${v || ''}</td>`).join('')}
   </tr>
 `;
 
 const rowJiji = shouldDeleteRow(maskedJiji) ? '' : `
   <tr>
-    <td>${sinsalName}</td>
+    <td><span class="explainable" data-group="etcsinsal" data-term="">${sinsalName}</span></td>
     ${maskedJiji.map(v => `<td>${v || ''}</td>`).join('')}
   </tr>
 `;
 
 const rowGanji = shouldDeleteRow(maskedGanji) ? '' : `
   <tr>
-    <td style="text-align:center;">${sinsalName}</td>
+    <td><span class="explainable" data-group="etcsinsal" data-term="">${sinsalName}</span></td>
     ${maskedGanji.map(v => `<td>${v || ''}</td>`).join('')}
   </tr>
 `;

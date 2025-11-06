@@ -510,7 +510,7 @@ export function getDangryeongCheongans(dangryeong) {
     })
     .join('');
 
-  return `<span class="explainable" data-group="terms" data-term="">사령식</span>: ${styled}`;
+  return `<span class="explainable" data-group="terms" data-term="">사령식</span>: <span class="explainable" data-group="dang" data-term="">${styled}</span>`;
 }
 
 
@@ -881,7 +881,7 @@ const johuRow1 = `
            text-align:center;
            vertical-align:middle;
            white-space:nowrap;">
-             <span class="explainable" data-group="terms" data-term="">조후<br>용신</span><br>[<span style="color:blue;">${applyType}</span>]</td>
+             <span class="explainable" data-group="terms" data-term="">조후<br>용신</span><br>[<span class="explainable" data-group="terms" data-term=""; style="color:blue;">${applyType}</span>]</td>
     <td style="background-color:#fff8dc;">기준</td>
     ${johuChars.map((ch, i) => {
       const desc = johuMeaning[i] || "";
@@ -1028,7 +1028,7 @@ export function getJohuApplyType() {
       if (targetFromSamhap === target) {
         console.log("🟢 삼합 보정으로 양 판정:", key, "=>", targetFromSamhap);
         console.groupEnd();
-        return "양";
+        return "+";
       }
     }
   }
@@ -2201,9 +2201,9 @@ console.log("📦 1차 필터링 + 중복제거 결과:", firstList);
 
       return `
         <tr>
-          <td style="border:1px solid #ccc; padding:4px;">${구분}</td>
+          <td style="border:1px solid #ccc; padding:4px;"><span class="explainable" data-group="taegwa" data-term="">${구분}</span></td>
           <td style="border:1px solid #ccc; padding:4px;"><span style="color:red;">${원인}</span></td>
-          <td style="border:1px solid #ccc; padding:4px;"><strong>${tags}</strong></td>
+          <td style="border:1px solid #ccc; padding:4px;"><strong><span class="explainable" data-group="taegwa" data-term="">${tags}</span></strong></td>
           <td style="border:1px solid #ccc; padding:4px;">${조건}</td>
           <td style="border:1px solid #ccc; padding:4px;"><span style="color:blue;">${yakStr}</span></td>
         </tr>
@@ -2215,10 +2215,10 @@ console.log("📦 1차 필터링 + 중복제거 결과:", firstList);
         <tr style="background:#f2f2f2;">
           <th rowspan="${secondList.length + 1}" style="padding:4px; background:#e6f0ff;"><span class="explainable" data-group="terms" data-term="">태과불급</span>+</th>
           <th style="padding:4px; background:#fff8dc;">구분</th>
-          <th style="padding:4px; background:#fff8dc;">원인</th>
+          <th style="padding:4px; background:#fff8dc;"><span class="explainable" data-group="taegwa" data-term="">원인</span></th>
           <th style="padding:4px; background:#fff8dc;">명칭</th>
           <th style="padding:4px; background:#fff8dc;">조건</th>
-          <th style="padding:4px; background:#fff8dc;">藥</th>
+          <th style="padding:4px; background:#fff8dc;"><span class="explainable" data-group="taegwa" data-term="">藥</span></th>
         </tr>
         ${rows}
       </table>
@@ -2316,8 +2316,8 @@ export function renderSimpleTable() {
       <tr style="background:#f9f9f9;">
         <th>多한 글자</th>
         <th>부족한 글자</th>
-        <th>태과불급</th>
-        <th>선택된 대운세운</th>
+        <th>태과불급 忌 유발 글자</th>
+        <th>선택된 運의 글자[촉발자]</th>
       </tr>
       <tr>
         <td>${window.multiList.join(", ") || "-"}</td>
