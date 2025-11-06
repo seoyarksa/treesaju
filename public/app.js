@@ -5491,195 +5491,11 @@ requestAnimationFrame(() => {
 
 
   console.log("[saju] OK to render");
-
-  // ✅ renderSaju 내부 (사주 출력 완료 직후)
-// ✅ 사주 출력이 끝나는 부분 (renderSaju 마지막 catch 위나 return 직전)
-// renderSaju 마지막 부분 어딘가(출력 끝났을 때)
-try {
-  const formKey = `${year}-${month}-${day}-${hour}-${minute}-${calendarType}-${gender}`;
-  const formData = { year, month, day, hour, minute, calendarType, gender };
-
-  // 새 탭도 복원되길 원하면 localStorage, 현재 탭만이면 sessionStorage
-localStorage.setItem("lastSajuFormKey", formKey);
-localStorage.setItem("lastSajuFormData", JSON.stringify(formData));
-localStorage.setItem("lastSajuResult", JSON.stringify(resultData));
-
-  console.log('💾 마지막 사주 저장:', formKey);
-} catch(e) {
-  console.warn('[save saju failed]', e);
-}
-
-
-
   // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
 // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
 // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
 
   }
-
-
-
-  // 탭 복귀 시 흔히 붙여둔 재초기화/재요청 로직을 전부 무력화하는 가드
-(function guardFocusVisibilityReinit(){
-  // pageshow(bfcache)로 돌아와도 재초기화 금지
-  window.addEventListener('pageshow', (e) => {
-    // persisted=true면 bfcache 복귀 — 이미 화면/상태가 살아있으니 아무 것도 하지 않음
-    if (e.persisted) {
-      // no-op
-    }
-  });
-
-  // 보통 여기에 init이나 requestSubmit을 걸어두는데, 전부 무시
-  window.addEventListener('focus', () => {
-    // no-op: 탭 복귀 시 재실행 금지
-  });
-
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) {
-      // no-op: 탭이 다시 보일 때도 재실행 금지
-    }
-  });
-})();
-
-// ✅ 전역 Click Delegation (한 번만 설치)
-//    개별 버튼에 바인딩하던 걸 모두 여기에서 라우팅합니다.
-(function bindGlobalDelegates(){
-  if (window.__DELEGATES_BOUND__) return;
-  window.__DELEGATES_BOUND__ = true;
-
-  // 클릭 중복 방지 (빠른 더블클릭 보호)
-  let lastClickAt = 0;
-
-  document.addEventListener('click', async (e) => {
-    const now = Date.now();
-    if (now - lastClickAt < 150) return; // 150ms 내 중복 방지
-    lastClickAt = now;
-
-    const el = e.target;
-
-    // ─────────────────────────────
-    // 0) 혹시 상시 깔린 오버레이가 클릭을 먹는 경우가 있어 제거
-    killStuckOverlay();
-
-    // 도우미
-    const is = (sel) => el.matches?.(sel) || el.closest?.(sel);
-
-    // ─────────────────────────────
-    // 1) 로그아웃
-    if (is('#logoutBtn')) {
-      e.preventDefault();
-      try {
-        window.__MANUAL_LOGOUT__ = true;
-        await window.supabaseClient.auth.signOut();
-      } finally {
-        window.__MANUAL_LOGOUT__ = false;
-        updateAuthUI?.(null);
-      }
-      return;
-    }
-
-    // ─────────────────────────────
-    // 2) 회원정보 수정(예: 저장 버튼/열기 버튼 등)
-    //    wireProfileEditEvents 안에서 개별 바인딩했다면 죽을 수 있음 → 위임으로 보강
-    if (is('#profileEditOpenBtn')) {
-      e.preventDefault();
-      openProfileEditModal?.();
-      return;
-    }
-    if (is('#profileSaveBtn')) {
-      e.preventDefault();
-      await saveProfileChanges?.(); // 너의 기존 함수 호출
-      return;
-    }
-
-    // ─────────────────────────────
-    // 3) 정기구독/결제 정보(예상되는 버튼 id들 커버)
-    if (is('#subscribeBtn, #billingBtn, #openPlanModalBtn')) {
-      e.preventDefault();
-      openSubscriptionModal?.(); // 네가 쓰는 기존 함수명에 맞춰주세요
-      return;
-    }
-
-    // ─────────────────────────────
-    // 4) 사주 출력
-    if (is('#sajuSubmit')) {
-      e.preventDefault();
-      const form = document.getElementById('saju-form');
-      if (form) {
-        window.outputMode = 'basic';
-        try { form.requestSubmit(); } catch(_) { form.submit(); }
-      }
-      return;
-    }
-
-    // 5) 12운성/12신살 탭 토글 (가능한 id/데이터속성 모두 커버)
-    if (is('#sinsalBtn, [data-action="switch-mode"][data-mode="sinsal"]')) {
-      e.preventDefault();
-      const form = document.getElementById('saju-form');
-      if (form) {
-        window.outputMode = 'sinsal';
-        try { form.requestSubmit(); } catch(_) { form.submit(); }
-      }
-      return;
-    }
-    if (is('#unseongBtn, [data-action="switch-mode"][data-mode="basic"]')) {
-      e.preventDefault();
-      const form = document.getElementById('saju-form');
-      if (form) {
-        window.outputMode = 'basic';
-        try { form.requestSubmit(); } catch(_) { form.submit(); }
-      }
-      return;
-    }
-
-    // (참고) 이미 위임으로 처리한 것들: .saju-record-link / .delete-record-btn 등은 그대로 유지
-  }, { passive: true });
-
-  // 탭 복귀/페이지 캐시 복원 시 혹시 내부에서 다시 바인딩해도
-  // 위임은 살아 있으므로 추가 조치 불필요. 그래도 안전하게 모달 닫기/포인터 복구.
-  window.addEventListener('pageshow', (e) => { if (e.persisted) killStuckOverlay(); });
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') killStuckOverlay(); });
-
-  // 오버레이/포인터 이슈 방지 유틸
-  function killStuckOverlay(){
-    // 흔한 오버레이/백드롭 후보들
-    const blockers = document.querySelectorAll(`
-      .modal-backdrop, .overlay, .backdrop, #overlay, [data-backdrop="true"]
-    `);
-    blockers.forEach(b => {
-      const cs = getComputedStyle(b);
-      // 화면에 보이면서 pointer-events가 켜져 있으면 클릭을 가로챌 수 있음
-      if (cs.display !== 'none' && cs.visibility !== 'hidden' && cs.pointerEvents !== 'none') {
-        // 우선 pointer-events만 꺼서 안전하게 클릭 통과
-        b.style.pointerEvents = 'none';
-      }
-    });
-
-    // 혹시 전체 래퍼가 pointer-events:none 되어 있으면 복구
-    const app = document.getElementById('app') || document.body;
-    const cs = getComputedStyle(app);
-    if (cs.pointerEvents === 'none') {
-      app.style.pointerEvents = 'auto';
-    }
-  }
-})();
-
-// ✅ 페이지 로드 시 직전 사주 자동 복원
-// ✅ 페이지 로드 시 직전 사주 자동 복원
-// 새로고침/탭 복귀 시 자동 복원 (자동 제출 없이도 이전 결과로 고정)
-window.addEventListener('DOMContentLoaded', async () => {
-  try {
-    const savedData = localStorage.getItem('lastSajuFormData');
-    if (savedData && !sessionStorage.getItem('__RESTORE_DONE__')) {
-      const formData = JSON.parse(savedData);
-      await renderSaju(formData);
-      sessionStorage.setItem('__RESTORE_DONE__', '1'); // 같은 세션 중복 복원 방지
-    }
-  } catch (e) {
-    console.warn('[auto restore error]', e);
-  }
-});
-
 
 
 
@@ -6114,7 +5930,6 @@ function __miniWireMinimizePersist(box) {
 
 
 
-
 // renderUserProfile 정의는 그대로 유지 (드롭인 교체)
 async function renderUserProfile() {
   const { data: { user } } = await window.supabaseClient.auth.getUser();
@@ -6158,31 +5973,6 @@ async function renderUserProfile() {
 
 // === 초기화 (하나로 통합)
 document.addEventListener("DOMContentLoaded", async () => {
-
-  // 🔻 ① 여기에 자동 복원 코드 넣기
-  try {
-   const savedKey = localStorage.getItem("lastSajuFormKey");
-   const savedData = localStorage.getItem("lastSajuFormData");
-   const savedResult = localStorage.getItem("lastSajuResult");
-
-    if (!sessionStorage.getItem("__RESTORE_DONE__") && savedKey && savedData) {
-      console.log("🔁 새로고침 후 이전 사주 자동 복원:", savedKey);
-      const formData = JSON.parse(savedData);
-
-      // ⚠️ renderSaju가 formData 하나만 받는 구조면 이 줄로 충분
-      await renderSaju(formData);
-       sessionStorage.setItem("__RESTORE_DONE__", "1"); // 같은 세션에서 중복 복원 방지
-
-      // 만약 renderSaju가 2개 인자를 받는 구조면:
-      // await renderSaju(formData, JSON.parse(savedResult));
-    } else {
-      console.log("ℹ️ 이전 사주 데이터 없음 — 기본 상태로 시작");
-    }
-  } catch (e) {
-    console.warn("[Auto Restore Error]", e);
-  }
-
-
   try {
     console.log("[app] DOM ready");
 
@@ -6336,25 +6126,16 @@ window.addEventListener("beforeunload", () => {
         }
       }
 
-     // 🔒 새로고침은 '진짜로 필요할 때만'
-     if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
-       // 1) 직전 사주가 저장돼 있으면 굳이 리로드 불필요 → 스킵
-       const hasSaved = !!localStorage.getItem("lastSajuFormData");
-       // 2) 탭이 백그라운드였다가 포그라운드로 올 때 오는 케이스도 스킵
-       const notVisible = document.visibilityState !== "visible";
-       if (hasSaved || notVisible) {
-        updateAuthUI(newSession);
-         return;
-       }
-       if (!__reloading) {
-         __reloading = true;
-         if (window.location.hash) {
-           history.replaceState(null, "", window.location.pathname + window.location.search);
-         }
-         window.location.reload();
-       }
-       return;
-     }
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+        if (!__reloading) {
+          __reloading = true;
+          if (window.location.hash) {
+            history.replaceState(null, "", window.location.pathname + window.location.search);
+          }
+          window.location.reload();
+        }
+        return;
+      }
       updateAuthUI(newSession);
     });
 
@@ -6582,10 +6363,6 @@ function bindAuthPipelines() {
 
         // 4) UI 반영
         updateAuthUI(session);
-
-          console.log("🪄 로그인 직전 상태 백업 시도");
-  // sessionStorage는 자동 보존되지만, 혹시 새로 로그인으로 덮어쓸 때 대비
-  sessionStorage.setItem("__autoRestorePending", "1");
       }
 
       if (event === "SIGNED_OUT") {

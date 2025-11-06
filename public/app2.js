@@ -5498,6 +5498,7 @@ requestAnimationFrame(() => {
   }
 
 
+
 // ─── 미니 사주창: CSS 주입 ───
 (function injectMiniSajuCSS(){
   if (document.getElementById('mini-saju-style')) return;
@@ -5614,17 +5615,20 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
   let box = document.getElementById('saju-mini');
   if (!box) {
     box = document.createElement('div');
-    box.id = 'saju-mini';
-    box.innerHTML = `
-      <div class="bar">
-        <strong id="saju-mini-title">사주팔자</strong>
-        <div>
-          <button class="btn" id="saju-mini-min" title="접기">—</button>
-          <button class="btn" id="saju-mini-close" title="닫기">×</button>
-        </div>
-      </div>
-      <div class="body" id="saju-mini-body"></div>
-    `;
+// 박스 생성할 때 (네 코드의 box.innerHTML 부분 교체)
+box.id = 'saju-mini';
+box.className = 'saju-mini';
+box.innerHTML = `
+  <div class="saju-mini__bar">   <!-- 드래그 핸들 -->
+    <strong id="saju-mini-title">사주팔자</strong>
+    <div class="saju-mini__actions">
+      <button class="btn" id="saju-mini-min" title="접기">—</button>
+      <button class="btn" id="saju-mini-close" title="닫기">×</button>
+    </div>
+  </div>
+  <div class="saju-mini__body" id="saju-mini-body"></div>
+`;
+
     // (중요) DOM에 붙인 다음 제목 세팅
     document.body.appendChild(box);
     setMiniTitle('after-append');
@@ -5710,6 +5714,219 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
     el.textContent = v ? `사주팔자(${v})` : '사주팔자';
   });
 })();
+
+
+// 0) CSS: 드래그 표시/선택 방지
+(function injectMiniSajuDragCSS(){
+  if (document.getElementById('mini-saju-drag-style')) return;
+  const s = document.createElement('style');
+  s.id = 'mini-saju-drag-style';
+  s.textContent = `
+    #saju-mini .bar { cursor: grab; }
+    #saju-mini.is-dragging, #saju-mini.is-dragging * { cursor: grabbing !important; user-select: none; }
+  `;
+  document.head.appendChild(s);
+})();
+
+// 1) 위치 저장/복원 유틸
+const MINI_POS_KEY = 'sajuMiniPos';
+const MINI_MIN_KEY = 'sajuMiniMinimized';
+
+function __miniLoadPos() {
+  try {
+    const raw = localStorage.getItem(MINI_POS_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (typeof obj?.left === 'number' && typeof obj?.top === 'number') return obj;
+  } catch {}
+  return null;
+}
+
+function __miniSavePos(left, top) {
+  try { localStorage.setItem(MINI_POS_KEY, JSON.stringify({ left, top })); } catch {}
+}
+
+function __miniApplyPos(box, left, top) {
+  // fixed 기준 좌상단 배치로 전환
+  box.style.left = `${left}px`;
+  box.style.top  = `${top}px`;
+  box.style.right = 'auto';
+  box.style.bottom = 'auto';
+}
+
+function __miniClampToViewport(left, top, box) {
+  const pad = 8;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const rect = box.getBoundingClientRect();
+  const w = rect.width || 300;
+  const h = rect.height || 220;
+  const clampedLeft = Math.min(Math.max(left, pad), Math.max(vw - w - pad, pad));
+  const clampedTop  = Math.min(Math.max(top,  pad), Math.max(vh - h - pad, pad));
+  return { left: clampedLeft, top: clampedTop };
+}
+
+// 2) 드래그 바인딩
+function __miniMakeDraggable(box) {
+  const handle = box.querySelector('.bar');
+  if (!handle) return;
+
+  let startX = 0, startY = 0, baseLeft = 0, baseTop = 0;
+
+  const onPointerMove = (e) => {
+    if (!box.classList.contains('is-dragging')) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    let left = baseLeft + dx;
+    let top  = baseTop + dy;
+    ({ left, top } = __miniClampToViewport(left, top, box));
+    __miniApplyPos(box, left, top);
+  };
+
+  const onPointerUp = (e) => {
+    if (!box.classList.contains('is-dragging')) return;
+    box.classList.remove('is-dragging');
+    document.removeEventListener('pointermove', onPointerMove);
+    document.removeEventListener('pointerup', onPointerUp);
+
+    const rect = box.getBoundingClientRect();
+    __miniSavePos(rect.left, rect.top);
+  };
+
+  handle.addEventListener('pointerdown', (e) => {
+    // 텍스트 드래그/더블클릭 등 방지
+    e.preventDefault();
+
+    // 현재 위치 기준 계산(기본 우하단 고정 상태일 수도 있으므로 좌표 환산)
+    const rect = box.getBoundingClientRect();
+    startX = e.clientX;
+    startY = e.clientY;
+    baseLeft = rect.left;
+    baseTop  = rect.top;
+
+    // 드래그 모드 진입 + 좌상단 고정 모드로 전환
+    box.classList.add('is-dragging');
+    __miniApplyPos(box, baseLeft, baseTop);
+
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
+  }, { passive: false });
+
+  // 화면 크기 변할 때 화면 바깥으로 나가지 않도록 스냅
+  window.addEventListener('resize', () => {
+    const pos = __miniLoadPos();
+    if (!pos) return;
+    let { left, top } = __miniClampToViewport(pos.left, pos.top, box);
+    __miniApplyPos(box, left, top);
+    __miniSavePos(left, top);
+  });
+}
+
+// 3) 최소화 상태 저장/복원
+function __miniRestoreMinimized(box) {
+  const v = localStorage.getItem(MINI_MIN_KEY);
+  if (v === '1') box.classList.add('is-min');
+}
+function __miniWireMinimizePersist(box) {
+  const btn = box.querySelector('#saju-mini-min');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const minimized = box.classList.toggle('is-min');
+    try { localStorage.setItem(MINI_MIN_KEY, minimized ? '1' : '0'); } catch {}
+  });
+}
+
+// 4) 렌더 직후 한 번만 호출 (네 renderSajuMiniFromCurrentOutput 내부 “박스 생성” 이후 위치에 추가)
+// 4) 렌더 직후 초기화 + DOM 감시(박스가 생길 때마다 자동 배선/복원)
+(function setupMiniSajuObserver(){
+  const SEL = '#saju-mini';
+
+  function initMiniSajuPositioning(box) {
+    if (!box || box.dataset.wired === '1') return;
+    box.dataset.wired = '1';
+
+    // 드래그/최소화 배선
+    __miniMakeDraggable(box);
+    __miniWireMinimizePersist(box);
+    __miniRestoreMinimized(box);
+
+    // 저장된 위치 복원(없으면 현 상태 유지)
+    const pos = __miniLoadPos();
+    if (pos) {
+      let { left, top } = __miniClampToViewport(pos.left, pos.top, box);
+      __miniApplyPos(box, left, top);
+      __miniSavePos(left, top); // 클램프된 값으로 갱신
+    } else {
+      // 최초 한 번: 현재 위치(우하단 fixed) 좌표로 환산해 저장(선택)
+      const r = box.getBoundingClientRect();
+      __miniSavePos(r.left, r.top);
+    }
+  }
+
+  // 이미 떠 있으면 즉시 초기화
+  const exist = document.querySelector(SEL);
+  if (exist) initMiniSajuPositioning(exist);
+
+  // 이후로는 DOM 감시: 미니창이 새로 붙을 때마다 자동 배선
+  const mo = new MutationObserver((ms) => {
+    for (const m of ms) {
+      if (m.type !== 'childList') continue;
+      // 추가된 노드들 중 saju-mini 탐색
+      for (const n of m.addedNodes) {
+        if (!(n instanceof Element)) continue;
+        if (n.id === 'saju-mini') {
+          initMiniSajuPositioning(n);
+        } else {
+          const found = n.querySelector?.(SEL);
+          if (found) initMiniSajuPositioning(found);
+        }
+      }
+    }
+  });
+  mo.observe(document.body || document.documentElement, { childList: true, subtree: true });
+
+  // 편의 API(필요하면 콘솔/코드에서 호출)
+  window.sajuMini = window.sajuMini || {};
+  window.sajuMini.reinit = () => {
+    const box = document.querySelector(SEL);
+    if (box) {
+      box.dataset.wired = '';
+      initMiniSajuPositioning(box);
+    }
+  };
+  window.sajuMini.getPosition = () => __miniLoadPos();
+  window.sajuMini.savePosition = () => {
+    const box = document.querySelector(SEL);
+    if (!box) return;
+    const r = box.getBoundingClientRect();
+    __miniSavePos(r.left, r.top);
+  };
+  window.sajuMini.resetPosition = (corner = 'br') => {
+    const box = document.querySelector(SEL);
+    if (!box) return;
+    // 코너 스냅: br(우하), tr(우상), bl(좌하), tl(좌상)
+    const pad = 16;
+    const w = box.getBoundingClientRect().width || 300;
+    const h = box.getBoundingClientRect().height || 220;
+    let left, top;
+    switch (corner) {
+      case 'tr': left = window.innerWidth - w - pad; top = pad; break;
+      case 'bl': left = pad; top = window.innerHeight - h - pad; break;
+      case 'tl': left = pad; top = pad; break;
+      case 'br':
+      default:   left = window.innerWidth - w - pad; top = window.innerHeight - h - pad; break;
+    }
+    ({ left, top } = __miniClampToViewport(left, top, box));
+    __miniApplyPos(box, left, top);
+    __miniSavePos(left, top);
+  };
+})();
+
+
+
+
+
+
 
 
 
