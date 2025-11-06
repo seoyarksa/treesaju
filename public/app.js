@@ -5657,37 +5657,61 @@ box.innerHTML = `
   }
 
   // 7) 본문 표 렌더
-  const body = box.querySelector('#saju-mini-body');
-  const C = (txt) => (typeof _colorize === 'function' ? _colorize(txt) : (txt ?? ''));
-  const coerceCol = (p) => (!p || typeof p !== 'object')
-    ? { gan:'-', ten:'-', jiji:'-', hides:[] }
-    : { gan: p.gan ?? '-', ten: p.ten ?? '-', jiji: p.jiji ?? '-', hides: Array.isArray(p.hides) ? p.hides : [] };
+  // 7) 본문 표 렌더 (+ 대운/세운 칸)
+const body = box.querySelector('#saju-mini-body');
+const C = (txt) => (typeof _colorize === 'function' ? _colorize(txt) : (txt ?? ''));
+const coerceCol = (p) => (!p || typeof p !== 'object')
+  ? { gan:'-', ten:'-', jiji:'-', hides:[] }
+  : { gan: p.gan ?? '-', ten: p.ten ?? '-', jiji: p.jiji ?? '-', hides: Array.isArray(p.hides) ? p.hides : [] };
 
-  const columns = [data.hour, data.day, data.month, data.year].map(coerceCol);
+const pillars = [data.hour, data.day, data.month, data.year].map(coerceCol);
 
-  body.innerHTML = `
-    <table class="mini-grid">
-      <thead>
-        <tr>
-          <th>시주</th>
-          <th>일주</th>
-          <th>월주</th>
-          <th>년주</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          ${columns.map(p => `<td><strong>${C(p.gan)}</strong> <small>(${C(p.ten)})</small></td>`).join('')}
-        </tr>
-        <tr>
-          ${columns.map(p => `<td><strong>${C(p.jiji)}</strong></td>`).join('')}
-        </tr>
-        <tr>
-          ${columns.map(p => `<td>${p.hides.length ? p.hides.map(h => `<span class="saju-chip">(${h})</span>`).join('') : '-'}</td>`).join('')}
-        </tr>
-      </tbody>
-    </table>
-  `;
+// ── 저장된 대운/세운 불러오기(없으면 '-') ──
+const MINI_DAEYUN_KEY = 'sajuMiniSelDaeyun';
+const MINI_SEWOON_KEY = 'sajuMiniSelSewoon';
+function __miniLoadSel(key){
+  try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch { return {}; }
+}
+const selD = __miniLoadSel(MINI_DAEYUN_KEY); // { main, sub }
+const selS = __miniLoadSel(MINI_SEWOON_KEY); // { main, sub }
+
+// 안전 기본값
+const D = { main: selD?.main || '-', sub: selD?.sub || '' };
+const S = { main: selS?.main || '-', sub: selS?.sub || '' };
+
+// ── 표 렌더 ──
+body.innerHTML = `
+  <table class="mini-grid">
+    <thead>
+      <tr>
+        <th>시주</th>
+        <th>일주</th>
+        <th>월주</th>
+        <th>년주</th>
+        <th>大</th>
+        <th>世</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        ${pillars.map(p => `<td><strong>${C(p.gan)}</strong> <small>(${C(p.ten)})</small></td>`).join('')}
+        <td id="mini-daeyun-r1"><strong>${D.main}</strong></td>
+        <td id="mini-sewoon-r1"><strong>${S.main}</strong></td>
+      </tr>
+      <tr>
+        ${pillars.map(p => `<td><strong>${C(p.jiji)}</strong></td>`).join('')}
+        <td id="mini-daeyun-r2">${D.sub ? `<small>${D.sub}</small>` : '-'}</td>
+        <td id="mini-sewoon-r2">${S.sub ? `<small>${S.sub}</small>` : '-'}</td>
+      </tr>
+      <tr>
+        ${pillars.map(p => `<td>${p.hides.length ? p.hides.map(h => `<span class="saju-chip">(${h})</span>`).join('') : '-'}</td>`).join('')}
+        <td id="mini-daeyun-r3">-</td>
+        <td id="mini-sewoon-r3">-</td>
+      </tr>
+    </tbody>
+  </table>
+`;
+
 
   // 8) 제목 즉시/지연 갱신(자동입력 대응)
   setMiniTitle();
@@ -5697,6 +5721,35 @@ box.innerHTML = `
 
 
 
+// 대운/세운 미니창 셋터 (아주 단순)
+(function exposeMiniSelAPIs(){
+  const MINI_DAEYUN_KEY = 'sajuMiniSelDaeyun';
+  const MINI_SEWOON_KEY = 'sajuMiniSelSewoon';
+  function save(key, v){ try{ localStorage.setItem(key, JSON.stringify(v)); }catch{} }
+  function setCell(id, html){ const el = document.getElementById(id); if (el) el.innerHTML = html; }
+
+  window.sajuMini = window.sajuMini || {};
+
+  // setDaeyun(main, sub?)
+  window.sajuMini.setDaeyun = (main, sub='')=>{
+    main = String(main||'').trim(); sub = String(sub||'').trim();
+    const v = { main: main || '-', sub: sub || '' };
+    save(MINI_DAEYUN_KEY, v);
+    // 즉시 반영(미니창 열려 있으면)
+    setCell('mini-daeyun-r1', `<strong>${v.main}</strong>`);
+    setCell('mini-daeyun-r2', v.sub ? `<small>${v.sub}</small>` : '-');
+  };
+
+  // setSewoon(main, sub?)
+  window.sajuMini.setSewoon = (main, sub='')=>{
+    main = String(main||'').trim(); sub = String(sub||'').trim();
+    const v = { main: main || '-', sub: sub || '' };
+    save(MINI_SEWOON_KEY, v);
+    // 즉시 반영
+    setCell('mini-sewoon-r1', `<strong>${v.main}</strong>`);
+    setCell('mini-sewoon-r2', v.sub ? `<small>${v.sub}</small>` : '-');
+  };
+})();
 
 
 
