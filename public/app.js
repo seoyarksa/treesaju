@@ -2610,6 +2610,16 @@ async function handleSajuSubmit(e) {
       const limitGuest = getDailyLimit(guestProfile); // 정책 반영(60일 이후 0, 이전 3)
       const remainingPreview = (limitGuest === Infinity) ? Infinity : Math.max(limitGuest - todayCount, 0);
 
+
+// ✅ 먼저 "같은 사주"인 경우를 허용해야 함
+if (window.lastOutputData === formKey) {
+  console.log("⚠️ 동일 입력(직전과 동일, 게스트) → 카운트 증가 없이 출력만");
+  renderSaju(formData);
+  return;
+}
+
+// 🔸 그 다음에 남은 횟수 검사
+
       if (limitGuest !== Infinity && remainingPreview <= 0) {
         alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다.");
         updateCountDisplayFromGate({
@@ -2621,12 +2631,6 @@ async function handleSajuSubmit(e) {
         return; // ✅ 출력 차단
       }
 
-      // ✅ 직전과 동일할 때만 '카운트 없이' 출력 허용
-      if (window.lastOutputData === formKey) {
-        console.log("⚠️ 동일 입력(직전과 동일, 게스트) → 카운트 증가 없이 출력만");
-        renderSaju(formData);
-        return;
-      }
 
 
 // === 오늘 날짜 예외 처리 (년월일시까지만 비교) ===
