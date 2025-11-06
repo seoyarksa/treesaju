@@ -5749,18 +5749,24 @@ console.log('[mini:init] selected=', window.selectedDaewoon, window.selectedSewo
   }
 
   // 2) 지장간 칩 생성(HanhiddenStemsMap 사용)
-  function makeHides(jiHan){
-    const map = window.HanhiddenStemsMap || {};
-    const arr = map[jiHan] || [];
-    if (!arr.length) return "-";
-    const getTenGod = window.getTenGod || null;
-    const dayKor    = window.dayGanKorGan || "";
-    const h2k       = window.convertHanToKorStem || (s=>s);
-    return arr.map(han=>{
-      const ten = (getTenGod && dayKor) ? (getTenGod(dayKor, h2k(han))||"") : "";
-      return `<span class="saju-chip">(${han}${ten ? " " + ten : ""})</span>`;
-    }).join("");
-  }
+function makeHides(jiHan){
+  const map = window.HanhiddenStemsMap || {};
+  const arr = map[jiHan] || [];
+  if (!arr.length) return "-";
+
+  // ★ 십신 계산 준비: _getTenGod / _convertHanToKorStem 우선 사용 + 폴백 맵
+  const getTenGod = (typeof _getTenGod === "function" ? _getTenGod : window.getTenGod) || null;
+  const STEM_H2K = { '甲':'갑','乙':'을','丙':'병','丁':'정','戊':'무','己':'기','庚':'경','辛':'신','壬':'임','癸':'계' };
+  const h2k = (typeof _convertHanToKorStem === "function" ? _convertHanToKorStem
+             : (window.convertHanToKorStem || (s => STEM_H2K[s] || s)));
+  const base = window.dayGanKorGan || "";
+
+  return arr.map(han => {
+    const ten = (getTenGod && base) ? (getTenGod(base, h2k(han)) || "") : "";
+    return `<span class="saju-chip">(${han}${ten ? " " + ten : ""})</span>`;
+  }).join("");
+}
+
 
   // 3) 적용
   function apply(prefix, gan, ji){
