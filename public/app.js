@@ -5729,6 +5729,54 @@ body.innerHTML = `
   </table>
 `;
 
+// ▶ 미니 大/世 채우기: 간(+십신) / 지지 / 지장간칩
+(function fillMiniDaeyunSewoon(){
+  const getTenGod = _getTenGod || window.getTenGod;
+  const h2k = _convertHanToKorStem || window.convertHanToKorStem;
+  const k2h = _convertKorToHanStem || window.convertKorToHanStem;
+  const base = (typeof dayGanKorGan !== 'undefined' ? dayGanKorGan : window.dayGanKorGan) || '';
+  const map  = window.jijiToSibganMap || {};
+
+  function chipsForJi(jiHan){
+    const raw = map[jiHan] || map[h2k?.(jiHan) || ''] || [];
+    if (!raw.length) return '';
+    return raw.map(it => {
+      // '갑' 같은 문자열 or { stem:'갑', isMiddle:true }
+      const kor = (typeof it === 'string') ? it : (it.stem || it.kor || '');
+      const han = k2h ? (k2h(kor) || kor) : kor;
+      const ten = getTenGod ? (getTenGod(base, kor) || '') : '';
+      const mid = (typeof it === 'object' && it.isMiddle) ? ' (중기)' : '';
+      return `<span class="saju-chip">(${han} ${ten}${mid})</span>`;
+    }).join('');
+  }
+
+  function apply(prefix, stemHan, branchHan){
+    if (!stemHan || !branchHan) return;
+
+    // 1) 간(+십신)
+    const ten = (getTenGod && h2k) ? (getTenGod(base, h2k(stemHan)) || '') : '';
+    const elGan = document.getElementById(`${prefix}-gan`);
+    if (elGan) elGan.innerHTML = `<strong>${stemHan}</strong>${ten ? ` <small>(${ten})</small>` : ''}`;
+
+    // 2) 지지
+    const elJi = document.getElementById(`${prefix}-ji`);
+    if (elJi) elJi.innerHTML = `<strong>${branchHan}</strong>`;
+
+    // 3) 지장간 칩
+    const elH = document.getElementById(`${prefix}-hides`);
+    if (elH) elH.innerHTML = chipsForJi(branchHan) || '-';
+  }
+
+  // 선택된 값으로 반영 (네가 이미 전역에 저장하고 있음)
+  if (window.selectedDaewoon) {
+    apply('mini-daeyun', window.selectedDaewoon.stem, window.selectedDaewoon.branch);
+  }
+  if (window.selectedSewoon) {
+    apply('mini-sewoon', window.selectedSewoon.stem, window.selectedSewoon.branch);
+  }
+})();
+
+
 // === [미니창 패치] 대운/세운도 사주와 동일 포맷으로 표시 ===
 // 미니창이 이미 들고 있는 계산기들을 그대로 공유
 window.__miniCalc = {
