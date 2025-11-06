@@ -6054,6 +6054,64 @@ window.__miniCalc = {
 })();
 
 
+// === Mini 대/세 지장간: HanhiddenStemsMap로 바로 채우기 (+로그) ===
+(function miniHiddenStemsFill(){
+  const MAP = window.HanhiddenStemsMap;                   // {'戌':['戊','辛','丁'], ...} ← 지금 존재함
+  const getTenGod = window.getTenGod || (()=> '');        // 선택: 십신 없으면 공백
+  const h2kStem   = window.convertHanToKorStem || (s=>s); // 십신 계산시 한자→한글
+  const baseDay   = window.dayGanKorGan || '';            // 예: '기'
+
+  function chipsForJi(jiHan){
+    const arr = MAP?.[jiHan] || [];
+    console.log('[mini:hides:lookup]', jiHan, '→', arr);
+    if (!arr.length) return '-';
+    return arr.map(hanStem=>{
+      const ten = (getTenGod && baseDay) ? (getTenGod(baseDay, h2kStem(hanStem)) || '') : '';
+      return `<span class="saju-chip">(${hanStem}${ten ? ' ' + ten : ''})</span>`;
+    }).join('');
+  }
+
+  function setHides(cellId, jiHan){
+    const el = document.getElementById(cellId);
+    if (!el) { console.warn('[mini:hides] cell not found:', cellId); return; }
+    el.innerHTML = jiHan ? chipsForJi(jiHan) : '-';
+  }
+
+  // 초기 채우기(이미 선택된 게 있으면)
+  if (window.selectedDaewoon?.branch) setHides('mini-daeyun-hides', window.selectedDaewoon.branch);
+  if (window.selectedSewoon?.branch)  setHides('mini-sewoon-hides', window.selectedSewoon.branch);
+
+  // setDaeyun / setSewoon 호출될 때마다 지장간도 같이 갱신 (얇게 래핑)
+  window.sajuMini = window.sajuMini || {};
+  const prevD = window.sajuMini.setDaeyun;
+  const prevS = window.sajuMini.setSewoon;
+
+  const STEMS = '甲乙丙丁戊己庚辛壬癸'.split('');
+  const BR    = '子丑寅卯辰巳午未申酉戌亥'.split('');
+  const parseGanJi = (a,b)=>{
+    if (b != null) return { gan:String(a||''), ji:String(b||'') };
+    const s = String(a||'');
+    const gan = STEMS.find(ch => s.includes(ch)) || '';
+    const ji  = BR.find(ch   => s.includes(ch)) || '';
+    return { gan, ji };
+  };
+
+  window.sajuMini.setDaeyun = function(a,b){
+    const { ji } = parseGanJi(a,b);
+    console.log('[mini:setDaeyun→hides]', ji);
+    if (prevD) prevD.apply(this, arguments);
+    setHides('mini-daeyun-hides', ji);
+  };
+
+  window.sajuMini.setSewoon = function(a,b){
+    const { ji } = parseGanJi(a,b);
+    console.log('[mini:setSewoon→hides]', ji);
+    if (prevS) prevS.apply(this, arguments);
+    setHides('mini-sewoon-hides', ji);
+  };
+})();
+
+
 // === 지지 지장간 계산 보강: 한자/한글 키 모두 대응 + 값 형식(문자/객체) 모두 대응 ===
 (function patchMiniHidesResolver(){
   // 한자<->한글 지지 변환 테이블(간단)
