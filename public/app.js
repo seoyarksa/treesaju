@@ -6018,26 +6018,91 @@ function __miniWireMinimizePersist(box) {
 }
 
 // 4) 렌더 직후 한 번만 호출 (네 renderSajuMiniFromCurrentOutput 내부 “박스 생성” 이후 위치에 추가)
-(function initMiniSajuPositioning(){
-  const box = document.getElementById('saju-mini');
-  if (!box) return;
+// 4) 렌더 직후 초기화 + DOM 감시(박스가 생길 때마다 자동 배선/복원)
+(function setupMiniSajuObserver(){
+  const SEL = '#saju-mini';
 
-  // 기존 ‘닫기’ 버튼 유지: 위치는 localStorage에 남아 다시 열면 복원됨
-  __miniMakeDraggable(box);
-  __miniWireMinimizePersist(box);
-  __miniRestoreMinimized(box);
+  function initMiniSajuPositioning(box) {
+    if (!box || box.dataset.wired === '1') return;
+    box.dataset.wired = '1';
 
-  // 최초 복원: 저장된 위치가 있으면 적용, 없으면 기존 우하단(16,16) 유지
-  const pos = __miniLoadPos();
-  if (pos) {
-    let { left, top } = __miniClampToViewport(pos.left, pos.top, box);
-    __miniApplyPos(box, left, top);
-  } else {
-    // 없으면 현재 우하단 배치를 좌표로 환산해서 첫 저장(옵션)
+    // 드래그/최소화 배선
+    __miniMakeDraggable(box);
+    __miniWireMinimizePersist(box);
+    __miniRestoreMinimized(box);
+
+    // 저장된 위치 복원(없으면 현 상태 유지)
+    const pos = __miniLoadPos();
+    if (pos) {
+      let { left, top } = __miniClampToViewport(pos.left, pos.top, box);
+      __miniApplyPos(box, left, top);
+      __miniSavePos(left, top); // 클램프된 값으로 갱신
+    } else {
+      // 최초 한 번: 현재 위치(우하단 fixed) 좌표로 환산해 저장(선택)
+      const r = box.getBoundingClientRect();
+      __miniSavePos(r.left, r.top);
+    }
+  }
+
+  // 이미 떠 있으면 즉시 초기화
+  const exist = document.querySelector(SEL);
+  if (exist) initMiniSajuPositioning(exist);
+
+  // 이후로는 DOM 감시: 미니창이 새로 붙을 때마다 자동 배선
+  const mo = new MutationObserver((ms) => {
+    for (const m of ms) {
+      if (m.type !== 'childList') continue;
+      // 추가된 노드들 중 saju-mini 탐색
+      for (const n of m.addedNodes) {
+        if (!(n instanceof Element)) continue;
+        if (n.id === 'saju-mini') {
+          initMiniSajuPositioning(n);
+        } else {
+          const found = n.querySelector?.(SEL);
+          if (found) initMiniSajuPositioning(found);
+        }
+      }
+    }
+  });
+  mo.observe(document.body || document.documentElement, { childList: true, subtree: true });
+
+  // 편의 API(필요하면 콘솔/코드에서 호출)
+  window.sajuMini = window.sajuMini || {};
+  window.sajuMini.reinit = () => {
+    const box = document.querySelector(SEL);
+    if (box) {
+      box.dataset.wired = '';
+      initMiniSajuPositioning(box);
+    }
+  };
+  window.sajuMini.getPosition = () => __miniLoadPos();
+  window.sajuMini.savePosition = () => {
+    const box = document.querySelector(SEL);
+    if (!box) return;
     const r = box.getBoundingClientRect();
     __miniSavePos(r.left, r.top);
-  }
+  };
+  window.sajuMini.resetPosition = (corner = 'br') => {
+    const box = document.querySelector(SEL);
+    if (!box) return;
+    // 코너 스냅: br(우하), tr(우상), bl(좌하), tl(좌상)
+    const pad = 16;
+    const w = box.getBoundingClientRect().width || 300;
+    const h = box.getBoundingClientRect().height || 220;
+    let left, top;
+    switch (corner) {
+      case 'tr': left = window.innerWidth - w - pad; top = pad; break;
+      case 'bl': left = pad; top = window.innerHeight - h - pad; break;
+      case 'tl': left = pad; top = pad; break;
+      case 'br':
+      default:   left = window.innerWidth - w - pad; top = window.innerHeight - h - pad; break;
+    }
+    ({ left, top } = __miniClampToViewport(left, top, box));
+    __miniApplyPos(box, left, top);
+    __miniSavePos(left, top);
+  };
 })();
+
 
 
 
