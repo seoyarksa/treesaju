@@ -2746,7 +2746,7 @@ if (formDate === todayKey && window.lastOutputData) {
       }
       if (!ok?.allowed) {
         let reason = "이용이 제한되었습니다.";
-        if (ok?.remaining === 0) reason = "오늘 사용 가능한 횟수를 모두 소진하셨습니다.";
+        if (ok?.remaining === 0) reason = "오늘 사용 가능한 횟수를 모두 소진하셨습니다!!";
         else if (ok?.limit === 0) reason = "구독이 필요합니다. 결제를 진행해주세요.";
         else if (ok?.message) reason = ok.message;
         alert(reason);
