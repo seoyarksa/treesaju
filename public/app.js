@@ -5805,6 +5805,30 @@ async function renderUserProfile() {
 
 // === 초기화 (하나로 통합)
 document.addEventListener("DOMContentLoaded", async () => {
+
+  // 🔻 ① 여기에 자동 복원 코드 넣기
+  try {
+    const savedKey = sessionStorage.getItem("lastSajuFormKey");
+    const savedData = sessionStorage.getItem("lastSajuFormData");
+    const savedResult = sessionStorage.getItem("lastSajuResult");
+
+    if (savedKey && savedData && savedResult) {
+      console.log("🔁 새로고침 후 이전 사주 자동 복원:", savedKey);
+      const formData = JSON.parse(savedData);
+
+      // ⚠️ renderSaju가 formData 하나만 받는 구조면 이 줄로 충분
+      await renderSaju(formData);
+
+      // 만약 renderSaju가 2개 인자를 받는 구조면:
+      // await renderSaju(formData, JSON.parse(savedResult));
+    } else {
+      console.log("ℹ️ 이전 사주 데이터 없음 — 기본 상태로 시작");
+    }
+  } catch (e) {
+    console.warn("[Auto Restore Error]", e);
+  }
+
+
   try {
     console.log("[app] DOM ready");
 
