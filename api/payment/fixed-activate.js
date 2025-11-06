@@ -1,4 +1,4 @@
-// pages/api/payment/fixed-activate.js
+// /api/payment/fixed-activate.js
 
 // 로컬 개발에서만 .env 로드 (Vercel 프로덕션은 필요 없음)
 

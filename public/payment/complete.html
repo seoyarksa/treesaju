@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>결제 처리</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Apple SD Gothic Neo,Pretendard,Arial,sans-serif;
+         padding:18px; line-height:1.5}
+    .ok{color:#0a7d28} .err{color:#b00020}
+  </style>
+</head>
+<body>
+  <h1>결제 처리</h1>
+  <p id="msg">결제 결과 확인 중입니다…</p>
+
+  <script>
+  (async function () {
+    const msg = document.getElementById('msg');
+    const q = new URLSearchParams(location.search);
+
+    // PortOne가 붙여주는 기본 파라미터
+    const imp_uid = q.get('imp_uid');
+    const merchant_uid = q.get('merchant_uid');
+    const success = q.get('imp_success') ?? q.get('success');
+
+    // 우리가 m_redirect_url에 붙여줄 힌트(선택)
+    const provider = q.get('provider');     // 'kakaopay' 등
+    const kind = q.get('kind');             // 'recurring_start' | 'fixed'
+    const tier = q.get('tier');
+    const customer_uid = q.get('customer_uid');
+    const months = q.get('months');
+    const productId = q.get('productId');
+
+    if (!imp_uid && !merchant_uid) {
+      msg.className = 'err';
+      msg.textContent = '잘못된 접근: 결제 식별자가 없습니다.';
+      return;
+    }
+
+    try {
+      let endpoint = '/api/payment/manage-subscription?action=auto_verify';
+      const payload = { imp_uid, merchant_uid, customer_uid, success, tier };
+
+      if (provider === 'kakaopay' && kind === 'recurring_start') {
+        endpoint = '/api/payment/manage-subscription?action=register';
+      } else if (provider === 'kakaopay' && kind === 'fixed') {
+        endpoint = '/api/payment/fixed-activate';
+        payload.termMonths = Number(months || 0);
+        if (productId) payload.productId = productId;
+      }
+      // 이니시스 등 기타는 auto_verify로 서버가 알아서 확정
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload),
+        credentials: 'include'
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok) {
+        msg.className = 'ok';
+        msg.textContent = '✅ 결제가 완료되었습니다. 구독이 갱신되었어요!';
+        setTimeout(() => {
+          try { window.opener?.location?.reload(); } catch {}
+          location.replace('/');
+        }, 800);
+      } else {
+        msg.className = 'err';
+        msg.textContent = '❌ 결제 확인 실패: ' + (data.error || res.status);
+      }
+    } catch (e) {
+      msg.className = 'err';
+      msg.textContent = '❌ 서버 통신 오류: ' + (e && e.message ? e.message : e);
+    }
+  })();
+  </script>
+</body>
+</html>
+

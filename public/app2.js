@@ -19,7 +19,7 @@ window.TERM_HELP = TERM_HELP;
 import { 
   elementMap, 
   DANGRYEONGSHIK_MAP,
-  yukshinToKey,  
+  yukshinToKey,  HanhiddenStemsMap,
   tenGodMap,
   tenGodMapKor,
   YANG_GAN, YIN_GAN,
@@ -885,8 +885,11 @@ function openSignupModal() {
 // ─── 전화 인증 모달 ───────────────────────────────────────────
 
 
-async function openPhoneOtpModal() {
-  // ── 내부 유틸: 전화번호 가져오기 + 포맷
+// 기존 함수 시그니처는 유지 + (선택) 앵커 파라미터만 추가
+// 전화번호 인증 모달 (앵커 근처 배치 + Web OTP 자동입력 지원)
+async function openPhoneOtpModal(anchor /* 엘리먼트 or 셀렉터 */, opts = {}) {
+  // ─────────────────────────────────────
+  // 내부 유틸: 프로필 번호 조회 + 포맷 (기존 로직 유지)
   async function __fetchProfilePhone() {
     try {
       const { data: { user } } = await window.supabaseClient.auth.getUser();
@@ -908,59 +911,120 @@ async function openPhoneOtpModal() {
     if (only.length === 10) return `${only.slice(0,3)}-${only.slice(3,6)}-${only.slice(6)}`;
     return only;
   }
-  async function __prefillPhoneIntoModal() {
-    const el = document.getElementById("otp-phone");
-    if (!el) return;
-    // 이미 값이 있으면 덮어쓰지 않음
-    if (el.value && el.value.trim() !== "") return;
-    const raw = await __fetchProfilePhone();
-    if (!raw) return;
- // 항상 toKRNational로 국내 하이픈 포맷화(+82 → 0 변환 포함)
- const val = toKRNational(raw);
-    el.value = val;
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-    el.dispatchEvent(new Event("change", { bubbles: true }));
-  }
 
-  // +82, 공백/하이픈 섞인 입력 → 국내 하이픈 포맷으로
-function toKRNational(raw) {
-  let n = String(raw || "").replace(/\D+/g, ""); // 숫자만
-  if (n.startsWith("82")) n = "0" + n.slice(2);  // +82 → 0
-  // 11자리(010 모바일) → 3-4-4
-  if (n.length === 11) return `${n.slice(0,3)}-${n.slice(3,7)}-${n.slice(7)}`;
-  // 10자리: 서울(02)은 2-4-4, 그 외 3-3-4
-  if (n.length === 10 && n.startsWith("02")) return `${n.slice(0,2)}-${n.slice(2,6)}-${n.slice(6)}`;
-  if (n.length === 10) return `${n.slice(0,3)}-${n.slice(3,6)}-${n.slice(6)}`;
-  return n; // 그 외는 원본 숫자열 반환
-}
-
-// 파일 상단 util 근처에 추가 (내부 표준화 함수)
-function normalizePhoneKR(input, mode = "intl") {
-  let n = String(input || "").replace(/\D+/g, "");
-  if (mode === "intl") {
-    if (n.startsWith("82")) return `+${n}`;
-    if (n.startsWith("0"))  return `+82${n.slice(1)}`;
-    if (n.startsWith("+"))  return n;
-    return `+${n}`;
-  } else if (mode === "nat") {
-    if (n.startsWith("82")) n = "0" + n.slice(2);
+  // +82, 공백/하이픈 섞인 입력 → 국내 하이픈 포맷
+  function toKRNational(raw) {
+    let n = String(raw || "").replace(/\D+/g, "");
+    if (n.startsWith("82")) n = "0" + n.slice(2);  // +82 → 0
     if (n.length === 11) return `${n.slice(0,3)}-${n.slice(3,7)}-${n.slice(7)}`;
     if (n.length === 10 && n.startsWith("02")) return `${n.slice(0,2)}-${n.slice(2,6)}-${n.slice(6)}`;
     if (n.length === 10) return `${n.slice(0,3)}-${n.slice(3,6)}-${n.slice(6)}`;
     return n;
   }
-  return input;
-}
+  // 국내/국제 포맷 표준화 (기존 함수 유지)
+  function normalizePhoneKR(input, mode = "intl") {
+    let n = String(input || "").replace(/\D+/g, "");
+    if (mode === "intl") {
+      if (n.startsWith("82")) return `+${n}`;
+      if (n.startsWith("0"))  return `+82${n.slice(1)}`;
+      if (String(input).trim().startsWith("+")) return String(input).trim().replace(/\s+/g, "");
+      return `+${n}`;
+    } else if (mode === "nat") {
+      if (n.startsWith("82")) n = "0" + n.slice(2);
+      if (n.length === 11) return `${n.slice(0,3)}-${n.slice(3,7)}-${n.slice(7)}`;
+      if (n.length === 10 && n.startsWith("02")) return `${n.slice(0,2)}-${n.slice(2,6)}-${n.slice(6)}`;
+      if (n.length === 10) return `${n.slice(0,3)}-${n.slice(3,6)}-${n.slice(6)}`;
+      return n;
+    }
+    return input;
+  }
 
+  // E.164(+82) 변환: 빈 값만 막고 나머지는 관대하게 보정
+  function toE164KR(raw) {
+    const digits = String(raw || "").replace(/\D+/g, "");
+    if (!digits) return ""; // 진짜 빈 입력만 실패
+    if (digits.startsWith("82")) return `+${digits}`;
+    if (digits.startsWith("0"))  return `+82${digits.slice(1)}`;
+    if (String(raw).trim().startsWith("+")) return String(raw).trim().replace(/\s+/g, "");
+    return `+${digits}`;
+  }
 
-  // ── 모달이 이미 있으면: 보여주고 → ★ 자동 채움도 시도
+  // ─────────────────────────────────────
+  // NEW: 앵커 해석 + 패널 배치
+  function __resolveAnchor(a) {
+    if (!a) return null;
+    if (a instanceof Element) return a;
+    try { return document.querySelector(a); } catch { return null; }
+  }
+  function __clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+  function __placePanelNearAnchor(panel, anchorEl) {
+    if (!panel || !anchorEl) return;
+    const r  = anchorEl.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const pad = 12;
+    // 패널 크기는 생성 후에야 측정 가능
+    const pr = panel.getBoundingClientRect();
+    let left = r.left;       // 앵커 좌측 정렬
+    let top  = r.bottom + 8; // 앵커 바로 아래
+
+    left = __clamp(left, pad, vw - pr.width  - pad);
+    top  = __clamp(top,  pad, vh - pr.height - pad);
+
+    // 중앙 정렬이 아닌 고정 좌표
+    panel.style.position = 'fixed';
+    panel.style.left = `${left}px`;
+    panel.style.top  = `${top}px`;
+    panel.style.margin = '0';
+    panel.dataset.pos = 'anchored';
+  }
+
+  // NEW: Web OTP 자동 입력 (지원 브라우저에서만)
+  function __tryWebOTPOnce(targetInput, timeoutMs = 2 * 60 * 1000) {
+    if (!('OTPCredential' in window) || !navigator.credentials?.get) return;
+    if (!targetInput) return;
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    navigator.credentials.get({
+      otp: { transport: ['sms'] },
+      signal: ctrl.signal
+    }).then(cred => {
+      if (cred && cred.code) {
+        targetInput.value = cred.code;
+        targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+        targetInput.focus(); // 필요하면 여기서 바로 verify 클릭도 가능
+      }
+    }).catch(()=>{}).finally(()=> clearTimeout(t));
+  }
+
+  // 내부: 모달 내 전화번호 자동 채움(기존 유지)
+  async function __prefillPhoneIntoModal() {
+    const el = document.getElementById("otp-phone");
+    if (!el) return;
+    if (el.value && el.value.trim() !== "") return; // 이미 입력돼 있으면 스킵
+    const raw = await __fetchProfilePhone();
+    if (!raw) return;
+    const val = toKRNational(raw);
+    el.value = val;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  // ─────────────────────────────────────
+  // 모달 재사용
   if (document.getElementById("phone-otp-modal")) {
-    document.getElementById("phone-otp-modal").style.display = "block";
-    // ★ [AUTO-PREFILL] 열릴 때마다 채움 시도
+    const m = document.getElementById("phone-otp-modal");
+    m.style.display = "block";
     setTimeout(__prefillPhoneIntoModal, 0);
+    const anchorEl = __resolveAnchor(anchor || opts.anchor);
+    if (anchorEl) {
+      const panel = m.querySelector('[data-otp-panel]');
+      requestAnimationFrame(() => __placePanelNearAnchor(panel, anchorEl));
+    }
     return;
   }
 
+  // ─────────────────────────────────────
+  // 모달/패널 생성 (기존 디자인 유지)
   const modal = document.createElement("div");
   modal.id = "phone-otp-modal";
   modal.style.cssText = `
@@ -969,6 +1033,7 @@ function normalizePhoneKR(input, mode = "intl") {
   `;
 
   const panel = document.createElement("div");
+  panel.setAttribute('data-otp-panel','');
   panel.style.cssText = `
     width:100%; max-width:420px; background:#fff; border-radius:10px; overflow:hidden;
     box-shadow:0 10px 30px rgba(0,0,0,.2); font-family:'Nanum Gothic',sans-serif;
@@ -994,178 +1059,175 @@ function normalizePhoneKR(input, mode = "intl") {
       </div>
     </div>
   `;
-
   modal.appendChild(panel);
   document.body.appendChild(modal);
 
-  // ★ [AUTO-PREFILL] 새 모달 생성 직후에도 자동 채움
+  // 앵커가 있으면 좌상단 그림 등의 근처로 이동
+  const anchorEl = __resolveAnchor(anchor || opts.anchor);
+  if (anchorEl) {
+    requestAnimationFrame(() => __placePanelNearAnchor(panel, anchorEl));
+  }
+
+  // 자동 프리필
   setTimeout(__prefillPhoneIntoModal, 0);
 
   // 닫기
-  document.getElementById("otp-close").onclick = () => {
-    modal.style.display = "none";
+  document.getElementById("otp-close").onclick = () => { modal.style.display = "none"; };
+
+  // ─────────────────────────────────────
+  // 코드 받기 (기존 흐름 유지 + 프리필 타이밍 보강 + Web OTP 시도)
+  document.getElementById("otp-send").onclick = async (e) => {
+    const btn = e.currentTarget;
+    if (btn.disabled) return;
+    btn.disabled = true;
+    try {
+      let raw = (document.getElementById("otp-phone").value || "").trim();
+
+      // 열자마자 클릭 타이밍 대비: 두 번 프리필 시도
+      if (!raw) { await __prefillPhoneIntoModal(); raw = (document.getElementById("otp-phone").value || "").trim(); }
+      if (!raw) {
+        const fetched = await __fetchProfilePhone();
+        if (fetched) {
+          const nat = toKRNational(fetched);
+          document.getElementById("otp-phone").value = nat;
+          raw = nat;
+        }
+      }
+      if (!raw) { alert("전화번호를 입력하세요."); return; }
+
+      // E.164로 보정(관대)
+      let phone = toE164KR(raw);
+      if (!phone) {
+        const digits = raw.replace(/\D+/g, "");
+        if (!digits) { alert("전화번호를 입력하세요."); return; }
+        phone = raw.trim().startsWith("+") ? raw.trim().replace(/\s+/g, "") : `+${digits}`;
+      }
+
+      const res = await fetch("/api/otp?action=send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone })
+      });
+
+      const text = await res.text();
+      let data = null; try { data = JSON.parse(text); } catch {}
+      if (!res.ok || !data?.ok) {
+        const msg = data?.error || data?.details || text || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+
+      if (data.code) console.log("[DEV] 인증 코드:", data.code);
+      alert("인증 코드가 발송되었습니다. (개발중이면 콘솔에서 코드 확인)");
+
+      // 사용자 클릭 직후 Web OTP 한 번 시도
+      const codeInput = document.getElementById('otp-code');
+      codeInput.setAttribute('autocomplete','one-time-code');
+      codeInput.setAttribute('inputmode','numeric');
+      codeInput.setAttribute('pattern','[0-9]*');
+      __tryWebOTPOnce(codeInput);
+
+    } catch (err) {
+      console.error("[OTP send] error:", err);
+      alert(err?.message || "인증 코드를 보낼 수 없습니다.");
+    } finally {
+      btn.disabled = false;
+    }
   };
 
-// ───────────────────────────────────────────────
-// 보조 유틸: 한국 번호 → E.164(+82) 표준화
-function toE164KR(raw) {
-  const digits = String(raw || "").replace(/\D+/g, "");
-  if (!digits) return "";
-  if (digits.startsWith("82")) return `+${digits}`;     // 82XXXXXXXXXX
-  if (digits.startsWith("0"))  return `+82${digits.slice(1)}`; // 0XXXXXXXXXX
-  if (digits.startsWith("+"))  return digits;           // 이미 + 포함
-  return `+${digits}`;                                  // 최후 보정
-}
-// ───────────────────────────────────────────────
+  // 인증하기 (기존 그대로)
+  document.getElementById("otp-verify").onclick = async (e) => {
+    const btn = e.currentTarget;
+    if (btn.disabled) return;
+    btn.disabled = true;
 
-// 코드 받기
-document.getElementById("otp-send").onclick = async (e) => {
-  const btn = e.currentTarget;
-  if (btn.disabled) return;     // 중복 클릭 방지
-  btn.disabled = true;
-
-  try {
-    // 1) 입력칸에서 먼저 가져오고, 없으면 프로필에서 끌어와 자동 채움
-    let raw = (document.getElementById("otp-phone").value || "").trim();
-    if (!raw) {
-      raw = await __fetchProfilePhone();
-      if (raw) {
-        const nat = toKRNational(raw); // 기존 네 함수 유지
-        document.getElementById("otp-phone").value = nat;
-        raw = nat;
-      }
-    }
-    if (!raw) {
-      alert("전화번호를 입력하세요.");
-      return;
-    }
-
-    // 2) 서버에는 국제 포맷(E.164)으로 전송
-    const phone = toE164KR(raw);
-    if (!phone) {
-      alert("유효한 전화번호 형식이 아닙니다.");
-      return;
-    }
-
-    const res = await fetch("/api/otp?action=send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone })
-    });
-
-    const text = await res.text();
-    let data = null; try { data = JSON.parse(text); } catch {}
-
-    if (!res.ok || !data?.ok) {
-      const msg = data?.error || data?.details || text || `HTTP ${res.status}`;
-      throw new Error(msg);
-    }
-
-    if (data.code) console.log("[DEV] 인증 코드:", data.code);
-    alert("인증 코드가 발송되었습니다. (개발중이면 콘솔에서 코드 확인)");
-  } catch (err) {
-    console.error("[OTP send] error:", err);
-    alert(err?.message || "인증 코드를 보낼 수 없습니다.");
-  } finally {
-    btn.disabled = false;
-  }
-};
-
-// 인증하기
-document.getElementById("otp-verify").onclick = async (e) => {
-  const btn = e.currentTarget;
-  if (btn.disabled) return;     // 중복 클릭 방지
-  btn.disabled = true;
-
-  try {
-    const raw   = (document.getElementById("otp-phone").value || "").trim();
-    const token = (document.getElementById("otp-code").value  || "").trim();
-    if (!raw || !token) {
-      alert("전화번호와 인증 코드를 입력하세요.");
-      return;
-    }
-
-    // postJSON 가드
-    if (typeof window.postJSON !== "function") {
-      console.error("[OTP verify] postJSON is not defined");
-      alert("내부 오류: postJSON 미정의");
-      return;
-    }
-
-    const phone = (typeof window.normalizePhoneKR === "function")
-      ? window.normalizePhoneKR(raw, "intl")
-      : toE164KR(raw);
-
-    const { data: { user } } = await window.supabaseClient.auth.getUser();
-    if (!user) {
-      alert("로그인 후 인증 가능합니다.");
-      return;
-    }
-
-    const { status, json, text } = await postJSON("/api/otp?action=verify", {
-      phone,
-      code: token,
-      user_id: user.id
-    });
-
-    const ok = (status === 200) && json?.ok && json?.verified;
-    if (!ok) {
-      console.error("[OTP verify] fail:", { status, json, text });
-      alert("인증 실패: " + (json?.error || json?.details || text || `HTTP ${status}`));
-      return;
-    }
-
-    alert("전화번호 인증이 완료되었습니다!");
-    modal.style.display = "none";
-
-    await window.supabaseClient
-      .from("profiles")
-      .update({
-        phone_verified: true,
-        phone_verified_at: new Date().toISOString(),
-      })
-      .eq("user_id", user.id);
-
-    if (typeof window.openSubscriptionModal === "function") {
-      window.openSubscriptionModal();
-    } else {
-      const subModal = document.getElementById("subscriptionModal");
-      if (subModal) subModal.style.display = "block";
-    }
-
-    const { data: { session } } = await window.supabaseClient.auth.getSession();
-    updateAuthUI(session);
-
-  } catch (err) {
-    console.error("[OTP verify] catch:", err);
     try {
-      const phoneIntl = (typeof window.normalizePhoneKR === "function")
-        ? window.normalizePhoneKR(document.getElementById("otp-phone").value.trim(), "intl")
-        : toE164KR(document.getElementById("otp-phone").value.trim());
+      const raw   = (document.getElementById("otp-phone").value || "").trim();
+      const token = (document.getElementById("otp-code").value  || "").trim();
+      if (!raw || !token) { alert("전화번호와 인증 코드를 입력하세요."); return; }
 
-      const { data: me } = await window.supabaseClient.auth.getUser();
-      const myId = me?.user?.id || null;
-
-      const { data: dup } = await window.supabaseClient
-        .from("profiles")
-        .select("user_id")
-        .eq("phone", phoneIntl)
-        .neq("user_id", myId)
-        .maybeSingle();
-
-      if (dup) {
-        alert("이미 존재하는 번호입니다.\n다른 번호를 입력하거나, 해당 번호로 가입된 계정으로 로그인해 주세요.");
+      if (typeof window.postJSON !== "function") {
+        console.error("[OTP verify] postJSON is not defined");
+        alert("내부 오류: postJSON 미정의");
         return;
       }
-    } catch (_) {}
 
-    const rawMsg = `${err?.message || ''} ${err?.text || ''} ${err?.json?.error || ''} ${err?.json?.details || ''}`.trim();
-    alert(`인증 실패: ${rawMsg || '서버 오류'}`);
-  } finally {
-    btn.disabled = false;
-  }
-};
+      const phone = (typeof window.normalizePhoneKR === "function")
+        ? window.normalizePhoneKR(raw, "intl")
+        : toE164KR(raw);
 
+      const { data: { user } } = await window.supabaseClient.auth.getUser();
+      if (!user) { alert("로그인 후 인증 가능합니다."); return; }
+
+      const { status, json, text } = await postJSON("/api/otp?action=verify", {
+        phone,
+        code: token,
+        user_id: user.id
+      });
+
+      const ok = (status === 200) && json?.ok && json?.verified;
+      if (!ok) {
+        console.error("[OTP verify] fail:", { status, json, text });
+        alert("인증 실패: " + (json?.error || json?.details || text || `HTTP ${status}`));
+        return;
+      }
+
+      alert("전화번호 인증이 완료되었습니다!");
+      modal.style.display = "none";
+
+      await window.supabaseClient
+        .from("profiles")
+        .update({ phone_verified: true, phone_verified_at: new Date().toISOString() })
+        .eq("user_id", user.id);
+
+      if (typeof window.openSubscriptionModal === "function") {
+        window.openSubscriptionModal();
+      } else {
+        const subModal = document.getElementById("subscriptionModal");
+        if (subModal) subModal.style.display = "block";
+      }
+
+      const { data: { session } } = await window.supabaseClient.auth.getSession();
+      updateAuthUI(session);
+
+    } catch (err) {
+      console.error("[OTP verify] catch:", err);
+      try {
+        const phoneIntl = (typeof window.normalizePhoneKR === "function")
+          ? window.normalizePhoneKR(document.getElementById("otp-phone").value.trim(), "intl")
+          : toE164KR(document.getElementById("otp-phone").value.trim());
+
+        const { data: me } = await window.supabaseClient.auth.getUser();
+        const myId = me?.user?.id || null;
+
+        const { data: dup } = await window.supabaseClient
+          .from("profiles")
+          .select("user_id")
+          .eq("phone", phoneIntl)
+          .neq("user_id", myId)
+          .maybeSingle();
+
+        if (dup) {
+          alert("이미 존재하는 번호입니다.\n다른 번호를 입력하거나, 해당 번호로 가입된 계정으로 로그인해 주세요.");
+          return;
+        }
+      } catch (_) {}
+
+      const rawMsg = `${err?.message || ''} ${err?.text || ''} ${err?.json?.error || ''} ${err?.json?.details || ''}`.trim();
+      alert(`인증 실패: ${rawMsg || '서버 오류'}`);
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
+  // 코드 입력칸 자동완성 힌트(모든 케이스에서 안전)
+  requestAnimationFrame(() => {
+    const code = document.getElementById('otp-code');
+    if (code) {
+      code.setAttribute('autocomplete','one-time-code');
+      code.setAttribute('inputmode','numeric');
+      code.setAttribute('pattern','[0-9]*');
+    }
+  });
 }
 
 
@@ -5498,45 +5560,69 @@ requestAnimationFrame(() => {
   }
 
 
+//미니창 시작///////////////////////////////
+// ──────────────────────────────────────────────────────────
+// Mini Saju: Clean, Single-Block Implementation
+// ──────────────────────────────────────────────────────────
 
-// ─── 미니 사주창: CSS 주입 ───
+// 1) CSS (once)
+// 미니창 제목 바 배경색 복구(우선순위 ↑)
+(function fixMiniBarBg(){
+  const id='mini-saju-style-fix';
+  if (document.getElementById(id)) return;
+  const s=document.createElement('style'); s.id=id;
+  s.textContent = `
+    /* 당신이 쓰던 '연두 테두리' 스타일 */
+    #saju-mini .saju-mini__bar{
+      background: linear-gradient(
+        90deg,
+        #e8f0c8 0 8px,
+        #e8f0c8 8px calc(100% - 8px),
+        #e8f0c8 calc(100% - 8px) 100%
+      ) !important;
+      border-bottom: 2px solid #e6e6ea !important;
+    }
+  `;
+  document.head.appendChild(s);
+})();
+
+
 (function injectMiniSajuCSS(){
   if (document.getElementById('mini-saju-style')) return;
   const s = document.createElement('style');
   s.id = 'mini-saju-style';
   s.textContent = `
-    #saju-mini {
-      position: fixed; right: 16px; bottom: 16px; z-index: 9999;
-      width: 300px; max-width: calc(100vw - 24px);
+    #saju-mini{
+      position:fixed; right:16px; bottom:16px; z-index:2147483647;
+      width: 360px; max-width: calc(100vw - 24px);
       background:#fff; border:1px solid #e5e5ea; border-radius:12px;
-      box-shadow:0 10px 30px rgba(0,0,0,.18); overflow:hidden; font-size:14px;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
+      box-shadow:0 10px 30px rgba(0,0,0,.18); overflow:hidden;
+      font-size:14px; font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif;
     }
-    #saju-mini .bar { display:flex; align-items:center; justify-content:space-between;
-      padding:8px 10px; background:linear-gradient(180deg,#f7f7f9,#efeff3); border-bottom:1px solid #ececf1;
-    }
-    #saju-mini .body { max-height:260px; overflow:auto; padding:10px; }
-    #saju-mini table { width:100%; border-collapse:collapse; }
-    #saju-mini th, #saju-mini td { border-bottom:1px solid #f3f3f6; padding:4px 6px; text-align:left; vertical-align:top; }
-    #saju-mini th { width:3.5em; color:#666; font-weight:600; }
-    #saju-mini small { color:#777; }
-    #saju-mini .chip { display:inline-block; padding:2px 6px; border:1px solid #eee; border-radius:6px; margin:2px 2px 0 0; background:#fbfbfe; }
-    #saju-mini .btn { border:0; background:#f1f1f6; width:24px; height:24px; border-radius:6px; cursor:pointer; font-size:14px; line-height:1; }
-    #saju-mini .btn:hover { background:#e9e9f2; }
-    #saju-mini.is-min .body { display:none; }
+    #saju-mini .saju-mini__bar{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;
+      background:linear-gradient(180deg,#f7f7f9,#efeff3); border-bottom:1px solid #ececf1; cursor:grab; user-select:none;}
+    #saju-mini .saju-mini__body{max-height:260px; overflow:auto; padding:10px;}
+    #saju-mini table{width:100%; border-collapse:collapse;}
+    #saju-mini th,#saju-mini td{border-bottom:1px solid #f3f3f6; padding:4px 6px; text-align:center; vertical-align:top;}
+    #saju-mini small{color:#666;}
+    #saju-mini .saju-chip{display:inline-block; padding:1px 4px; border:1px solid #eee; border-radius:6px; margin:2px 2px 0 0; background:#fbfbfe; font-size:11px;}
+    #saju-mini .btn{border:0; background:#f1f1f6; width:24px; height:24px; border-radius:6px; cursor:pointer; font-size:14px; line-height:1;}
+    #saju-mini .btn:hover{background:#e9e9f2;}
+    #saju-mini.is-min .saju-mini__body{display:none;}
+    #saju-mini.is-dragging, #saju-mini.is-dragging * { cursor:grabbing !important; user-select:none; }
   `;
   document.head.appendChild(s);
 })();
 
-// ─── 미니 사주창: 렌더러 ───
+// 2) Renderer
 function renderSajuMiniFromCurrentOutput(ctx = {}) {
-  // 1) 의존 함수(없으면 안전 폴백)
+  // deps
   const _getTenGod           = ctx.getTenGod           || window.getTenGod           || (() => '');
   const _convertHanToKorStem = ctx.convertHanToKorStem || window.convertHanToKorStem || (x => x);
   const _convertKorToHanStem = ctx.convertKorToHanStem || window.convertKorToHanStem || (x => x);
   const _colorize            = ctx.colorize            || window.colorize            || (x => x);
 
-  // 2) 데이터 (ctx → window)
+  // data
   const timeGanji  = ctx.timeGanji  || window.timeGanji;
   const dayGanji   = ctx.dayGanji   || window.dayGanji;
   const monthGanji = ctx.monthGanji || window.monthGanji;
@@ -5549,13 +5635,8 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
 
   const dayGanKorGan = ctx.dayGanKorGan || window.dayGanKorGan || '';
 
-  // (필수 값 없으면 그만)
-  if (!dayGanji || !monthGanji || !yearGanji || !timeGanji) {
-    console.warn('[mini] pillars missing — skip render');
-    return;
-  }
+  if (!dayGanji || !monthGanji || !yearGanji || !timeGanji) return;
 
-  // 3) 표 데이터 가공
   const data = {
     hour:  { gan: timeGanji.gan,  ten: _getTenGod(dayGanKorGan, _convertHanToKorStem(timeGanji.gan)),  jiji: timeGanji.ji,  hides: timeLines.map(s  => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
     day:   { gan: dayGanji.gan,   ten: '일간',                                                         jiji: dayGanji.ji,   hides: dayLines.map(s   => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
@@ -5563,369 +5644,292 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
     year:  { gan: yearGanji.gan,  ten: _getTenGod(dayGanKorGan, _convertHanToKorStem(yearGanji.gan)),  jiji: yearGanji.ji,  hides: yearLines.map(s  => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
   };
 
-  // 4) 제목 세터 (항상 #customer-name을 읽어 표시)
-  const setMiniTitle = (label = 'setMiniTitle') => {
-    // id로 먼저 찾고, 없으면 .bar strong으로 폴백
+  // title setter
+  const setMiniTitle = () => {
     let titleEl = document.querySelector('#saju-mini #saju-mini-title')
+               || document.querySelector('#saju-mini .saju-mini__bar strong')
                || document.querySelector('#saju-mini .bar strong');
-    if (!titleEl) {
-      console.warn(`[mini:title] ${label} → title 요소 없음`);
-      return;
-    }
-
+    if (!titleEl) return;
     const inputEl = document.getElementById('customer-name');
     const v1 = inputEl?.value ?? '';
     const v2 = inputEl?.getAttribute?.('value') ?? '';
     const v3 = window.customerName ?? '';
     const v4 = (typeof ctx.customerName === 'string' ? ctx.customerName : (ctx.name || ''));
-
-    const raw = (v1 || v2 || v3 || v4 || '');
-    const name = raw.trim();
-
-    titleEl.textContent = name ? `사주팔자(${name})` : '사주팔자';
-
-    // 디버깅 로그(필요 없으면 주석 처리해도 됨)
-    console.log('[mini:title]', { label, value:v1, attr:v2, win:v3, ctx:v4, decided:name, text:titleEl.textContent });
+    const name = (v1 || v2 || v3 || v4 || '').trim();
+    titleEl.textContent = name ? `사주팔자[드래그시 위치이동가능](${name})` : '사주팔자[드래그시 위치이동가능]';
   };
 
-  // 5) CSS 1회 주입
-  if (!document.getElementById('mini-saju-style')) {
-    const s = document.createElement('style');
-    s.id = 'mini-saju-style';
-    s.textContent = `
-      #saju-mini{position:fixed;right:16px;bottom:16px;z-index:9999;width:300px;max-width:calc(100vw - 24px);
-        background:#fff;border:1px solid #e5e5ea;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);overflow:hidden;
-        font-size:12px;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif;}
-      #saju-mini .bar{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:linear-gradient(180deg,#f7f7f9,#efeff3);
-        border-bottom:1px solid #ececf1;}
-      #saju-mini .body{max-height:260px;overflow:auto;padding:10px;}
-      #saju-mini table{width:100%;border-collapse:collapse;}
-      #saju-mini th,#saju-mini td{border-bottom:1px solid #f3f3f6;padding:4px 6px;text-align:left;vertical-align:top;}
-      #saju-mini th{color:#666;font-weight:600;}
-      #saju-mini small{color:#777;}
-      #saju-mini .saju-chip{display:inline-block;padding:1px 4px;border:1px solid #eee;border-radius:6px;margin:2px 2px 0 0;background:#fbfbfe;font-size:11px;}
-      #saju-mini .btn{border:0;background:#f1f1f6;width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:14px;line-height:1;}
-      #saju-mini .btn:hover{background:#e9e9f2;}
-      #saju-mini.is-min .body{display:none;}
-    `;
-    document.head.appendChild(s);
-  }
-
-  // 6) 박스 생성(없으면 만들고, 있으면 재사용)
+  // ensure box
   let box = document.getElementById('saju-mini');
   if (!box) {
     box = document.createElement('div');
-// 박스 생성할 때 (네 코드의 box.innerHTML 부분 교체)
-box.id = 'saju-mini';
-box.className = 'saju-mini';
-box.innerHTML = `
-  <div class="saju-mini__bar">   <!-- 드래그 핸들 -->
-    <strong id="saju-mini-title">사주팔자</strong>
-    <div class="saju-mini__actions">
-      <button class="btn" id="saju-mini-min" title="접기">—</button>
-      <button class="btn" id="saju-mini-close" title="닫기">×</button>
-    </div>
-  </div>
-  <div class="saju-mini__body" id="saju-mini-body"></div>
-`;
+    box.id = 'saju-mini';
+    box.innerHTML = `
+      <div class="saju-mini__bar">
+        <strong id="saju-mini-title">사주팔자</strong>
+        <div class="saju-mini__actions">
+          <button class="btn" id="saju-mini-min" title="접기">—</button>
+          <button class="btn" id="saju-mini-close" title="닫기">×</button>
+        </div>
+      </div>
+      <div class="saju-mini__body" id="saju-mini-body"></div>
+    `;
 
-    // (중요) DOM에 붙인 다음 제목 세팅
+      // 🔽🔽🔽 추가: 첫 로딩(저장값 없음)이라면 기본 접힘
+  if (localStorage.getItem('sajuMiniMinimized') === null) {
+    box.classList.add('is-min');
+    try { localStorage.setItem('sajuMiniMinimized', '1'); } catch {}
+  }
+  // 🔼🔼🔼 추가 끝
     document.body.appendChild(box);
-    setMiniTitle('after-append');
-
-    // 버튼 바인딩
+    setMiniTitle();
     box.querySelector('#saju-mini-min')?.addEventListener('click', () => box.classList.toggle('is-min'));
     box.querySelector('#saju-mini-close')?.addEventListener('click', () => box.remove());
-
-    // 고객명 입력 변화 감지(1회만 연결)
     if (!window.__miniTitleWired) {
       const input = document.getElementById('customer-name');
       if (input) {
-        input.addEventListener('input',  () => setMiniTitle('input'));
-        input.addEventListener('change', () => setMiniTitle('change'));
-      } else {
-        console.warn('[mini:title] #customer-name 없음 → 입력 이벤트 연결 보류');
+        input.addEventListener('input',  setMiniTitle);
+        input.addEventListener('change', setMiniTitle);
       }
       window.__miniTitleWired = true;
     }
-  } else {
-    // 혹시 예전 마크업이라 id 빠졌으면 복구
-    if (!box.querySelector('#saju-mini-title')) {
-      const strong = box.querySelector('.bar strong');
-      if (strong) strong.id = 'saju-mini-title';
-    }
   }
 
-  // 7) 본문 표 렌더
+  // table
   const body = box.querySelector('#saju-mini-body');
   const C = (txt) => (typeof _colorize === 'function' ? _colorize(txt) : (txt ?? ''));
   const coerceCol = (p) => (!p || typeof p !== 'object')
-    ? { gan:'-', ten:'-', jiji:'-', hides:[] }
-    : { gan: p.gan ?? '-', ten: p.ten ?? '-', jiji: p.jiji ?? '-', hides: Array.isArray(p.hides) ? p.hides : [] };
+    ? { gan:'-', ten:'', jiji:'-', hides:[] }
+    : { gan: p.gan ?? '-', ten: p.ten ?? '', jiji: p.jiji ?? '-', hides: Array.isArray(p.hides) ? p.hides : [] };
+  const pillars = [data.hour, data.day, data.month, data.year].map(coerceCol);
 
-  const columns = [data.hour, data.day, data.month, data.year].map(coerceCol);
+  const MINI_DAEYUN_KEY = 'sajuMiniSelDaeyun_v2';
+  const MINI_SEWOON_KEY = 'sajuMiniSelSewoon_v2';
+  const D = (JSON.parse(localStorage.getItem(MINI_DAEYUN_KEY) || '{}')) || {};
+  const S = (JSON.parse(localStorage.getItem(MINI_SEWOON_KEY) || '{}')) || {};
 
   body.innerHTML = `
     <table class="mini-grid">
       <thead>
         <tr>
-          <th>시주</th>
-          <th>일주</th>
-          <th>월주</th>
-          <th>년주</th>
+          <th>시주</th><th>일주</th><th>월주</th><th>년주</th><th>大運</th><th>世運</th>
         </tr>
       </thead>
       <tbody>
         <tr>
-          ${columns.map(p => `<td><strong>${C(p.gan)}</strong> <small>(${C(p.ten)})</small></td>`).join('')}
+          ${pillars.map(p => `<td><strong>${C(p.gan)}</strong>${p.ten ? ` <small>(${C(p.ten)})</small>` : ''}</td>`).join('')}
+          <td id="mini-daeyun-gan"><strong>${C(D.gan||'-')}</strong>${D.ten ? ` <small>(${C(D.ten)})</small>` : ''}</td>
+          <td id="mini-sewoon-gan"><strong>${C(S.gan||'-')}</strong>${S.ten ? ` <small>(${C(S.ten)})</small>` : ''}</td>
         </tr>
         <tr>
-          ${columns.map(p => `<td><strong>${C(p.jiji)}</strong></td>`).join('')}
+          ${pillars.map(p => `<td><strong>${C(p.jiji)}</strong></td>`).join('')}
+          <td id="mini-daeyun-ji"><strong>${C(D.ji||'-')}</strong></td>
+          <td id="mini-sewoon-ji"><strong>${C(S.ji||'-')}</strong></td>
         </tr>
         <tr>
-          ${columns.map(p => `<td>${p.hides.length ? p.hides.map(h => `<span class="saju-chip">(${h})</span>`).join('') : '-'}</td>`).join('')}
+          ${pillars.map(p => `<td>${p.hides.length ? p.hides.map(h => `<span class="saju-chip">(${h})</span>`).join('') : '-'}</td>`).join('')}
+          <td id="mini-daeyun-hides">-</td>
+          <td id="mini-sewoon-hides">-</td>
         </tr>
       </tbody>
     </table>
   `;
 
-  // 8) 제목 즉시/지연 갱신(자동입력 대응)
-  setMiniTitle();
-  requestAnimationFrame(() => setMiniTitle('raf'));
-  setTimeout(() => setMiniTitle('t+300'), 300);
-}
+  // 3) Final fill (지장간/십신) — 선택값이 없어도 표에서 추출, 덮어쓰기에도 유지
+  (function miniFinalFillAndKeep(){
+    const h2k = (typeof _convertHanToKorStem === 'function' ? _convertHanToKorStem
+                : (window.convertHanToKorStem || (s=>({甲:'갑',乙:'을',丙:'병',丁:'정',戊:'무',己:'기',庚:'경',辛:'신',壬:'임',癸:'계'}[s]||s))));
+    const getTG = (typeof _getTenGod === 'function' ? _getTenGod : window.getTenGod) || null;
+    const base  = dayGanKorGan || window.dayGanKorGan || '';
 
+    const STEM_RE   = /[甲乙丙丁戊己庚辛壬癸]/;
+    const BRANCH_RE = /[子丑寅卯辰巳午未申酉戌亥]/;
 
-
-
-
-
-(function wireMiniTitleLive(){
-  if (window.__miniTitleWired) return;
-  window.__miniTitleWired = true;
-
-  const input = document.getElementById('customer-name');
-  if (!input) return; // 페이지에 그 요소 없으면 패스
-
-  input.addEventListener('input', () => {
-    const el = document.querySelector('#saju-mini #saju-mini-title');
-    if (!el) return;
-    const v = input.value.trim();
-    el.textContent = v ? `사주팔자(${v})` : '사주팔자';
-  });
-})();
-
-
-// 0) CSS: 드래그 표시/선택 방지
-(function injectMiniSajuDragCSS(){
-  if (document.getElementById('mini-saju-drag-style')) return;
-  const s = document.createElement('style');
-  s.id = 'mini-saju-drag-style';
-  s.textContent = `
-    #saju-mini .bar { cursor: grab; }
-    #saju-mini.is-dragging, #saju-mini.is-dragging * { cursor: grabbing !important; user-select: none; }
-  `;
-  document.head.appendChild(s);
-})();
-
-// 1) 위치 저장/복원 유틸
-const MINI_POS_KEY = 'sajuMiniPos';
-const MINI_MIN_KEY = 'sajuMiniMinimized';
-
-function __miniLoadPos() {
-  try {
-    const raw = localStorage.getItem(MINI_POS_KEY);
-    if (!raw) return null;
-    const obj = JSON.parse(raw);
-    if (typeof obj?.left === 'number' && typeof obj?.top === 'number') return obj;
-  } catch {}
-  return null;
-}
-
-function __miniSavePos(left, top) {
-  try { localStorage.setItem(MINI_POS_KEY, JSON.stringify({ left, top })); } catch {}
-}
-
-function __miniApplyPos(box, left, top) {
-  // fixed 기준 좌상단 배치로 전환
-  box.style.left = `${left}px`;
-  box.style.top  = `${top}px`;
-  box.style.right = 'auto';
-  box.style.bottom = 'auto';
-}
-
-function __miniClampToViewport(left, top, box) {
-  const pad = 8;
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const rect = box.getBoundingClientRect();
-  const w = rect.width || 300;
-  const h = rect.height || 220;
-  const clampedLeft = Math.min(Math.max(left, pad), Math.max(vw - w - pad, pad));
-  const clampedTop  = Math.min(Math.max(top,  pad), Math.max(vh - h - pad, pad));
-  return { left: clampedLeft, top: clampedTop };
-}
-
-// 2) 드래그 바인딩
-function __miniMakeDraggable(box) {
-  const handle = box.querySelector('.bar, .saju-mini__bar');
-  if (!handle) return;
-
-  let startX = 0, startY = 0, baseLeft = 0, baseTop = 0;
-
-  const onPointerMove = (e) => {
-    if (!box.classList.contains('is-dragging')) return;
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
-    let left = baseLeft + dx;
-    let top  = baseTop + dy;
-    ({ left, top } = __miniClampToViewport(left, top, box));
-    __miniApplyPos(box, left, top);
-  };
-
-  const onPointerUp = (e) => {
-    if (!box.classList.contains('is-dragging')) return;
-    box.classList.remove('is-dragging');
-    document.removeEventListener('pointermove', onPointerMove);
-    document.removeEventListener('pointerup', onPointerUp);
-
-    const rect = box.getBoundingClientRect();
-    __miniSavePos(rect.left, rect.top);
-  };
-
-  handle.addEventListener('pointerdown', (e) => {
-    // 텍스트 드래그/더블클릭 등 방지
-    e.preventDefault();
-
-    // 현재 위치 기준 계산(기본 우하단 고정 상태일 수도 있으므로 좌표 환산)
-    const rect = box.getBoundingClientRect();
-    startX = e.clientX;
-    startY = e.clientY;
-    baseLeft = rect.left;
-    baseTop  = rect.top;
-
-    // 드래그 모드 진입 + 좌상단 고정 모드로 전환
-    box.classList.add('is-dragging');
-    __miniApplyPos(box, baseLeft, baseTop);
-
-    document.addEventListener('pointermove', onPointerMove);
-    document.addEventListener('pointerup', onPointerUp);
-  }, { passive: false });
-
-  // 화면 크기 변할 때 화면 바깥으로 나가지 않도록 스냅
-  window.addEventListener('resize', () => {
-    const pos = __miniLoadPos();
-    if (!pos) return;
-    let { left, top } = __miniClampToViewport(pos.left, pos.top, box);
-    __miniApplyPos(box, left, top);
-    __miniSavePos(left, top);
-  });
-}
-
-// 3) 최소화 상태 저장/복원
-function __miniRestoreMinimized(box) {
-  const v = localStorage.getItem(MINI_MIN_KEY);
-  if (v === '1') box.classList.add('is-min');
-}
-function __miniWireMinimizePersist(box) {
-  const btn = box.querySelector('#saju-mini-min');
-  if (!btn) return;
-  btn.addEventListener('click', () => {
-    const minimized = box.classList.toggle('is-min');
-    try { localStorage.setItem(MINI_MIN_KEY, minimized ? '1' : '0'); } catch {}
-  });
-}
-
-// 4) 렌더 직후 한 번만 호출 (네 renderSajuMiniFromCurrentOutput 내부 “박스 생성” 이후 위치에 추가)
-// 4) 렌더 직후 초기화 + DOM 감시(박스가 생길 때마다 자동 배선/복원)
-(function setupMiniSajuObserver(){
-  const SEL = '#saju-mini';
-
-  function initMiniSajuPositioning(box) {
-    if (!box || box.dataset.wired === '1') return;
-    box.dataset.wired = '1';
-
-    // 드래그/최소화 배선
-    __miniMakeDraggable(box);
-    __miniWireMinimizePersist(box);
-    __miniRestoreMinimized(box);
-
-    // 저장된 위치 복원(없으면 현 상태 유지)
-    const pos = __miniLoadPos();
-    if (pos) {
-      let { left, top } = __miniClampToViewport(pos.left, pos.top, box);
-      __miniApplyPos(box, left, top);
-      __miniSavePos(left, top); // 클램프된 값으로 갱신
-    } else {
-      // 최초 한 번: 현재 위치(우하단 fixed) 좌표로 환산해 저장(선택)
-      const r = box.getBoundingClientRect();
-      __miniSavePos(r.left, r.top);
+    function extract(prefix){
+      const gtxt = document.getElementById(`${prefix}-gan`)?.textContent || '';
+      const jtxt = document.getElementById(`${prefix}-ji`)?.textContent  || '';
+      const gan  = (gtxt.match(STEM_RE)||[])[0] || '';
+      const ji   = (jtxt.match(BRANCH_RE)||[])[0] || '';
+      return { gan, ji };
     }
-  }
 
-  // 이미 떠 있으면 즉시 초기화
-  const exist = document.querySelector(SEL);
-  if (exist) initMiniSajuPositioning(exist);
+    function makeChips(ji){
+      const map = window.HanhiddenStemsMap || {};
+      const arr = map[ji] || [];
+      if (!arr.length) return '-';
+      return arr.map(han=>{
+        const ten = (getTG && base) ? (getTG(base, h2k(han)) || '') : '';
+        return `<span class="saju-chip">(${han}${ten ? ' ' + ten : ''})</span>`;
+      }).join('');
+    }
 
-  // 이후로는 DOM 감시: 미니창이 새로 붙을 때마다 자동 배선
-  const mo = new MutationObserver((ms) => {
-    for (const m of ms) {
-      if (m.type !== 'childList') continue;
-      // 추가된 노드들 중 saju-mini 탐색
-      for (const n of m.addedNodes) {
-        if (!(n instanceof Element)) continue;
-        if (n.id === 'saju-mini') {
-          initMiniSajuPositioning(n);
-        } else {
-          const found = n.querySelector?.(SEL);
-          if (found) initMiniSajuPositioning(found);
+    function applyOnce(){
+      const d = extract('mini-daeyun');
+      const s = extract('mini-sewoon');
+      const dEl = document.getElementById('mini-daeyun-hides');
+      const sEl = document.getElementById('mini-sewoon-hides');
+      if (dEl && d.ji) dEl.innerHTML = makeChips(d.ji);
+      if (sEl && s.ji) sEl.innerHTML = makeChips(s.ji);
+    }
+
+    applyOnce();
+    requestAnimationFrame(applyOnce);
+    setTimeout(applyOnce, 0);
+    setTimeout(applyOnce, 120);
+
+    // expose setters
+    window.sajuMini = window.sajuMini || {};
+    const prevD = window.sajuMini.setDaeyun;
+    const prevS = window.sajuMini.setSewoon;
+
+    const STEMS = '甲乙丙丁戊己庚辛壬癸'.split('');
+    const BR    = '子丑寅卯辰巳午未申酉戌亥'.split('');
+    function parseGanJi(a,b){
+      if (b != null) return {gan:String(a||''), ji:String(b||'')};
+      const s=String(a||''); 
+      return { gan: STEMS.find(ch=>s.includes(ch))||'', ji: BR.find(ch=>s.includes(ch))||'' };
+    }
+
+    function save(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
+    const MINI_DAEYUN_KEY = 'sajuMiniSelDaeyun_v2';
+    const MINI_SEWOON_KEY = 'sajuMiniSelSewoon_v2';
+
+    function wrap(fn, key, prefix){
+      return function(a,b){
+        const { gan, ji } = parseGanJi(a,b);
+        if (fn) fn.apply(this, arguments);
+        if (gan && ji) {
+          // 간(+십신)
+          const elG = document.getElementById(`${prefix}-gan`);
+          const ten = (getTG && base) ? (getTG(base, h2k(gan)) || '') : '';
+          if (elG) elG.innerHTML = `<strong>${gan}</strong>${ten ? ` <small>(${ten})</small>` : ''}`;
+          // 지지
+          const elJ = document.getElementById(`${prefix}-ji`);
+          if (elJ) elJ.innerHTML = `<strong>${ji}</strong>`;
+          // 지장간
+          const elH = document.getElementById(`${prefix}-hides`);
+          if (elH) elH.innerHTML = makeChips(ji);
+          save(key, { gan, ji, ten });
         }
       }
     }
-  });
-  mo.observe(document.body || document.documentElement, { childList: true, subtree: true });
 
-  // 편의 API(필요하면 콘솔/코드에서 호출)
+    window.sajuMini.setDaeyun = wrap(prevD, MINI_DAEYUN_KEY, 'mini-daeyun');
+    window.sajuMini.setSewoon = wrap(prevS, MINI_SEWOON_KEY, 'mini-sewoon');
+  })();
+
+  // title refresh
+  setMiniTitle();
+  requestAnimationFrame(setMiniTitle);
+  setTimeout(setMiniTitle, 300);
+}
+
+// 3) Drag & position (persist)
+(function setupMiniDragAndPersist(){
+  const POS_KEY = 'sajuMiniPos';
+  const MIN_KEY = 'sajuMiniMinimized';
+
+  function loadPos(){ try{ return JSON.parse(localStorage.getItem(POS_KEY) || 'null'); }catch{ return null; } }
+  function savePos(left, top){ try{ localStorage.setItem(POS_KEY, JSON.stringify({left, top})); }catch{} }
+  function applyPos(box, left, top){
+    box.style.left = `${left}px`; box.style.top = `${top}px`;
+    box.style.right = 'auto'; box.style.bottom = 'auto';
+  }
+  function clamp(left, top, box){
+    const pad=8, vw=window.innerWidth, vh=window.innerHeight;
+    const r=box.getBoundingClientRect(), w=r.width||360, h=r.height||220;
+    return { left: Math.min(Math.max(left,pad), Math.max(vw-w-pad,pad)),
+             top:  Math.min(Math.max(top, pad), Math.max(vh-h-pad,pad)) };
+  }
+
+  function makeDraggable(box){
+    const handle = box.querySelector('.saju-mini__bar, .bar');
+    if (!handle) return;
+    let sx=0, sy=0, bx=0, by=0;
+    const move = (e)=>{ if(!box.classList.contains('is-dragging')) return;
+      const {left, top} = clamp(bx + (e.clientX - sx), by + (e.clientY - sy), box);
+      applyPos(box, left, top);
+    };
+    const up = ()=>{
+      if(!box.classList.contains('is-dragging')) return;
+      box.classList.remove('is-dragging');
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      const r = box.getBoundingClientRect(); savePos(r.left, r.top);
+    };
+    handle.addEventListener('pointerdown', (e)=>{
+      e.preventDefault();
+      const r = box.getBoundingClientRect();
+      sx = e.clientX; sy = e.clientY; bx = r.left; by = r.top;
+      box.classList.add('is-dragging'); applyPos(box, bx, by);
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', up);
+    }, {passive:false});
+    window.addEventListener('resize', ()=>{
+      const pos = loadPos(); if(!pos) return;
+      const {left, top} = clamp(pos.left, pos.top, box);
+      applyPos(box, left, top); savePos(left, top);
+    });
+  }
+
+function restoreMin(box){
+  const v = localStorage.getItem(MIN_KEY);
+  // 저장값이 없거나 '1'이면 접힘
+  if (v === null || v === '1') box.classList.add('is-min');
+  else box.classList.remove('is-min');
+
+  box.querySelector('#saju-mini-min')?.addEventListener('click', ()=>{
+    const m = box.classList.toggle('is-min');
+    try { localStorage.setItem(MIN_KEY, m ? '1' : '0'); } catch {}
+  });
+}
+
+
+  function init(box){
+    if (!box || box.dataset.wired === '1') return;
+    box.dataset.wired = '1';
+    makeDraggable(box);
+    restoreMin(box);
+    const pos = loadPos();
+    if (pos) { const {left, top} = clamp(pos.left, pos.top, box); applyPos(box, left, top); savePos(left, top); }
+    else { const r = box.getBoundingClientRect(); savePos(r.left, r.top); }
+  }
+
+  const exist = document.getElementById('saju-mini'); if (exist) init(exist);
+  const mo = new MutationObserver(ms=>{
+    for (const m of ms) if (m.type === 'childList')
+      for (const n of m.addedNodes) {
+        if (!(n instanceof Element)) continue;
+        if (n.id === 'saju-mini') init(n);
+        else { const f = n.querySelector?.('#saju-mini'); if (f) init(f); }
+      }
+  });
+  mo.observe(document.body || document.documentElement, {childList:true, subtree:true});
+
+  // helper APIs
   window.sajuMini = window.sajuMini || {};
-  window.sajuMini.reinit = () => {
-    const box = document.querySelector(SEL);
-    if (box) {
-      box.dataset.wired = '';
-      initMiniSajuPositioning(box);
-    }
-  };
-  window.sajuMini.getPosition = () => __miniLoadPos();
-  window.sajuMini.savePosition = () => {
-    const box = document.querySelector(SEL);
-    if (!box) return;
-    const r = box.getBoundingClientRect();
-    __miniSavePos(r.left, r.top);
-  };
-  window.sajuMini.resetPosition = (corner = 'br') => {
-    const box = document.querySelector(SEL);
-    if (!box) return;
-    // 코너 스냅: br(우하), tr(우상), bl(좌하), tl(좌상)
-    const pad = 16;
-    const w = box.getBoundingClientRect().width || 300;
-    const h = box.getBoundingClientRect().height || 220;
+  window.sajuMini.reinit = ()=>{ const b=document.getElementById('saju-mini'); if (b){ b.dataset.wired=''; init(b); } };
+  window.sajuMini.getPosition = ()=>{ try{ return JSON.parse(localStorage.getItem(POS_KEY)||'null'); }catch{ return null; } };
+  window.sajuMini.resetPosition = (corner='br')=>{
+    const b=document.getElementById('saju-mini'); if(!b) return;
+    const pad=16, r=b.getBoundingClientRect(), w=r.width||360, h=r.height||220;
     let left, top;
-    switch (corner) {
-      case 'tr': left = window.innerWidth - w - pad; top = pad; break;
-      case 'bl': left = pad; top = window.innerHeight - h - pad; break;
-      case 'tl': left = pad; top = pad; break;
-      case 'br':
-      default:   left = window.innerWidth - w - pad; top = window.innerHeight - h - pad; break;
-    }
-    ({ left, top } = __miniClampToViewport(left, top, box));
-    __miniApplyPos(box, left, top);
-    __miniSavePos(left, top);
+    switch (corner){ case 'tr': left=window.innerWidth-w-pad; top=pad; break;
+      case 'bl': left=pad; top=window.innerHeight-h-pad; break;
+      case 'tl': left=pad; top=pad; break;
+      default: left=window.innerWidth-w-pad; top=window.innerHeight-h-pad; }
+    const p=clamp(left, top, b); applyPos(b, p.left, p.top); savePos(p.left, p.top);
   };
 })();
 
+// ──────────────────────────────────────────────────────────
+// 사용 예:
+//   renderSajuMiniFromCurrentOutput(); // 렌더
+//   sajuMini.setDaeyun('丙戌');        // 대운 갱신
+//   sajuMini.setSewoon('乙巳');        // 세운 갱신
+// ──────────────────────────────────────────────────────────
 
-
-
-
+//미니창 끝///////////////////////////////
 
 
 
