@@ -1371,14 +1371,22 @@ async function openPhoneOtpModal(anchor /* 엘리먼트 or 셀렉터 */, opts = 
 
 
 // ✅ 카카오 정기결제창 (V1 기준, 통합 API 버전)
+// 공통: 리디렉션 URL 만들어 주는 헬퍼
+function __buildRedirectURL(params = {}) {
+  const url = new URL('/payment/complete.html', location.origin);
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+  });
+  return url.href; // 절대경로
+}
+
+// ✅ 카카오 정기결제창 (V1 기준, 통합 API 버전)
 // tier: 'basic' | 'plus'  (기본값: 'basic')
 window.startKakaoSubscription = async function(tier = 'basic') {
   try {
-    // 1️⃣ Supabase 로그인 확인
     const { data: { user } } = await window.supabaseClient.auth.getUser();
     if (!user) return alert("로그인이 필요합니다.");
 
-    // ── 플랜 매핑 (금액/일일한도/표시명/내부코드) ─────────────────────────
     const PLAN = {
       basic: { amount: 11000, daily_limit: 60,  name: "Kakao 정기구독 (월간)",  planId: "recurring_monthly_60"  },
       plus:  { amount: 16500, daily_limit: 150, name: "Kakao 정기구독+ (월간)", planId: "recurring_monthly_150" },
@@ -1386,59 +1394,70 @@ window.startKakaoSubscription = async function(tier = 'basic') {
     const sel = PLAN[tier] || PLAN.basic;
 
     const IMP = window.IMP;
-    IMP.init("imp81444885"); // ✅ 아임포트 V1 고객사 식별코드
+    IMP.init("imp81444885"); // 아임포트 V1 고객사 식별코드
 
     const userId = user.id;
-    // ⚠️ 동시에 두 플랜을 운용할 수도 있으니 tier를 붙여 UID를 구분(권장)
-    const customerUid = `kakao_${userId}_${tier}`; // 고객별·플랜별 고유 빌링 UID
+    const customerUid = `kakao_${userId}_${tier}`;
+    const merchantUid = `order_${tier}_` + Date.now();
 
-    // 2️⃣ 결제창 호출
+    // ★ 모바일 필수: 리디렉션 주소 생성 (분기정보 포함)
+    const mRedirect = __buildRedirectURL({
+      provider: 'kakaopay',
+      kind: 'recurring_start',
+      tier,
+      merchant_uid: merchantUid,
+      customer_uid: customerUid
+    });
+
     IMP.request_pay({
-      pg: "kakaopay.TCSUBSCRIP",          // ✅ 테스트용 카카오페이 PG상점 ID
+      pg: "kakaopay.TCSUBSCRIP",              // 테스트용 정기 MID
       pay_method: "card",
-      merchant_uid: `order_${tier}_` + new Date().getTime(), // 주문번호에 tier 반영
-      name: sel.name,                      // ★ 플랜명
-      amount: sel.amount,                  // ★ 금액(기본 11,000원 / 플러스 16,500원)
-      customer_uid: customerUid,           // 플랜별 빌링키 UID
+      merchant_uid: merchantUid,
+      name: sel.name,
+      amount: sel.amount,
+      customer_uid: customerUid,
       buyer_email: user.email || "user@example.com",
       buyer_name: user.user_metadata?.name || "홍길동",
       buyer_tel: user.user_metadata?.phone || "01012345678",
+
+      // ★★★ 모바일 필수
+      m_redirect_url: mRedirect,
+
+      // (선택) 하이브리드 앱이면 딥링크 스킴 지정
+      // app_scheme: "treesaju://pay-complete"
     }, async function (rsp) {
-      if (rsp.success) {
-        alert("결제 성공 🎉\n결제번호: " + rsp.imp_uid);
-
-        try {
-          // 3️⃣ 서버로 정기결제 등록 요청 (플랜 정보 함께 전달)
-          const res = await fetch("/api/payment/manage-subscription?action=register", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              imp_uid: rsp.imp_uid,
-              customer_uid: rsp.customer_uid || customerUid,
-              user_id: userId,
-              // ↓ 서버에서 플랜/가격/일일한도 저장·검증할 수 있게 함께 보냄
-              tier,                               // 'basic' | 'plus'
-              planId: sel.planId,                 // 예: 'recurring_monthly_150'
-              price: sel.amount,                  // 11000 | 16500
-              daily_limit: sel.daily_limit,       // 60 | 150
-            }),
-          });
-
-          const data = await res.json();
-          if (res.ok) {
-            alert("✅ 정기결제 등록 및 프리미엄 등급 적용 완료");
-            setTimeout(() => { window.location.reload(); }, 300);
-          } else {
-            alert("❌ 서버 등록 실패: " + (data.error || "서버 오류"));
-          }
-        } catch (err) {
-          console.error("[fetch error]", err);
-          alert("❌ 서버 통신 오류: " + err.message);
-        }
-
-      } else {
+      // ⚠️ 데스크톱 환경에서는 콜백이 호출되지만,
+      //     모바일/인앱 브라우저는 대부분 호출되지 않고 m_redirect_url로 이동합니다.
+      if (!rsp.success) {
         console.warn("[결제 실패]", rsp);
-        alert("❌ 결제 실패: " + rsp.error_msg);
+        return alert("❌ 결제 실패: " + rsp.error_msg);
+      }
+
+      // 데스크톱 즉시 처리용(서버 등록)
+      try {
+        const res = await fetch("/api/payment/manage-subscription?action=register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imp_uid: rsp.imp_uid,
+            customer_uid: rsp.customer_uid || customerUid,
+            user_id: userId,
+            tier,
+            planId: sel.planId,
+            price: sel.amount,
+            daily_limit: sel.daily_limit,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          alert("✅ 정기결제 등록 및 프리미엄 등급 적용 완료");
+          setTimeout(() => { window.location.reload(); }, 300);
+        } else {
+          alert("❌ 서버 등록 실패: " + (data.error || "서버 오류"));
+        }
+      } catch (err) {
+        console.error("[fetch error]", err);
+        alert("❌ 서버 통신 오류: " + err.message);
       }
     });
   } catch (err) {
@@ -1457,46 +1476,54 @@ window.startKakaoSubscriptionPlus  = () => window.startKakaoSubscription('plus')
 // 3/6개월 선결제: Iamport KakaoPay 일반결제 → 서버에 활성화 등록
 // ───────────────────────────────────────────────────────────
 async function startFixedTermPay({ months, amount, productId, dailyLimit = 60 }) {
-  // 1) 로그인 체크
   const { data: { user } } = await window.supabaseClient.auth.getUser();
   if (!user) return alert("로그인이 필요합니다.");
 
-  // 2) Iamport 초기화
   const IMP = window.IMP;
-  IMP.init("imp81444885"); // 아임포트 V1 고객사 식별코드 (정기결제와 동일)
+  IMP.init("imp81444885");
 
-  // 3) 주문번호 생성
   const merchantUid = `order_fixed_${months}m_${Date.now()}`;
 
-  // 4) 결제창 호출 (일반결제: pg='kakaopay')
+  // ★ 리디렉션 주소 (고정권한·분기정보 포함)
+  const mRedirect = __buildRedirectURL({
+    provider: 'kakaopay',
+    kind: 'fixed',
+    months,
+    productId,
+    merchant_uid: merchantUid
+  });
+
   IMP.request_pay({
-    pg: "kakaopay.TC0ONETIME",    // ★ 원타임(테스트 MID)
+    pg: "kakaopay.TC0ONETIME",   // 테스트용 원타임 MID
     pay_method: "card",
     merchant_uid: merchantUid,
     name: `${months}개월 구독 (1일 ${dailyLimit}회)`,
-    amount,                       // ★ 3개월=60000, 6개월=100000
+    amount,
     buyer_email: user.email || "user@example.com",
     buyer_name: user.user_metadata?.name || "홍길동",
     buyer_tel: user.user_metadata?.phone || "01012345678",
+
+    // ★★★ 모바일 필수
+    m_redirect_url: mRedirect,
   }, async (rsp) => {
     if (!rsp.success) {
       console.warn("[fixed pay fail]", rsp);
       return alert("❌ 결제 실패: " + rsp.error_msg);
     }
 
-    // 5) 서버에 활성화 요청 (검증 + 기간부여)
+    // 데스크톱 즉시 처리용(서버 활성화)
     try {
       const res = await fetch("/api/payment/manage-subscription?action=activate_fixed", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imp_uid: rsp.imp_uid,        // 아임포트 결제건 식별자
+          imp_uid: rsp.imp_uid,
           merchant_uid: rsp.merchant_uid,
           user_id: user.id,
-          productId,                   // 예: 'sub_3m_60_60000'
-          termMonths: months,          // 3 | 6
-          dailyLimit,                  // 60
-          price: amount,               // 60000 | 100000
+          productId,
+          termMonths: months,
+          dailyLimit,
+          price: amount,
         }),
       });
       const data = await res.json();
@@ -1512,7 +1539,6 @@ async function startFixedTermPay({ months, amount, productId, dailyLimit = 60 })
     }
   });
 }
-
 
 // 버튼 핸들러 (이미 바인딩되어 있으니 함수만 존재하면 됩니다)
 // ★ 전역에 올려서 어디서든 호출 가능하게
@@ -1629,7 +1655,7 @@ window.startSixMonthPlan = function () {
       buyer_email: user.email || "user@example.com",
       buyer_name: user.user_metadata?.name || "홍길동",
       buyer_tel: normalizeTel(user.user_metadata?.phone),
-      m_redirect_url: location.origin + "/payment/complete",
+      m_redirect_url: location.origin + "/payment/complete.html?provider=inicis"
     };
     if (customer_uid) payload.customer_uid = customer_uid;
 

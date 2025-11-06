@@ -12,10 +12,9 @@
       "path": "/api/payment/manage-subscription?action=charge",
       "schedule": "0 0 * * *"
     },
-    {
-      "path": "/api/payment/manage-subscription?action=autoCancel",
-      "schedule": "5 0 * * *"
-    }
+    { "path": "/api/payment/manage-subscription?action=autoCancel", 
+      "schedule": "5 3 * * *"
+    } 
   ],
     "headers": [
     {
