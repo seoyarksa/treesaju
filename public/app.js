@@ -6166,14 +6166,69 @@ function bindAuthPipelines() {
         await postJSON("/api/update-session", { user_id: userId, session_id: sessionId });
 
         // ✅ 2-1) 다른 기기들에게 "지금 당장 나가라" 브로드캐스트
-       window.supabaseClient
-         .channel(`user:${userId}`)
-         .send({ type: "broadcast", event: "force-logout", payload: { except: sessionId } });
+        window.supabaseClient
+          .channel(`user:${userId}`)
+          .send({ type: "broadcast", event: "force-logout", payload: { except: sessionId } });
+
         // 3) 실시간 감시 시작 (한 번만 구독)
         await initRealtimeWatcher();
 
         // 4) UI 반영
         updateAuthUI(session);
+
+        // ─────────────────────────────────────────────
+        // ✅ 추가된 부분: 로그인 시 “오늘 사주” 자동 출력
+        // ─────────────────────────────────────────────
+        setTimeout(async () => {
+          try {
+            console.log("[AutoSaju] 로그인 감지 → 오늘 사주 자동 출력 시작");
+
+            const today = new Date();
+            const todayPayload = {
+              year: today.getFullYear(),
+              month: today.getMonth() + 1,
+              day: today.getDate(),
+              hour: today.getHours(),
+              minute: today.getMinutes(),
+              calendarType: "solar",
+              gender: "male",
+            };
+
+            const res = await fetch("/api/saju", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(todayPayload),
+            });
+
+            if (!res.ok) {
+              console.warn("[AutoSaju] API 응답 오류:", res.status);
+              return;
+            }
+
+            const todayData = await res.json();
+            if (!todayData?.ganji) return;
+
+            const yearGanji2 = splitGanji(todayData.ganji.year);
+            const monthGanji2 = splitGanji(todayData.ganji.month);
+            const dayGanji2 = splitGanji(todayData.ganji.day);
+            const timeGanji2 = splitGanji(todayData.ganji.time);
+            const dayGanKorGan2 = convertHanToKorStem(dayGanji2.gan);
+
+            renderTodaySajuBox({
+              yearGanji: yearGanji2,
+              monthGanji: monthGanji2,
+              dayGanji: dayGanji2,
+              timeGanji: timeGanji2,
+              dayGanKorGan: dayGanKorGan2,
+              todayStr: `${todayPayload.year}-${String(todayPayload.month).padStart(2, "0")}-${String(todayPayload.day).padStart(2, "0")}`,
+              birthSaju: { yearGanji: yearGanji2, monthGanji: monthGanji2, dayGanji: dayGanji2, timeGanji: timeGanji2 },
+            });
+
+            console.log("[AutoSaju] 오늘 사주 자동 렌더 완료 ✅");
+          } catch (err) {
+            console.error("[AutoSaju] 예외:", err);
+          }
+        }, 800); // 🔹 한 프레임 뒤 실행 (UI 업데이트 이후)
       }
 
       if (event === "SIGNED_OUT") {
@@ -6187,6 +6242,7 @@ function bindAuthPipelines() {
     }
   });
 }
+
 
 /***** ✅ 실시간 세션 변경 감시 (다른 기기 로그인 시 자동 로그아웃) *****/
 // ✅ active_sessions 테이블에 "현재 세션"이 바뀌면, 이 기기 즉시 로그아웃
