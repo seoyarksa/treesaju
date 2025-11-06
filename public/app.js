@@ -19,7 +19,7 @@ window.TERM_HELP = TERM_HELP;
 import { 
   elementMap, 
   DANGRYEONGSHIK_MAP,
-  yukshinToKey,  
+  yukshinToKey,  HanhiddenStemsMap,
   tenGodMap,
   tenGodMapKor,
   YANG_GAN, YIN_GAN,
