@@ -2610,42 +2610,7 @@ async function handleSajuSubmit(e) {
       const limitGuest = getDailyLimit(guestProfile); // 정책 반영(60일 이후 0, 이전 3)
       const remainingPreview = (limitGuest === Infinity) ? Infinity : Math.max(limitGuest - todayCount, 0);
 
-
-// 오늘 날짜 문자열 (YYYY-MM-DD 형식)
-const todayKey = new Date().toISOString().slice(0, 10);
-
-// formKey 예: "2025-11-06-00-00"
-const isTodaySaju = formKey.startsWith(todayKey);
-
-// ① 동일 사주면 무조건 허용
-if (window.lastOutputData === formKey) {
-  console.log("⚠️ 동일 입력(직전과 동일, 게스트) → 카운트 증가 없이 출력만");
-  renderSaju(formData);
-  return;
-}
-
-// ② 오늘의 사주라면 남은 횟수 0이어도 예외 허용
-if (isTodaySaju && remainingPreview <= 0) {
-  console.log("🌞 오늘의 사주 예외 허용 → 출력만");
-  renderSaju(formData);
-  return;
-}
-
-// ③ 그 외 일반 제한
-if (limitGuest !== Infinity && remainingPreview <= 0) {
-  alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다!");
-  updateCountDisplayFromGate({
-    limit: limitGuest,
-    remaining: 0,
-    todayCount,
-    totalCount: Object.values(usage).filter(v => typeof v === "number").reduce((a,b)=>a+b,0),
-  });
-  return; // ✅ 차단
-}
-
-
-
-
+      
 // === 오늘 날짜 예외 처리 (년월일시까지만 비교) ===
 const now = new Date();
 const todayKey = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
@@ -2668,6 +2633,31 @@ if (formDate === todayKey && window.lastOutputData) {
     console.warn('⚠️ 오늘날짜 예외 처리 중 JSON 파싱 실패:', e);
   }
 }
+
+
+// ✅ 먼저 "같은 사주"인 경우를 허용해야 함
+if (window.lastOutputData === formKey) {
+  console.log("⚠️ 동일 입력(직전과 동일, 게스트) → 카운트 증가 없이 출력만");
+  renderSaju(formData);
+  return;
+}
+
+// 🔸 그 다음에 남은 횟수 검사
+
+      if (limitGuest !== Infinity && remainingPreview <= 0) {
+        alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다!");
+        updateCountDisplayFromGate({
+          limit: limitGuest,
+          remaining: 0,
+          todayCount,
+          totalCount: Object.values(usage).filter(v => typeof v === "number").reduce((a,b)=>a+b,0),
+        });
+        return; // ✅ 출력 차단
+      }
+
+
+
+
 
 
 
