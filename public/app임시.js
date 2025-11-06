@@ -129,6 +129,34 @@ console.log('🔥 app.js loaded');
 /************************************
  * 1) 비로그인 출력 제한
  ************************************/
+// ▼ 전역 한 번만! (렌더 함수 밖)
+if (!window.__miniSajuDelegated) {
+  document.addEventListener('click', (e) => {
+    const mini = document.getElementById('saju-mini');
+    if (!mini) return;
+
+    // 축소 버튼
+    if (e.target.closest('#saju-mini-min')) {
+      mini.classList.toggle('is-min');
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    // 닫기 버튼
+    if (e.target.closest('#saju-mini-close')) {
+      mini.remove();
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+  }, { capture: true }); // ← 캡처 단계에서 가로채 재렌더/버블 이슈 방지
+
+  window.__miniSajuDelegated = true;
+}
+
+
+
 // ===== app.js (안전망 포함, 전체 교체용) =====
 // 파일 상단 어딘가
 // 부모 창 전역
@@ -1923,14 +1951,17 @@ document.getElementById("gwBtnInicis").addEventListener("click", () => {
         <h3>구독 결제</h3>
         <p>전화번호 인증이 완료되었습니다. 상품을 선택하여 결제하세요.</p>
 
-        <div class="plan">
-          <ul>
-            <li><strong>3개월 일반 결제</strong>: 1일 60회 · <strong>3개월간 60,000원[일시불]</strong></li>
-            <li><strong>6개월 일반 결제</strong>: 1일 60회 · <strong>6개월간 100,000원[일시불]</strong></li>
-            <li><strong>프리미엄 정기구독 결제</strong> (기본): 1일 60회 · <strong>월 11,000원</strong></li>
-            <li><strong>프리미엄+ 정기구독 결제</strong> (플러스): 1일 150회 · <strong>월 16,500원</strong></li>
-          </ul>
-        </div>
+       <div class="plan">
+  <ul>
+    <li><strong>3개월 일반 결제</strong>: 1일 60회 · <strong>3개월간 60,000원[일시불]</strong></li>
+    <li><strong>6개월 일반 결제</strong>: 1일 60회 · <strong>6개월간 100,000원[일시불]</strong></li>
+    <li><strong>프리미엄 정기구독 결제</strong> (기본): 1일 60회 · <strong>월 11,000원</strong></li>
+    <li><strong>프리미엄+ 정기구독 결제</strong> (플러스): 1일 150회 · <strong>월 16,500원</strong></li>
+
+
+  </ul>
+</div>
+
 
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button class="btn-success" id="btn3m">3개월 일반 결제</button>
@@ -2579,25 +2610,7 @@ async function handleSajuSubmit(e) {
       const limitGuest = getDailyLimit(guestProfile); // 정책 반영(60일 이후 0, 이전 3)
       const remainingPreview = (limitGuest === Infinity) ? Infinity : Math.max(limitGuest - todayCount, 0);
 
-      if (limitGuest !== Infinity && remainingPreview <= 0) {
-        alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다.");
-        updateCountDisplayFromGate({
-          limit: limitGuest,
-          remaining: 0,
-          todayCount,
-          totalCount: Object.values(usage).filter(v => typeof v === "number").reduce((a,b)=>a+b,0),
-        });
-        return; // ✅ 출력 차단
-      }
-
-      // ✅ 직전과 동일할 때만 '카운트 없이' 출력 허용
-      if (window.lastOutputData === formKey) {
-        console.log("⚠️ 동일 입력(직전과 동일, 게스트) → 카운트 증가 없이 출력만");
-        renderSaju(formData);
-        return;
-      }
-
-
+      
 // === 오늘 날짜 예외 처리 (년월일시까지만 비교) ===
 const now = new Date();
 const todayKey = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
@@ -2620,6 +2633,31 @@ if (formDate === todayKey && window.lastOutputData) {
     console.warn('⚠️ 오늘날짜 예외 처리 중 JSON 파싱 실패:', e);
   }
 }
+
+
+// ✅ 먼저 "같은 사주"인 경우를 허용해야 함
+if (window.lastOutputData === formKey) {
+  console.log("⚠️ 동일 입력(직전과 동일, 게스트) → 카운트 증가 없이 출력만");
+  renderSaju(formData);
+  return;
+}
+
+// 🔸 그 다음에 남은 횟수 검사
+
+      if (limitGuest !== Infinity && remainingPreview <= 0) {
+        alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다!");
+        updateCountDisplayFromGate({
+          limit: limitGuest,
+          remaining: 0,
+          todayCount,
+          totalCount: Object.values(usage).filter(v => typeof v === "number").reduce((a,b)=>a+b,0),
+        });
+        return; // ✅ 출력 차단
+      }
+
+
+
+
 
 
 
@@ -2665,7 +2703,7 @@ if (formDate === todayKey && window.lastOutputData) {
     const preGate = await buildGateFromDb(userId, profile);
     if (preGate.limit !== Infinity && preGate.remaining <= 0) {
       // 등급별 메시지 커스터마이즈 가능
-      alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다.");
+      alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다!!");
       updateCountDisplayFromGate(preGate);
       return; // ✅ 출력 차단
     }
@@ -2711,7 +2749,7 @@ if (formDate === todayKey && window.lastOutputData) {
       }
       if (!ok?.allowed) {
         let reason = "이용이 제한되었습니다.";
-        if (ok?.remaining === 0) reason = "오늘 사용 가능한 횟수를 모두 소진하셨습니다.";
+        if (ok?.remaining === 0) reason = "오늘 사용 가능한 횟수를 모두 소진하셨습니다!!!";
         else if (ok?.limit === 0) reason = "구독이 필요합니다. 결제를 진행해주세요.";
         else if (ok?.message) reason = ok.message;
         alert(reason);
@@ -4115,6 +4153,11 @@ async function showBirthInfo(data) {
 window.handleDaeyunClick = handleDaeyunClick;
 
 
+function tgTag(label) {
+  const term = (label ?? '').toString().trim();
+  if (!term) return ''; // 빈 값이면 그냥 빈 문자열
+  return `<span class="ten-god explainable" data-group="tengod" data-term="${term}">${term}</span>`;
+}
 
 
     document.getElementById('common-section').innerHTML = `
@@ -4647,25 +4690,25 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
     <!-- 천간 -->
     <tr>
       <td>
-        <div>${colorize(timeGanji.gan)}</div>
+        <div><span class="explainable" data-group="ganji" data-term="">${colorize(timeGanji.gan)}</span></div>
         <div style="font-size:0.85rem; color:#888;">
-          (${getTenGod(dayGanKorGan, convertHanToKorStem(timeGanji.gan))})
+          ${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(timeGanji.gan)))}
         </div>
       </td>
       <td>
-        <div>${colorize(dayGanji.gan)}</div>
-        <div style="font-size:0.85rem; color:#888;">(일간)</div>
+        <div><span class="explainable" data-group="ganji" data-term="">${colorize(dayGanji.gan)}</span></div>
+        <div style="font-size:0.85rem; color:#888;"><span class="explainable" data-group="terms" data-term="">(일간)</span></div>
       </td>
       <td>
-        <div>${colorize(monthGanji.gan)}</div>
+        <div><span class="explainable" data-group="ganji" data-term="">${colorize(monthGanji.gan)}</span></div>
         <div style="font-size:0.85rem; color:#888;">
-          (${getTenGod(dayGanKorGan, convertHanToKorStem(monthGanji.gan))})
+          ${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(monthGanji.gan)))}
         </div>
       </td>
       <td>
-        <div>${colorize(yearGanji.gan)}</div>
+        <div><span class="explainable" data-group="ganji" data-term="">${colorize(yearGanji.gan)}</span></div>
         <div style="font-size:0.85rem; color:#888;">
-          (${getTenGod(dayGanKorGan, convertHanToKorStem(yearGanji.gan))})
+          ${tgTag(getTenGod(dayGanKorGan, convertHanToKorStem(yearGanji.gan)))}
         </div>
       </td>
  
@@ -4683,10 +4726,10 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
 
     <!-- 지지 -->
     <tr>
-      <td>${colorize(timeGanji.ji)}</td>
-      <td>${colorize(dayGanji.ji)}</td>
-      <td>${colorize(monthGanji.ji)}</td>
-      <td>${colorize(yearGanji.ji)}</td>
+      <td><span class="explainable" data-group="ganji" data-term="">${colorize(timeGanji.ji)}</span></td>
+      <td><span class="explainable" data-group="ganji" data-term="">${colorize(dayGanji.ji)}</span></td>
+      <td><span class="explainable" data-group="ganji" data-term="">${colorize(monthGanji.ji)}</span></td>
+      <td><span class="explainable" data-group="ganji" data-term="">${colorize(yearGanji.ji)}</span></td>
     </tr>
 
     <!-- 지장간 + 육신 -->
@@ -4694,44 +4737,44 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
   <td>
     <div class="hidden-stem-wrapper">
       ${timeLines.map(s => `
-        <div class="hidden-stem">
-          (${colorize(convertKorToHanStem(s), '0.85rem')}
+        <div class="hidden-stem"><span class="explainable" data-group="ganji" data-term="">
+          ${colorize(convertKorToHanStem(s), '0.85rem')}</span>
           <span style="font-size:0.75rem; color:#999;">
-            ${getTenGod(dayGanKorGan, s)}
-          </span>)
+             ${tgTag(getTenGod(dayGanKorGan, s))}
+          </span>
         </div>`).join('')}
     </div>
   </td>
   <td>
     <div class="hidden-stem-wrapper">
       ${dayLines.map(s => `
-        <div class="hidden-stem">
-          (${colorize(convertKorToHanStem(s), '0.85rem')}
+        <div class="hidden-stem"><span class="explainable" data-group="ganji" data-term="">
+          ${colorize(convertKorToHanStem(s), '0.85rem')}</span>
           <span style="font-size:0.75rem; color:#999;">
-            ${getTenGod(dayGanKorGan, s)}
-          </span>)
+             ${tgTag(getTenGod(dayGanKorGan, s))}
+          </span>
         </div>`).join('')}
     </div>
   </td>
   <td>
     <div class="hidden-stem-wrapper">
       ${monthLines.map(s => `
-        <div class="hidden-stem">
-          (${colorize(convertKorToHanStem(s), '0.85rem')}
+        <div class="hidden-stem"><span class="explainable" data-group="ganji" data-term="">
+          ${colorize(convertKorToHanStem(s), '0.85rem')}</span>
           <span style="font-size:0.75rem; color:#999;">
-            ${getTenGod(dayGanKorGan, s)}
-          </span>)
+            ${tgTag(getTenGod(dayGanKorGan, s))}
+          </span>
         </div>`).join('')}
     </div>
   </td>
   <td>
     <div class="hidden-stem-wrapper">
       ${yearLines.map(s => `
-        <div class="hidden-stem">
-          (${colorize(convertKorToHanStem(s), '0.85rem')}
+        <div class="hidden-stem"><span class="explainable" data-group="ganji" data-term="">
+          ${colorize(convertKorToHanStem(s), '0.85rem')}</span>
           <span style="font-size:0.75rem; color:#999;">
-            ${getTenGod(dayGanKorGan, s)}
-          </span>)
+             ${tgTag(getTenGod(dayGanKorGan, s))}
+          </span>
         </div>`).join('')}
     </div>
   </td>
@@ -4762,6 +4805,14 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
 
 
 `;
+
+
+renderSajuMiniFromCurrentOutput({
+  timeGanji, dayGanji, monthGanji, yearGanji,
+  timeLines, dayLines, monthLines, yearLines,
+  dayGanKorGan,
+  getTenGod, convertHanToKorStem, convertKorToHanStem, colorize
+});
 
 
     document.getElementById('basic-section').innerHTML = `
@@ -4799,7 +4850,8 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
         <td style="border:1px solid #ccc; padding:4px;">
           <div id="dangryeongshik-container" style="margin-top: 0.5rem;"></div>
         </td>
-        <td style="border:1px solid #ccc; padding:4px;"><div id="gyeok-flow"></div></td>
+        <td style="border:1px solid #ccc; padding:4px;">
+<div id="gyeok-flow"></div></td>
        
       </tr>
        <tr>
@@ -4811,13 +4863,17 @@ td.setAttribute("data-year", year);   // ✅ 세운 연도 저장
         </tr>
         <!-- 태과불급 전용 한 칸 -->
 <tr>
-  <td colspan="2" style="border:1px solid #ccc; padding:4px; color:purple;" >
+  <td colspan="2" style="border:1px solid #ccc; padding:4px; color:purple;" ><div style="text-align:left; margin:8px 0; color:#0077cc;">
+  07] <span class="explainable" data-group="terms" data-term="">태과불급</span>에 따른 여러가지 현상들
+</div>
  <div id="taegwa-bulgeup-cell">${tb} </div><div id="simple-table-box"></div>
 </td>
 </tr>
 
   <tr>
-    <td colspan="2">
+    <td colspan="2"><div style="text-align:left; margin:8px 0; color:#0077cc;">
+  08] 천간과 지지에 따른 기타 신살들
+</div>
       <div id="etc-sinsal-box"></div>
     </td>
   </tr>
@@ -4875,9 +4931,9 @@ if (secondaryGyeokResult?.primary && secondaryGyeokResult?.secondary) {
   // 생지(복수격)
   gyeokDisplayText = `
     <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;"><b>
-      ${window.gyeokName}${window.gyeokStem ? '' : ''}
+     ${window.gyeokName}${window.gyeokStem ? '' : ''}
     </b></span>
-    <span style="font-size:0.92em;"> (보조격: </span>
+    <span class="explainable" data-group="terms" data-term="보조격"; style="font-size:0.92em;"> (보조격: </span>
     <span id="gyeok-secondary" style="cursor:pointer; color:#ff8844;">
       <b>${secondaryGyeokResult.secondary.char}</b>
     </span>
@@ -4892,7 +4948,7 @@ if (secondaryGyeokResult?.primary && secondaryGyeokResult?.secondary) {
     <span id="gyeok-primary" style="cursor:pointer; color:#2277ff;">
       ${window.gyeokName}${window.gyeokStem ? '' : ''}
     </span>
-    <span style="font-size:0.92em;"> (보조격: </span>
+    <span class="explainable" data-group="terms" data-term="보조격"; style="font-size:0.92em;"> (보조격: </span>
     <span id="gyeok-secondary" style="cursor:pointer; color:#ff8844;">
       ${secondaryGyeokResult.char}
     </span>
@@ -4936,7 +4992,9 @@ if (gyeokDisplayEl) {
   );
 
   // 출력은 기존의 주격+보조격 로직(gyeokDisplayText)을 유지
-  gyeokDisplayEl.innerHTML = ` 격국: ${gyeokDisplayText} `;
+  gyeokDisplayEl.innerHTML = `   <div style="text-align:left; margin:8px 0; color:#0077cc;">
+  05] <span class="explainable" data-group="terms" data-term="">격국</span>[&<span class="explainable" data-group="terms" data-term="">보조격</span>]의 구성 및 도식도
+</div><br><br><span class="explainable" data-group="terms" data-term="">격국</span>: ${gyeokDisplayText} `;
 
 
 }
@@ -5433,6 +5491,26 @@ requestAnimationFrame(() => {
 
 
   console.log("[saju] OK to render");
+
+  // ✅ renderSaju 내부 (사주 출력 완료 직후)
+// ✅ 사주 출력이 끝나는 부분 (renderSaju 마지막 catch 위나 return 직전)
+// renderSaju 마지막 부분 어딘가(출력 끝났을 때)
+try {
+  const formKey = `${year}-${month}-${day}-${hour}-${minute}-${calendarType}-${gender}`;
+  const formData = { year, month, day, hour, minute, calendarType, gender };
+
+  // 새 탭도 복원되길 원하면 localStorage, 현재 탭만이면 sessionStorage
+localStorage.setItem("lastSajuFormKey", formKey);
+localStorage.setItem("lastSajuFormData", JSON.stringify(formData));
+localStorage.setItem("lastSajuResult", JSON.stringify(resultData));
+
+  console.log('💾 마지막 사주 저장:', formKey);
+} catch(e) {
+  console.warn('[save saju failed]', e);
+}
+
+
+
   // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
 // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
 // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
@@ -5441,9 +5519,382 @@ requestAnimationFrame(() => {
 
 
 
+  // 탭 복귀 시 흔히 붙여둔 재초기화/재요청 로직을 전부 무력화하는 가드
+(function guardFocusVisibilityReinit(){
+  // pageshow(bfcache)로 돌아와도 재초기화 금지
+  window.addEventListener('pageshow', (e) => {
+    // persisted=true면 bfcache 복귀 — 이미 화면/상태가 살아있으니 아무 것도 하지 않음
+    if (e.persisted) {
+      // no-op
+    }
+  });
+
+  // 보통 여기에 init이나 requestSubmit을 걸어두는데, 전부 무시
+  window.addEventListener('focus', () => {
+    // no-op: 탭 복귀 시 재실행 금지
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      // no-op: 탭이 다시 보일 때도 재실행 금지
+    }
+  });
+})();
+
+// ✅ 전역 Click Delegation (한 번만 설치)
+//    개별 버튼에 바인딩하던 걸 모두 여기에서 라우팅합니다.
+(function bindGlobalDelegates(){
+  if (window.__DELEGATES_BOUND__) return;
+  window.__DELEGATES_BOUND__ = true;
+
+  // 클릭 중복 방지 (빠른 더블클릭 보호)
+  let lastClickAt = 0;
+
+  document.addEventListener('click', async (e) => {
+    const now = Date.now();
+    if (now - lastClickAt < 150) return; // 150ms 내 중복 방지
+    lastClickAt = now;
+
+    const el = e.target;
+
+    // ─────────────────────────────
+    // 0) 혹시 상시 깔린 오버레이가 클릭을 먹는 경우가 있어 제거
+    killStuckOverlay();
+
+    // 도우미
+    const is = (sel) => el.matches?.(sel) || el.closest?.(sel);
+
+    // ─────────────────────────────
+    // 1) 로그아웃
+    if (is('#logoutBtn')) {
+      e.preventDefault();
+      try {
+        window.__MANUAL_LOGOUT__ = true;
+        await window.supabaseClient.auth.signOut();
+      } finally {
+        window.__MANUAL_LOGOUT__ = false;
+        updateAuthUI?.(null);
+      }
+      return;
+    }
+
+    // ─────────────────────────────
+    // 2) 회원정보 수정(예: 저장 버튼/열기 버튼 등)
+    //    wireProfileEditEvents 안에서 개별 바인딩했다면 죽을 수 있음 → 위임으로 보강
+    if (is('#profileEditOpenBtn')) {
+      e.preventDefault();
+      openProfileEditModal?.();
+      return;
+    }
+    if (is('#profileSaveBtn')) {
+      e.preventDefault();
+      await saveProfileChanges?.(); // 너의 기존 함수 호출
+      return;
+    }
+
+    // ─────────────────────────────
+    // 3) 정기구독/결제 정보(예상되는 버튼 id들 커버)
+    if (is('#subscribeBtn, #billingBtn, #openPlanModalBtn')) {
+      e.preventDefault();
+      openSubscriptionModal?.(); // 네가 쓰는 기존 함수명에 맞춰주세요
+      return;
+    }
+
+    // ─────────────────────────────
+    // 4) 사주 출력
+    if (is('#sajuSubmit')) {
+      e.preventDefault();
+      const form = document.getElementById('saju-form');
+      if (form) {
+        window.outputMode = 'basic';
+        try { form.requestSubmit(); } catch(_) { form.submit(); }
+      }
+      return;
+    }
+
+    // 5) 12운성/12신살 탭 토글 (가능한 id/데이터속성 모두 커버)
+    if (is('#sinsalBtn, [data-action="switch-mode"][data-mode="sinsal"]')) {
+      e.preventDefault();
+      const form = document.getElementById('saju-form');
+      if (form) {
+        window.outputMode = 'sinsal';
+        try { form.requestSubmit(); } catch(_) { form.submit(); }
+      }
+      return;
+    }
+    if (is('#unseongBtn, [data-action="switch-mode"][data-mode="basic"]')) {
+      e.preventDefault();
+      const form = document.getElementById('saju-form');
+      if (form) {
+        window.outputMode = 'basic';
+        try { form.requestSubmit(); } catch(_) { form.submit(); }
+      }
+      return;
+    }
+
+    // (참고) 이미 위임으로 처리한 것들: .saju-record-link / .delete-record-btn 등은 그대로 유지
+  }, { passive: true });
+
+  // 탭 복귀/페이지 캐시 복원 시 혹시 내부에서 다시 바인딩해도
+  // 위임은 살아 있으므로 추가 조치 불필요. 그래도 안전하게 모달 닫기/포인터 복구.
+  window.addEventListener('pageshow', (e) => { if (e.persisted) killStuckOverlay(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') killStuckOverlay(); });
+
+  // 오버레이/포인터 이슈 방지 유틸
+  function killStuckOverlay(){
+    // 흔한 오버레이/백드롭 후보들
+    const blockers = document.querySelectorAll(`
+      .modal-backdrop, .overlay, .backdrop, #overlay, [data-backdrop="true"]
+    `);
+    blockers.forEach(b => {
+      const cs = getComputedStyle(b);
+      // 화면에 보이면서 pointer-events가 켜져 있으면 클릭을 가로챌 수 있음
+      if (cs.display !== 'none' && cs.visibility !== 'hidden' && cs.pointerEvents !== 'none') {
+        // 우선 pointer-events만 꺼서 안전하게 클릭 통과
+        b.style.pointerEvents = 'none';
+      }
+    });
+
+    // 혹시 전체 래퍼가 pointer-events:none 되어 있으면 복구
+    const app = document.getElementById('app') || document.body;
+    const cs = getComputedStyle(app);
+    if (cs.pointerEvents === 'none') {
+      app.style.pointerEvents = 'auto';
+    }
+  }
+})();
+
+// ✅ 페이지 로드 시 직전 사주 자동 복원
+// ✅ 페이지 로드 시 직전 사주 자동 복원
+// 새로고침/탭 복귀 시 자동 복원 (자동 제출 없이도 이전 결과로 고정)
+window.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const savedData = localStorage.getItem('lastSajuFormData');
+    if (savedData && !sessionStorage.getItem('__RESTORE_DONE__')) {
+      const formData = JSON.parse(savedData);
+      await renderSaju(formData);
+      sessionStorage.setItem('__RESTORE_DONE__', '1'); // 같은 세션 중복 복원 방지
+    }
+  } catch (e) {
+    console.warn('[auto restore error]', e);
+  }
+});
 
 
 
+
+// ─── 미니 사주창: CSS 주입 ───
+(function injectMiniSajuCSS(){
+  if (document.getElementById('mini-saju-style')) return;
+  const s = document.createElement('style');
+  s.id = 'mini-saju-style';
+  s.textContent = `
+    #saju-mini {
+      position: fixed; right: 16px; bottom: 16px; z-index: 9999;
+      width: 300px; max-width: calc(100vw - 24px);
+      background:#fff; border:1px solid #e5e5ea; border-radius:12px;
+      box-shadow:0 10px 30px rgba(0,0,0,.18); overflow:hidden; font-size:14px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
+    }
+    #saju-mini .bar { display:flex; align-items:center; justify-content:space-between;
+      padding:8px 10px; background:linear-gradient(180deg,#f7f7f9,#efeff3); border-bottom:1px solid #ececf1;
+    }
+    #saju-mini .body { max-height:260px; overflow:auto; padding:10px; }
+    #saju-mini table { width:100%; border-collapse:collapse; }
+    #saju-mini th, #saju-mini td { border-bottom:1px solid #f3f3f6; padding:4px 6px; text-align:left; vertical-align:top; }
+    #saju-mini th { width:3.5em; color:#666; font-weight:600; }
+    #saju-mini small { color:#777; }
+    #saju-mini .chip { display:inline-block; padding:2px 6px; border:1px solid #eee; border-radius:6px; margin:2px 2px 0 0; background:#fbfbfe; }
+    #saju-mini .btn { border:0; background:#f1f1f6; width:24px; height:24px; border-radius:6px; cursor:pointer; font-size:14px; line-height:1; }
+    #saju-mini .btn:hover { background:#e9e9f2; }
+    #saju-mini.is-min .body { display:none; }
+  `;
+  document.head.appendChild(s);
+})();
+
+// ─── 미니 사주창: 렌더러 ───
+function renderSajuMiniFromCurrentOutput(ctx = {}) {
+  // 1) 의존 함수(없으면 안전 폴백)
+  const _getTenGod           = ctx.getTenGod           || window.getTenGod           || (() => '');
+  const _convertHanToKorStem = ctx.convertHanToKorStem || window.convertHanToKorStem || (x => x);
+  const _convertKorToHanStem = ctx.convertKorToHanStem || window.convertKorToHanStem || (x => x);
+  const _colorize            = ctx.colorize            || window.colorize            || (x => x);
+
+  // 2) 데이터 (ctx → window)
+  const timeGanji  = ctx.timeGanji  || window.timeGanji;
+  const dayGanji   = ctx.dayGanji   || window.dayGanji;
+  const monthGanji = ctx.monthGanji || window.monthGanji;
+  const yearGanji  = ctx.yearGanji  || window.yearGanji;
+
+  const timeLines  = ctx.timeLines  || window.timeLines  || [];
+  const dayLines   = ctx.dayLines   || window.dayLines   || [];
+  const monthLines = ctx.monthLines || window.monthLines || [];
+  const yearLines  = ctx.yearLines  || window.yearLines  || [];
+
+  const dayGanKorGan = ctx.dayGanKorGan || window.dayGanKorGan || '';
+
+  // (필수 값 없으면 그만)
+  if (!dayGanji || !monthGanji || !yearGanji || !timeGanji) {
+    console.warn('[mini] pillars missing — skip render');
+    return;
+  }
+
+  // 3) 표 데이터 가공
+  const data = {
+    hour:  { gan: timeGanji.gan,  ten: _getTenGod(dayGanKorGan, _convertHanToKorStem(timeGanji.gan)),  jiji: timeGanji.ji,  hides: timeLines.map(s  => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
+    day:   { gan: dayGanji.gan,   ten: '일간',                                                         jiji: dayGanji.ji,   hides: dayLines.map(s   => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
+    month: { gan: monthGanji.gan, ten: _getTenGod(dayGanKorGan, _convertHanToKorStem(monthGanji.gan)), jiji: monthGanji.ji, hides: monthLines.map(s => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
+    year:  { gan: yearGanji.gan,  ten: _getTenGod(dayGanKorGan, _convertHanToKorStem(yearGanji.gan)),  jiji: yearGanji.ji,  hides: yearLines.map(s  => `${_convertKorToHanStem(s)} ${_getTenGod(dayGanKorGan, s)}`) },
+  };
+
+  // 4) 제목 세터 (항상 #customer-name을 읽어 표시)
+  const setMiniTitle = (label = 'setMiniTitle') => {
+    // id로 먼저 찾고, 없으면 .bar strong으로 폴백
+    let titleEl = document.querySelector('#saju-mini #saju-mini-title')
+               || document.querySelector('#saju-mini .bar strong');
+    if (!titleEl) {
+      console.warn(`[mini:title] ${label} → title 요소 없음`);
+      return;
+    }
+
+    const inputEl = document.getElementById('customer-name');
+    const v1 = inputEl?.value ?? '';
+    const v2 = inputEl?.getAttribute?.('value') ?? '';
+    const v3 = window.customerName ?? '';
+    const v4 = (typeof ctx.customerName === 'string' ? ctx.customerName : (ctx.name || ''));
+
+    const raw = (v1 || v2 || v3 || v4 || '');
+    const name = raw.trim();
+
+    titleEl.textContent = name ? `사주팔자(${name})` : '사주팔자';
+
+    // 디버깅 로그(필요 없으면 주석 처리해도 됨)
+    console.log('[mini:title]', { label, value:v1, attr:v2, win:v3, ctx:v4, decided:name, text:titleEl.textContent });
+  };
+
+  // 5) CSS 1회 주입
+  if (!document.getElementById('mini-saju-style')) {
+    const s = document.createElement('style');
+    s.id = 'mini-saju-style';
+    s.textContent = `
+      #saju-mini{position:fixed;right:16px;bottom:16px;z-index:9999;width:300px;max-width:calc(100vw - 24px);
+        background:#fff;border:1px solid #e5e5ea;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);overflow:hidden;
+        font-size:12px;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif;}
+      #saju-mini .bar{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:linear-gradient(180deg,#f7f7f9,#efeff3);
+        border-bottom:1px solid #ececf1;}
+      #saju-mini .body{max-height:260px;overflow:auto;padding:10px;}
+      #saju-mini table{width:100%;border-collapse:collapse;}
+      #saju-mini th,#saju-mini td{border-bottom:1px solid #f3f3f6;padding:4px 6px;text-align:left;vertical-align:top;}
+      #saju-mini th{color:#666;font-weight:600;}
+      #saju-mini small{color:#777;}
+      #saju-mini .saju-chip{display:inline-block;padding:1px 4px;border:1px solid #eee;border-radius:6px;margin:2px 2px 0 0;background:#fbfbfe;font-size:11px;}
+      #saju-mini .btn{border:0;background:#f1f1f6;width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:14px;line-height:1;}
+      #saju-mini .btn:hover{background:#e9e9f2;}
+      #saju-mini.is-min .body{display:none;}
+    `;
+    document.head.appendChild(s);
+  }
+
+  // 6) 박스 생성(없으면 만들고, 있으면 재사용)
+  let box = document.getElementById('saju-mini');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'saju-mini';
+    box.innerHTML = `
+      <div class="bar">
+        <strong id="saju-mini-title">사주팔자</strong>
+        <div>
+          <button class="btn" id="saju-mini-min" title="접기">—</button>
+          <button class="btn" id="saju-mini-close" title="닫기">×</button>
+        </div>
+      </div>
+      <div class="body" id="saju-mini-body"></div>
+    `;
+    // (중요) DOM에 붙인 다음 제목 세팅
+    document.body.appendChild(box);
+    setMiniTitle('after-append');
+
+    // 버튼 바인딩
+    box.querySelector('#saju-mini-min')?.addEventListener('click', () => box.classList.toggle('is-min'));
+    box.querySelector('#saju-mini-close')?.addEventListener('click', () => box.remove());
+
+    // 고객명 입력 변화 감지(1회만 연결)
+    if (!window.__miniTitleWired) {
+      const input = document.getElementById('customer-name');
+      if (input) {
+        input.addEventListener('input',  () => setMiniTitle('input'));
+        input.addEventListener('change', () => setMiniTitle('change'));
+      } else {
+        console.warn('[mini:title] #customer-name 없음 → 입력 이벤트 연결 보류');
+      }
+      window.__miniTitleWired = true;
+    }
+  } else {
+    // 혹시 예전 마크업이라 id 빠졌으면 복구
+    if (!box.querySelector('#saju-mini-title')) {
+      const strong = box.querySelector('.bar strong');
+      if (strong) strong.id = 'saju-mini-title';
+    }
+  }
+
+  // 7) 본문 표 렌더
+  const body = box.querySelector('#saju-mini-body');
+  const C = (txt) => (typeof _colorize === 'function' ? _colorize(txt) : (txt ?? ''));
+  const coerceCol = (p) => (!p || typeof p !== 'object')
+    ? { gan:'-', ten:'-', jiji:'-', hides:[] }
+    : { gan: p.gan ?? '-', ten: p.ten ?? '-', jiji: p.jiji ?? '-', hides: Array.isArray(p.hides) ? p.hides : [] };
+
+  const columns = [data.hour, data.day, data.month, data.year].map(coerceCol);
+
+  body.innerHTML = `
+    <table class="mini-grid">
+      <thead>
+        <tr>
+          <th>시주</th>
+          <th>일주</th>
+          <th>월주</th>
+          <th>년주</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          ${columns.map(p => `<td><strong>${C(p.gan)}</strong> <small>(${C(p.ten)})</small></td>`).join('')}
+        </tr>
+        <tr>
+          ${columns.map(p => `<td><strong>${C(p.jiji)}</strong></td>`).join('')}
+        </tr>
+        <tr>
+          ${columns.map(p => `<td>${p.hides.length ? p.hides.map(h => `<span class="saju-chip">(${h})</span>`).join('') : '-'}</td>`).join('')}
+        </tr>
+      </tbody>
+    </table>
+  `;
+
+  // 8) 제목 즉시/지연 갱신(자동입력 대응)
+  setMiniTitle();
+  requestAnimationFrame(() => setMiniTitle('raf'));
+  setTimeout(() => setMiniTitle('t+300'), 300);
+}
+
+
+
+
+
+
+(function wireMiniTitleLive(){
+  if (window.__miniTitleWired) return;
+  window.__miniTitleWired = true;
+
+  const input = document.getElementById('customer-name');
+  if (!input) return; // 페이지에 그 요소 없으면 패스
+
+  input.addEventListener('input', () => {
+    const el = document.querySelector('#saju-mini #saju-mini-title');
+    if (!el) return;
+    const v = input.value.trim();
+    el.textContent = v ? `사주팔자(${v})` : '사주팔자';
+  });
+})();
 
 
 
@@ -5490,6 +5941,31 @@ async function renderUserProfile() {
 
 // === 초기화 (하나로 통합)
 document.addEventListener("DOMContentLoaded", async () => {
+
+  // 🔻 ① 여기에 자동 복원 코드 넣기
+  try {
+   const savedKey = localStorage.getItem("lastSajuFormKey");
+   const savedData = localStorage.getItem("lastSajuFormData");
+   const savedResult = localStorage.getItem("lastSajuResult");
+
+    if (!sessionStorage.getItem("__RESTORE_DONE__") && savedKey && savedData) {
+      console.log("🔁 새로고침 후 이전 사주 자동 복원:", savedKey);
+      const formData = JSON.parse(savedData);
+
+      // ⚠️ renderSaju가 formData 하나만 받는 구조면 이 줄로 충분
+      await renderSaju(formData);
+       sessionStorage.setItem("__RESTORE_DONE__", "1"); // 같은 세션에서 중복 복원 방지
+
+      // 만약 renderSaju가 2개 인자를 받는 구조면:
+      // await renderSaju(formData, JSON.parse(savedResult));
+    } else {
+      console.log("ℹ️ 이전 사주 데이터 없음 — 기본 상태로 시작");
+    }
+  } catch (e) {
+    console.warn("[Auto Restore Error]", e);
+  }
+
+
   try {
     console.log("[app] DOM ready");
 
@@ -5643,16 +6119,25 @@ window.addEventListener("beforeunload", () => {
         }
       }
 
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
-        if (!__reloading) {
-          __reloading = true;
-          if (window.location.hash) {
-            history.replaceState(null, "", window.location.pathname + window.location.search);
-          }
-          window.location.reload();
-        }
-        return;
-      }
+     // 🔒 새로고침은 '진짜로 필요할 때만'
+     if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+       // 1) 직전 사주가 저장돼 있으면 굳이 리로드 불필요 → 스킵
+       const hasSaved = !!localStorage.getItem("lastSajuFormData");
+       // 2) 탭이 백그라운드였다가 포그라운드로 올 때 오는 케이스도 스킵
+       const notVisible = document.visibilityState !== "visible";
+       if (hasSaved || notVisible) {
+        updateAuthUI(newSession);
+         return;
+       }
+       if (!__reloading) {
+         __reloading = true;
+         if (window.location.hash) {
+           history.replaceState(null, "", window.location.pathname + window.location.search);
+         }
+         window.location.reload();
+       }
+       return;
+     }
       updateAuthUI(newSession);
     });
 
@@ -5880,6 +6365,10 @@ function bindAuthPipelines() {
 
         // 4) UI 반영
         updateAuthUI(session);
+
+          console.log("🪄 로그인 직전 상태 백업 시도");
+  // sessionStorage는 자동 보존되지만, 혹시 새로 로그인으로 덮어쓸 때 대비
+  sessionStorage.setItem("__autoRestorePending", "1");
       }
 
       if (event === "SIGNED_OUT") {
