@@ -5733,20 +5733,22 @@ body.innerHTML = `
 /* ===== 미니 大/世 출력 — 단일/최소 버전 ===== */
 (function miniApplyDaSe(){
   // 필요 자원 (이미 위에서 쓰는 걸 그대로 사용)
-  const MAP          = window.HanhiddenStemsMap || {};   // {'戌':['戊','辛','丁'], ...}  ← 한자 지지 키
+
   const getTenGod    = _getTenGod || window.getTenGod || null;
   const han2korStem  = _convertHanToKorStem || window.convertHanToKorStem || (s=>s);
   const dayKor       = (typeof dayGanKorGan !== 'undefined' ? dayGanKorGan : window.dayGanKorGan) || '';
 
   // 칩 HTML 생성 (지장간 한자 배열 → 칩)
-  function makeHides(jiHan){
-    const arr = MAP[jiHan] || [];
-    if (!arr.length) return '-';
-    return arr.map(hanStem=>{
-      const ten = (getTenGod && dayKor) ? (getTenGod(dayKor, han2korStem(hanStem)) || '') : '';
-      return `<span class="saju-chip">(${hanStem}${ten ? ' ' + ten : ''})</span>`;
-    }).join('');
-  }
+function makeHides(jiHan){
+  const map = window.HanhiddenStemsMap;            // ★ 매 호출마다 최신 전역 참조
+  const arr = map && map[jiHan] ? map[jiHan] : []; // 키는 한자 지지(예: '戌','巳')
+  if (!arr.length) return '-';
+  return arr.map(hanStem=>{
+    const ten = (getTenGod && dayKor) ? (getTenGod(dayKor, han2korStem(hanStem)) || '') : '';
+    return `<span class="saju-chip">(${hanStem}${ten ? ' ' + ten : ''})</span>`;
+  }).join('');
+}
+
 
   // 한 번에 반영
   function apply(prefix, stemHan, jiHan){
