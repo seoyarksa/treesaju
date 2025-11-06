@@ -10,13 +10,11 @@
     th { background: #f5f5f5; }
     .pagination { margin-top: 15px; text-align: center; }
     .pagination button { margin: 0 3px; padding: 5px 10px; }
-    /* 모달 스타일 */
     #editModal {
       display:none; position:fixed; top:5%; left:10%;
       width:80%; height:85%; overflow-y:scroll;
       background:#fff; border:1px solid #ccc; padding:20px; z-index:1000;
     }
-
     .cell-changed { color: red; font-weight: 600; }
     .cell-flash { transition: color 0.6s ease; }
   </style>
@@ -24,9 +22,9 @@
 </head>
 <body>
   <h2>회원관리</h2>
- 
   <input type="text" id="searchInput" placeholder="닉네임/이메일 검색" />
-  <button onclick="loadMembers(1)">검색</button>   <a href="https://supabase.com/dashboard/project/dxrgobsgeeshkybkbnxo/editor/45485" target="_blank">전체테이블 보기</a> 
+  <button onclick="loadMembers(1)">검색</button>
+  <a href="https://supabase.com/dashboard/project/dxrgobsgeeshkybkbnxo/editor/45485" target="_blank">전체테이블 보기</a> 
 
   <table>
     <thead>
@@ -66,7 +64,7 @@
       <label>닉네임: <input type="text" id="edit-nickname" readonly></label><br>
       <label>전화번호: <input type="text" id="edit-phone"></label><br>
 
-      <!-- NEW: phone_verified 편집 -->
+      <!-- phone_verified 편집 -->
       <label>전화번호 인증 (phone_verified):
         <select id="edit-phone_verified">
           <option value="false">false</option>
@@ -86,8 +84,9 @@
         </select>
       </label><br>
 
+      <!-- role은 DB에서 자동 계산/제한 → 읽기 전용 표시 -->
       <label>권한 (role):
-        <select id="edit-role">
+        <select id="edit-role" disabled title="DB에서 자동 계산/제한되어 직접 수정 불가">
           <option value="normal">일반회원</option>
           <option value="premium3">정기회원3</option>
           <option value="premium6">정기회원6</option>
@@ -222,7 +221,7 @@
       let query = supabase
         .from("profiles")
         .select("*", { count: "exact" })
-        .order('updated_at', { ascending: false })  // 최신순
+        .order('updated_at', { ascending: false })
         .range(from, to);
 
       if (search) {
@@ -247,17 +246,8 @@
           <td>${member.role || "-"}</td>
           <td>${member.created_at ? new Date(member.created_at).toLocaleDateString() : "-"}</td>
           <td>${member.updated_at ? new Date(member.updated_at).toLocaleDateString() : "-"}</td>
-          <td>
-            ${member.current_period_end
-              ? new Date(member.current_period_end).toLocaleDateString('ko-KR')
-              : "-"}
-          </td>
-          <td>
-            ${member.cancel_effective_at
-              ? new Date(member.cancel_effective_at).toLocaleDateString('ko-KR')
-              : "-"}
-          </td>
-
+          <td>${member.current_period_end ? new Date(member.current_period_end).toLocaleDateString('ko-KR') : "-"}</td>
+          <td>${member.cancel_effective_at ? new Date(member.cancel_effective_at).toLocaleDateString('ko-KR') : "-"}</td>
           <td>${member.daily_usage_date || "-"}</td>
           <td>${member.daily_usage_count ?? "-"}</td>
           <td>${member.daily_limit ?? "-"}</td>
@@ -300,9 +290,8 @@
       document.getElementById("edit-nickname").value = data.nickname || data.display_name || "";
       document.getElementById("edit-phone").value = data.phone || "";
       document.getElementById("edit-grade").value = data.grade || "basic";
-      document.getElementById("edit-role").value  = data.role  || "normal";
+      document.getElementById("edit-role").value  = data.role  || "normal"; // 표시만
 
-      // NEW: phone_verified 값 주입
       document.getElementById("edit-phone_verified").value = data.phone_verified ? "true" : "false";
 
       const d = s => s ? s.split("T")[0] : "";
@@ -324,7 +313,6 @@
 
     // 저장
     async function saveEdit() {
-      // 입력 정규화 유틸
       const Vdate = (id) => {
         const v = document.getElementById(id).value;
         return v ? new Date(v + "T00:00:00Z").toISOString() : null;
@@ -337,13 +325,12 @@
         const v = document.getElementById(id).value;
         return v?.trim() || null;
       };
-      // NEW: boolean 파서
       const Vbool = (id) => document.getElementById(id).value === "true";
 
+      // role 제외 (DB가 막고 있음)
       const updates = {
         phone: Vtxt("edit-phone"),
         grade: Vtxt("edit-grade"),
-        role:  Vtxt("edit-role"),
         current_period_end:  Vdate("edit-current_period_end"),
         cancel_effective_at: Vdate("edit-cancel_effective_at"),
         daily_limit:      Vnum("edit-daily_limit"),
@@ -351,7 +338,6 @@
         premium_assigned_at:       Vdate("edit-premium_assigned_at"),
         premium_first_assigned_at: Vdate("edit-premium_first_assigned_at"),
         has_ever_premium: document.getElementById("edit-has_ever_premium").value === "true",
-        // NEW: phone_verified 업데이트
         phone_verified: Vbool("edit-phone_verified"),
       };
 
@@ -369,31 +355,26 @@
         alert("저장 실패: " + (error.message || JSON.stringify(error)));
         return;
       }
-
-      // RLS/권한 이슈 등으로 0행 업데이트인 경우 바로 안내
       if (!data || data.length === 0) {
         alert("수정이 반영되지 않았습니다. (권한/RLS 정책 확인 필요)");
         return;
       }
 
-      // 서버가 돌려준 최신 행을 기준으로 테이블 즉시 패치
       const row = data[0];
       patchAndHighlightRow?.(currentUserId, {
         phone: row.phone,
         grade: row.grade,
-        role:  row.role,
+        // role은 서버 계산값, 목록은 재조회 시 반영됨
         daily_limit: row.daily_limit,
         special_assigned_at: row.special_assigned_at,
         premium_assigned_at: row.premium_assigned_at,
         premium_first_assigned_at: row.premium_first_assigned_at,
         has_ever_premium: row.has_ever_premium,
-        // NEW: phone_verified 반영
         phone_verified: row.phone_verified,
       });
 
       alert("저장 완료");
       closeEditModal();
-      // 최종 동기화를 위해 재조회
       loadMembers(currentPage);
     }
 
@@ -407,9 +388,7 @@
         .eq("user_id", userId)
         .select();
 
-      console.log("삭제 시도 userId:", userId);
-      console.log("삭제 응답 data:", data);
-      console.log("삭제 응답 error:", error);
+      console.log("삭제 시도 userId:", userId, "data:", data, "error:", error);
 
       if (error) {
         alert("삭제 실패: " + error.message);
@@ -425,12 +404,8 @@
 
   <!--수정사항 표시-->
   <script>
-    function fmtDateOrDash(v) {
-      if (!v) return "-";
-      try { return new Date(v).toLocaleDateString(); } catch { return "-"; }
-    }
+    function fmtDateOrDash(v) { if (!v) return "-"; try { return new Date(v).toLocaleDateString(); } catch { return "-"; } }
     function fmtBoolYN(b) { return b ? "예" : "아니오"; }
-    // NEW: 체크마크 출력 유틸
     function fmtCheck(b){ return b ? "✅" : "❌"; }
   </script>
   <script>
@@ -442,18 +417,14 @@
       const c = idx => row.children[idx];
       const mark = idx => {
         c(idx).classList.add("cell-changed","cell-flash");
-        if (options.clearAfterMs) {
-          setTimeout(() => c(idx).classList.remove("cell-changed"), options.clearAfterMs);
-        }
+        if (options.clearAfterMs) setTimeout(() => c(idx).classList.remove("cell-changed"), options.clearAfterMs);
       };
 
       if ("phone" in updates) { c(3).textContent = updates.phone || "-"; mark(3); }
-      // NEW: phone_verified 셀 업데이트 (열 인덱스 4)
       if ("phone_verified" in updates) { c(4).textContent = fmtCheck(updates.phone_verified); mark(4); }
-
       if ("grade" in updates) { c(5).textContent = updates.grade || "-"; mark(5); }
       if ("grade_override" in updates) { c(6).textContent = updates.grade_override || "-"; mark(6); }
-      if ("role" in updates)  { c(7).textContent = updates.role || "-"; mark(7); }
+      // role은 서버 계산값으로 두고, 전체 재조회(loadMembers)에서 반영
       if ("daily_limit" in updates) { c(14).textContent = (updates.daily_limit ?? "-"); mark(14); }
       if ("special_assigned_at" in updates) { c(15).textContent = fmtDateOrDash(updates.special_assigned_at); mark(15); }
       if ("premium_assigned_at" in updates) { c(16).textContent = fmtDateOrDash(updates.premium_assigned_at); mark(16); }
