@@ -5729,6 +5729,97 @@ body.innerHTML = `
   </table>
 `;
 
+
+// === [DEBUG: 大/世 지장간] 최소 로그 & 즉시 채움 ===
+(function debugMiniHiddenStems(){
+  const BR = '子丑寅卯辰巳午未申酉戌亥'.split('');
+  const JI_H2K = {子:'자',丑:'축',寅:'인',卯:'묘',辰:'진',巳:'사',午:'오',未:'미',申:'신',酉:'유',戌:'술',亥:'해'};
+
+  // 0) 맵 확인 (가장 흔한 문제: window에 안 올라옴)
+  const MAP = window.HanhiddenStemsMap;
+  console.log('[mini:map]', { has: !!MAP, type: typeof MAP, keys: MAP ? Object.keys(MAP).slice(0, 6) : '(none)' });
+
+  // 1) 셀 존재 체크
+  const ids = ['mini-daeyun-gan','mini-daeyun-ji','mini-daeyun-hides','mini-sewoon-gan','mini-sewoon-ji','mini-sewoon-hides'];
+  ids.forEach(id => console.log('[mini:cell]', id, !!document.getElementById(id)));
+
+  // 2) 선택 상태(대운/세운) 확인
+  console.log('[mini:selected]', { daewoon: window.selectedDaewoon, sewoon: window.selectedSewoon });
+
+  function chipsForJi(jiHan) {
+    if (!MAP) return '(MAP missing)';
+    const jiKor = JI_H2K[jiHan] || jiHan;
+    const arr = MAP[jiHan] || MAP[jiKor] || []; // 한자/한글 둘 다 시도
+    console.log('[mini:lookup]', { jiHan, jiKor, found: Array.isArray(arr) ? arr.join(',') : arr });
+
+    if (!arr || !arr.length) return '-';
+
+    // 십신 붙이기(있으면), 없으면 한자만
+    const base = window.dayGanKorGan || '';
+    const getTenGod = window.getTenGod;
+    const h2kStem = window.convertHanToKorStem || (s => s);
+
+    return arr.map(han => {
+      const ten = (getTenGod && base) ? (getTenGod(base, h2kStem(han)) || '') : '';
+      return `<span class="saju-chip">(${han}${ten ? ' ' + ten : ''})</span>`;
+    }).join('');
+  }
+
+  function fill(prefix, stemHan, jiHan) {
+    console.log('[mini:fill]', { prefix, stemHan, jiHan });
+    // 1) 간(+십신)
+    const base = window.dayGanKorGan || '';
+    const getTenGod = window.getTenGod;
+    const h2kStem = window.convertHanToKorStem || (s => s);
+    const ten = (getTenGod && base) ? (getTenGod(base, h2kStem(stemHan)) || '') : '';
+    const g = document.getElementById(`${prefix}-gan`);
+    const j = document.getElementById(`${prefix}-ji`);
+    const h = document.getElementById(`${prefix}-hides`);
+    if (g) g.innerHTML = `<strong>${stemHan || '-'}</strong>${ten ? ` <small>(${ten})</small>` : ''}`;
+    if (j) j.innerHTML = `<strong>${jiHan || '-'}</strong>`;
+    if (h) h.innerHTML = chipsForJi(jiHan);
+  }
+
+  // 3) 현재 선택값으로 즉시 채우기
+  if (window.selectedDaewoon?.branch) fill('mini-daeyun', window.selectedDaewoon.stem, window.selectedDaewoon.branch);
+  if (window.selectedSewoon?.branch)  fill('mini-sewoon', window.selectedSewoon.stem, window.selectedSewoon.branch);
+
+  // 4) setDaeyun/setSewoon 호출될 때마다 로그 + 채움 (얇게 래핑)
+  window.sajuMini = window.sajuMini || {};
+  const prevD = window.sajuMini.setDaeyun;
+  const prevS = window.sajuMini.setSewoon;
+
+  function parseGanJi(a,b){
+    if (b != null) return { gan: String(a||''), ji: String(b||'') };
+    const s = String(a||''); const gan = BR.map(()=>0) && '甲乙丙丁戊己庚辛壬癸'.split('').find(ch=>s.includes(ch)) || '';
+    const ji  = BR.find(ch=>s.includes(ch)) || '';
+    return { gan, ji };
+  }
+
+  window.sajuMini.setDaeyun = function(a,b){
+    const { gan, ji } = parseGanJi(a,b);
+    console.log('[mini:setDaeyun]', { a, b, gan, ji });
+    if (prevD) prevD.apply(this, arguments);
+    if (ji) fill('mini-daeyun', gan, ji);
+  };
+  window.sajuMini.setSewoon = function(a,b){
+    const { gan, ji } = parseGanJi(a,b);
+    console.log('[mini:setSewoon]', { a, b, gan, ji });
+    if (prevS) prevS.apply(this, arguments);
+    if (ji) fill('mini-sewoon', gan, ji);
+  };
+
+  // 5) 실행 순서 문제 방지: MAP이 늦게 뜨면 500ms 후 재시도
+  if (!MAP) {
+    setTimeout(() => {
+      console.log('[mini:retry] HanhiddenStemsMap after delay =>', !!window.HanhiddenStemsMap);
+      if (window.selectedDaewoon?.branch) fill('mini-daeyun', window.selectedDaewoon.stem, window.selectedDaewoon.branch);
+      if (window.selectedSewoon?.branch)  fill('mini-sewoon', window.selectedSewoon.stem, window.selectedSewoon.branch);
+    }, 500);
+  }
+})();
+
+
 // ▶ 미니 大/世 채우기: 간(+십신) / 지지 / 지장간칩
 (function fillMiniDaeyunSewoon(){
   const getTenGod = _getTenGod || window.getTenGod;
