@@ -5730,142 +5730,87 @@ body.innerHTML = `
 `;
 
 
-// === [DEBUG: 大/世 지장간] 최소 로그 & 즉시 채움 ===
-(function debugMiniHiddenStems(){
-  const BR = '子丑寅卯辰巳午未申酉戌亥'.split('');
-  const JI_H2K = {子:'자',丑:'축',寅:'인',卯:'묘',辰:'진',巳:'사',午:'오',未:'미',申:'신',酉:'유',戌:'술',亥:'해'};
+/* ===== 미니 大/世 출력 — 단일/최소 버전 ===== */
+(function miniApplyDaSe(){
+  // 필요 자원 (이미 위에서 쓰는 걸 그대로 사용)
+  const MAP          = window.HanhiddenStemsMap || {};   // {'戌':['戊','辛','丁'], ...}  ← 한자 지지 키
+  const getTenGod    = _getTenGod || window.getTenGod || null;
+  const han2korStem  = _convertHanToKorStem || window.convertHanToKorStem || (s=>s);
+  const dayKor       = (typeof dayGanKorGan !== 'undefined' ? dayGanKorGan : window.dayGanKorGan) || '';
 
-  // 0) 맵 확인 (가장 흔한 문제: window에 안 올라옴)
-  const MAP = window.HanhiddenStemsMap;
-  console.log('[mini:map]', { has: !!MAP, type: typeof MAP, keys: MAP ? Object.keys(MAP).slice(0, 6) : '(none)' });
-
-  // 1) 셀 존재 체크
-  const ids = ['mini-daeyun-gan','mini-daeyun-ji','mini-daeyun-hides','mini-sewoon-gan','mini-sewoon-ji','mini-sewoon-hides'];
-  ids.forEach(id => console.log('[mini:cell]', id, !!document.getElementById(id)));
-
-  // 2) 선택 상태(대운/세운) 확인
-  console.log('[mini:selected]', { daewoon: window.selectedDaewoon, sewoon: window.selectedSewoon });
-
-  function chipsForJi(jiHan) {
-    if (!MAP) return '(MAP missing)';
-    const jiKor = JI_H2K[jiHan] || jiHan;
-    const arr = MAP[jiHan] || MAP[jiKor] || []; // 한자/한글 둘 다 시도
-    console.log('[mini:lookup]', { jiHan, jiKor, found: Array.isArray(arr) ? arr.join(',') : arr });
-
-    if (!arr || !arr.length) return '-';
-
-    // 십신 붙이기(있으면), 없으면 한자만
-    const base = window.dayGanKorGan || '';
-    const getTenGod = window.getTenGod;
-    const h2kStem = window.convertHanToKorStem || (s => s);
-
-    return arr.map(han => {
-      const ten = (getTenGod && base) ? (getTenGod(base, h2kStem(han)) || '') : '';
-      return `<span class="saju-chip">(${han}${ten ? ' ' + ten : ''})</span>`;
+  // 칩 HTML 생성 (지장간 한자 배열 → 칩)
+  function makeHides(jiHan){
+    const arr = MAP[jiHan] || [];
+    if (!arr.length) return '-';
+    return arr.map(hanStem=>{
+      const ten = (getTenGod && dayKor) ? (getTenGod(dayKor, han2korStem(hanStem)) || '') : '';
+      return `<span class="saju-chip">(${hanStem}${ten ? ' ' + ten : ''})</span>`;
     }).join('');
   }
 
-  function fill(prefix, stemHan, jiHan) {
-    console.log('[mini:fill]', { prefix, stemHan, jiHan });
+  // 한 번에 반영
+  function apply(prefix, stemHan, jiHan){
     // 1) 간(+십신)
-    const base = window.dayGanKorGan || '';
-    const getTenGod = window.getTenGod;
-    const h2kStem = window.convertHanToKorStem || (s => s);
-    const ten = (getTenGod && base) ? (getTenGod(base, h2kStem(stemHan)) || '') : '';
-    const g = document.getElementById(`${prefix}-gan`);
-    const j = document.getElementById(`${prefix}-ji`);
-    const h = document.getElementById(`${prefix}-hides`);
-    if (g) g.innerHTML = `<strong>${stemHan || '-'}</strong>${ten ? ` <small>(${ten})</small>` : ''}`;
-    if (j) j.innerHTML = `<strong>${jiHan || '-'}</strong>`;
-    if (h) h.innerHTML = chipsForJi(jiHan);
+    const ten = (getTenGod && dayKor) ? (getTenGod(dayKor, han2korStem(stemHan)) || '') : '';
+    const elG = document.getElementById(`${prefix}-gan`);
+    if (elG) elG.innerHTML = `<strong>${stemHan || '-'}</strong>${ten ? ` <small>(${ten})</small>` : ''}`;
+
+    // 2) 지지
+    const elJ = document.getElementById(`${prefix}-ji`);
+    if (elJ) elJ.innerHTML = `<strong>${jiHan || '-'}</strong>`;
+
+    // 3) 지장간 칩
+    const elH = document.getElementById(`${prefix}-hides`);
+    if (elH) elH.innerHTML = jiHan ? (makeHides(jiHan) || '-') : '-';
   }
 
-  // 3) 현재 선택값으로 즉시 채우기
-  if (window.selectedDaewoon?.branch) fill('mini-daeyun', window.selectedDaewoon.stem, window.selectedDaewoon.branch);
-  if (window.selectedSewoon?.branch)  fill('mini-sewoon', window.selectedSewoon.stem, window.selectedSewoon.branch);
+  // 초기 채우기: 선택값 우선 → 없으면 localStorage 값(D/S) 사용
+  const MINI_DAEYUN_KEY = 'sajuMiniSelDaeyun_v2';
+  const MINI_SEWOON_KEY = 'sajuMiniSelSewoon_v2';
+  const D = (window.selectedDaewoon && window.selectedDaewoon.stem && window.selectedDaewoon.branch)
+              ? window.selectedDaewoon
+              : (JSON.parse(localStorage.getItem(MINI_DAEYUN_KEY) || '{}'));
+  const S = (window.selectedSewoon && window.selectedSewoon.stem && window.selectedSewoon.branch)
+              ? window.selectedSewoon
+              : (JSON.parse(localStorage.getItem(MINI_SEWOON_KEY) || '{}'));
 
-  // 4) setDaeyun/setSewoon 호출될 때마다 로그 + 채움 (얇게 래핑)
+  if (D?.stem && D?.branch) apply('mini-daeyun', D.stem, D.branch);
+  if (S?.stem && S?.branch) apply('mini-sewoon', S.stem, S.branch);
+
+  // 클릭 시에도 간단히 갱신: 기존 setter 있으면 유지하고, 없으면 만들어서 쓰기
   window.sajuMini = window.sajuMini || {};
   const prevD = window.sajuMini.setDaeyun;
   const prevS = window.sajuMini.setSewoon;
 
+  // "丙戌" / 분리 인자 모두 지원
+  const STEMS = '甲乙丙丁戊己庚辛壬癸'.split('');
+  const BR    = '子丑寅卯辰巳午未申酉戌亥'.split('');
   function parseGanJi(a,b){
-    if (b != null) return { gan: String(a||''), ji: String(b||'') };
-    const s = String(a||''); const gan = BR.map(()=>0) && '甲乙丙丁戊己庚辛壬癸'.split('').find(ch=>s.includes(ch)) || '';
-    const ji  = BR.find(ch=>s.includes(ch)) || '';
-    return { gan, ji };
+    if (b != null) return {gan:String(a||''), ji:String(b||'')};
+    const s=String(a||''); 
+    return { gan: STEMS.find(ch=>s.includes(ch))||'', ji: BR.find(ch=>s.includes(ch))||'' };
   }
 
   window.sajuMini.setDaeyun = function(a,b){
     const { gan, ji } = parseGanJi(a,b);
-    console.log('[mini:setDaeyun]', { a, b, gan, ji });
     if (prevD) prevD.apply(this, arguments);
-    if (ji) fill('mini-daeyun', gan, ji);
+    if (gan && ji) {
+      apply('mini-daeyun', gan, ji);
+      try { localStorage.setItem(MINI_DAEYUN_KEY, JSON.stringify({ gan, ji })); } catch {}
+    }
   };
+
   window.sajuMini.setSewoon = function(a,b){
     const { gan, ji } = parseGanJi(a,b);
-    console.log('[mini:setSewoon]', { a, b, gan, ji });
     if (prevS) prevS.apply(this, arguments);
-    if (ji) fill('mini-sewoon', gan, ji);
+    if (gan && ji) {
+      apply('mini-sewoon', gan, ji);
+      try { localStorage.setItem(MINI_SEWOON_KEY, JSON.stringify({ gan, ji })); } catch {}
+    }
   };
-
-  // 5) 실행 순서 문제 방지: MAP이 늦게 뜨면 500ms 후 재시도
-  if (!MAP) {
-    setTimeout(() => {
-      console.log('[mini:retry] HanhiddenStemsMap after delay =>', !!window.HanhiddenStemsMap);
-      if (window.selectedDaewoon?.branch) fill('mini-daeyun', window.selectedDaewoon.stem, window.selectedDaewoon.branch);
-      if (window.selectedSewoon?.branch)  fill('mini-sewoon', window.selectedSewoon.stem, window.selectedSewoon.branch);
-    }, 500);
-  }
 })();
 
 
-// ▶ 미니 大/世 채우기: 간(+십신) / 지지 / 지장간칩
-(function fillMiniDaeyunSewoon(){
-  const getTenGod = _getTenGod || window.getTenGod;
-  const h2k = _convertHanToKorStem || window.convertHanToKorStem;
-  const k2h = _convertKorToHanStem || window.convertKorToHanStem;
-  const base = (typeof dayGanKorGan !== 'undefined' ? dayGanKorGan : window.dayGanKorGan) || '';
-  const map  = window.jijiToSibganMap || {};
-
-  function chipsForJi(jiHan){
-    const raw = map[jiHan] || map[h2k?.(jiHan) || ''] || [];
-    if (!raw.length) return '';
-    return raw.map(it => {
-      // '갑' 같은 문자열 or { stem:'갑', isMiddle:true }
-      const kor = (typeof it === 'string') ? it : (it.stem || it.kor || '');
-      const han = k2h ? (k2h(kor) || kor) : kor;
-      const ten = getTenGod ? (getTenGod(base, kor) || '') : '';
-      const mid = (typeof it === 'object' && it.isMiddle) ? ' (중기)' : '';
-      return `<span class="saju-chip">(${han} ${ten}${mid})</span>`;
-    }).join('');
-  }
-
-  function apply(prefix, stemHan, branchHan){
-    if (!stemHan || !branchHan) return;
-
-    // 1) 간(+십신)
-    const ten = (getTenGod && h2k) ? (getTenGod(base, h2k(stemHan)) || '') : '';
-    const elGan = document.getElementById(`${prefix}-gan`);
-    if (elGan) elGan.innerHTML = `<strong>${stemHan}</strong>${ten ? ` <small>(${ten})</small>` : ''}`;
-
-    // 2) 지지
-    const elJi = document.getElementById(`${prefix}-ji`);
-    if (elJi) elJi.innerHTML = `<strong>${branchHan}</strong>`;
-
-    // 3) 지장간 칩
-    const elH = document.getElementById(`${prefix}-hides`);
-    if (elH) elH.innerHTML = chipsForJi(branchHan) || '-';
-  }
-
-  // 선택된 값으로 반영 (네가 이미 전역에 저장하고 있음)
-  if (window.selectedDaewoon) {
-    apply('mini-daeyun', window.selectedDaewoon.stem, window.selectedDaewoon.branch);
-  }
-  if (window.selectedSewoon) {
-    apply('mini-sewoon', window.selectedSewoon.stem, window.selectedSewoon.branch);
-  }
-})();
 
 
 // === [미니창 패치] 대운/세운도 사주와 동일 포맷으로 표시 ===
@@ -5937,181 +5882,6 @@ window.__miniCalc = {
 
 
 
-// === 大/世 셋터: 미니 컨텍스트(__miniCtx)로 십신/지장간을 본판과 동일 계산 ===
-(function miniSettersUseMiniCtx(){
-  const setHTML = (id, html)=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; };
-  const setHides = (id, arr)=>{
-    const el=document.getElementById(id); if(!el) return;
-    el.innerHTML = (arr && arr.length)
-      ? arr.map(t=>`<span class="saju-chip">(${t})</span>`).join('')
-      : '-';
-  };
-
-  const STEMS   = '甲乙丙丁戊己庚辛壬癸'.split('');
-  const BRANCH  = '子丑寅卯辰巳午未申酉戌亥'.split('');
-  const parseGanJi = (v)=>{
-    v = String(v||'').trim();
-    if (!v) return { gan:'', ji:'' };
-    // "丙戌" 같은 2글자 or 섞여 들어온 문자열 대응
-    const gan = STEMS.find(ch => v.includes(ch)) || '';
-    const ji  = BRANCH.find(ch => v.includes(ch)) || '';
-    return { gan, ji };
-  };
-
-  function computeByMiniCtx(ganHan, jiHan){
-    const ctx = window.__miniCtx || {};
-    const getTenGod           = ctx.getTenGod;
-    const h2k                 = ctx.convertHanToKorStem;
-    const k2h                 = ctx.convertKorToHanStem;
-    const base                = ctx.dayGanKorGan || '';
-    const jijiToSibganMap     = ctx.jijiToSibganMap || {};
-
-    // 1) 십신(간 기준)
-    const ten = (getTenGod && h2k) ? (getTenGod(base, h2k(ganHan)) || '') : '';
-
-    // 2) 지장간 → 칩(한자천간 + 십신)로 변환
-    const raw = jijiToSibganMap[jiHan] || jijiToSibganMap[h2k?.(jiHan) || ''] || [];
-    const hides = raw.map(it => {
-      // it: '갑' 같은 문자열 또는 { stem:'갑', isMiddle:true } 형태 모두 허용
-      const kor = (typeof it === 'string') ? it : (it.stem || it.kor || '');
-      const han = k2h ? (k2h(kor) || kor) : kor;
-      const tg  = getTenGod ? (getTenGod(base, kor) || '') : '';
-      const mid = (typeof it === 'object' && it?.isMiddle) ? ' (중기)' : '';
-      return `${han} ${tg}${mid}`.trim();
-    });
-
-    return { ten, hides };
-  }
-
-  function apply(prefix, gan, ji, ten, hides){
-    setHTML(`${prefix}-gan`, `<strong>${gan || '-'}</strong>${ten ? ` <small>(${ten})</small>` : ''}`);
-    setHTML(`${prefix}-ji`,  `<strong>${ji  || '-'}</strong>`);
-    setHides(`${prefix}-hides`, hides);
-  }
-
-  window.sajuMini = window.sajuMini || {};
-
-  // 문자열 "丙戌"도 OK, 분리 인자(gan, ji)도 OK
-  window.sajuMini.setDaeyun = (a,b)=>{
-    let gan, ji; 
-    if (b == null) ({ gan, ji } = parseGanJi(a)); else { gan=a; ji=b; }
-    const { ten, hides } = computeByMiniCtx(gan, ji);
-    apply('mini-daeyun', gan, ji, ten, hides);
-  };
-
-  window.sajuMini.setSewoon = (a,b)=>{
-    let gan, ji;
-    if (b == null) ({ gan, ji } = parseGanJi(a)); else { gan=a; ji=b; }
-    const { ten, hides } = computeByMiniCtx(gan, ji);
-    apply('mini-sewoon', gan, ji, ten, hides);
-  };
-})();
-
-// === 미니창 大/世 지장간: HanhiddenStemsMap 직접 사용 ===
-(function miniHidesWithMap(){
-  const MAP = window.HanhiddenStemsMap || {};     // 예: { '戌': ['戊','辛','丁'], '巳': ['丙','戊','庚'], ... }
-  const getTenGod = window.getTenGod || (()=> ''); // 선택: 십신 없으면 빈칸
-  const h2kStem   = window.convertHanToKorStem || (s=>s); // 십신 계산용(한자→한글)
-  const baseDay   = window.dayGanKorGan || '';     // 예: '기'
-
-  const BRANCHES = '子丑寅卯辰巳午未申酉戌亥'.split('');
-  const findJi = (val, ji) => ji || (BRANCHES.find(ch => String(val||'').includes(ch)) || '');
-
-  function chipsForJi(jiHan){
-    const arr = MAP[jiHan] || [];
-    if (!arr.length) return '-';
-    return arr.map(hanStem=>{
-      const ten = getTenGod(baseDay, h2kStem(hanStem)) || '';
-      return `<span class="saju-chip">(${hanStem}${ten ? ' ' + ten : ''})</span>`;
-    }).join('');
-  }
-
-  function setHides(cellId, ji){
-    const el = document.getElementById(cellId);
-    if (!el) return;
-    el.innerHTML = chipsForJi(ji);
-  }
-
-  // 처음 렌더 직후: 이미 저장된 선택값으로 채우기
-  if (window.selectedDaewoon?.branch) setHides('mini-daeyun-hides', window.selectedDaewoon.branch);
-  if (window.selectedSewoon?.branch)  setHides('mini-sewoon-hides', window.selectedSewoon.branch);
-
-  // 이후 클릭으로 setDaeyun/ setSewoon 부를 때 자동 반영(얇은 래핑)
-  window.sajuMini = window.sajuMini || {};
-  const prevD = window.sajuMini.setDaeyun;
-  const prevS = window.sajuMini.setSewoon;
-
-  window.sajuMini.setDaeyun = function(a,b){
-    if (prevD) prevD.apply(this, arguments);
-    const ji = findJi(a, b);
-    setHides('mini-daeyun-hides', ji);
-  };
-  window.sajuMini.setSewoon = function(a,b){
-    if (prevS) prevS.apply(this, arguments);
-    const ji = findJi(a, b);
-    setHides('mini-sewoon-hides', ji);
-  };
-})();
-
-
-// === Mini 대/세 지장간: HanhiddenStemsMap로 바로 채우기 (+로그) ===
-(function miniHiddenStemsFill(){
-  const MAP = window.HanhiddenStemsMap;                   // {'戌':['戊','辛','丁'], ...} ← 지금 존재함
-  const getTenGod = window.getTenGod || (()=> '');        // 선택: 십신 없으면 공백
-  const h2kStem   = window.convertHanToKorStem || (s=>s); // 십신 계산시 한자→한글
-  const baseDay   = window.dayGanKorGan || '';            // 예: '기'
-
-  function chipsForJi(jiHan){
-    const arr = MAP?.[jiHan] || [];
-    console.log('[mini:hides:lookup]', jiHan, '→', arr);
-    if (!arr.length) return '-';
-    return arr.map(hanStem=>{
-      const ten = (getTenGod && baseDay) ? (getTenGod(baseDay, h2kStem(hanStem)) || '') : '';
-      return `<span class="saju-chip">(${hanStem}${ten ? ' ' + ten : ''})</span>`;
-    }).join('');
-  }
-
-  function setHides(cellId, jiHan){
-    const el = document.getElementById(cellId);
-    if (!el) { console.warn('[mini:hides] cell not found:', cellId); return; }
-    el.innerHTML = jiHan ? chipsForJi(jiHan) : '-';
-  }
-
-  // 초기 채우기(이미 선택된 게 있으면)
-  if (window.selectedDaewoon?.branch) setHides('mini-daeyun-hides', window.selectedDaewoon.branch);
-  if (window.selectedSewoon?.branch)  setHides('mini-sewoon-hides', window.selectedSewoon.branch);
-
-  // setDaeyun / setSewoon 호출될 때마다 지장간도 같이 갱신 (얇게 래핑)
-  window.sajuMini = window.sajuMini || {};
-  const prevD = window.sajuMini.setDaeyun;
-  const prevS = window.sajuMini.setSewoon;
-
-  const STEMS = '甲乙丙丁戊己庚辛壬癸'.split('');
-  const BR    = '子丑寅卯辰巳午未申酉戌亥'.split('');
-  const parseGanJi = (a,b)=>{
-    if (b != null) return { gan:String(a||''), ji:String(b||'') };
-    const s = String(a||'');
-    const gan = STEMS.find(ch => s.includes(ch)) || '';
-    const ji  = BR.find(ch   => s.includes(ch)) || '';
-    return { gan, ji };
-  };
-
-  window.sajuMini.setDaeyun = function(a,b){
-    const { ji } = parseGanJi(a,b);
-    console.log('[mini:setDaeyun→hides]', ji);
-    if (prevD) prevD.apply(this, arguments);
-    setHides('mini-daeyun-hides', ji);
-  };
-
-  window.sajuMini.setSewoon = function(a,b){
-    const { ji } = parseGanJi(a,b);
-    console.log('[mini:setSewoon→hides]', ji);
-    if (prevS) prevS.apply(this, arguments);
-    setHides('mini-sewoon-hides', ji);
-  };
-})();
-
-
 // === Mini 大/世 지장간: HanhiddenStemsMap만 사용 (간단/안정)
 (function miniHiddenStemsFillMinimal(){
   // 1) 전제: 전역에 맵이 있어야 함 (이미 true 확인됨)
@@ -6171,184 +5941,6 @@ window.__miniCalc = {
   };
 })();
 
-
-// === 지지 지장간 계산 보강: 한자/한글 키 모두 대응 + 값 형식(문자/객체) 모두 대응 ===
-(function patchMiniHidesResolver(){
-  // 한자<->한글 지지 변환 테이블(간단)
-  const JI_H2K = { '子':'자','丑':'축','寅':'인','卯':'묘','辰':'진','巳':'사','午':'오','未':'미','申':'신','酉':'유','戌':'술','亥':'해' };
-  const JI_K2H = Object.fromEntries(Object.entries(JI_H2K).map(([h,k]) => [k,h]));
-
-  // 현재 미니창이 가진 계산 자원
-  const ctx = window.__miniCtx || window.__miniCalc || {};
-  const getTenGod           = ctx.getTenGod           || window.getTenGod;
-  const convertKorToHanStem = ctx.convertKorToHanStem || window.convertKorToHanStem;
-  const dayGanKorGan        = ctx.dayGanKorGan        || window.dayGanKorGan || '';
-  let   jijiToSibganMap     = ctx.jijiToSibganMap     || window.jijiToSibganMap || {};
-
-  // 맵이 아예 없으면 안전 기본값 제공
-  if (!jijiToSibganMap || !Object.keys(jijiToSibganMap).length) {
-    jijiToSibganMap = {
-      '子':['계'], '丑':['기','계','신'], '寅':['갑','병','무'], '卯':['을'], '辰':['무','을','계'],
-      '巳':['병','무','경'], '午':['정','기'], '未':['기','정','을'], '申':['경','임','무'], '酉':['신'],
-      '戌':['무','신','정'], '亥':['임','갑'],
-      // 한글 키도 함께
-      '자':['계'], '축':['기','계','신'], '인':['갑','병','무'], '묘':['을'], '진':['무','을','계'],
-      '사':['병','무','경'], '오':['정','기'], '미':['기','정','을'], '신':['경','임','무'], '유':['신'],
-      '술':['무','신','정'], '해':['임','갑'],
-    };
-  }
-
-  // 한자/한글 지지로 모두 시도해서 지장간 배열 얻기
-  function getHidesByJi(jiHan) {
-    const jiKor = JI_H2K[jiHan] || jiHan;         // 한자 → 한글(없으면 원본)
-    // 1) 한자 키
-    let raw = jijiToSibganMap[jiHan];
-    // 2) 없으면 한글 키
-    if (!raw) raw = jijiToSibganMap[jiKor];
-    if (!raw) return [];
-
-    const arr = [];
-    for (const it of raw) {
-      // 값이 '갑' 같은 문자열이거나 {stem:'갑', isMiddle:true} 객체일 수 있음
-      const stemKor = (typeof it === 'string') ? it : (it.stem || it.kor || '');
-      const stemHan = convertKorToHanStem ? (convertKorToHanStem(stemKor) || stemKor) : stemKor;
-      const ten     = getTenGod ? (getTenGod(dayGanKorGan, stemKor) || '') : '';
-      const mid     = (typeof it === 'object' && it.isMiddle) ? ' (중기)' : '';
-      arr.push(`${stemHan} ${ten}${mid}`.trim());
-    }
-    return arr;
-  }
-
-  // 미니창 셋터가 이 함수를 사용하도록 주입/교체
-  // (__miniCalc 또는 __miniCtx 중 하나를 쓰고 있을 텐데, 둘 다에 꽂아줌)
-  window.__miniCalc = Object.assign({}, window.__miniCalc, {
-    hidesFromHanJi: getHidesByJi
-  });
-  window.__miniCtx  = Object.assign({}, window.__miniCtx,  {
-    jijiToSibganMap,
-    convertKorToHanStem,
-    getTenGod,
-    dayGanKorGan
-  });
-
-  // 이미 만들어둔 setter가 __miniCalc.hidesFromHanJi / __miniCtx를 참조 중이면 즉시 효과
-  // 혹시 직접 호출하고 싶다면:
-  //   const hides = window.__miniCalc.hidesFromHanJi('戌');  // ['戊 겁재','辛 식신','丁 편인'] 형태
-})();
-
-
-// === 大/世 셋터 (문자열 "丙戌"도 받고, 분리 인자도 받고, 객체도 받는 관용 API) ===
-// === 大/世 셋터 v4: "丙戌" 문자열/분리 인자/객체 모두 지원 + 십신/지장간 자동계산 ===
-(function exposeMiniSelAPIs_v4(){
-  const MINI_DAEYUN_KEY = 'sajuMiniSelDaeyun_v2';
-  const MINI_SEWOON_KEY = 'sajuMiniSelSewoon_v2';
-  const save = (k,v)=>{ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} };
-  const setHTML = (id, html)=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; };
-  const setHides = (id, arr)=>{ 
-    const el=document.getElementById(id); if(!el) return;
-    el.innerHTML = (arr && arr.length)
-      ? arr.map(t=>`<span class="saju-chip">(${t})</span>`).join('')
-      : '-';
-  };
-
-  // 환경 의존 함수(없으면 안전 폴백)
-  const _getTenGod           = window.getTenGod           || (() => '');
-  const _convertHanToKorStem = window.convertHanToKorStem || (x => x);
-  const _convertKorToHanStem = window.convertKorToHanStem || (x => x);
-  const dayGanKorGan         = window.dayGanKorGan        || ''; // 십신 계산 기준
-
-  // 유효 문자 집합
-  const STEMS = '甲乙丙丁戊己庚辛壬癸'.split('');
-  const BRANCHES = '子丑寅卯辰巳午未申酉戌亥'.split('');
-
-  // "丙戌" → {gan:'丙', ji:'戌'}
-  function parseGanJi(input){
-    const s = String(input||'').trim();
-    if (!s) return { gan:'', ji:'' };
-    if (s.length === 2 && STEMS.includes(s[0]) && BRANCHES.includes(s[1])) {
-      return { gan: s[0], ji: s[1] };
-    }
-    const gan = STEMS.find(ch => s.includes(ch)) || '';
-    const ji  = BRANCHES.find(ch => s.includes(ch)) || '';
-    return { gan, ji };
-  }
-
-  function normArgs(arg1, arg2, arg3, arg4){
-    // 지원 형태:
-    //   ('丙戌') or ('丙戌', ten?) or ('丙戌', ten, hidesArray)
-    //   (stem, branch) or (stem, branch, ten?, hidesArray?)
-    //   ({gan, ji, ten, hides})
-    if (typeof arg1 === 'object' && arg1) {
-      const { gan='', ji='', ten='', hides=[] } = arg1;
-      return { gan:String(gan).trim(), ji:String(ji).trim(), ten:String(ten).trim(), hides:Array.isArray(hides)?hides:[] };
-    }
-    if (arg2 == null || (typeof arg2 === 'string' && arg3 == null)) {
-      // ('丙戌') or ('丙戌','정인')
-      const { gan, ji } = parseGanJi(arg1);
-      const ten = String(arg2||'').trim();
-      return { gan, ji, ten, hides:[] };
-    }
-    // (stem, branch, ten?, hides?)
-    const ten = String(arg3||'').trim();
-    const hides = Array.isArray(arg4) ? arg4 : (Array.isArray(arg3)?arg3:[]);
-    return { gan:String(arg1||'').trim(), ji:String(arg2||'').trim(), ten, hides };
-  }
-
-  // 지지 → 지장간 리스트(문자열 또는 객체 혼재 대응)
-  function computeHidesFromJi(ji){
-    // 기대: window.jijiToSibganMap[ji]가 ['甲','丙',...] 또는 [{stem:'甲', isMiddle:true}, ...]
-    const map = window.jijiToSibganMap || {};
-    const raw = map[ji] || map[_convertHanToKorStem(ji)] || []; // 혹시 키가 한글일 수도
-    const arr = [];
-    for (const item of raw) {
-      const stemKor = typeof item === 'string' ? item : (item.stem || item.kor || '');
-      const stemHan = _convertKorToHanStem(stemKor) || stemKor || '';
-      const ten = _getTenGod(dayGanKorGan, stemKor) || '';
-      if (stemHan) arr.push(`${stemHan} ${ten}`.trim());
-    }
-    return arr;
-  }
-
-  // 십신 자동계산 (인자에 없을 때만)
-  function computeTenIfNeeded(gan, givenTen){
-    if (givenTen) return givenTen;
-    if (!gan) return '';
-    // getTenGod은 "한글천간"을 기대하므로 변환
-    const kor = _convertHanToKorStem(gan);
-    return _getTenGod(dayGanKorGan, kor) || '';
-  }
-
-  function applyAll(prefix, gan, ji, ten, hides){
-    setHTML(`${prefix}-gan`, `<strong>${gan || '-'}</strong>${ten ? ` <small>(${ten})</small>` : ''}`);
-    setHTML(`${prefix}-ji`,  `<strong>${ji  || '-'}</strong>`);
-    setHides(`${prefix}-hides`, hides);
-  }
-
-  window.sajuMini = window.sajuMini || {};
-
-  // === 大運 ===
-  // 사용 예:
-  //  - sajuMini.setDaeyun(`${stem}${branch}`)       // "丙戌"
-  //  - sajuMini.setDaeyun(stem, branch)
-  //  - sajuMini.setDaeyun(stem, branch, tenName)
-  //  - sajuMini.setDaeyun({gan:'丙', ji:'戌', ten:'정인', hides:['戊 겁재','庚 상관']})
-  window.sajuMini.setDaeyun = (a,b,c,d)=>{
-    let { gan, ji, ten, hides } = normArgs(a,b,c,d);
-    ten = computeTenIfNeeded(gan, ten);
-    if (!hides || !hides.length) hides = ji ? computeHidesFromJi(ji) : [];
-    save(MINI_DAEYUN_KEY, { gan:gan||'-', ji:ji||'-', ten:ten||'', hides });
-    applyAll('mini-daeyun', gan, ji, ten, hides);
-  };
-
-  // === 歲運 ===
-  window.sajuMini.setSewoon = (a,b,c,d)=>{
-    let { gan, ji, ten, hides } = normArgs(a,b,c,d);
-    ten = computeTenIfNeeded(gan, ten);
-    if (!hides || !hides.length) hides = ji ? computeHidesFromJi(ji) : [];
-    save(MINI_SEWOON_KEY, { gan:gan||'-', ji:ji||'-', ten:ten||'', hides });
-    applyAll('mini-sewoon', gan, ji, ten, hides);
-  };
-})();
 
 
 
