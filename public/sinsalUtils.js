@@ -552,7 +552,7 @@ return `<td class="clickable${sajuGanArr.includes(gan) ? ' saju-blue' : ''}"
             data-type="unseong" 
             data-gan="${gan}" 
             style="cursor:pointer; text-align:center;">
-            <div>${gan}</div>
+            <div><span class="explainable" data-group="ganji" data-term="">${gan}</span></div>
             <div style="font-size:0.8em; color:#555;">${sipsinHtml}</div>
         </td>`;
 
