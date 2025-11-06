@@ -5504,6 +5504,27 @@ requestAnimationFrame(() => {
 // ──────────────────────────────────────────────────────────
 
 // 1) CSS (once)
+// 미니창 제목 바 배경색 복구(우선순위 ↑)
+(function fixMiniBarBg(){
+  const id='mini-saju-style-fix';
+  if (document.getElementById(id)) return;
+  const s=document.createElement('style'); s.id=id;
+  s.textContent = `
+    /* 당신이 쓰던 '연두 테두리' 스타일 */
+    #saju-mini .saju-mini__bar{
+      background: linear-gradient(
+        90deg,
+        #e8f0c8 0 8px,
+        #ffffff 8px calc(100% - 8px),
+        #e8f0c8 calc(100% - 8px) 100%
+      ) !important;
+      border-bottom: 1px solid #e6e6ea !important;
+    }
+  `;
+  document.head.appendChild(s);
+})();
+
+
 (function injectMiniSajuCSS(){
   if (document.getElementById('mini-saju-style')) return;
   const s = document.createElement('style');
