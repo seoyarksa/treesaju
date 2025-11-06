@@ -2621,7 +2621,7 @@ if (window.lastOutputData === formKey) {
 // 🔸 그 다음에 남은 횟수 검사
 
       if (limitGuest !== Infinity && remainingPreview <= 0) {
-        alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다.");
+        alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다!");
         updateCountDisplayFromGate({
           limit: limitGuest,
           remaining: 0,
@@ -2700,7 +2700,7 @@ if (formDate === todayKey && window.lastOutputData) {
     const preGate = await buildGateFromDb(userId, profile);
     if (preGate.limit !== Infinity && preGate.remaining <= 0) {
       // 등급별 메시지 커스터마이즈 가능
-      alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다.");
+      alert("오늘 사용 가능한 횟수를 모두 소진하셨습니다!!");
       updateCountDisplayFromGate(preGate);
       return; // ✅ 출력 차단
     }
@@ -2746,7 +2746,7 @@ if (formDate === todayKey && window.lastOutputData) {
       }
       if (!ok?.allowed) {
         let reason = "이용이 제한되었습니다.";
-        if (ok?.remaining === 0) reason = "오늘 사용 가능한 횟수를 모두 소진하셨습니다!!";
+        if (ok?.remaining === 0) reason = "오늘 사용 가능한 횟수를 모두 소진하셨습니다!!!";
         else if (ok?.limit === 0) reason = "구독이 필요합니다. 결제를 진행해주세요.";
         else if (ok?.message) reason = ok.message;
         alert(reason);
