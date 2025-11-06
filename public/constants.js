@@ -163,6 +163,11 @@ export const HanhiddenStemsMap = {
   '亥': ['戊', '甲', '壬']
 };
 
+
+// 👇 이 한 줄 추가
+if (typeof window !== 'undefined') window.HanhiddenStemsMap = HanhiddenStemsMap;
+
+
 //산업분류
 export const 산업분류Map = {
   '1차산업': ['子', '丑'],
