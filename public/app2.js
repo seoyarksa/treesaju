@@ -5768,7 +5768,7 @@ function __miniClampToViewport(left, top, box) {
 
 // 2) 드래그 바인딩
 function __miniMakeDraggable(box) {
-  const handle = box.querySelector('.bar');
+  const handle = box.querySelector('.bar, .saju-mini__bar');
   if (!handle) return;
 
   let startX = 0, startY = 0, baseLeft = 0, baseTop = 0;
