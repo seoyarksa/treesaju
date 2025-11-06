@@ -223,7 +223,7 @@ export function renderBasicDaeyunTable({
         </tr>
         <tr>
   <td colspan="20" style="border:1px solid #ccc; padding:4px; color:red;" >
- * 대운이나 세운을 클릭[글자옆 여백을 클릭]하면 해당 대운&세운의 작용을 확인할 수 있습니다. 
+ * 대운이나 세운을 클릭<span style="color:blue;">[글자옆 여백을 클릭]</span>하면 해당 대운&세운의 작용을 확인할 수 있습니다. 
 </td>
 </tr>
       </tbody>
