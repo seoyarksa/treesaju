@@ -5588,6 +5588,19 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
     console.log('[mini:title]', { label, value:v1, attr:v2, win:v3, ctx:v4, decided:name, text:titleEl.textContent });
   };
 
+
+  // ── (추가) 미니 컨텍스트 공유: 본 렌더에서 쓰는 의존성 그대로 노출 ──
+window.__miniCtx = {
+  getTenGod:           _getTenGod,
+  convertHanToKorStem: _convertHanToKorStem,
+  convertKorToHanStem: _convertKorToHanStem,
+  dayGanKorGan:        dayGanKorGan || window.dayGanKorGan || '',
+  // 지장간 맵은 있으면 사용(없어도 안전)
+  jijiToSibganMap:     window.jijiToSibganMap || {},
+};
+
+
+
   // 5) CSS 1회 주입
   if (!document.getElementById('mini-saju-style')) {
     const s = document.createElement('style');
@@ -5726,6 +5739,77 @@ body.innerHTML = `
 
 
 
+
+
+// === 大/世 셋터: 미니 컨텍스트(__miniCtx)로 십신/지장간을 본판과 동일 계산 ===
+(function miniSettersUseMiniCtx(){
+  const setHTML = (id, html)=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; };
+  const setHides = (id, arr)=>{
+    const el=document.getElementById(id); if(!el) return;
+    el.innerHTML = (arr && arr.length)
+      ? arr.map(t=>`<span class="saju-chip">(${t})</span>`).join('')
+      : '-';
+  };
+
+  const STEMS   = '甲乙丙丁戊己庚辛壬癸'.split('');
+  const BRANCH  = '子丑寅卯辰巳午未申酉戌亥'.split('');
+  const parseGanJi = (v)=>{
+    v = String(v||'').trim();
+    if (!v) return { gan:'', ji:'' };
+    // "丙戌" 같은 2글자 or 섞여 들어온 문자열 대응
+    const gan = STEMS.find(ch => v.includes(ch)) || '';
+    const ji  = BRANCH.find(ch => v.includes(ch)) || '';
+    return { gan, ji };
+  };
+
+  function computeByMiniCtx(ganHan, jiHan){
+    const ctx = window.__miniCtx || {};
+    const getTenGod           = ctx.getTenGod;
+    const h2k                 = ctx.convertHanToKorStem;
+    const k2h                 = ctx.convertKorToHanStem;
+    const base                = ctx.dayGanKorGan || '';
+    const jijiToSibganMap     = ctx.jijiToSibganMap || {};
+
+    // 1) 십신(간 기준)
+    const ten = (getTenGod && h2k) ? (getTenGod(base, h2k(ganHan)) || '') : '';
+
+    // 2) 지장간 → 칩(한자천간 + 십신)로 변환
+    const raw = jijiToSibganMap[jiHan] || jijiToSibganMap[h2k?.(jiHan) || ''] || [];
+    const hides = raw.map(it => {
+      // it: '갑' 같은 문자열 또는 { stem:'갑', isMiddle:true } 형태 모두 허용
+      const kor = (typeof it === 'string') ? it : (it.stem || it.kor || '');
+      const han = k2h ? (k2h(kor) || kor) : kor;
+      const tg  = getTenGod ? (getTenGod(base, kor) || '') : '';
+      const mid = (typeof it === 'object' && it?.isMiddle) ? ' (중기)' : '';
+      return `${han} ${tg}${mid}`.trim();
+    });
+
+    return { ten, hides };
+  }
+
+  function apply(prefix, gan, ji, ten, hides){
+    setHTML(`${prefix}-gan`, `<strong>${gan || '-'}</strong>${ten ? ` <small>(${ten})</small>` : ''}`);
+    setHTML(`${prefix}-ji`,  `<strong>${ji  || '-'}</strong>`);
+    setHides(`${prefix}-hides`, hides);
+  }
+
+  window.sajuMini = window.sajuMini || {};
+
+  // 문자열 "丙戌"도 OK, 분리 인자(gan, ji)도 OK
+  window.sajuMini.setDaeyun = (a,b)=>{
+    let gan, ji; 
+    if (b == null) ({ gan, ji } = parseGanJi(a)); else { gan=a; ji=b; }
+    const { ten, hides } = computeByMiniCtx(gan, ji);
+    apply('mini-daeyun', gan, ji, ten, hides);
+  };
+
+  window.sajuMini.setSewoon = (a,b)=>{
+    let gan, ji;
+    if (b == null) ({ gan, ji } = parseGanJi(a)); else { gan=a; ji=b; }
+    const { ten, hides } = computeByMiniCtx(gan, ji);
+    apply('mini-sewoon', gan, ji, ten, hides);
+  };
+})();
 
 // === 大/世 셋터 (문자열 "丙戌"도 받고, 분리 인자도 받고, 객체도 받는 관용 API) ===
 // === 大/世 셋터 v4: "丙戌" 문자열/분리 인자/객체 모두 지원 + 십신/지장간 자동계산 ===
