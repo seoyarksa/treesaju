@@ -5916,6 +5916,53 @@ window.__miniCalc = {
   };
 })();
 
+// === 미니창 大/世 지장간: HanhiddenStemsMap 직접 사용 ===
+(function miniHidesWithMap(){
+  const MAP = window.HanhiddenStemsMap || {};     // 예: { '戌': ['戊','辛','丁'], '巳': ['丙','戊','庚'], ... }
+  const getTenGod = window.getTenGod || (()=> ''); // 선택: 십신 없으면 빈칸
+  const h2kStem   = window.convertHanToKorStem || (s=>s); // 십신 계산용(한자→한글)
+  const baseDay   = window.dayGanKorGan || '';     // 예: '기'
+
+  const BRANCHES = '子丑寅卯辰巳午未申酉戌亥'.split('');
+  const findJi = (val, ji) => ji || (BRANCHES.find(ch => String(val||'').includes(ch)) || '');
+
+  function chipsForJi(jiHan){
+    const arr = MAP[jiHan] || [];
+    if (!arr.length) return '-';
+    return arr.map(hanStem=>{
+      const ten = getTenGod(baseDay, h2kStem(hanStem)) || '';
+      return `<span class="saju-chip">(${hanStem}${ten ? ' ' + ten : ''})</span>`;
+    }).join('');
+  }
+
+  function setHides(cellId, ji){
+    const el = document.getElementById(cellId);
+    if (!el) return;
+    el.innerHTML = chipsForJi(ji);
+  }
+
+  // 처음 렌더 직후: 이미 저장된 선택값으로 채우기
+  if (window.selectedDaewoon?.branch) setHides('mini-daeyun-hides', window.selectedDaewoon.branch);
+  if (window.selectedSewoon?.branch)  setHides('mini-sewoon-hides', window.selectedSewoon.branch);
+
+  // 이후 클릭으로 setDaeyun/ setSewoon 부를 때 자동 반영(얇은 래핑)
+  window.sajuMini = window.sajuMini || {};
+  const prevD = window.sajuMini.setDaeyun;
+  const prevS = window.sajuMini.setSewoon;
+
+  window.sajuMini.setDaeyun = function(a,b){
+    if (prevD) prevD.apply(this, arguments);
+    const ji = findJi(a, b);
+    setHides('mini-daeyun-hides', ji);
+  };
+  window.sajuMini.setSewoon = function(a,b){
+    if (prevS) prevS.apply(this, arguments);
+    const ji = findJi(a, b);
+    setHides('mini-sewoon-hides', ji);
+  };
+})();
+
+
 // === 지지 지장간 계산 보강: 한자/한글 키 모두 대응 + 값 형식(문자/객체) 모두 대응 ===
 (function patchMiniHidesResolver(){
   // 한자<->한글 지지 변환 테이블(간단)
