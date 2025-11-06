@@ -6149,40 +6149,36 @@ document.getElementById("logoutBtn")?.addEventListener("click", async () => {
 showIfAdmin("#admin-menu");
 
 /***** ✅ 로그인/로그아웃 공통 파이프라인 — “한 계정 1세션” 강제 *****/
-function bindAuthPipelines() {
-  if (__AUTH_LISTENER_SET__) return;
-  __AUTH_LISTENER_SET__ = true;
+/***** ✅ 전역 플래그 *****/
+let __MANUAL_LOGOUT__ = false;
+let __AUTH_LISTENER_SET__ = false;
+let __REALTIME_SET__ = false;
 
+/***** ✅ 로그인/로그아웃 공통 파이프라인 *****/
 function bindAuthPipelines() {
   if (__AUTH_LISTENER_SET__) return;
   __AUTH_LISTENER_SET__ = true;
 
   window.supabaseClient.auth.onAuthStateChange(async (event, session) => {
+    console.log("[AuthStateChange]", event);
     try {
       if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session?.user?.id) {
         const userId = session.user.id;
-        const sessionId = session.access_token; // (표시용) 현재 기기 식별
+        const sessionId = session.access_token;
 
-        // 1) 기존 로그인 세션 전부 종료 (다른 기기 즉시 무효화 상태로)
+        // 1️⃣ 기존 로그인 세션 정리
         await window.supabaseClient.auth.signOut({ scope: "others" });
 
-        // 2) 현재 세션을 active_sessions에 기록 (Realtime 트리거 포인트)
+        // 2️⃣ 세션 상태 DB 업데이트
         await postJSON("/api/update-session", { user_id: userId, session_id: sessionId });
 
-        // ✅ 2-1) 다른 기기들에게 "지금 당장 나가라" 브로드캐스트
-        window.supabaseClient
-          .channel(`user:${userId}`)
-          .send({ type: "broadcast", event: "force-logout", payload: { except: sessionId } });
-
-        // 3) 실시간 감시 시작 (한 번만 구독)
+        // 3️⃣ 실시간 감시 시작
         await initRealtimeWatcher();
 
-        // 4) UI 반영
+        // 4️⃣ UI 업데이트
         updateAuthUI(session);
 
-        // ────────────────────────────────
-        // ✅ 추가: 로그인 시 “오늘 사주” 자동 출력
-        // ────────────────────────────────
+        // 5️⃣ 로그인 시 오늘 사주 자동 출력
         setTimeout(async () => {
           try {
             console.log("[AutoSaju] 로그인 감지 → 오늘 사주 자동 출력 시작");
@@ -6192,7 +6188,6 @@ function bindAuthPipelines() {
             const ampm = hours >= 12 ? "PM" : "AM";
             const twelveHour = hours % 12 || 12;
 
-            // ✅ 필수 데이터 완비
             const todayPayload = {
               name: "오늘 기준",
               birthDate: `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`,
@@ -6212,33 +6207,21 @@ function bindAuthPipelines() {
             });
 
             if (!res.ok) {
-              const text = await res.text();
-              console.error("[AutoSaju] Fetch 실패:", res.status, text);
+              console.error("[AutoSaju] Fetch 실패:", res.status);
               return;
             }
 
-            const todayData = await res.json();
-            console.log("[AutoSaju] todayData:", todayData);
+            const data = await res.json();
+            console.log("[AutoSaju] todayData:", data);
 
-            // ✅ 렌더링 함수는 상황에 맞게 자동 선택
-            if (typeof renderSaju === "function") {
-              renderSaju(todayData);
-            } else if (typeof renderSajuMiniFromCurrentOutput === "function") {
-              renderSajuMiniFromCurrentOutput(todayData);
-            } else if (typeof renderTodaySajuBox === "function") {
-              renderTodaySajuBox(todayData);
-            } else {
-              console.warn("[AutoSaju] 렌더 함수 없음 — 데이터만 준비됨");
-            }
+            if (typeof renderSaju === "function") renderSaju(data);
+            else if (typeof renderSajuMiniFromCurrentOutput === "function") renderSajuMiniFromCurrentOutput(data);
           } catch (err) {
             console.error("[AutoSaju] 예외 발생:", err);
           }
-        }, 1000); // 🔹 로그인 후 1초 뒤 실행 (UI 준비 시간 확보)
+        }, 1000);
       }
 
-      // ────────────────────────────────
-      // 로그아웃 처리
-      // ────────────────────────────────
       if (event === "SIGNED_OUT") {
         if (!__MANUAL_LOGOUT__) {
           alert("다른 기기에서 로그인되어 로그아웃되었습니다.");
@@ -6250,6 +6233,52 @@ function bindAuthPipelines() {
     }
   });
 }
+
+/***** ✅ 실시간 세션 변경 감시 *****/
+async function initRealtimeWatcher() {
+  if (__REALTIME_SET__) return;
+  const { data: u } = await window.supabaseClient.auth.getUser();
+  const user = u?.user;
+  if (!user) return;
+
+  const channel = window.supabaseClient
+    .channel(`realtime:active_sessions:${user.id}`)
+    .on("postgres_changes", {
+      event: "*",
+      schema: "public",
+      table: "active_sessions",
+      filter: `user_id=eq.${user.id}`,
+    }, async (payload) => {
+      const { data: s } = await window.supabaseClient.auth.getSession();
+      const currentAccess = s?.session?.access_token || "";
+      const latestAccess = payload?.new?.session_id || "";
+      if (latestAccess && latestAccess !== currentAccess) {
+        alert("다른 기기에서 로그인되어 자동 로그아웃됩니다.");
+        await window.supabaseClient.auth.signOut();
+        updateAuthUI(null);
+      }
+    })
+    .subscribe((status) => console.log("[realtime] active_sessions:", status));
+
+  __REALTIME_SET__ = true;
+}
+
+/***** ✅ 최초 부팅 시 *****/
+(async function bootstrapRealtime() {
+  bindAuthPipelines(); // ← 딱 한 번만 바인딩
+
+  const { data: s } = await window.supabaseClient.auth.getSession();
+  const session = s?.session;
+  if (session?.user?.id) {
+    await initRealtimeWatcher();
+    await postJSON("/api/update-session", {
+      user_id: session.user.id,
+      session_id: session.access_token,
+    });
+    updateAuthUI(session);
+  }
+})();
+
 
 
 
