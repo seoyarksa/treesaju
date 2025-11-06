@@ -6186,17 +6186,17 @@ setTimeout(async () => {
     const now = new Date();
     const hours = now.getHours();
     const ampm = hours >= 12 ? "PM" : "AM";
-    const twelveHour = hours % 12 || 12;  // 0시는 12시로 변환
+    const twelveHour = hours % 12 || 12; // 0시는 12시로 변환
 
+    // ✅ 서버와 동일한 필드 구조로 수정
     const todayPayload = {
-      year: now.getFullYear(),
-      month: now.getMonth() + 1,
-      day: now.getDate(),
-      hour: twelveHour,       // ✅ 12시간제
-      minute: now.getMinutes(),
-      ampm,                   // ✅ 반드시 포함
+      name: "오늘 기준",
+      birthDate: `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`,
       calendarType: "solar",
       gender: "male",
+      ampm,
+      hour: String(twelveHour),
+      minute: String(now.getMinutes()).padStart(2, "0"),
     };
 
     console.log("[AutoSaju] todayPayload:", todayPayload);
@@ -6210,37 +6210,18 @@ setTimeout(async () => {
     if (!res.ok) {
       const text = await res.text();
       console.error("[AutoSaju] Fetch 실패:", res.status, text);
-      alert("오늘 사주 자동 출력 실패: " + res.status);
       return;
     }
 
     const todayData = await res.json();
-    if (!todayData?.ganji) {
-      console.warn("[AutoSaju] 데이터 구조 이상:", todayData);
-      return;
-    }
+    console.log("[AutoSaju] todayData:", todayData);
 
-    const yearGanji2 = splitGanji(todayData.ganji.year);
-    const monthGanji2 = splitGanji(todayData.ganji.month);
-    const dayGanji2 = splitGanji(todayData.ganji.day);
-    const timeGanji2 = splitGanji(todayData.ganji.time);
-    const dayGanKorGan2 = convertHanToKorStem(dayGanji2.gan);
-
-    renderTodaySajuBox({
-      yearGanji: yearGanji2,
-      monthGanji: monthGanji2,
-      dayGanji: dayGanji2,
-      timeGanji: timeGanji2,
-      dayGanKorGan: dayGanKorGan2,
-      todayStr: `${todayPayload.year}-${String(todayPayload.month).padStart(2, "0")}-${String(todayPayload.day).padStart(2, "0")}`,
-      birthSaju: { yearGanji: yearGanji2, monthGanji: monthGanji2, dayGanji: dayGanji2, timeGanji: timeGanji2 },
-    });
-
-    console.log("[AutoSaju] 오늘 사주 자동 렌더 완료 ✅");
+    renderSaju(todayData); // ✅ 기존 사주 렌더러 호출 (renderTodaySajuBox 또는 renderSajuMini 등)
   } catch (err) {
     console.error("[AutoSaju] 예외 발생:", err);
   }
-}, 800);
+}, 1000);
+
  // 🔹 한 프레임 뒤 실행 (UI 업데이트 이후)
       }
 
