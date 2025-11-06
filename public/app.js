@@ -6127,6 +6127,7 @@ async function postJSON(url, body, init = {}) {
 
 /***** ✅ 버튼: 로그인 시도만 수행 *****/
 document.getElementById("loginBtn")?.addEventListener("click", async (e) => {
+    beforeLoginSave(); // 🔹 로그인 전 현재 사주 저장
   e.preventDefault();
   const email = document.getElementById("email")?.value?.trim();
   const password = document.getElementById("password")?.value ?? "";
@@ -6148,6 +6149,7 @@ document.getElementById("signupBtn")?.addEventListener("click", (e) => {
 });
 
 document.getElementById("googleLogin")?.addEventListener("click", async (e) => {
+    beforeLoginSave(); // 🔹 로그인 전 현재 사주 저장
   e.preventDefault();
   await window.supabaseClient.auth.signInWithOAuth({
     provider: "google",
@@ -6156,6 +6158,7 @@ document.getElementById("googleLogin")?.addEventListener("click", async (e) => {
 });
 
 document.getElementById("kakaoLogin")?.addEventListener("click", async (e) => {
+    beforeLoginSave(); // 🔹 로그인 전 현재 사주 저장
   e.preventDefault();
   await window.supabaseClient.auth.signInWithOAuth({
     provider: "kakao",
