@@ -5582,7 +5582,7 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
     const raw = (v1 || v2 || v3 || v4 || '');
     const name = raw.trim();
 
-    titleEl.textContent = name ? `사주팔자(${name})` : '사주팔자';
+    titleEl.textContent = name ? `사주팔자[드래그시 위치이동가능](${name})` : '사주팔자[드래그시 위치이동가능]';
 
     // 디버깅 로그(필요 없으면 주석 처리해도 됨)
     console.log('[mini:title]', { label, value:v1, attr:v2, win:v3, ctx:v4, decided:name, text:titleEl.textContent });
