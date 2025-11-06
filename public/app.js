@@ -5674,6 +5674,13 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
       </div>
       <div class="saju-mini__body" id="saju-mini-body"></div>
     `;
+
+      // 🔽🔽🔽 추가: 첫 로딩(저장값 없음)이라면 기본 접힘
+  if (localStorage.getItem('sajuMiniMinimized') === null) {
+    box.classList.add('is-min');
+    try { localStorage.setItem('sajuMiniMinimized', '1'); } catch {}
+  }
+  // 🔼🔼🔼 추가 끝
     document.body.appendChild(box);
     setMiniTitle();
     box.querySelector('#saju-mini-min')?.addEventListener('click', () => box.classList.toggle('is-min'));
@@ -5865,12 +5872,18 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
     });
   }
 
-  function restoreMin(box){
-    if (localStorage.getItem(MIN_KEY) === '1') box.classList.add('is-min');
-    box.querySelector('#saju-mini-min')?.addEventListener('click', ()=>{
-      const m = box.classList.toggle('is-min'); try{ localStorage.setItem(MIN_KEY, m ? '1' : '0'); }catch{}
-    });
-  }
+function restoreMin(box){
+  const v = localStorage.getItem(MIN_KEY);
+  // 저장값이 없거나 '1'이면 접힘
+  if (v === null || v === '1') box.classList.add('is-min');
+  else box.classList.remove('is-min');
+
+  box.querySelector('#saju-mini-min')?.addEventListener('click', ()=>{
+    const m = box.classList.toggle('is-min');
+    try { localStorage.setItem(MIN_KEY, m ? '1' : '0'); } catch {}
+  });
+}
+
 
   function init(box){
     if (!box || box.dataset.wired === '1') return;

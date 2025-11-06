@@ -477,8 +477,8 @@ body {
   position: fixed;     /* ✅ 스크롤해도 화면에 고정 */
   right: 16px;
   bottom: 16px;
-  width: 300px;
-  max-width: calc(100vw - 24px);
+  width: 300px;  /* ✅ 사주창 넓이 */
+  max-width: calc(100vw - 24px); 
   background:#f8f1c9;
   border:1px solid #ddd;
   border-radius:12px;
@@ -489,6 +489,16 @@ body {
   z-index: 9999;
   overflow: hidden;
 }
+
+
+/* 미니창 폭 강제 오버라이드 */
+#saju-mini, .saju-mini {
+  width: 500px !important;          /* 원하는 값으로 */
+  max-width: calc(100vw - 24px) !important;  /* 모바일 안전장치 */
+  min-width: 420px !important;      /* 내부 레이아웃에 의해 줄어드는 것 방지 */
+}
+
+
 
 .saju-mini__bar{
   display:flex; align-items:center; justify-content:space-between;
@@ -547,6 +557,36 @@ body {
 }
 #saju-mini { z-index: 2147483647; }
 #saju-mini, #saju-mini * { pointer-events: auto; }
+
+/* === Mini 창 폰트/여백 오버라이드 (맨 아래에 추가) === */
+.saju-mini, #saju-mini { 
+  font-size: 16px !important;          /* 본문 기본 글자 */
+  line-height: 1.35;    
+}
+
+#saju-mini .mini-grid,
+.saju-mini table { 
+  font-size: 15px !important;          /* 표 안 글자 */
+}
+
+#saju-mini small { 
+  font-size: 0.9em !important;         /* 괄호(십신) */
+  color: #555;
+}
+
+#saju-mini th, 
+#saju-mini td {
+  padding: 4px 6px !important;         /* 너무 빽빽하면 살짝 넓힘 */
+  line-height: 1.25 !important;
+}
+
+#saju-mini .saju-chip { 
+  font-size: 12px !important; 
+  padding: 2px 6px !important; 
+  border-radius: 6px !important;
+}
+
+
 
 
 /* 작은 창 끝 */
@@ -924,7 +964,9 @@ body {
 
 <div class="note-box">
   ※ 태어난 분대가 20~40분(30분 근처)에 있는 분은 정확한 시주가 산출되지 않을 수도 <br>있으니 따로 확인해 주세요! 한국썸머타임은 적용된 상태입니다.
-  <br>
+     <span style="color:#d32f2f;font-weight:700">
+    [사주정보 출력시 탭간 이동은 하지 않도록 새창에서 열어주세요!!]
+  </span>
   <span class="note-links">
     <a href="/terms1.html">이용약관</a> |
     <a href="/privacy1.html">개인정보취급방침</a> |
