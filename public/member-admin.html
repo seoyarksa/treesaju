@@ -66,6 +66,14 @@
       <label>닉네임: <input type="text" id="edit-nickname" readonly></label><br>
       <label>전화번호: <input type="text" id="edit-phone"></label><br>
 
+      <!-- NEW: phone_verified 편집 -->
+      <label>전화번호 인증 (phone_verified):
+        <select id="edit-phone_verified">
+          <option value="false">false</option>
+          <option value="true">true</option>
+        </select>
+      </label><br>
+
       <label>등급 (grade):
         <select id="edit-grade">
           <option value="basic">일반회원</option>
@@ -90,12 +98,12 @@
         </select>
       </label><br>
 
- <label>만료일 (current_period_end):
-  <input type="date" id="edit-current_period_end">
-</label><br>
-<label>해지 효력일 (cancel_effective_at):
-  <input type="date" id="edit-cancel_effective_at">
-</label><br>
+      <label>만료일 (current_period_end):
+        <input type="date" id="edit-current_period_end">
+      </label><br>
+      <label>해지 효력일 (cancel_effective_at):
+        <input type="date" id="edit-cancel_effective_at">
+      </label><br>
 
       <label>일일 제한: <input type="number" id="edit-daily_limit"></label><br>
       <label>Special 지정일: <input type="date" id="edit-special_assigned_at"></label><br>
@@ -239,16 +247,16 @@
           <td>${member.role || "-"}</td>
           <td>${member.created_at ? new Date(member.created_at).toLocaleDateString() : "-"}</td>
           <td>${member.updated_at ? new Date(member.updated_at).toLocaleDateString() : "-"}</td>
-   <td>
-  ${member.current_period_end
-    ? new Date(member.current_period_end).toLocaleDateString('ko-KR')
-    : "-"}
-</td>
-<td>
-  ${member.cancel_effective_at
-    ? new Date(member.cancel_effective_at).toLocaleDateString('ko-KR')
-    : "-"}
-</td>
+          <td>
+            ${member.current_period_end
+              ? new Date(member.current_period_end).toLocaleDateString('ko-KR')
+              : "-"}
+          </td>
+          <td>
+            ${member.cancel_effective_at
+              ? new Date(member.cancel_effective_at).toLocaleDateString('ko-KR')
+              : "-"}
+          </td>
 
           <td>${member.daily_usage_date || "-"}</td>
           <td>${member.daily_usage_count ?? "-"}</td>
@@ -294,9 +302,12 @@
       document.getElementById("edit-grade").value = data.grade || "basic";
       document.getElementById("edit-role").value  = data.role  || "normal";
 
+      // NEW: phone_verified 값 주입
+      document.getElementById("edit-phone_verified").value = data.phone_verified ? "true" : "false";
+
       const d = s => s ? s.split("T")[0] : "";
-  document.getElementById("edit-current_period_end").value   = d(data.current_period_end);
-  document.getElementById("edit-cancel_effective_at").value  = d(data.cancel_effective_at);
+      document.getElementById("edit-current_period_end").value   = d(data.current_period_end);
+      document.getElementById("edit-cancel_effective_at").value  = d(data.cancel_effective_at);
 
       document.getElementById("edit-daily_limit").value             = data.daily_limit ?? "";
       document.getElementById("edit-special_assigned_at").value     = d(data.special_assigned_at);
@@ -326,18 +337,22 @@
         const v = document.getElementById(id).value;
         return v?.trim() || null;
       };
+      // NEW: boolean 파서
+      const Vbool = (id) => document.getElementById(id).value === "true";
 
       const updates = {
         phone: Vtxt("edit-phone"),
         grade: Vtxt("edit-grade"),
         role:  Vtxt("edit-role"),
-    current_period_end:  Vdate("edit-current_period_end"),
-    cancel_effective_at: Vdate("edit-cancel_effective_at"),
+        current_period_end:  Vdate("edit-current_period_end"),
+        cancel_effective_at: Vdate("edit-cancel_effective_at"),
         daily_limit:      Vnum("edit-daily_limit"),
         special_assigned_at:       Vdate("edit-special_assigned_at"),
         premium_assigned_at:       Vdate("edit-premium_assigned_at"),
         premium_first_assigned_at: Vdate("edit-premium_first_assigned_at"),
-        has_ever_premium: document.getElementById("edit-has_ever_premium").value === "true"
+        has_ever_premium: document.getElementById("edit-has_ever_premium").value === "true",
+        // NEW: phone_verified 업데이트
+        phone_verified: Vbool("edit-phone_verified"),
       };
 
       console.log("업데이트 시도:", { currentUserId, updates });
@@ -372,6 +387,8 @@
         premium_assigned_at: row.premium_assigned_at,
         premium_first_assigned_at: row.premium_first_assigned_at,
         has_ever_premium: row.has_ever_premium,
+        // NEW: phone_verified 반영
+        phone_verified: row.phone_verified,
       });
 
       alert("저장 완료");
@@ -413,6 +430,8 @@
       try { return new Date(v).toLocaleDateString(); } catch { return "-"; }
     }
     function fmtBoolYN(b) { return b ? "예" : "아니오"; }
+    // NEW: 체크마크 출력 유틸
+    function fmtCheck(b){ return b ? "✅" : "❌"; }
   </script>
   <script>
     function patchAndHighlightRow(userId, updates, options = {clearAfterMs: 3500}) {
@@ -429,6 +448,9 @@
       };
 
       if ("phone" in updates) { c(3).textContent = updates.phone || "-"; mark(3); }
+      // NEW: phone_verified 셀 업데이트 (열 인덱스 4)
+      if ("phone_verified" in updates) { c(4).textContent = fmtCheck(updates.phone_verified); mark(4); }
+
       if ("grade" in updates) { c(5).textContent = updates.grade || "-"; mark(5); }
       if ("grade_override" in updates) { c(6).textContent = updates.grade_override || "-"; mark(6); }
       if ("role" in updates)  { c(7).textContent = updates.role || "-"; mark(7); }
@@ -444,3 +466,4 @@
   </script>
 </body>
 </html>
+
