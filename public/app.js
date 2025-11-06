@@ -5887,6 +5887,43 @@ window.addEventListener("beforeunload", () => {
 
     // 이미 있는 onAuthStateChange는 유지하되,
     // SIGNED_OUT 때 구독 정리만 추가하면 좋아요.
+// ──────────────────────────────
+// ✅ 사주 자동 저장 (로그인/새로고침/탭 이동 전)
+// ──────────────────────────────
+function saveSajuBeforeReload(reason = "unknown") {
+  try {
+    const name = document.getElementById("customer-name")?.value || "";
+    const backup = {
+      name,
+      saju: window.saju || null,
+      gyeok: window.gyeok || null,
+      sinsal: window.sinsal || null,
+      reason,
+    };
+    localStorage.setItem("sajuAutoBackup", JSON.stringify(backup));
+    console.log(`[sajuAutoBackup] 저장 (${reason})`, backup);
+  } catch (e) {
+    console.warn("[sajuAutoBackup] 저장 실패:", e);
+  }
+}
+
+// ✅ 어떤 새로고침/탭 이동이든 저장 보장
+window.addEventListener("beforeunload", () => saveSajuBeforeReload("beforeunload"));
+
+// ✅ Supabase 로그인/로그아웃 시 저장 후 리로드
+window.supabaseClient.auth.onAuthStateChange((event, session) => {
+  console.log("[AuthStateChange]", event);
+
+  if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+    saveSajuBeforeReload(event); // ✅ 이유 표시
+    window.location.reload();
+    return;
+  }
+
+  if (event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
+    updateAuthUI(session);
+  }
+});
 
     // ✅ 로그인 상태 변경 감시 (이중 새로고침 방지)
     let __reloading = false;
@@ -6306,6 +6343,8 @@ try {
   } catch (err) {
     console.error("[init] fatal:", err);
   }
+    // 300ms 지연 후 복원 (DOM 완성 대기)
+  setTimeout(restoreSajuAfterReload, 300);
 });
 
 
