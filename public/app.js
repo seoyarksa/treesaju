@@ -886,16 +886,71 @@ function openSignupModal() {
 
 
 // 기존 함수 시그니처는 유지 + (선택) 앵커 파라미터만 추가
-async function openPhoneOtpModal(anchor /* ← 선택: 엘리먼트 or 셀렉터 */, opts = {}) {
-  // ── 내부 유틸: 전화번호 가져오기 + 포맷 (원본 유지)
-  async function __fetchProfilePhone() { /* ...원본 그대로... */ }
-  function __formatKR(raw) { /* ...원본 그대로... */ }
+// 전화번호 인증 모달 (앵커 근처 배치 + Web OTP 자동입력 지원)
+async function openPhoneOtpModal(anchor /* 엘리먼트 or 셀렉터 */, opts = {}) {
+  // ─────────────────────────────────────
+  // 내부 유틸: 프로필 번호 조회 + 포맷 (기존 로직 유지)
+  async function __fetchProfilePhone() {
+    try {
+      const { data: { user } } = await window.supabaseClient.auth.getUser();
+      if (!user) return "";
+      const { data: prof } = await window.supabaseClient
+        .from("profiles")
+        .select("phone")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      return prof?.phone || user.user_metadata?.phone || "";
+    } catch (e) {
+      console.warn("[OTP prefill] fetch error:", e);
+      return "";
+    }
+  }
+  function __formatKR(raw) {
+    const only = String(raw || "").replace(/\D+/g, "");
+    if (only.length === 11) return `${only.slice(0,3)}-${only.slice(3,7)}-${only.slice(7)}`;
+    if (only.length === 10) return `${only.slice(0,3)}-${only.slice(3,6)}-${only.slice(6)}`;
+    return only;
+  }
 
-  // +82 → 국내 하이픈 포맷 (원본 유지)
-  function toKRNational(raw) { /* ...원본 그대로... */ }
-  function normalizePhoneKR(input, mode = "intl") { /* ...원본 그대로... */ }
+  // +82, 공백/하이픈 섞인 입력 → 국내 하이픈 포맷
+  function toKRNational(raw) {
+    let n = String(raw || "").replace(/\D+/g, "");
+    if (n.startsWith("82")) n = "0" + n.slice(2);  // +82 → 0
+    if (n.length === 11) return `${n.slice(0,3)}-${n.slice(3,7)}-${n.slice(7)}`;
+    if (n.length === 10 && n.startsWith("02")) return `${n.slice(0,2)}-${n.slice(2,6)}-${n.slice(6)}`;
+    if (n.length === 10) return `${n.slice(0,3)}-${n.slice(3,6)}-${n.slice(6)}`;
+    return n;
+  }
+  // 국내/국제 포맷 표준화 (기존 함수 유지)
+  function normalizePhoneKR(input, mode = "intl") {
+    let n = String(input || "").replace(/\D+/g, "");
+    if (mode === "intl") {
+      if (n.startsWith("82")) return `+${n}`;
+      if (n.startsWith("0"))  return `+82${n.slice(1)}`;
+      if (String(input).trim().startsWith("+")) return String(input).trim().replace(/\s+/g, "");
+      return `+${n}`;
+    } else if (mode === "nat") {
+      if (n.startsWith("82")) n = "0" + n.slice(2);
+      if (n.length === 11) return `${n.slice(0,3)}-${n.slice(3,7)}-${n.slice(7)}`;
+      if (n.length === 10 && n.startsWith("02")) return `${n.slice(0,2)}-${n.slice(2,6)}-${n.slice(6)}`;
+      if (n.length === 10) return `${n.slice(0,3)}-${n.slice(3,6)}-${n.slice(6)}`;
+      return n;
+    }
+    return input;
+  }
 
-  // ✅ NEW: 앵커 해석 + 패널 배치 유틸 (기존 레이아웃에 영향 없음)
+  // E.164(+82) 변환: 빈 값만 막고 나머지는 관대하게 보정
+  function toE164KR(raw) {
+    const digits = String(raw || "").replace(/\D+/g, "");
+    if (!digits) return ""; // 진짜 빈 입력만 실패
+    if (digits.startsWith("82")) return `+${digits}`;
+    if (digits.startsWith("0"))  return `+82${digits.slice(1)}`;
+    if (String(raw).trim().startsWith("+")) return String(raw).trim().replace(/\s+/g, "");
+    return `+${digits}`;
+  }
+
+  // ─────────────────────────────────────
+  // NEW: 앵커 해석 + 패널 배치
   function __resolveAnchor(a) {
     if (!a) return null;
     if (a instanceof Element) return a;
@@ -907,35 +962,28 @@ async function openPhoneOtpModal(anchor /* ← 선택: 엘리먼트 or 셀렉터
     const r  = anchorEl.getBoundingClientRect();
     const vw = window.innerWidth, vh = window.innerHeight;
     const pad = 12;
-
     // 패널 크기는 생성 후에야 측정 가능
     const pr = panel.getBoundingClientRect();
-    let left = r.left;                   // 기본: 앵커의 좌측 맞춤
-    let top  = r.bottom + 8;            // 기본: 앵커 바로 아래
+    let left = r.left;       // 앵커 좌측 정렬
+    let top  = r.bottom + 8; // 앵커 바로 아래
 
-    // 화면 밖으로 나가지 않도록 클램프
     left = __clamp(left, pad, vw - pr.width  - pad);
     top  = __clamp(top,  pad, vh - pr.height - pad);
 
-    // 패널을 오버레이 중앙 정렬 대신 고정 좌표로 이동
+    // 중앙 정렬이 아닌 고정 좌표
     panel.style.position = 'fixed';
     panel.style.left = `${left}px`;
     panel.style.top  = `${top}px`;
-    panel.style.margin = '0';           // 중앙정렬 제거
+    panel.style.margin = '0';
     panel.dataset.pos = 'anchored';
   }
 
-  // ✅ NEW: Web OTP 자동 입력
-  // - 반드시 사용자 제스처(버튼 클릭) 직후 호출해야 함 (브라우저 정책)
-  // - 성공하면 #otp-code 에 코드 채우고, 포커스 이동
+  // NEW: Web OTP 자동 입력 (지원 브라우저에서만)
   function __tryWebOTPOnce(targetInput, timeoutMs = 2 * 60 * 1000) {
     if (!('OTPCredential' in window) || !navigator.credentials?.get) return;
     if (!targetInput) return;
-
-    // AbortController로 타임아웃/취소 관리
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
-
     navigator.credentials.get({
       otp: { transport: ['sms'] },
       signal: ctrl.signal
@@ -943,19 +991,30 @@ async function openPhoneOtpModal(anchor /* ← 선택: 엘리먼트 or 셀렉터
       if (cred && cred.code) {
         targetInput.value = cred.code;
         targetInput.dispatchEvent(new Event('input', { bubbles: true }));
-        // 자동 포커스 이동(원하면 바로 인증 버튼 클릭도 가능)
-        targetInput.focus();
+        targetInput.focus(); // 필요하면 여기서 바로 verify 클릭도 가능
       }
-    }).catch(() => {/* 취소/타임아웃은 묵음 */})
-      .finally(() => clearTimeout(t));
+    }).catch(()=>{}).finally(()=> clearTimeout(t));
   }
 
-  // ── 모달 재사용 (원본 유지 + 자동 채움 시도 한 줄만 유지)
+  // 내부: 모달 내 전화번호 자동 채움(기존 유지)
+  async function __prefillPhoneIntoModal() {
+    const el = document.getElementById("otp-phone");
+    if (!el) return;
+    if (el.value && el.value.trim() !== "") return; // 이미 입력돼 있으면 스킵
+    const raw = await __fetchProfilePhone();
+    if (!raw) return;
+    const val = toKRNational(raw);
+    el.value = val;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  // ─────────────────────────────────────
+  // 모달 재사용
   if (document.getElementById("phone-otp-modal")) {
     const m = document.getElementById("phone-otp-modal");
     m.style.display = "block";
     setTimeout(__prefillPhoneIntoModal, 0);
-    // ✅ NEW: 재오픈 시에도 앵커 있으면 근처 배치 시도
     const anchorEl = __resolveAnchor(anchor || opts.anchor);
     if (anchorEl) {
       const panel = m.querySelector('[data-otp-panel]');
@@ -964,7 +1023,8 @@ async function openPhoneOtpModal(anchor /* ← 선택: 엘리먼트 or 셀렉터
     return;
   }
 
-  // ── 모달/패널 생성 (원본 유지)
+  // ─────────────────────────────────────
+  // 모달/패널 생성 (기존 디자인 유지)
   const modal = document.createElement("div");
   modal.id = "phone-otp-modal";
   modal.style.cssText = `
@@ -973,7 +1033,7 @@ async function openPhoneOtpModal(anchor /* ← 선택: 엘리먼트 or 셀렉터
   `;
 
   const panel = document.createElement("div");
-  panel.setAttribute('data-otp-panel',''); // ✅ NEW: 패널 식별용
+  panel.setAttribute('data-otp-panel','');
   panel.style.cssText = `
     width:100%; max-width:420px; background:#fff; border-radius:10px; overflow:hidden;
     box-shadow:0 10px 30px rgba(0,0,0,.2); font-family:'Nanum Gothic',sans-serif;
@@ -999,48 +1059,49 @@ async function openPhoneOtpModal(anchor /* ← 선택: 엘리먼트 or 셀렉터
       </div>
     </div>
   `;
-
   modal.appendChild(panel);
   document.body.appendChild(modal);
 
-  // ✅ NEW: 앵커가 있으면 패널 위치를 좌상단 그림 근처로 이동
+  // 앵커가 있으면 좌상단 그림 등의 근처로 이동
   const anchorEl = __resolveAnchor(anchor || opts.anchor);
   if (anchorEl) {
-    // 오버레이 중앙 정렬을 깨지 않도록 다음 프레임에 위치 조정
     requestAnimationFrame(() => __placePanelNearAnchor(panel, anchorEl));
   }
 
-  // ★ [AUTO-PREFILL] 새 모달 생성 직후 기존 로직 유지
+  // 자동 프리필
   setTimeout(__prefillPhoneIntoModal, 0);
 
-  // 닫기 (원본 유지)
+  // 닫기
   document.getElementById("otp-close").onclick = () => { modal.style.display = "none"; };
 
-  // ───────────────────────────────────────────────
-  // 보조 유틸: 한국 번호 → E.164(+82) 표준화 (원본 유지)
-  function toE164KR(raw) { /* ...원본 그대로... */ }
-  // ───────────────────────────────────────────────
-
-  // 코드 받기 (원본 흐름 유지)
+  // ─────────────────────────────────────
+  // 코드 받기 (기존 흐름 유지 + 프리필 타이밍 보강 + Web OTP 시도)
   document.getElementById("otp-send").onclick = async (e) => {
     const btn = e.currentTarget;
     if (btn.disabled) return;
     btn.disabled = true;
-
     try {
       let raw = (document.getElementById("otp-phone").value || "").trim();
+
+      // 열자마자 클릭 타이밍 대비: 두 번 프리필 시도
+      if (!raw) { await __prefillPhoneIntoModal(); raw = (document.getElementById("otp-phone").value || "").trim(); }
       if (!raw) {
-        raw = await __fetchProfilePhone();
-        if (raw) {
-          const nat = toKRNational(raw);
+        const fetched = await __fetchProfilePhone();
+        if (fetched) {
+          const nat = toKRNational(fetched);
           document.getElementById("otp-phone").value = nat;
           raw = nat;
         }
       }
       if (!raw) { alert("전화번호를 입력하세요."); return; }
 
-      const phone = toE164KR(raw);
-      if (!phone) { alert("유효한 전화번호 형식이 아닙니다."); return; }
+      // E.164로 보정(관대)
+      let phone = toE164KR(raw);
+      if (!phone) {
+        const digits = raw.replace(/\D+/g, "");
+        if (!digits) { alert("전화번호를 입력하세요."); return; }
+        phone = raw.trim().startsWith("+") ? raw.trim().replace(/\s+/g, "") : `+${digits}`;
+      }
 
       const res = await fetch("/api/otp?action=send", {
         method: "POST",
@@ -1058,13 +1119,12 @@ async function openPhoneOtpModal(anchor /* ← 선택: 엘리먼트 or 셀렉터
       if (data.code) console.log("[DEV] 인증 코드:", data.code);
       alert("인증 코드가 발송되었습니다. (개발중이면 콘솔에서 코드 확인)");
 
-      // ✅ NEW: 사용자 클릭 제스처 직후 Web OTP 한 번 시도
+      // 사용자 클릭 직후 Web OTP 한 번 시도
       const codeInput = document.getElementById('otp-code');
-      // 자동 입력 인식 향상을 위해 속성 부여
-      codeInput.setAttribute('autocomplete','one-time-code'); // iOS/안드 공통 힌트
+      codeInput.setAttribute('autocomplete','one-time-code');
       codeInput.setAttribute('inputmode','numeric');
       codeInput.setAttribute('pattern','[0-9]*');
-      __tryWebOTPOnce(codeInput);  // 브라우저가 지원하면 자동입력됨
+      __tryWebOTPOnce(codeInput);
 
     } catch (err) {
       console.error("[OTP send] error:", err);
@@ -1074,7 +1134,7 @@ async function openPhoneOtpModal(anchor /* ← 선택: 엘리먼트 or 셀렉터
     }
   };
 
-  // 인증하기 (원본 유지)
+  // 인증하기 (기존 그대로)
   document.getElementById("otp-verify").onclick = async (e) => {
     const btn = e.currentTarget;
     if (btn.disabled) return;
@@ -1159,7 +1219,7 @@ async function openPhoneOtpModal(anchor /* ← 선택: 엘리먼트 or 셀렉터
     }
   };
 
-  // ✅ NEW: 모달 열릴 때 코드 입력 필드에 자동완성 힌트 부여 (안전)
+  // 코드 입력칸 자동완성 힌트(모든 케이스에서 안전)
   requestAnimationFrame(() => {
     const code = document.getElementById('otp-code');
     if (code) {
@@ -1168,9 +1228,6 @@ async function openPhoneOtpModal(anchor /* ← 선택: 엘리먼트 or 셀렉터
       code.setAttribute('pattern','[0-9]*');
     }
   });
-
-  // 내부: 기존 자동 채움 함수 (원본 정의 위치 유지)
-  async function __prefillPhoneIntoModal() { /* ...원본 그대로... */ }
 }
 
 
