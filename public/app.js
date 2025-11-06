@@ -5620,7 +5620,7 @@ box.id = 'saju-mini';
 box.className = 'saju-mini';
 box.innerHTML = `
   <div class="saju-mini__bar">   <!-- 드래그 핸들 -->
-    <strong id="saju-mini-title">사주팔자</strong>
+    <strong id="saju-mini-title">사주팔자 미니창</strong>
     <div class="saju-mini__actions">
       <button class="btn" id="saju-mini-min" title="접기">—</button>
       <button class="btn" id="saju-mini-close" title="닫기">×</button>
