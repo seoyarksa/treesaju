@@ -5928,20 +5928,7 @@ body.innerHTML = `
 
 
 
-(function wireMiniTitleLive(){
-  if (window.__miniTitleWired) return;
-  window.__miniTitleWired = true;
 
-  const input = document.getElementById('customer-name');
-  if (!input) return; // 페이지에 그 요소 없으면 패스
-
-  input.addEventListener('input', () => {
-    const el = document.querySelector('#saju-mini #saju-mini-title');
-    if (!el) return;
-    const v = input.value.trim();
-    el.textContent = v ? `사주팔자(${v})` : '사주팔자';
-  });
-})();
 
 
 // 0) CSS: 드래그 표시/선택 방지
