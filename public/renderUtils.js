@@ -330,6 +330,9 @@ export function handleBasicDaeyunClick(idx, stem, branch) {
   window.selectedDaewoon = { stem, branch };
   console.log("▶ 선택된 대운:", window.selectedDaewoon);
 
+// 미니창 반영 (바로 표시 + 저장)
+window.sajuMini?.setDaeyun(`${stem}${branch}`);
+
   // === 기존 세운값 리셋 ===
   window.selectedSewoon = null;
   console.log("⏹ 세운 리셋 완료");
@@ -435,6 +438,10 @@ export function basicSewoonClick(td, stem, branch, year) {
   // 세운 선택 전역 저장
   window.selectedSewoon = { type: "sewoon", stem, branch, year };
   console.log("▶ 선택된 세운:", window.selectedSewoon);
+
+
+// 미니창 반영 (바로 표시 + 저장)
+window.sajuMini?.setSewoon(`${stem}${branch}`, String(year || ''));
 
   // 리스트 갱신
   const lists = getAllCompareLists(window.saju);
