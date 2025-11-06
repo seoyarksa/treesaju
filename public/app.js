@@ -5728,62 +5728,115 @@ body.innerHTML = `
 
 
 // === 大/世 셋터 (문자열 "丙戌"도 받고, 분리 인자도 받고, 객체도 받는 관용 API) ===
-(function exposeMiniSelAPIs_v3(){
+// === 大/世 셋터 v4: "丙戌" 문자열/분리 인자/객체 모두 지원 + 십신/지장간 자동계산 ===
+(function exposeMiniSelAPIs_v4(){
   const MINI_DAEYUN_KEY = 'sajuMiniSelDaeyun_v2';
   const MINI_SEWOON_KEY = 'sajuMiniSelSewoon_v2';
   const save = (k,v)=>{ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} };
   const setHTML = (id, html)=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; };
+  const setHides = (id, arr)=>{ 
+    const el=document.getElementById(id); if(!el) return;
+    el.innerHTML = (arr && arr.length)
+      ? arr.map(t=>`<span class="saju-chip">(${t})</span>`).join('')
+      : '-';
+  };
 
-  // 유효 천간/지지 목록
+  // 환경 의존 함수(없으면 안전 폴백)
+  const _getTenGod           = window.getTenGod           || (() => '');
+  const _convertHanToKorStem = window.convertHanToKorStem || (x => x);
+  const _convertKorToHanStem = window.convertKorToHanStem || (x => x);
+  const dayGanKorGan         = window.dayGanKorGan        || ''; // 십신 계산 기준
+
+  // 유효 문자 집합
   const STEMS = '甲乙丙丁戊己庚辛壬癸'.split('');
   const BRANCHES = '子丑寅卯辰巳午未申酉戌亥'.split('');
 
-  // "丙戌" / "乙巳" 같은 2글자 문자열 → {gan:'丙', ji:'戌'}
+  // "丙戌" → {gan:'丙', ji:'戌'}
   function parseGanJi(input){
     const s = String(input||'').trim();
     if (!s) return { gan:'', ji:'' };
-    // 1) 정확히 2글자라면 천간+지지로 가정
     if (s.length === 2 && STEMS.includes(s[0]) && BRANCHES.includes(s[1])) {
       return { gan: s[0], ji: s[1] };
     }
-    // 2) 혹시 섞여 들어온 경우(간/지 순서 무관) → 찾아서 매핑
     const gan = STEMS.find(ch => s.includes(ch)) || '';
     const ji  = BRANCHES.find(ch => s.includes(ch)) || '';
     return { gan, ji };
   }
 
-  function normArgs(arg1, arg2, arg3){
+  function normArgs(arg1, arg2, arg3, arg4){
     // 지원 형태:
-    //   ( '丙戌' )
-    //   ( stem, branch )
-    //   ( {gan:'丙', ji:'戌', ten:'정인'} )
-    //   ( stem, branch, ten )
+    //   ('丙戌') or ('丙戌', ten?) or ('丙戌', ten, hidesArray)
+    //   (stem, branch) or (stem, branch, ten?, hidesArray?)
+    //   ({gan, ji, ten, hides})
     if (typeof arg1 === 'object' && arg1) {
-      return { gan: String(arg1.gan||'').trim(), ji: String(arg1.ji||'').trim(), ten: String(arg1.ten||'').trim() };
+      const { gan='', ji='', ten='', hides=[] } = arg1;
+      return { gan:String(gan).trim(), ji:String(ji).trim(), ten:String(ten).trim(), hides:Array.isArray(hides)?hides:[] };
     }
-    if (arg2 == null && arg3 == null) {
-      // "丙戌" 같이 한 덩어리만 넘어온 경우
-      return { ...parseGanJi(arg1), ten: '' };
+    if (arg2 == null || (typeof arg2 === 'string' && arg3 == null)) {
+      // ('丙戌') or ('丙戌','정인')
+      const { gan, ji } = parseGanJi(arg1);
+      const ten = String(arg2||'').trim();
+      return { gan, ji, ten, hides:[] };
     }
-    return { gan: String(arg1||'').trim(), ji: String(arg2||'').trim(), ten: String(arg3||'').trim() };
+    // (stem, branch, ten?, hides?)
+    const ten = String(arg3||'').trim();
+    const hides = Array.isArray(arg4) ? arg4 : (Array.isArray(arg3)?arg3:[]);
+    return { gan:String(arg1||'').trim(), ji:String(arg2||'').trim(), ten, hides };
+  }
+
+  // 지지 → 지장간 리스트(문자열 또는 객체 혼재 대응)
+  function computeHidesFromJi(ji){
+    // 기대: window.jijiToSibganMap[ji]가 ['甲','丙',...] 또는 [{stem:'甲', isMiddle:true}, ...]
+    const map = window.jijiToSibganMap || {};
+    const raw = map[ji] || map[_convertHanToKorStem(ji)] || []; // 혹시 키가 한글일 수도
+    const arr = [];
+    for (const item of raw) {
+      const stemKor = typeof item === 'string' ? item : (item.stem || item.kor || '');
+      const stemHan = _convertKorToHanStem(stemKor) || stemKor || '';
+      const ten = _getTenGod(dayGanKorGan, stemKor) || '';
+      if (stemHan) arr.push(`${stemHan} ${ten}`.trim());
+    }
+    return arr;
+  }
+
+  // 십신 자동계산 (인자에 없을 때만)
+  function computeTenIfNeeded(gan, givenTen){
+    if (givenTen) return givenTen;
+    if (!gan) return '';
+    // getTenGod은 "한글천간"을 기대하므로 변환
+    const kor = _convertHanToKorStem(gan);
+    return _getTenGod(dayGanKorGan, kor) || '';
+  }
+
+  function applyAll(prefix, gan, ji, ten, hides){
+    setHTML(`${prefix}-gan`, `<strong>${gan || '-'}</strong>${ten ? ` <small>(${ten})</small>` : ''}`);
+    setHTML(`${prefix}-ji`,  `<strong>${ji  || '-'}</strong>`);
+    setHides(`${prefix}-hides`, hides);
   }
 
   window.sajuMini = window.sajuMini || {};
 
-  window.sajuMini.setDaeyun = (a,b,c)=>{
-    const { gan, ji, ten } = normArgs(a,b,c);
-    const v = { gan: gan || '-', ji: ji || '-', ten: ten || '' };
-    save(MINI_DAEYUN_KEY, v);
-    setHTML('mini-daeyun-gan', `<strong>${v.gan}</strong>${v.ten ? ` <small>(${v.ten})</small>` : ''}`);
-    setHTML('mini-daeyun-ji',  `<strong>${v.ji}</strong>`);
+  // === 大運 ===
+  // 사용 예:
+  //  - sajuMini.setDaeyun(`${stem}${branch}`)       // "丙戌"
+  //  - sajuMini.setDaeyun(stem, branch)
+  //  - sajuMini.setDaeyun(stem, branch, tenName)
+  //  - sajuMini.setDaeyun({gan:'丙', ji:'戌', ten:'정인', hides:['戊 겁재','庚 상관']})
+  window.sajuMini.setDaeyun = (a,b,c,d)=>{
+    let { gan, ji, ten, hides } = normArgs(a,b,c,d);
+    ten = computeTenIfNeeded(gan, ten);
+    if (!hides || !hides.length) hides = ji ? computeHidesFromJi(ji) : [];
+    save(MINI_DAEYUN_KEY, { gan:gan||'-', ji:ji||'-', ten:ten||'', hides });
+    applyAll('mini-daeyun', gan, ji, ten, hides);
   };
 
-  window.sajuMini.setSewoon = (a,b,c)=>{
-    const { gan, ji, ten } = normArgs(a,b,c);
-    const v = { gan: gan || '-', ji: ji || '-', ten: ten || '' };
-    save(MINI_SEWOON_KEY, v);
-    setHTML('mini-sewoon-gan', `<strong>${v.gan}</strong>${v.ten ? ` <small>(${v.ten})</small>` : ''}`);
-    setHTML('mini-sewoon-ji',  `<strong>${v.ji}</strong>`);
+  // === 歲運 ===
+  window.sajuMini.setSewoon = (a,b,c,d)=>{
+    let { gan, ji, ten, hides } = normArgs(a,b,c,d);
+    ten = computeTenIfNeeded(gan, ten);
+    if (!hides || !hides.length) hides = ji ? computeHidesFromJi(ji) : [];
+    save(MINI_SEWOON_KEY, { gan:gan||'-', ji:ji||'-', ten:ten||'', hides });
+    applyAll('mini-sewoon', gan, ji, ten, hides);
   };
 })();
 
