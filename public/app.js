@@ -5493,19 +5493,21 @@ requestAnimationFrame(() => {
   console.log("[saju] OK to render");
 
   // ✅ renderSaju 내부 (사주 출력 완료 직후)
+// ✅ 사주 출력이 끝나는 부분 (renderSaju 마지막 catch 위나 return 직전)
 try {
-  window.lastOutputData = formKey;       // 고유키 (생년월일시 등)
-  window.lastFormData = formData;        // 입력 폼 데이터
-  window.lastSajuResult = sajuData;      // 계산 결과
+  const formKey = `${year}-${month}-${day}-${hour}-${minute}-${calendarType}-${gender}`;
+  const formData = { year, month, day, hour, minute, calendarType, gender };
+  const resultData = data; // 서버 응답 그대로 저장
 
   sessionStorage.setItem("lastSajuFormKey", formKey);
   sessionStorage.setItem("lastSajuFormData", JSON.stringify(formData));
-  sessionStorage.setItem("lastSajuResult", JSON.stringify(sajuData));
+  sessionStorage.setItem("lastSajuResult", JSON.stringify(resultData));
 
-  console.log("💾 사주 상태 저장됨:", formKey);
-} catch (e) {
-  console.warn("[Save Saju Error]", e);
+  console.log("💾 사주 상태 저장 완료:", formKey);
+} catch (err) {
+  console.warn("[Save Saju Error]", err);
 }
+
 
   // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
 // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
@@ -5515,28 +5517,22 @@ try {
 
 
 // ✅ 페이지 로드 시 직전 사주 자동 복원
+// ✅ 페이지 로드 시 직전 사주 자동 복원
 window.addEventListener("load", () => {
   try {
     const savedKey = sessionStorage.getItem("lastSajuFormKey");
     const savedData = sessionStorage.getItem("lastSajuFormData");
     const savedResult = sessionStorage.getItem("lastSajuResult");
 
-    if (savedKey && savedData && savedResult) {
+if (sessionStorage.getItem("__autoRestorePending")) {
+  console.log("🔁 로그인 후 복원 트리거 실행");
+  sessionStorage.removeItem("__autoRestorePending");
+}
+
+    if (savedKey && savedData) {
       console.log("🔁 새로고침 후 이전 사주 자동 복원:", savedKey);
-
-      // 전역 변수에 다시 등록
-      window.lastOutputData = savedKey;
       const formData = JSON.parse(savedData);
-      const sajuData = JSON.parse(savedResult);
-
-      // ⚠️ renderSaju 인자 구조 확인 (formData 하나만 쓰는 경우 아래 줄로)
       renderSaju(formData);
-      // renderSaju(formData, sajuData); // ← 필요 시 이 줄로 교체
-
-      // 복원 후 세션에 남겨두면 로그인 후에도 유지됨 (원하시면 삭제 X)
-      // sessionStorage.removeItem("lastSajuFormKey");
-      // sessionStorage.removeItem("lastSajuFormData");
-      // sessionStorage.removeItem("lastSajuResult");
     } else {
       console.log("ℹ️ 이전 사주 데이터 없음 — 기본 상태로 시작");
     }
@@ -5544,6 +5540,7 @@ window.addEventListener("load", () => {
     console.warn("[Auto Restore Error]", e);
   }
 });
+
 
 
 
@@ -6219,6 +6216,10 @@ function bindAuthPipelines() {
 
         // 4) UI 반영
         updateAuthUI(session);
+
+          console.log("🪄 로그인 직전 상태 백업 시도");
+  // sessionStorage는 자동 보존되지만, 혹시 새로 로그인으로 덮어쓸 때 대비
+  sessionStorage.setItem("__autoRestorePending", "1");
       }
 
       if (event === "SIGNED_OUT") {
