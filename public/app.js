@@ -5868,6 +5868,71 @@ window.__miniCalc = {
   };
 })();
 
+// === 지지 지장간 계산 보강: 한자/한글 키 모두 대응 + 값 형식(문자/객체) 모두 대응 ===
+(function patchMiniHidesResolver(){
+  // 한자<->한글 지지 변환 테이블(간단)
+  const JI_H2K = { '子':'자','丑':'축','寅':'인','卯':'묘','辰':'진','巳':'사','午':'오','未':'미','申':'신','酉':'유','戌':'술','亥':'해' };
+  const JI_K2H = Object.fromEntries(Object.entries(JI_H2K).map(([h,k]) => [k,h]));
+
+  // 현재 미니창이 가진 계산 자원
+  const ctx = window.__miniCtx || window.__miniCalc || {};
+  const getTenGod           = ctx.getTenGod           || window.getTenGod;
+  const convertKorToHanStem = ctx.convertKorToHanStem || window.convertKorToHanStem;
+  const dayGanKorGan        = ctx.dayGanKorGan        || window.dayGanKorGan || '';
+  let   jijiToSibganMap     = ctx.jijiToSibganMap     || window.jijiToSibganMap || {};
+
+  // 맵이 아예 없으면 안전 기본값 제공
+  if (!jijiToSibganMap || !Object.keys(jijiToSibganMap).length) {
+    jijiToSibganMap = {
+      '子':['계'], '丑':['기','계','신'], '寅':['갑','병','무'], '卯':['을'], '辰':['무','을','계'],
+      '巳':['병','무','경'], '午':['정','기'], '未':['기','정','을'], '申':['경','임','무'], '酉':['신'],
+      '戌':['무','신','정'], '亥':['임','갑'],
+      // 한글 키도 함께
+      '자':['계'], '축':['기','계','신'], '인':['갑','병','무'], '묘':['을'], '진':['무','을','계'],
+      '사':['병','무','경'], '오':['정','기'], '미':['기','정','을'], '신':['경','임','무'], '유':['신'],
+      '술':['무','신','정'], '해':['임','갑'],
+    };
+  }
+
+  // 한자/한글 지지로 모두 시도해서 지장간 배열 얻기
+  function getHidesByJi(jiHan) {
+    const jiKor = JI_H2K[jiHan] || jiHan;         // 한자 → 한글(없으면 원본)
+    // 1) 한자 키
+    let raw = jijiToSibganMap[jiHan];
+    // 2) 없으면 한글 키
+    if (!raw) raw = jijiToSibganMap[jiKor];
+    if (!raw) return [];
+
+    const arr = [];
+    for (const it of raw) {
+      // 값이 '갑' 같은 문자열이거나 {stem:'갑', isMiddle:true} 객체일 수 있음
+      const stemKor = (typeof it === 'string') ? it : (it.stem || it.kor || '');
+      const stemHan = convertKorToHanStem ? (convertKorToHanStem(stemKor) || stemKor) : stemKor;
+      const ten     = getTenGod ? (getTenGod(dayGanKorGan, stemKor) || '') : '';
+      const mid     = (typeof it === 'object' && it.isMiddle) ? ' (중기)' : '';
+      arr.push(`${stemHan} ${ten}${mid}`.trim());
+    }
+    return arr;
+  }
+
+  // 미니창 셋터가 이 함수를 사용하도록 주입/교체
+  // (__miniCalc 또는 __miniCtx 중 하나를 쓰고 있을 텐데, 둘 다에 꽂아줌)
+  window.__miniCalc = Object.assign({}, window.__miniCalc, {
+    hidesFromHanJi: getHidesByJi
+  });
+  window.__miniCtx  = Object.assign({}, window.__miniCtx,  {
+    jijiToSibganMap,
+    convertKorToHanStem,
+    getTenGod,
+    dayGanKorGan
+  });
+
+  // 이미 만들어둔 setter가 __miniCalc.hidesFromHanJi / __miniCtx를 참조 중이면 즉시 효과
+  // 혹시 직접 호출하고 싶다면:
+  //   const hides = window.__miniCalc.hidesFromHanJi('戌');  // ['戊 겁재','辛 식신','丁 편인'] 형태
+})();
+
+
 // === 大/世 셋터 (문자열 "丙戌"도 받고, 분리 인자도 받고, 객체도 받는 관용 API) ===
 // === 大/世 셋터 v4: "丙戌" 문자열/분리 인자/객체 모두 지원 + 십신/지장간 자동계산 ===
 (function exposeMiniSelAPIs_v4(){
