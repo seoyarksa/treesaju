@@ -5733,6 +5733,58 @@ console.log('[mini:init] selected=', window.selectedDaewoon, window.selectedSewo
 ['mini-daeyun-hides','mini-sewoon-hides'].forEach(id => console.log('[mini:cell]', id, !!document.getElementById(id)));
 
 
+// === [폴백] 대/세 셀에서 간/지 추출 → 지장간 칩 채우기 ===
+(function miniFillFromCellsWhenNoSelection(){
+  // 1) 간/지 한자 추출기
+  const STEM_RE   = /[甲乙丙丁戊己庚辛壬癸]/;
+  const BRANCH_RE = /[子丑寅卯辰巳午未申酉戌亥]/;
+
+  function extractGanJi(prefix){
+    const gtxt = document.getElementById(`${prefix}-gan`)?.textContent || "";
+    const jtxt = document.getElementById(`${prefix}-ji`)?.textContent  || "";
+    const gan  = (gtxt.match(STEM_RE)||[])[0] || "";
+    const ji   = (jtxt.match(BRANCH_RE)||[])[0] || "";
+    return { gan, ji };
+  }
+
+  // 2) 지장간 칩 생성(HanhiddenStemsMap 사용)
+  function makeHides(jiHan){
+    const map = window.HanhiddenStemsMap || {};
+    const arr = map[jiHan] || [];
+    if (!arr.length) return "-";
+    const getTenGod = window.getTenGod || null;
+    const dayKor    = window.dayGanKorGan || "";
+    const h2k       = window.convertHanToKorStem || (s=>s);
+    return arr.map(han=>{
+      const ten = (getTenGod && dayKor) ? (getTenGod(dayKor, h2k(han))||"") : "";
+      return `<span class="saju-chip">(${han}${ten ? " " + ten : ""})</span>`;
+    }).join("");
+  }
+
+  // 3) 적용
+  function apply(prefix, gan, ji){
+    // 간(+십신) 보정: 표에 이미 있으니 건드리지 않고, 지장간만 채움
+    const hEl = document.getElementById(`${prefix}-hides`);
+    if (!hEl) return;
+    hEl.innerHTML = ji ? makeHides(ji) : "-";
+  }
+
+  // 4) 선택값이 비어 있으면 셀에서 추출해서 채우기
+  const dSel = window.selectedDaewoon || {};
+  const sSel = window.selectedSewoon  || {};
+
+  if (!dSel.stem || !dSel.branch) {
+    const { gan, ji } = extractGanJi("mini-daeyun");
+    if (gan && ji) apply("mini-daeyun", gan, ji);
+  }
+  if (!sSel.stem || !sSel.branch) {
+    const { gan, ji } = extractGanJi("mini-sewoon");
+    if (gan && ji) apply("mini-sewoon", gan, ji);
+  }
+})();
+
+
+
 /* ===== 미니 大/世 출력 — 단일/최소 버전 ===== */
 (function miniApplyDaSe(){
   // 필요 자원 (이미 위에서 쓰는 걸 그대로 사용)
