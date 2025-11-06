@@ -5898,79 +5898,29 @@ window.addEventListener("beforeunload", () => {
     // SIGNED_OUT 때 구독 정리만 추가하면 좋아요.
 
     // ✅ 로그인 상태 변경 감시 (이중 새로고침 방지)
-    function beforeLoginSave() {
-  try {
-    // 🔸 현재 보고 있던 사주 데이터를 임시 저장
-    if (window.lastOutputData) {
-      sessionStorage.setItem("lastSajuFormKey", window.lastOutputData);
-      sessionStorage.setItem("lastSajuFormData", JSON.stringify(window.lastFormData || {}));
-      sessionStorage.setItem("lastSajuResult", JSON.stringify(window.lastSajuResult || {}));
-      console.log("💾 로그인 전 사주 상태 저장됨:", window.lastOutputData);
-    }
-  } catch (e) {
-    console.warn("[beforeLoginSave] error:", e);
-  }
-}
+    let __reloading = false;
+    window.supabaseClient.auth.onAuthStateChange((event, newSession) => {
+      console.log("[AuthStateChange]", event);
 
-function bindAuthPipelines() {
-  if (__AUTH_LISTENER_SET__) return;
-  __AUTH_LISTENER_SET__ = true;
-
-  window.supabaseClient.auth.onAuthStateChange(async (event, session) => {
-    try {
-      // ✅ 로그인 완료 직후 (새로고침 이후) 복원 처리
-      if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session?.user?.id) {
-        const userId = session.user.id;
-        const sessionId = session.access_token; // (표시용) 현재 기기 식별
-
-        // 🔹 1) 다른 기기 세션 종료
-        await window.supabaseClient.auth.signOut({ scope: "others" });
-
-        // 🔹 2) 현재 세션을 active_sessions에 기록
-        await postJSON("/api/update-session", { user_id: userId, session_id: sessionId });
-
-        // 🔹 3) 다른 기기에게 로그아웃 신호
-        window.supabaseClient
-          .channel(`user:${userId}`)
-          .send({ type: "broadcast", event: "force-logout", payload: { except: sessionId } });
-
-        // 🔹 4) 실시간 감시 시작
-        await initRealtimeWatcher();
-
-        // 🔹 5) UI 반영
-        updateAuthUI(session);
-
-        // ✅ 로그인 후 바로 직전 사주 복원
-        const savedKey = sessionStorage.getItem("lastSajuFormKey");
-        const savedData = sessionStorage.getItem("lastSajuFormData");
-        const savedResult = sessionStorage.getItem("lastSajuResult");
-        if (savedKey && savedData && savedResult) {
-          console.log("🔁 로그인 후 이전 사주 복원:", savedKey);
-          window.lastOutputData = savedKey;
-          const formData = JSON.parse(savedData);
-          const sajuData = JSON.parse(savedResult);
-          renderSaju(formData);
-
-          // 복원 후 클리어
-          sessionStorage.removeItem("lastSajuFormKey");
-          sessionStorage.removeItem("lastSajuFormData");
-          sessionStorage.removeItem("lastSajuResult");
-        }
-      }
-
-      // ✅ 로그아웃 처리
       if (event === "SIGNED_OUT") {
-        if (!__MANUAL_LOGOUT__) {
-          alert("다른 기기에서 로그인되어 로그아웃되었습니다.");
+        if (window.__profileCh) {
+          try { window.supabaseClient.removeChannel(window.__profileCh); } catch (_) {}
+          window.__profileCh = null;
         }
-        updateAuthUI(null);
       }
-    } catch (e) {
-      console.error("[auth pipeline error]", e);
-    }
-  });
-}
 
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+        if (!__reloading) {
+          __reloading = true;
+          if (window.location.hash) {
+            history.replaceState(null, "", window.location.pathname + window.location.search);
+          }
+          window.location.reload();
+        }
+        return;
+      }
+      updateAuthUI(newSession);
+    });
 
     // ✅ 사주 기록 클릭 → 입력폼 채워넣기 + 출력
     document.addEventListener("click", async (e) => {
@@ -6121,13 +6071,8 @@ async function postJSON(url, body, init = {}) {
   return { status: res.status, json, text };
 }
 
-
-
-
-
 /***** ✅ 버튼: 로그인 시도만 수행 *****/
 document.getElementById("loginBtn")?.addEventListener("click", async (e) => {
-    beforeLoginSave(); // 🔹 로그인 전 현재 사주 저장
   e.preventDefault();
   const email = document.getElementById("email")?.value?.trim();
   const password = document.getElementById("password")?.value ?? "";
@@ -6149,7 +6094,6 @@ document.getElementById("signupBtn")?.addEventListener("click", (e) => {
 });
 
 document.getElementById("googleLogin")?.addEventListener("click", async (e) => {
-    beforeLoginSave(); // 🔹 로그인 전 현재 사주 저장
   e.preventDefault();
   await window.supabaseClient.auth.signInWithOAuth({
     provider: "google",
@@ -6158,7 +6102,6 @@ document.getElementById("googleLogin")?.addEventListener("click", async (e) => {
 });
 
 document.getElementById("kakaoLogin")?.addEventListener("click", async (e) => {
-    beforeLoginSave(); // 🔹 로그인 전 현재 사주 저장
   e.preventDefault();
   await window.supabaseClient.auth.signInWithOAuth({
     provider: "kakao",
