@@ -6153,6 +6153,10 @@ function bindAuthPipelines() {
   if (__AUTH_LISTENER_SET__) return;
   __AUTH_LISTENER_SET__ = true;
 
+function bindAuthPipelines() {
+  if (__AUTH_LISTENER_SET__) return;
+  __AUTH_LISTENER_SET__ = true;
+
   window.supabaseClient.auth.onAuthStateChange(async (event, session) => {
     try {
       if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session?.user?.id) {
@@ -6176,55 +6180,65 @@ function bindAuthPipelines() {
         // 4) UI 반영
         updateAuthUI(session);
 
-        // ─────────────────────────────────────────────
-        // ✅ 추가된 부분: 로그인 시 “오늘 사주” 자동 출력
-        // ─────────────────────────────────────────────
-setTimeout(async () => {
-  try {
-    console.log("[AutoSaju] 로그인 감지 → 오늘 사주 자동 출력 시작");
+        // ────────────────────────────────
+        // ✅ 추가: 로그인 시 “오늘 사주” 자동 출력
+        // ────────────────────────────────
+        setTimeout(async () => {
+          try {
+            console.log("[AutoSaju] 로그인 감지 → 오늘 사주 자동 출력 시작");
 
-const now = new Date();
-const hours = now.getHours();
-const ampm = hours >= 12 ? "PM" : "AM";
-const twelveHour = hours % 12 || 12;
+            const now = new Date();
+            const hours = now.getHours();
+            const ampm = hours >= 12 ? "PM" : "AM";
+            const twelveHour = hours % 12 || 12;
 
-const payload = {
-  name: "오늘 기준",
-  birthDate: `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`,
-  calendarType: "solar",
-  gender: "male",
-  ampm,
-  hour: twelveHour.toString(),
-  minute: String(now.getMinutes()).padStart(2, "0"),
-};
+            // ✅ 필수 데이터 완비
+            const todayPayload = {
+              name: "오늘 기준",
+              birthDate: `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`,
+              calendarType: "solar",
+              gender: "male",
+              ampm,
+              hour: twelveHour.toString(),
+              minute: String(now.getMinutes()).padStart(2, "0"),
+            };
 
+            console.log("[AutoSaju] todayPayload:", todayPayload);
 
-    console.log("[AutoSaju] todayPayload:", todayPayload);
+            const res = await fetch("/api/saju", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(todayPayload),
+            });
 
-    const res = await fetch("/api/saju", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(todayPayload),
-    });
+            if (!res.ok) {
+              const text = await res.text();
+              console.error("[AutoSaju] Fetch 실패:", res.status, text);
+              return;
+            }
 
-    if (!res.ok) {
-      const text = await res.text();
-      console.error("[AutoSaju] Fetch 실패:", res.status, text);
-      return;
-    }
+            const todayData = await res.json();
+            console.log("[AutoSaju] todayData:", todayData);
 
-    const todayData = await res.json();
-    console.log("[AutoSaju] todayData:", todayData);
-
-    renderSaju(todayData); // ✅ 기존 사주 렌더러 호출 (renderTodaySajuBox 또는 renderSajuMini 등)
-  } catch (err) {
-    console.error("[AutoSaju] 예외 발생:", err);
-  }
-}, 1000);
-
- // 🔹 한 프레임 뒤 실행 (UI 업데이트 이후)
+            // ✅ 렌더링 함수는 상황에 맞게 자동 선택
+            if (typeof renderSaju === "function") {
+              renderSaju(todayData);
+            } else if (typeof renderSajuMiniFromCurrentOutput === "function") {
+              renderSajuMiniFromCurrentOutput(todayData);
+            } else if (typeof renderTodaySajuBox === "function") {
+              renderTodaySajuBox(todayData);
+            } else {
+              console.warn("[AutoSaju] 렌더 함수 없음 — 데이터만 준비됨");
+            }
+          } catch (err) {
+            console.error("[AutoSaju] 예외 발생:", err);
+          }
+        }, 1000); // 🔹 로그인 후 1초 뒤 실행 (UI 준비 시간 확보)
       }
 
+      // ────────────────────────────────
+      // 로그아웃 처리
+      // ────────────────────────────────
       if (event === "SIGNED_OUT") {
         if (!__MANUAL_LOGOUT__) {
           alert("다른 기기에서 로그인되어 로그아웃되었습니다.");
@@ -6236,6 +6250,7 @@ const payload = {
     }
   });
 }
+
 
 
 /***** ✅ 실시간 세션 변경 감시 (다른 기기 로그인 시 자동 로그아웃) *****/
