@@ -6183,21 +6183,21 @@ setTimeout(async () => {
   try {
     console.log("[AutoSaju] 로그인 감지 → 오늘 사주 자동 출력 시작");
 
-    const now = new Date();
-    const hours = now.getHours();
-    const ampm = hours >= 12 ? "PM" : "AM";
-    const twelveHour = hours % 12 || 12; // 0시는 12시로 변환
+const now = new Date();
+const hours = now.getHours();
+const ampm = hours >= 12 ? "PM" : "AM";
+const twelveHour = hours % 12 || 12;
 
-    // ✅ 서버와 동일한 필드 구조로 수정
-    const todayPayload = {
-      name: "오늘 기준",
-      birthDate: `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`,
-      calendarType: "solar",
-      gender: "male",
-      ampm,
-      hour: String(twelveHour),
-      minute: String(now.getMinutes()).padStart(2, "0"),
-    };
+const payload = {
+  name: "오늘 기준",
+  birthDate: `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`,
+  calendarType: "solar",
+  gender: "male",
+  ampm,
+  hour: twelveHour.toString(),
+  minute: String(now.getMinutes()).padStart(2, "0"),
+};
+
 
     console.log("[AutoSaju] todayPayload:", todayPayload);
 
