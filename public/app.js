@@ -6412,8 +6412,7 @@ try {
   } catch (err) {
     console.error("[init] fatal:", err);
   }
-    // 300ms 지연 후 복원 (DOM 완성 대기)
-  setTimeout(restoreSajuAfterReload, 300);
+
 });
 
 
