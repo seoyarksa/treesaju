@@ -5729,6 +5729,63 @@ body.innerHTML = `
   </table>
 `;
 
+// === [미니창 패치] 대운/세운도 사주와 동일 포맷으로 표시 ===
+// 미니창이 이미 들고 있는 계산기들을 그대로 공유
+window.__miniCalc = {
+  tenFromHan: (ganHan) => {
+    try {
+      return _getTenGod?.(dayGanKorGan || window.dayGanKorGan, _convertHanToKorStem?.(ganHan)) || '';
+    } catch { return ''; }
+  },
+  hidesFromHanJi: (jiHan) => {
+    try {
+      const map = window.jijiToSibganMap || {};
+      const raw = map[jiHan] || map[_convertHanToKorStem?.(jiHan) || ''] || [];
+      const arr = [];
+      for (const item of raw) {
+        const kor = (typeof item === 'string') ? item : (item.stem || item.kor || '');
+        const han = _convertKorToHanStem?.(kor) || kor || '';
+        const ten = _getTenGod?.(dayGanKorGan || window.dayGanKorGan, kor) || '';
+        const mid = (typeof item === 'object' && item.isMiddle) ? ' (중기)' : '';
+        arr.push(`${han} ${ten}${mid}`.trim());
+      }
+      return arr;
+    } catch { return []; }
+  }
+};
+
+// 문자열 "丙戌"도, 분리 인자(gan, ji)도 받도록 파서
+(function ensureMiniSetters(){
+  const STEMS = '甲乙丙丁戊己庚辛壬癸'.split('');
+  const BR    = '子丑寅卯辰巳午未申酉戌亥'.split('');
+  function parseGanJi(a,b){
+    if (b != null) return { gan: String(a||'').trim(), ji: String(b||'').trim() };
+    const s = String(a||'').trim();
+    const gan = STEMS.find(ch => s.includes(ch)) || '';
+    const ji  = BR.find(ch   => s.includes(ch)) || '';
+    return { gan, ji };
+  }
+  function apply(prefix, gan, ji){
+    const ten   = window.__miniCalc?.tenFromHan(gan) || '';
+    const hides = window.__miniCalc?.hidesFromHanJi(ji) || [];
+    const elG = document.getElementById(`${prefix}-gan`);
+    const elJ = document.getElementById(`${prefix}-ji`);
+    const elH = document.getElementById(`${prefix}-hides`);
+    if (elG) elG.innerHTML = `<strong>${gan || '-'}</strong>${ten ? ` <small>(${ten})</small>` : ''}`;
+    if (elJ) elJ.innerHTML = `<strong>${ji  || '-'}</strong>`;
+    if (elH) elH.innerHTML = hides.length ? hides.map(t=>`<span class="saju-chip">(${t})</span>`).join('') : '-';
+  }
+
+  window.sajuMini = window.sajuMini || {};
+  window.sajuMini.setDaeyun = (a,b) => {
+    const { gan, ji } = parseGanJi(a,b);
+    apply('mini-daeyun', gan, ji);
+  };
+  window.sajuMini.setSewoon = (a,b) => {
+    const { gan, ji } = parseGanJi(a,b);
+    apply('mini-sewoon', gan, ji);
+  };
+})();
 
 
   // 8) 제목 즉시/지연 갱신(자동입력 대응)
