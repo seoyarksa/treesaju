@@ -5567,6 +5567,7 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
   const setMiniTitle = (label = 'setMiniTitle') => {
     // id로 먼저 찾고, 없으면 .bar strong으로 폴백
     let titleEl = document.querySelector('#saju-mini #saju-mini-title')
+    || document.querySelector('#saju-mini .saju-mini__bar strong') // ← 이 줄 추가
                || document.querySelector('#saju-mini .bar strong');
     if (!titleEl) {
       console.warn(`[mini:title] ${label} → title 요소 없음`);
@@ -5781,6 +5782,10 @@ console.log('[mini:init] selected=', window.selectedDaewoon, window.selectedSewo
     const { gan, ji } = extractGanJi("mini-sewoon");
     if (gan && ji) apply("mini-sewoon", gan, ji);
   }
+  console.log('[mini:filled-from-cells]',
+  document.getElementById('mini-daeyun-hides')?.innerText,
+  document.getElementById('mini-sewoon-hides')?.innerText);
+
 })();
 
 
