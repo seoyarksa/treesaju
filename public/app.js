@@ -5494,19 +5494,21 @@ requestAnimationFrame(() => {
 
   // ✅ renderSaju 내부 (사주 출력 완료 직후)
 // ✅ 사주 출력이 끝나는 부분 (renderSaju 마지막 catch 위나 return 직전)
+// renderSaju 마지막 부분 어딘가(출력 끝났을 때)
 try {
   const formKey = `${year}-${month}-${day}-${hour}-${minute}-${calendarType}-${gender}`;
   const formData = { year, month, day, hour, minute, calendarType, gender };
-  const resultData = data; // 서버 응답 그대로 저장
 
-  sessionStorage.setItem("lastSajuFormKey", formKey);
-  sessionStorage.setItem("lastSajuFormData", JSON.stringify(formData));
-  sessionStorage.setItem("lastSajuResult", JSON.stringify(resultData));
+  // 새 탭도 복원되길 원하면 localStorage, 현재 탭만이면 sessionStorage
+localStorage.setItem("lastSajuFormKey", formKey);
+localStorage.setItem("lastSajuFormData", JSON.stringify(formData));
+localStorage.setItem("lastSajuResult", JSON.stringify(resultData));
 
-  console.log("💾 사주 상태 저장 완료:", formKey);
-} catch (err) {
-  console.warn("[Save Saju Error]", err);
+  console.log('💾 마지막 사주 저장:', formKey);
+} catch(e) {
+  console.warn('[save saju failed]', e);
 }
+
 
 
   // ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆// ⬆⬆⬆ 기존 로직 끝 ⬆⬆⬆
@@ -5516,28 +5518,43 @@ try {
   }
 
 
+
+  // 탭 복귀 시 흔히 붙여둔 재초기화/재요청 로직을 전부 무력화하는 가드
+(function guardFocusVisibilityReinit(){
+  // pageshow(bfcache)로 돌아와도 재초기화 금지
+  window.addEventListener('pageshow', (e) => {
+    // persisted=true면 bfcache 복귀 — 이미 화면/상태가 살아있으니 아무 것도 하지 않음
+    if (e.persisted) {
+      // no-op
+    }
+  });
+
+  // 보통 여기에 init이나 requestSubmit을 걸어두는데, 전부 무시
+  window.addEventListener('focus', () => {
+    // no-op: 탭 복귀 시 재실행 금지
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      // no-op: 탭이 다시 보일 때도 재실행 금지
+    }
+  });
+})();
+
+
 // ✅ 페이지 로드 시 직전 사주 자동 복원
 // ✅ 페이지 로드 시 직전 사주 자동 복원
-window.addEventListener("load", () => {
+// 새로고침/탭 복귀 시 자동 복원 (자동 제출 없이도 이전 결과로 고정)
+window.addEventListener('DOMContentLoaded', async () => {
   try {
-    const savedKey = sessionStorage.getItem("lastSajuFormKey");
-    const savedData = sessionStorage.getItem("lastSajuFormData");
-    const savedResult = sessionStorage.getItem("lastSajuResult");
-
-if (sessionStorage.getItem("__autoRestorePending")) {
-  console.log("🔁 로그인 후 복원 트리거 실행");
-  sessionStorage.removeItem("__autoRestorePending");
-}
-
-    if (savedKey && savedData) {
-      console.log("🔁 새로고침 후 이전 사주 자동 복원:", savedKey);
+    const savedData = localStorage.getItem('lastSajuFormData');
+    if (savedData && !sessionStorage.getItem('__RESTORE_DONE__')) {
       const formData = JSON.parse(savedData);
-      renderSaju(formData);
-    } else {
-      console.log("ℹ️ 이전 사주 데이터 없음 — 기본 상태로 시작");
+      await renderSaju(formData);
+      sessionStorage.setItem('__RESTORE_DONE__', '1'); // 같은 세션 중복 복원 방지
     }
   } catch (e) {
-    console.warn("[Auto Restore Error]", e);
+    console.warn('[auto restore error]', e);
   }
 });
 
@@ -5805,16 +5822,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // 🔻 ① 여기에 자동 복원 코드 넣기
   try {
-    const savedKey = sessionStorage.getItem("lastSajuFormKey");
-    const savedData = sessionStorage.getItem("lastSajuFormData");
-    const savedResult = sessionStorage.getItem("lastSajuResult");
+   const savedKey = localStorage.getItem("lastSajuFormKey");
+   const savedData = localStorage.getItem("lastSajuFormData");
+   const savedResult = localStorage.getItem("lastSajuResult");
 
-    if (savedKey && savedData && savedResult) {
+    if (!sessionStorage.getItem("__RESTORE_DONE__") && savedKey && savedData) {
       console.log("🔁 새로고침 후 이전 사주 자동 복원:", savedKey);
       const formData = JSON.parse(savedData);
 
       // ⚠️ renderSaju가 formData 하나만 받는 구조면 이 줄로 충분
       await renderSaju(formData);
+       sessionStorage.setItem("__RESTORE_DONE__", "1"); // 같은 세션에서 중복 복원 방지
 
       // 만약 renderSaju가 2개 인자를 받는 구조면:
       // await renderSaju(formData, JSON.parse(savedResult));
@@ -5979,16 +5997,25 @@ window.addEventListener("beforeunload", () => {
         }
       }
 
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
-        if (!__reloading) {
-          __reloading = true;
-          if (window.location.hash) {
-            history.replaceState(null, "", window.location.pathname + window.location.search);
-          }
-          window.location.reload();
-        }
-        return;
-      }
+     // 🔒 새로고침은 '진짜로 필요할 때만'
+     if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+       // 1) 직전 사주가 저장돼 있으면 굳이 리로드 불필요 → 스킵
+       const hasSaved = !!localStorage.getItem("lastSajuFormData");
+       // 2) 탭이 백그라운드였다가 포그라운드로 올 때 오는 케이스도 스킵
+       const notVisible = document.visibilityState !== "visible";
+       if (hasSaved || notVisible) {
+        updateAuthUI(newSession);
+         return;
+       }
+       if (!__reloading) {
+         __reloading = true;
+         if (window.location.hash) {
+           history.replaceState(null, "", window.location.pathname + window.location.search);
+         }
+         window.location.reload();
+       }
+       return;
+     }
       updateAuthUI(newSession);
     });
 
