@@ -5656,30 +5656,34 @@ box.innerHTML = `
     }
   }
 
-  // 7) 본문 표 렌더
-  // 7) 본문 표 렌더 (+ 대운/세운 칸)
+ // 7) 본문 표 렌더 (+ 대운/세운을 사주칸과 같은 형식으로)
 const body = box.querySelector('#saju-mini-body');
 const C = (txt) => (typeof _colorize === 'function' ? _colorize(txt) : (txt ?? ''));
+
 const coerceCol = (p) => (!p || typeof p !== 'object')
-  ? { gan:'-', ten:'-', jiji:'-', hides:[] }
-  : { gan: p.gan ?? '-', ten: p.ten ?? '-', jiji: p.jiji ?? '-', hides: Array.isArray(p.hides) ? p.hides : [] };
+  ? { gan:'-', ten:'', jiji:'-', hides:[] }
+  : { gan: p.gan ?? '-', ten: p.ten ?? '', jiji: p.jiji ?? '-', hides: Array.isArray(p.hides) ? p.hides : [] };
 
 const pillars = [data.hour, data.day, data.month, data.year].map(coerceCol);
 
-// ── 저장된 대운/세운 불러오기(없으면 '-') ──
-const MINI_DAEYUN_KEY = 'sajuMiniSelDaeyun';
-const MINI_SEWOON_KEY = 'sajuMiniSelSewoon';
+// 저장된 大/世 객체 {gan, ji, ten} (연도 같은 건 저장하지 않음)
+const MINI_DAEYUN_KEY = 'sajuMiniSelDaeyun_v2';
+const MINI_SEWOON_KEY = 'sajuMiniSelSewoon_v2';
 function __miniLoadSel(key){
   try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch { return {}; }
 }
-const selD = __miniLoadSel(MINI_DAEYUN_KEY); // { main, sub }
-const selS = __miniLoadSel(MINI_SEWOON_KEY); // { main, sub }
+const D = __miniLoadSel(MINI_DAEYUN_KEY);
+const S = __miniLoadSel(MINI_SEWOON_KEY);
 
-// 안전 기본값
-const D = { main: selD?.main || '-', sub: selD?.sub || '' };
-const S = { main: selS?.main || '-', sub: selS?.sub || '' };
+const Dgan = D?.gan || '-';
+const Dten = D?.ten ? ` <small>(${C(D.ten)})</small>` : '';
+const Dji  = D?.ji  || '-';
 
-// ── 표 렌더 ──
+const Sgan = S?.gan || '-';
+const Sten = S?.ten ? ` <small>(${C(S.ten)})</small>` : '';
+const Sji  = S?.ji  || '-';
+
+// 렌더
 body.innerHTML = `
   <table class="mini-grid">
     <thead>
@@ -5694,23 +5698,24 @@ body.innerHTML = `
     </thead>
     <tbody>
       <tr>
-        ${pillars.map(p => `<td><strong>${C(p.gan)}</strong> <small>(${C(p.ten)})</small></td>`).join('')}
-        <td id="mini-daeyun-r1"><strong>${D.main}</strong></td>
-        <td id="mini-sewoon-r1"><strong>${S.main}</strong></td>
+        ${pillars.map(p => `<td><strong>${C(p.gan)}</strong>${p.ten ? ` <small>(${C(p.ten)})</small>` : ''}</td>`).join('')}
+        <td id="mini-daeyun-gan"><strong>${C(Dgan)}</strong>${Dten}</td>
+        <td id="mini-sewoon-gan"><strong>${C(Sgan)}</strong>${Sten}</td>
       </tr>
       <tr>
         ${pillars.map(p => `<td><strong>${C(p.jiji)}</strong></td>`).join('')}
-        <td id="mini-daeyun-r2">${D.sub ? `<small>${D.sub}</small>` : '-'}</td>
-        <td id="mini-sewoon-r2">${S.sub ? `<small>${S.sub}</small>` : '-'}</td>
+        <td id="mini-daeyun-ji"><strong>${C(Dji)}</strong></td>
+        <td id="mini-sewoon-ji"><strong>${C(Sji)}</strong></td>
       </tr>
       <tr>
         ${pillars.map(p => `<td>${p.hides.length ? p.hides.map(h => `<span class="saju-chip">(${h})</span>`).join('') : '-'}</td>`).join('')}
-        <td id="mini-daeyun-r3">-</td>
-        <td id="mini-sewoon-r3">-</td>
+        <td id="mini-daeyun-hides">-</td>
+        <td id="mini-sewoon-hides">-</td>
       </tr>
     </tbody>
   </table>
 `;
+
 
 
   // 8) 제목 즉시/지연 갱신(자동입력 대응)
@@ -5722,34 +5727,50 @@ body.innerHTML = `
 
 
 // 대운/세운 미니창 셋터 (아주 단순)
-(function exposeMiniSelAPIs(){
-  const MINI_DAEYUN_KEY = 'sajuMiniSelDaeyun';
-  const MINI_SEWOON_KEY = 'sajuMiniSelSewoon';
-  function save(key, v){ try{ localStorage.setItem(key, JSON.stringify(v)); }catch{} }
-  function setCell(id, html){ const el = document.getElementById(id); if (el) el.innerHTML = html; }
+// 대/세 셋터 (간/지/십신만 저장·반영) — 어디서든 1회만 선언
+(function exposeMiniSelAPIs_v2(){
+  const MINI_DAEYUN_KEY = 'sajuMiniSelDaeyun_v2';
+  const MINI_SEWOON_KEY = 'sajuMiniSelSewoon_v2';
+  const save = (k,v)=>{ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} };
+  const setHTML = (id, html)=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; };
 
   window.sajuMini = window.sajuMini || {};
 
-  // setDaeyun(main, sub?)
-  window.sajuMini.setDaeyun = (main, sub='')=>{
-    main = String(main||'').trim(); sub = String(sub||'').trim();
-    const v = { main: main || '-', sub: sub || '' };
+  // 사용법: setDaeyun('丙','戌','정인') 또는 setDaeyun({gan:'丙', ji:'戌', ten:'정인'})
+  window.sajuMini.setDaeyun = (ganOrObj, ji, ten='')=>{
+    let gan;
+    if (typeof ganOrObj === 'object') ({ gan, ji, ten = '' } = ganOrObj || {});
+    else gan = ganOrObj;
+
+    gan = String(gan||'').trim();
+    ji  = String(ji ||'').trim();
+    ten = String(ten||'').trim();
+
+    const v = { gan: gan || '-', ji: ji || '-', ten: ten || '' };
     save(MINI_DAEYUN_KEY, v);
-    // 즉시 반영(미니창 열려 있으면)
-    setCell('mini-daeyun-r1', `<strong>${v.main}</strong>`);
-    setCell('mini-daeyun-r2', v.sub ? `<small>${v.sub}</small>` : '-');
+
+    setHTML('mini-daeyun-gan', `<strong>${gan || '-'}</strong>${ten ? ` <small>(${ten})</small>` : ''}`);
+    setHTML('mini-daeyun-ji',  `<strong>${ji  || '-'}</strong>`);
   };
 
-  // setSewoon(main, sub?)
-  window.sajuMini.setSewoon = (main, sub='')=>{
-    main = String(main||'').trim(); sub = String(sub||'').trim();
-    const v = { main: main || '-', sub: sub || '' };
+  // 사용법: setSewoon('乙','巳','편관') 또는 setSewoon({gan:'乙', ji:'巳', ten:'편관'})
+  window.sajuMini.setSewoon = (ganOrObj, ji, ten='')=>{
+    let gan;
+    if (typeof ganOrObj === 'object') ({ gan, ji, ten = '' } = ganOrObj || {});
+    else gan = ganOrObj;
+
+    gan = String(gan||'').trim();
+    ji  = String(ji ||'').trim();
+    ten = String(ten||'').trim();
+
+    const v = { gan: gan || '-', ji: ji || '-', ten: ten || '' };
     save(MINI_SEWOON_KEY, v);
-    // 즉시 반영
-    setCell('mini-sewoon-r1', `<strong>${v.main}</strong>`);
-    setCell('mini-sewoon-r2', v.sub ? `<small>${v.sub}</small>` : '-');
+
+    setHTML('mini-sewoon-gan', `<strong>${gan || '-'}</strong>${ten ? ` <small>(${ten})</small>` : ''}`);
+    setHTML('mini-sewoon-ji',  `<strong>${ji  || '-'}</strong>`);
   };
 })();
+
 
 
 
