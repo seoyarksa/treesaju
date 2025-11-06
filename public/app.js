@@ -5949,7 +5949,7 @@ function bindAuthPipelines() {
           window.lastOutputData = savedKey;
           const formData = JSON.parse(savedData);
           const sajuData = JSON.parse(savedResult);
-          renderSaju(formData, sajuData);
+          renderSaju(formData);
 
           // 복원 후 클리어
           sessionStorage.removeItem("lastSajuFormKey");
