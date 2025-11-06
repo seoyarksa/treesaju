@@ -5897,6 +5897,155 @@ function renderSajuMiniFromCurrentOutput(ctx = {}) {
 })();
 
 
+// 0) CSS: 드래그 표시/선택 방지
+(function injectMiniSajuDragCSS(){
+  if (document.getElementById('mini-saju-drag-style')) return;
+  const s = document.createElement('style');
+  s.id = 'mini-saju-drag-style';
+  s.textContent = `
+    #saju-mini .bar { cursor: grab; }
+    #saju-mini.is-dragging, #saju-mini.is-dragging * { cursor: grabbing !important; user-select: none; }
+  `;
+  document.head.appendChild(s);
+})();
+
+// 1) 위치 저장/복원 유틸
+const MINI_POS_KEY = 'sajuMiniPos';
+const MINI_MIN_KEY = 'sajuMiniMinimized';
+
+function __miniLoadPos() {
+  try {
+    const raw = localStorage.getItem(MINI_POS_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (typeof obj?.left === 'number' && typeof obj?.top === 'number') return obj;
+  } catch {}
+  return null;
+}
+
+function __miniSavePos(left, top) {
+  try { localStorage.setItem(MINI_POS_KEY, JSON.stringify({ left, top })); } catch {}
+}
+
+function __miniApplyPos(box, left, top) {
+  // fixed 기준 좌상단 배치로 전환
+  box.style.left = `${left}px`;
+  box.style.top  = `${top}px`;
+  box.style.right = 'auto';
+  box.style.bottom = 'auto';
+}
+
+function __miniClampToViewport(left, top, box) {
+  const pad = 8;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const rect = box.getBoundingClientRect();
+  const w = rect.width || 300;
+  const h = rect.height || 220;
+  const clampedLeft = Math.min(Math.max(left, pad), Math.max(vw - w - pad, pad));
+  const clampedTop  = Math.min(Math.max(top,  pad), Math.max(vh - h - pad, pad));
+  return { left: clampedLeft, top: clampedTop };
+}
+
+// 2) 드래그 바인딩
+function __miniMakeDraggable(box) {
+  const handle = box.querySelector('.bar');
+  if (!handle) return;
+
+  let startX = 0, startY = 0, baseLeft = 0, baseTop = 0;
+
+  const onPointerMove = (e) => {
+    if (!box.classList.contains('is-dragging')) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    let left = baseLeft + dx;
+    let top  = baseTop + dy;
+    ({ left, top } = __miniClampToViewport(left, top, box));
+    __miniApplyPos(box, left, top);
+  };
+
+  const onPointerUp = (e) => {
+    if (!box.classList.contains('is-dragging')) return;
+    box.classList.remove('is-dragging');
+    document.removeEventListener('pointermove', onPointerMove);
+    document.removeEventListener('pointerup', onPointerUp);
+
+    const rect = box.getBoundingClientRect();
+    __miniSavePos(rect.left, rect.top);
+  };
+
+  handle.addEventListener('pointerdown', (e) => {
+    // 텍스트 드래그/더블클릭 등 방지
+    e.preventDefault();
+
+    // 현재 위치 기준 계산(기본 우하단 고정 상태일 수도 있으므로 좌표 환산)
+    const rect = box.getBoundingClientRect();
+    startX = e.clientX;
+    startY = e.clientY;
+    baseLeft = rect.left;
+    baseTop  = rect.top;
+
+    // 드래그 모드 진입 + 좌상단 고정 모드로 전환
+    box.classList.add('is-dragging');
+    __miniApplyPos(box, baseLeft, baseTop);
+
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
+  }, { passive: false });
+
+  // 화면 크기 변할 때 화면 바깥으로 나가지 않도록 스냅
+  window.addEventListener('resize', () => {
+    const pos = __miniLoadPos();
+    if (!pos) return;
+    let { left, top } = __miniClampToViewport(pos.left, pos.top, box);
+    __miniApplyPos(box, left, top);
+    __miniSavePos(left, top);
+  });
+}
+
+// 3) 최소화 상태 저장/복원
+function __miniRestoreMinimized(box) {
+  const v = localStorage.getItem(MINI_MIN_KEY);
+  if (v === '1') box.classList.add('is-min');
+}
+function __miniWireMinimizePersist(box) {
+  const btn = box.querySelector('#saju-mini-min');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const minimized = box.classList.toggle('is-min');
+    try { localStorage.setItem(MINI_MIN_KEY, minimized ? '1' : '0'); } catch {}
+  });
+}
+
+// 4) 렌더 직후 한 번만 호출 (네 renderSajuMiniFromCurrentOutput 내부 “박스 생성” 이후 위치에 추가)
+(function initMiniSajuPositioning(){
+  const box = document.getElementById('saju-mini');
+  if (!box) return;
+
+  // 기존 ‘닫기’ 버튼 유지: 위치는 localStorage에 남아 다시 열면 복원됨
+  __miniMakeDraggable(box);
+  __miniWireMinimizePersist(box);
+  __miniRestoreMinimized(box);
+
+  // 최초 복원: 저장된 위치가 있으면 적용, 없으면 기존 우하단(16,16) 유지
+  const pos = __miniLoadPos();
+  if (pos) {
+    let { left, top } = __miniClampToViewport(pos.left, pos.top, box);
+    __miniApplyPos(box, left, top);
+  } else {
+    // 없으면 현재 우하단 배치를 좌표로 환산해서 첫 저장(옵션)
+    const r = box.getBoundingClientRect();
+    __miniSavePos(r.left, r.top);
+  }
+})();
+
+
+
+
+
+
+
+
 
 // renderUserProfile 정의는 그대로 유지 (드롭인 교체)
 async function renderUserProfile() {
