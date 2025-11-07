@@ -424,25 +424,25 @@ async function chargeBilling(req, res) {
     const windowUtc = new Date(nowUtc.getTime() + 24 * 60 * 60 * 1000);
 
     // ---- 후보 1차 조회: 진행중 + 해지예약 아님 + (만료/효력 예정 시각이 24h 내) ----
-    //  * Supabase where절에서 COALESCE를 쓰기 어렵기 때문에 cancel_effective_at / current_period_end 각각 조건으로 or 처리
+    const baseSelect =
+      'id, user_id, plan, status, provider, cancel_at_period_end, cancel_effective_at, current_period_end, renew_attempt_date, renew_attempt_count_today, metadata';
+
     const { data: rows1, error: e1 } = await supabase
       .from('memberships')
-      .select('id, user_id, plan, status, provider, cancel_at_period_end, cancel_effective_at, current_period_end, renew_attempt_date, renew_attempt_count_today, metadata')
+      .select(baseSelect)
       .in('status', ['active', 'past_due'])
       .eq('cancel_at_period_end', false)
       .lte('current_period_end', windowUtc.toISOString())
       .gt('current_period_end', nowUtc.toISOString());
-
     if (e1) throw e1;
 
     const { data: rows2, error: e2 } = await supabase
       .from('memberships')
-      .select('id, user_id, plan, status, provider, cancel_at_period_end, cancel_effective_at, current_period_end, renew_attempt_date, renew_attempt_count_today, metadata')
+      .select(baseSelect)
       .in('status', ['active', 'past_due'])
       .eq('cancel_at_period_end', false)
       .lte('cancel_effective_at', windowUtc.toISOString())
       .gt('cancel_effective_at', nowUtc.toISOString());
-
     if (e2) throw e2;
 
     // 병합(중복 제거)
@@ -450,21 +450,20 @@ async function chargeBilling(req, res) {
     [...(rows1 || []), ...(rows2 || [])].forEach(r => map.set(r.id, r));
     let candidates = [...map.values()];
 
-    // ---- 2차 필터: 정기만(customer_uid 존재) + fixed 제외 + 오늘 회차 제한 만족 ----
+    // ---- 2차 필터: 정기만(customer_uid 존재) + fixed 제외 + (회차 제한; 남겨도 무방) ----
     const todayKst = todayKstDateStr(); // 'YYYY-MM-DD'
     candidates = candidates.filter(m => {
       const meta = parseMeta(m.metadata);
-      const kind = (meta?.kind || '').toLowerCase();       // 'fixed' / 'recurring' 등
+      const kind = (meta?.kind || '').toLowerCase();
       const customer_uid = meta?.customer_uid;
-      if (!customer_uid) return false;                      // 빌링키 없으면 탈락(정기 아님)
-      if (kind === 'fixed') return false;                   // 선결제 제외
-      // 오늘 회차 제한: 오늘이면 count < attempt, 아니면 0으로 간주
+      if (!customer_uid) return false;
+      if (kind === 'fixed') return false;
+      // 오늘 회차 제한(정책상 즉시 inactive로 바꾸더라도 남겨둬도 안전)
       const isToday = m.renew_attempt_date && String(m.renew_attempt_date).startsWith(todayKst);
       const cnt = isToday ? (m.renew_attempt_count_today || 0) : 0;
       return cnt < attempt;
     });
 
-    // 후보 없으면 종료
     if (!candidates.length) {
       return res.status(200).json({ ok: true, message: '대상 없음', count: 0 });
     }
@@ -482,7 +481,7 @@ async function chargeBilling(req, res) {
     const access_token = tokenJson?.response?.access_token;
     if (!access_token) throw new Error('IAMPORT_TOKEN_FAIL');
 
-    // ---- 가격 테이블 (정책에 맞게 필요 시 조정) ----
+    // ---- 가격 테이블 ----
     const PRICE = { premium: 11000, premium_plus: 16500 };
 
     let charged = 0, failed = 0;
@@ -492,11 +491,9 @@ async function chargeBilling(req, res) {
     for (const m of candidates) {
       const meta = parseMeta(m.metadata);
       const customer_uid = meta?.customer_uid;
-      const price = PRICE[m.plan] || PRICE['premium']; // plan 별 금액 추정 (없으면 기본)
-
+      const price = PRICE[m.plan] || PRICE.premium;
       const merchant_uid = buildRenewMerchantUid(customer_uid, attempt);
 
-      // again 호출
       let paid = null, paidVerify = null, payOk = false, payMsg = '';
       try {
         const r = await fetch('https://api.iamport.kr/subscribe/payments/again', {
@@ -512,7 +509,6 @@ async function chargeBilling(req, res) {
         const j = await r.json();
         if (j.code === 0) {
           paid = j.response;
-          // 결제 검증
           const rv = await fetch(`https://api.iamport.kr/payments/${paid.imp_uid}`, {
             headers: { 'Authorization': access_token },
           });
@@ -528,21 +524,21 @@ async function chargeBilling(req, res) {
       }
 
       if (payOk) {
+        // === SUCCESS: 기간 +1개월, active 유지 (등급/프로필 변경 금지) ===
         charged++;
-        // 성공: +1개월, 카운터 리셋, 상태 active 유지
+
         const base = new Date(m.cancel_effective_at ?? m.current_period_end ?? nowIso);
         const baseLater = base > new Date() ? base : new Date();
         const nextEnd = new Date(baseLater);
         nextEnd.setMonth(nextEnd.getMonth() + 1);
 
-        // 메타 기록 확장(선택)
         const newMeta = {
           ...(meta || {}),
           provider: m.provider || 'kakao',
           last_purchase: {
             kind: 'recurring_renew',
             imp_uid: paid?.imp_uid,
-            merchant_uid: merchant_uid,
+            merchant_uid,
             amount: paid?.amount,
             at: nowIso,
             pay_method: paidVerify?.pay_method || 'billing_key',
@@ -555,7 +551,7 @@ async function chargeBilling(req, res) {
             {
               kind: 'recurring_renew',
               imp_uid: paid?.imp_uid,
-              merchant_uid: merchant_uid,
+              merchant_uid,
               amount: paid?.amount,
               at: nowIso,
               pay_method: paidVerify?.pay_method || 'billing_key',
@@ -573,40 +569,35 @@ async function chargeBilling(req, res) {
             cancel_at_period_end: false,
             cancel_effective_at: null,
             current_period_end: nextEnd.toISOString(),
-            renew_attempt_date: todayKstDateStr(),       // 'YYYY-MM-DD'
-            renew_attempt_count_today: 0,
+            // 시도 카운터는 정책상 불필요 → 갱신하지 않음
             metadata: toJSONSafe(newMeta),
             updated_at: nowIso,
           })
           .eq('id', m.id);
 
+        console.log('[chargeBilling] SUCCESS -> extend & active', {
+          id: m.id, user_id: m.user_id, merchant_uid, next_end: nextEnd.toISOString()
+        });
+
       } else {
+        // === FAIL: 기간 그대로, inactive 로만 전환 (등급/프로필 변경 금지) ===
         failed++;
-// 실패: 오늘 카운트 +1, 상태 past_due (절대 inactive로 만들지 말 것!)
-const isToday = m.renew_attempt_date && String(m.renew_attempt_date).startsWith(todayKst);
-const curCount = isToday ? (m.renew_attempt_count_today || 0) : 0;
 
-await supabase
-  .from('memberships')
-  .update({
-    status: 'past_due',                  // ← 여기! inactive 금지
-    renew_attempt_date: todayKstDateStr(),
-    renew_attempt_count_today: curCount + 1,
-    updated_at: nowIso,
-  })
-  .eq('id', m.id);
+        await supabase
+          .from('memberships')
+          .update({
+            status: 'inactive',
+            // current_period_end 변경 없음
+            // cancel 관련 플래그는 정책대로 그대로 둠 (여기서는 미변경)
+            updated_at: nowIso,
+          })
+          .eq('id', m.id);
 
+        console.log('[chargeBilling] FAIL -> inactive', {
+          id: m.id, user_id: m.user_id, merchant_uid, payMsg
+        });
       }
     }
-
-    if (payOk) {
-  console.log('[chargeBilling] PAID', { id: m.id, user_id: m.user_id, merchant_uid });
-  // ...성공 처리
-} else {
-  console.log('[chargeBilling] FAIL->PAST_DUE', { id: m.id, user_id: m.user_id, merchant_uid, payMsg });
-  // ...실패 처리
-}
-
 
     return res.status(200).json({
       ok: true,
@@ -621,6 +612,7 @@ await supabase
     return res.status(500).json({ error: err.message || 'INTERNAL_ERROR' });
   }
 }
+
 
 
 // ✅ 아임포트 자동 결제 API
