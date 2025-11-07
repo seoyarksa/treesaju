@@ -43,24 +43,24 @@ function buildRenewMerchantUid(customer_uid, attempt) {
 
 
 
-const HANDLER_VERSION = 'manage-subscription#2025-11-07-10:xx'; // << 임의로 오늘 시각 넣기
+// 파일 맨 위 근처
+const HANDLER_VERSION = 'manage-subscription#2025-11-07-11:xx KST';
 
 export default async function handler(req, res) {
   const rawAction = (req.query?.action ?? '').toString();
   const action = rawAction.toLowerCase().replace(/-/g, '_').trim();
-  console.log('[manage-subscription] v=%s method=%s action=%s url=%s',
-    HANDLER_VERSION, req.method, action, req.url);
 
-  // 헬스체크(명시 버전/파일 확인)
+  res.setHeader('Cache-Control', 'no-store');
+
+  // ✅ health
   if ((req.method === 'GET' || req.method === 'POST') && action === 'health') {
     return res.status(200).json({
       ok: true,
       version: HANDLER_VERSION,
-      node: process.version,
-      file: 'api/payment/manage-subscription.js'
+      file: 'api/payment/manage-subscription.js',
+      node: process.version
     });
   }
-
   // ✅ 즉시 전환(선결제 → 정기)
   if (req.method === "POST" && action === "switch_from_fixed_to_recurring") {
     return await switchFromFixedToRecurring(req, res);
