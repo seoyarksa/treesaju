@@ -1,17 +1,14 @@
 {
   "functions": {
-    "api/**/*.js": {
-      "runtime": "@vercel/node@2.0.0"
-    }
+    "api/**/*.js": { "runtime": "@vercel/node@2.0.0" }
   },
-
   "crons": [
-    { "path": "/api/payment/manage-subscription?action=charge&attempt=1", "schedule": "0 0 * * *" }, 
-    { "path": "/api/payment/manage-subscription?action=charge&attempt=2", "schedule": "0 1 * * *" },  
-    { "path": "/api/payment/manage-subscription?action=charge&attempt=3", "schedule": "0 2 * * *" },  
-    { "path": "/api/payment/manage-subscription?action=autoCancel",       "schedule": "5 3 * * *" }   
+    {
+      "path": "/api/payment/manage-subscription?action=scheduler",
+      "schedule": "0 0 * * *"
+    }
   ],
-    "headers": [
+  "headers": [
     {
       "source": "/legal/(.*)",
       "headers": [
@@ -20,3 +17,5 @@
     }
   ]
 }
+
+

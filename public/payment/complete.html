@@ -1,3 +1,4 @@
+<!--m_redirect_url   /public/payment/complete.html-->
 <!doctype html>
 <html lang="ko">
 <head>
@@ -14,68 +15,122 @@
   <h1>결제 처리</h1>
   <p id="msg">결제 결과 확인 중입니다…</p>
 
-  <script>
-  (async function () {
-    const msg = document.getElementById('msg');
-    const q = new URLSearchParams(location.search);
+<script>
+(async function () {
+  const msg = document.getElementById('msg');
+  const q = new URLSearchParams(location.search);
 
-    // PortOne가 붙여주는 기본 파라미터
-    const imp_uid = q.get('imp_uid');
-    const merchant_uid = q.get('merchant_uid');
-    const success = q.get('imp_success') ?? q.get('success');
+  // PortOne가 붙여주는 기본 파라미터
+  const imp_uid      = q.get('imp_uid');
+  const merchant_uid = q.get('merchant_uid'); // 없을 수도 있음
+  const success      = q.get('imp_success') ?? q.get('success');
 
-    // 우리가 m_redirect_url에 붙여줄 힌트(선택)
-    const provider = q.get('provider');     // 'kakaopay' 등
-    const kind = q.get('kind');             // 'recurring_start' | 'fixed'
-    const tier = q.get('tier');
-    const customer_uid = q.get('customer_uid');
-    const months = q.get('months');
-    const productId = q.get('productId');
+  // 우리가 m_redirect_url에 붙여줄 힌트(선택)
+  const provider     = (q.get('provider') || '').toLowerCase(); // 'kakaopay' 등
+  const kind         = (q.get('kind') || '').toLowerCase();     // 'recurring_start' | 'fixed'
+  const tier         = q.get('tier');                           // 'premium' | 'premium_plus'
+  const customer_uid = q.get('customer_uid');                   // 정기등록 시 필수
+  const monthsParam  = q.get('months');                         // '3' | '6' (선결제)
+  const productId    = q.get('productId');
 
-    if (!imp_uid && !merchant_uid) {
-      msg.className = 'err';
-      msg.textContent = '잘못된 접근: 결제 식별자가 없습니다.';
-      return;
-    }
+  if (!imp_uid && !merchant_uid) {
+    msg.className = 'err';
+    msg.textContent = '잘못된 접근: 결제 식별자가 없습니다.';
+    return;
+  }
 
+  // 가격 표 (프론트에서 확정값 보내서 서버 MISSING_PARAMS 방지)
+  const PRICE = { premium: 11000, premium_plus: 16500, premium3: 29900, premium6: 54900 };
+  const toPlanName = (m) => (Number(m) === 6 ? 'premium6' : 'premium3');
+
+  // 사용자 ID 가져오기 (Supabase 세션 사용)
+  async function getUserId() {
     try {
-      let endpoint = '/api/payment/manage-subscription?action=auto_verify';
-      const payload = { imp_uid, merchant_uid, customer_uid, success, tier };
-
-      if (provider === 'kakaopay' && kind === 'recurring_start') {
-        endpoint = '/api/payment/manage-subscription?action=register';
-      } else if (provider === 'kakaopay' && kind === 'fixed') {
-        endpoint = '/api/payment/fixed-activate';
-        payload.termMonths = Number(months || 0);
-        if (productId) payload.productId = productId;
+      // 프로젝트에서 이미 쓰는 전역 supabase 클라이언트가 있다면 활용
+      const supa = window.supabaseClient || window.supabase;
+      if (supa?.auth?.getUser) {
+        const { data } = await supa.auth.getUser();
+        return data?.user?.id || null;
       }
-      // 이니시스 등 기타는 auto_verify로 서버가 알아서 확정
+    } catch {}
+    // 백업: 서버 세션 API가 있다면 교체
+    // const r = await fetch('/api/me'); const j = await r.json(); return j?.user?.id || null;
+    return null;
+  }
 
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify(payload),
-        credentials: 'include'
-      });
-      const data = await res.json().catch(() => ({}));
+  try {
+    const user_id = await getUserId();
 
-      if (res.ok) {
-        msg.className = 'ok';
-        msg.textContent = '✅ 결제가 완료되었습니다. 구독이 갱신되었어요!';
-        setTimeout(() => {
-          try { window.opener?.location?.reload(); } catch {}
-          location.replace('/');
-        }, 800);
-      } else {
-        msg.className = 'err';
-        msg.textContent = '❌ 결제 확인 실패: ' + (data.error || res.status);
+    let endpoint = '/api/payment/manage-subscription?action=auto_verify';
+    let payload  = { imp_uid, merchant_uid, success }; // 공통 (서버가 무시해도 무방)
+
+    if (provider === 'kakaopay' && kind === 'recurring_start') {
+      // ✅ 정기등록: 서버 요구사항 → imp_uid, customer_uid, user_id, tier
+      if (!customer_uid) throw new Error('customer_uid 가 없습니다.');
+      if (!user_id) throw new Error('로그인이 필요합니다.');
+
+      endpoint = '/api/payment/manage-subscription?action=register';
+      payload  = {
+        imp_uid,
+        customer_uid,
+        user_id,
+        tier: (tier === 'premium_plus' ? 'premium_plus' : 'premium') // 안전 변환
+      };
+
+    } else if (provider === 'kakaopay' && kind === 'fixed') {
+      // ✅ 선결제 활성: 서버 요구사항 → imp_uid, merchant_uid, user_id, termMonths, price, (productId?)
+      const termMonths = Number(monthsParam || 0);
+      if (!termMonths || (termMonths !== 3 && termMonths !== 6)) {
+        throw new Error('months 파라미터가 올바르지 않습니다(3 또는 6).');
       }
-    } catch (e) {
-      msg.className = 'err';
-      msg.textContent = '❌ 서버 통신 오류: ' + (e && e.message ? e.message : e);
+      if (!user_id) throw new Error('로그인이 필요합니다.');
+
+      // 경로 오타 수정 ✅
+      endpoint = '/api/payment/manage-subscription?action=activate_fixed';
+
+      const planName = toPlanName(termMonths);
+      const price    = PRICE[planName]; // 3개월/6개월 가격
+      // merchant_uid가 없을 수 있으므로 imp_uid에서 서버가 조회 가능하지만,
+      // 서버가 꼭 요구한다면 쿼리에서 받은 merchant_uid도 같이 보냅니다.
+      payload = {
+        imp_uid,
+        merchant_uid: merchant_uid || null,
+        user_id,
+        termMonths,
+        price,
+        ...(productId ? { productId } : {})
+      };
     }
-  })();
-  </script>
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok) {
+      msg.className = 'ok';
+      msg.textContent = '✅ 결제가 완료되었습니다. 구독이 갱신되었어요!';
+      setTimeout(() => {
+        try { window.opener?.location?.reload(); } catch {}
+        location.replace('/');
+      }, 800);
+    } else {
+      msg.className = 'err';
+      // 서버에서 MISSING_PARAMS 세부 내용 주면 함께 노출
+      msg.textContent = '❌ 결제 확인 실패: ' + (data?.error || res.status) + (data?.detail ? (' / ' + JSON.stringify(data.detail)) : '');
+    }
+
+  } catch (e) {
+    msg.className = 'err';
+    msg.textContent = '❌ 처리 중 오류: ' + (e?.message || e);
+  }
+})();
+</script>
+
 </body>
 </html>
 

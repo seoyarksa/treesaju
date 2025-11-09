@@ -2,7 +2,7 @@
 
 
 // git add .
-// git commit -m "결제전환보정"   
+// git commit -m "정기구독 재결제"   
 // git push origin main
 // git push
 //강제실행   vercel --prod --force
