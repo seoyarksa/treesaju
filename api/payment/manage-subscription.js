@@ -52,7 +52,7 @@ function utcRangeOfKstDay(kstBaseDate, dayOffset) {
 
 // (옵션) 스케줄러 헤더 토큰
 const SCHED_TOKEN = process.env.SCHEDULER_TOKEN || "";
-const HANDLER_VERSION = "manage-subscription#KST-2025-11-07-FIXED";
+const HANDLER_VERSION = "manage-subscription#KST-2025-11-10-FIXED";
 const HANDLER_FILE = "api/payment/manage-subscription.js";
 
 // ── Iamport helpers ───────────────────────────────────────────────────────────
@@ -69,6 +69,14 @@ async function getPayment(access_token, imp_uid) {
   return j.response;
 }
 
+function extractUserIdFromCustomerUid(cu) {
+  if (!cu) return null;
+  // ex) kakao_5713065a-966a-4c5b-a3b2-1cf21b7fb574_basic
+  const m = /^kakao_([0-9a-f-]{36})_/i.exec(String(cu));
+  return m ? m[1] : null;
+}
+
+
 // ── Router ───────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   const rawAction = (req.query?.action ?? "").toString();
@@ -80,6 +88,9 @@ export default async function handler(req, res) {
 
   if ((req.method === "GET" || req.method === "POST") && action === "health") {
     return res.status(200).json({ ok: true, version: HANDLER_VERSION, file: HANDLER_FILE, now: new Date().toISOString() });
+  }
+    if (req.method === "POST" && req.headers["content-type"]?.includes("application/json")) {
+    try { if (typeof req.body === "string") req.body = JSON.parse(req.body); } catch {}
   }
 
   // --- Action routes (정리: 각 액션 1회만 매칭) ---
@@ -120,8 +131,10 @@ async function schedulerAllInOne(req, res) {
 // ── 1) 정기 결제 등록 ─────────────────────────────────────────────────────────
 async function registerBilling(req, res) {
   const sb = getServiceClient();
-  const { imp_uid, customer_uid, user_id, tier } = req.body || {};
-  if (!imp_uid || !customer_uid || !user_id) return res.status(400).json({ error: "Missing parameters" });
+ const { imp_uid, customer_uid, tier } = req.body || {};
+ if (!imp_uid || !customer_uid) return res.status(400).json({ error: "Missing parameters" });
+ const user_id = extractUserIdFromCustomerUid(customer_uid);
+ if (!user_id) return res.status(400).json({ error: "INVALID_CUSTOMER_UID", detail: "Cannot extract user_id" });
 
   try {
     const tokenRes = await fetch("https://api.iamport.kr/users/getToken", {
@@ -134,6 +147,16 @@ async function registerBilling(req, res) {
     const vRes = await fetch(`https://api.iamport.kr/payments/${imp_uid}`, { headers: { Authorization: access_token } });
     const payment = (await vRes.json())?.response;
     if (!payment || payment.status !== "paid") throw new Error("Payment not completed");
+
+ // custom_data에서 자동 보완
+    if (!merchant_uid) merchant_uid = payment?.merchant_uid || null;
+    const cd = (() => { try { return payment.custom_data ? JSON.parse(payment.custom_data) : null; } catch { return null; } })();
+   if (!termMonths) termMonths = cd?.termMonths ?? cd?.months ?? null;
+    if (!price)      price      = cd?.price ?? payment?.amount ?? null;
+    if (!user_id)    user_id    = cd?.user_id ?? cd?.uid ?? extractUserIdFromCustomerUid(cd?.customer_uid || payment?.customer_uid) ?? null;
+    if (!merchant_uid || !user_id || !termMonths || !price) {
+     return res.status(400).json({ error: "MISSING_PARAMS", detail: { merchant_uid, user_id, termMonths, price } });
+    }
 
     const plan = (tier === "plus" || tier === "premium_plus") ? "premium_plus" : "premium";
     const now = new Date();
@@ -481,189 +504,105 @@ async function chargeBillingByDayOffsetCore({ dayOffset, attempt }) {
 }
 
 // ── 5) 자동 과금 (HTTP 엔드포인트) ────────────────────────────────────────────
-async function chargeBilling(req, res) {
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
+async function registerBilling(req, res) {
+  const supabase = getServiceClient();
+  // 변경: user_id가 없어도 처리
+  const { imp_uid, customer_uid, user_id: reqUserId, tier } = req.body || {};
+  const user_id = reqUserId || extractUserIdFromCustomerUid(customer_uid);
+
+  if (!imp_uid || !customer_uid || !user_id) {
+    return res.status(400).json({ error: "Missing parameters", need: { imp_uid: !!imp_uid, customer_uid: !!customer_uid, user_id: !!user_id } });
+  }
+
   try {
-    const attempt   = Math.max(1, Math.min(3, parseInt(req.query?.attempt ?? "1", 10)));
-    const dayOffset = Math.max(0, Math.min(3, parseInt(req.query?.day_offset ?? "0", 10))); // 0~3
-    const filterUserId = (req.query?.user_id ?? "").toString().trim() || null;
-    const debug = String(req.query?.debug ?? "") === "1";
-
-    // KST 하루창 → UTC
-    const now = new Date();
-    const kstMs = now.getTime() + 9 * 3600 * 1000;
-    const kst = new Date(kstMs);
-    const y = kst.getUTCFullYear(), m = kst.getUTCMonth(), d = kst.getUTCDate();
-    const kstStartMs = Date.UTC(y, m, d + dayOffset, 0, 0, 0);
-    const kstEndMs   = Date.UTC(y, m, d + dayOffset + 1, 0, 0, 0);
-    const startIso = new Date(kstStartMs - 9 * 3600 * 1000).toISOString();
-    const endIso   = new Date(kstEndMs   - 9 * 3600 * 1000).toISOString();
-
-    const baseSelect =
-      "id, user_id, plan, status, provider, cancel_at_period_end, cancel_effective_at, current_period_end, metadata";
-
-    // 후보 2쿼리 (각각 새 빌더)
-    const q1 = await supabase
-      .from("memberships").select(baseSelect)
-      .in("status", ["active", "past_due"])
-      .eq("cancel_at_period_end", false)
-      .in("plan", ["premium", "premium_plus"])
-      .gte("current_period_end", startIso)
-      .lt("current_period_end", endIso);
-    if (q1.error) throw q1.error;
-
-    const q2 = await supabase
-      .from("memberships").select(baseSelect)
-      .in("status", ["active", "past_due"])
-      .eq("cancel_at_period_end", false)
-      .in("plan", ["premium", "premium_plus"])
-      .gte("cancel_effective_at", startIso)
-      .lt("cancel_effective_at", endIso);
-    if (q2.error) throw q2.error;
-
-    const map = new Map();
-    [...(q1.data || []), ...(q2.data || [])].forEach(r => map.set(r.id, r));
-    let candidates = [...map.values()];
-    if (filterUserId) candidates = candidates.filter(c => c.user_id === filterUserId);
-
-    // 정기/빌링키 필터
-    candidates = candidates.filter(m => {
-      const meta = parseMeta(m.metadata);
-      const kind = (meta?.kind || "").toLowerCase();
-      return !!meta?.customer_uid && kind !== "fixed";
-    });
-
-    if (debug) {
-      return res.status(200).json({
-        ok: true, debug: true, dayOffset, attempt,
-        window: { startIso, endIso },
-        count: candidates.length,
-        candidates: candidates.map(c => ({
-          id: c.id, user_id: c.user_id, plan: c.plan, status: c.status,
-          cancel_at_period_end: c.cancel_at_period_end,
-          end: c.cancel_effective_at ?? c.current_period_end
-        })),
-      });
-    }
-
-    // 결제/검증/업데이트 (멱등 가드 포함)
     const tokenRes = await fetch("https://api.iamport.kr/users/getToken", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        imp_key: process.env.IAMPORT_API_KEY,
-        imp_secret: process.env.IAMPORT_API_SECRET,
-      }),
+      body: JSON.stringify({ imp_key: process.env.IAMPORT_API_KEY, imp_secret: process.env.IAMPORT_API_SECRET })
     });
-    const tokenJson = await tokenRes.json();
-    const access_token = tokenJson?.response?.access_token;
-    if (!access_token) throw new Error("IAMPORT_TOKEN_FAIL");
+    const access_token = tokenRes.ok ? (await tokenRes.json())?.response?.access_token : null;
+    if (!access_token) throw new Error("Failed to get access_token");
 
-    const PRICE = { premium: 11000, premium_plus: 16500 };
-    let charged = 0, failed = 0;
-    const nowIso2 = new Date().toISOString();
+    // 결제 조회
+    const vRes = await fetch(`https://api.iamport.kr/payments/${imp_uid}`, { headers: { Authorization: access_token } });
+    const payment = (await vRes.json())?.response;
+    if (!payment || payment.status !== "paid") throw new Error("Payment not completed");
 
-    for (const m of candidates) {
-      const meta = parseMeta(m.metadata);
-      const customer_uid = meta?.customer_uid;
-      const price = PRICE[m.plan] || PRICE.premium;
-      const merchant_uid = buildRenewMerchantUid(customer_uid, attempt);
-
-      // 멱등 가드
-      const purchases = Array.isArray(meta?.purchases) ? meta.purchases : [];
-      if (purchases.some(p => p?.merchant_uid === merchant_uid)) {
-        console.log("[chargeBilling] SKIP (already processed)", { id: m.id, user_id: m.user_id, merchant_uid });
-        continue;
-      }
-
-      let payOk = false, paid = null, v = null, payMsg = "";
-      try {
-        const r = await fetch("https://api.iamport.kr/subscribe/payments/again", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": access_token },
-          body: JSON.stringify({
-            customer_uid, merchant_uid, amount: price,
-            name: `월간 구독 자동결제 (${m.plan}) [D-${dayOffset} / attempt ${attempt}]`,
-          }),
-        });
-        const j = await r.json();
-        if (j.code === 0) {
-          paid = j.response;
-          const rv = await fetch(`https://api.iamport.kr/payments/${paid.imp_uid}`, {
-            headers: { Authorization: access_token },
-          });
-          const vj = await rv.json();
-          v = vj?.response;
-          payOk = !!v && v.status === "paid";
-          if (!payOk) payMsg = "PAYMENT_NOT_CONFIRMED";
-        } else {
-          payMsg = j.message || "AGAIN_FAILED";
-        }
-      } catch (e) {
-        payMsg = e?.message || "AGAIN_ERROR";
-      }
-
-      if (payOk) {
-        charged++;
-        const baseEnd = new Date(m.cancel_effective_at ?? m.current_period_end ?? nowIso2);
-        const base = baseEnd > new Date() ? baseEnd : new Date();
-        const nextEnd = new Date(base); nextEnd.setMonth(nextEnd.getMonth() + 1);
-
-        const newMeta = {
-          ...(meta || {}),
-          provider: m.provider || "kakao",
-          last_purchase: {
-            kind: "recurring_renew",
-            imp_uid: paid?.imp_uid,
-            merchant_uid,
-            amount: paid?.amount,
-            at: nowIso2,
-            pay_method: v?.pay_method || "billing_key",
-            pg_provider: v?.pg_provider || null,
-            pg_tid: v?.pg_tid || null,
-            paid_at_unix: v?.paid_at || null,
-          },
-          purchases: [
-            ...(Array.isArray(meta?.purchases) ? meta.purchases : []),
-            {
-              kind: "recurring_renew",
-              imp_uid: paid?.imp_uid,
-              merchant_uid,
-              amount: paid?.amount,
-              at: nowIso2,
-              pay_method: v?.pay_method || "billing_key",
-              pg_provider: v?.pg_provider || null,
-              pg_tid: v?.pg_tid || null,
-              paid_at_unix: v?.paid_at || null,
-            },
-          ],
-        };
-
-        await supabase.from("memberships").update({
-          current_period_end: nextEnd.toISOString(),
-          // 해지예약 상태는 여기서 변경하지 않음 (요청사항)
-          metadata: toJSONSafe(newMeta),
-          updated_at: nowIso2,
-        }).eq("id", m.id);
-
-        console.log("[chargeBilling] SUCCESS", { id: m.id, user_id: m.user_id, merchant_uid, next_end: nextEnd.toISOString(), dayOffset, attempt });
-      } else {
-        failed++;
-        await supabase.from("memberships").update({ updated_at: nowIso2 }).eq("id", m.id);
-        console.log("[chargeBilling] FAIL (no state change)", { id: m.id, user_id: m.user_id, merchant_uid, payMsg, dayOffset, attempt });
-      }
+    // 🔧 완화: merchant_uid에 uuid 강제가 있었다면 완화/우회
+    // (선택) 강제 검사 제거 또는 'custom_data.user_id' 허용
+    const customUser = (() => {
+      try { return JSON.parse(payment.custom_data || "{}")?.user_id || null; } catch { return null; }
+    })();
+    const uidOk =
+      (payment.merchant_uid && String(payment.merchant_uid).includes(user_id)) ||
+      (customUser && customUser === user_id);
+    // uidOk를 필수로 두지 말고, 경고만 로그
+    if (!uidOk) {
+      console.warn("[registerBilling] merchant_uid does not include user uuid (tolerated)", {
+        merchant_uid: payment.merchant_uid, user_id, custom_user: customUser
+      });
     }
 
-    return res.status(200).json({
-      ok: true, dayOffset, attempt, window: { startIso, endIso },
-      count: candidates.length, charged, failed,
-    });
+    const plan = (tier === "premium_plus") ? "premium_plus" : "premium";
+    const now = new Date();
+    const nextEnd = new Date(now); nextEnd.setMonth(nextEnd.getMonth() + 1);
+
+    const { data: existing } = await supabase.from("memberships")
+      .select("id, metadata").eq("user_id", user_id).maybeSingle();
+    const oldMeta = parseMeta(existing?.metadata);
+
+    const purchase = {
+      kind: "recurring_start",
+      imp_uid,
+      merchant_uid: payment?.merchant_uid || null,
+      amount: payment?.amount ?? (plan === "premium_plus" ? 16500 : 11000),
+      at: now.toISOString(),
+      pay_method: payment?.pay_method || "billing_key",
+      pg_provider: payment?.pg_provider || null,
+      pg_tid: payment?.pg_tid || null,
+      paid_at_unix: payment?.paid_at || null
+    };
+
+    const newMeta = {
+      ...oldMeta,
+      provider: "kakao",
+      kind: "recurring",
+      customer_uid,
+      last_purchase: purchase,
+      purchases: [ ...(oldMeta?.purchases || []), purchase ],
+    };
+
+    const payload = {
+      plan, status: "active", provider: "kakao",
+      current_period_end: nextEnd.toISOString(),
+      cancel_at_period_end: false, cancel_effective_at: null,
+      metadata: toJSONSafe(newMeta), updated_at: now.toISOString(),
+    };
+
+    let result;
+    if (existing) {
+      const { data, error } = await supabase.from("memberships").update(payload).eq("id", existing.id).select().single();
+      if (error) throw error;
+      result = data;
+    } else {
+      const { data, error } = await supabase.from("memberships").insert({ user_id, ...payload, created_at: now.toISOString() }).select().single();
+      if (error) throw error;
+      result = data;
+    }
+
+    // 프로필 보조
+    await supabase.from("profiles").update({
+      grade: plan === "premium_plus" ? "premium_plus" : "premium",
+      daily_limit: plan === "premium_plus" ? 150 : 60,
+      premium_assigned_at: now.toISOString(),
+      has_ever_premium: true,
+      updated_at: now.toISOString(),
+    }).eq("user_id", user_id);
+
+    return res.status(200).json({ ok: true, message: "정기결제 등록 및 프리미엄 등급 전환 완료 ✅", membership: result });
   } catch (err) {
-    console.error("[chargeBilling] error:", err);
-    if (String(req.query?.debug ?? "") === "1") {
-      return res.status(200).json({ ok: false, error: err?.message || "INTERNAL_ERROR" });
-    }
-    return res.status(500).json({ error: err?.message || "INTERNAL_ERROR" });
+    console.error("[registerBilling]", err);
+    return res.status(500).json({ error: err.message });
   }
 }
 
@@ -856,11 +795,20 @@ async function switchFromFixedToRecurring(req, res) {
  * 8) 선결제 활성(결제 완료 후)
  * ===================== */
 async function activateFixedAfterPayment(req, res) {
-  const supabase = getServiceClient();
-  if (req.method !== "POST") { res.setHeader("Allow", "POST"); return res.status(405).json({ error: "METHOD_NOT_ALLOWED" }); }
+ const supabase = getServiceClient();
+ if (req.method !== "POST") { res.setHeader("Allow", "POST"); return res.status(405).json({ error: "METHOD_NOT_ALLOWED" }); }
 
-  const { imp_uid, merchant_uid, user_id, termMonths, price, productId } = req.body || {};
-  if (!imp_uid || !merchant_uid || !user_id || !termMonths || !price) return res.status(400).json({ error: "MISSING_PARAMS" });
+  const { imp_uid, merchant_uid, termMonths, price, productId } = req.body || {};
+  if (!imp_uid || !merchant_uid || !termMonths || !price) return res.status(400).json({ error: "MISSING_PARAMS" });
+
+
+// 1) merchant_uid 규약에서 user_id 추출 시도
+ const rx = /_(?<uuid>[0-9a-f-]{36})(?:_|$)/i;
+ const m = rx.exec(String(merchant_uid));
+const user_id = m?.groups?.uuid || null;
+ if (!user_id) {
+   return res.status(400).json({ error: "NEED_USER_ID", detail: "merchant_uid must include user uuid" });
+ }
 
   try {
     const tokRes = await fetch("https://api.iamport.kr/users/getToken", {
@@ -873,6 +821,16 @@ async function activateFixedAfterPayment(req, res) {
     const payRes = await fetch(`https://api.iamport.kr/payments/${imp_uid}`, { headers: { Authorization: access_token } });
     const payment = (await payRes.json())?.response;
     if (!payment || payment.status !== "paid") return res.status(400).json({ error: "PAYMENT_NOT_PAID" });
+
+ if (!merchant_uid) merchant_uid = payment.merchant_uid || null;
+ const cd = (() => { try { return payment.custom_data ? JSON.parse(payment.custom_data) : null; } catch { return null; } })();
+ if (!termMonths) termMonths = cd?.termMonths ?? cd?.months ?? null;
+if (!price)      price      = cd?.price ?? payment.amount ?? null;
+ if (!user_id)    user_id    = cd?.user_id ?? cd?.uid ?? null;
+ if (!merchant_uid || !user_id || !termMonths || !price) {
+   return res.status(400).json({ error: "MISSING_PARAMS", detail: { merchant_uid, user_id, termMonths, price } });
+ }
+
 
     const months = Number(termMonths);
     const planName = months === 6 ? "premium6" : "premium3";

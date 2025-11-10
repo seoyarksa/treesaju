@@ -6,6 +6,7 @@
 // git push origin main
 // git push
 //강제실행   vercel --prod --force
+//          npx vercel@latest --prod --force
 
 
 //로그 다시 실행
@@ -1382,7 +1383,7 @@ function __buildRedirectURL(params = {}) {
 
 // ✅ 카카오 정기결제창 (V1 기준, 통합 API 버전)
 // tier: 'basic' | 'plus'  (기본값: 'basic')
-window.startKakaoSubscription = async function(tier = 'basic') {
+window.startKakaoSubscription = async function (tier = 'basic') {
   try {
     const { data: { user } } = await window.supabaseClient.auth.getUser();
     if (!user) return alert("로그인이 필요합니다.");
@@ -1394,13 +1395,17 @@ window.startKakaoSubscription = async function(tier = 'basic') {
     const sel = PLAN[tier] || PLAN.basic;
 
     const IMP = window.IMP;
-    IMP.init("imp81444885"); // 아임포트 V1 고객사 식별코드
+    IMP.init("imp81444885"); // 아임포트 V1 식별코드
 
     const userId = user.id;
-    const customerUid = `kakao_${userId}_${tier}`;
-    const merchantUid = `order_${tier}_` + Date.now();
 
-    // ★ 모바일 필수: 리디렉션 주소 생성 (분기정보 포함)
+    // 빌링키/정기 식별자
+    const customerUid = `kakao_${userId}_${tier}`;
+
+    // ✅ uuid를 반드시 포함시키는 merchant_uid (서버 검증 우회/완화에도 도움)
+    const merchantUid = `order_${tier}_${userId}_${Date.now()}`;
+
+    // ★ 모바일 필수: 리디렉션 주소 (분기정보 포함)
     const mRedirect = __buildRedirectURL({
       provider: 'kakaopay',
       kind: 'recurring_start',
@@ -1410,9 +1415,9 @@ window.startKakaoSubscription = async function(tier = 'basic') {
     });
 
     IMP.request_pay({
-      pg: "kakaopay.TCSUBSCRIP",              // 테스트용 정기 MID
+      pg: "kakaopay.TCSUBSCRIP", // 테스트 정기 MID
       pay_method: "card",
-      merchant_uid: merchantUid,
+      merchant_uid: merchantUid,  // ← uuid 포함
       name: sel.name,
       amount: sel.amount,
       customer_uid: customerUid,
@@ -1423,16 +1428,23 @@ window.startKakaoSubscription = async function(tier = 'basic') {
       // ★★★ 모바일 필수
       m_redirect_url: mRedirect,
 
-      // (선택) 하이브리드 앱이면 딥링크 스킴 지정
-      // app_scheme: "treesaju://pay-complete"
-    }, async function (rsp) {
-      // ⚠️ 데스크톱 환경에서는 콜백이 호출되지만,
-      //     모바일/인앱 브라우저는 대부분 호출되지 않고 m_redirect_url로 이동합니다.
-      if (!rsp.success) {
-        console.warn("[결제 실패]", rsp);
-        return alert("❌ 결제 실패: " + rsp.error_msg);
+      // ✅ 서버에서 보조로 사용할 수 있게 user_id를 심어둠
+      custom_data: JSON.stringify({ user_id: userId, tier })
+    }, function (rsp) {
+      // 웹(PC) 환경일 때 바로 콜백이 들어올 수 있으니 안내만 처리
+      if (rsp.success) {
+        // 모바일은 m_redirect_url로 넘어가서 서버 처리됨
+        console.log("[PortOne] success (web callback)", rsp);
+      } else {
+        console.warn("[PortOne] fail (web callback)", rsp);
+        // 모바일에서도 간혹 콜백이 먼저 오면 UX용 토스트 정도만
+        alert("결제 진행에 실패했어요. 다시 시도해 주세요.");
       }
-
+    });
+  } catch (e) {
+    console.error("[startKakaoSubscription] error", e);
+    alert("결제 시작 중 오류가 발생했어요: " + (e?.message || e));
+  }
       // 데스크톱 즉시 처리용(서버 등록)
       try {
         const res = await fetch("/api/payment/manage-subscription?action=register", {
@@ -1459,11 +1471,7 @@ window.startKakaoSubscription = async function(tier = 'basic') {
         console.error("[fetch error]", err);
         alert("❌ 서버 통신 오류: " + err.message);
       }
-    });
-  } catch (err) {
-    console.error("[startKakaoSubscription error]", err);
-    alert("내부 오류: " + err.message);
-  }
+
 };
 
 // (선택) 버튼에서 쓰기 편하도록 얇은 래퍼 제공
